@@ -1,0 +1,22 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    function myProfile() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+    function canReadOtherUser(targetUserId) {
+      let me = myProfile();
+      return request.auth.uid != targetUserId && me != null
+        && (me.role == 'superAdmin'
+            || (me.role == 'jefe' && resource.data.createdBy == request.auth.uid)
+            || (me.role == 'admin' && resource.data.createdBy == request.auth.uid));
+    }
+    match /users/{userId} {
+      allow read: if isSignedIn() && (request.auth.uid == userId || canReadOtherUser(userId));
+      allow write: if false;
+    }
+  }
+}
