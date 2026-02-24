@@ -72,3 +72,14 @@ Para que el login funcione en tu URL de Vercel:
 2. Añade el dominio de Vercel, por ejemplo: `kredi-app-xxx.vercel.app` (o tu dominio propio si lo configuras después).
 
 Si no añades el dominio, Firebase puede bloquear el inicio de sesión en producción.
+
+---
+
+## 6. Si sale "No Output Directory named 'public'"
+
+Este proyecto es **Next.js**, no un sitio estático. Next.js genera la salida en `.next`, no en `public`.
+
+1. En Vercel: **Project Settings** (Configuración del proyecto) → **Build & Development Settings**.
+2. En **Output Directory** déjalo **vacío** (no pongas `public`).
+3. **Framework Preset** debe ser **Next.js**.
+4. Guarda y haz **Redeploy**.
