@@ -32,6 +32,7 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 const PROFILE_COLLECTION = "users";
 
 async function fetchUserProfile(uid: string): Promise<UserProfile | null> {
+  if (!db) return null;
   const ref = doc(db, PROFILE_COLLECTION, uid);
   const snap = await getDoc(ref);
   if (!snap.exists()) return null;
@@ -57,6 +58,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   });
 
   useEffect(() => {
+    if (!auth) {
+      setState((s) => ({ ...s, loading: false }));
+      return;
+    }
     const unsub = onAuthStateChanged(auth, async (user) => {
       if (!user) {
         setState({ user: null, profile: null, loading: false, error: null });
@@ -73,6 +78,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const signIn = async (email: string, password: string) => {
+    if (!auth) throw new Error("Firebase no está configurado. Revisa las variables de entorno.");
     setState((s) => ({ ...s, error: null }));
     try {
       await signInWithEmailAndPassword(auth, email, password);
@@ -84,7 +90,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signOut = async () => {
-    await firebaseSignOut(auth);
+    if (auth) await firebaseSignOut(auth);
     setState({ user: null, profile: null, loading: false, error: null });
   };
 

@@ -56,6 +56,7 @@ export async function listUsersByCreator(
   createdByUid: string,
   role?: Role
 ): Promise<UserProfile[]> {
+  if (!db) return [];
   let q = query(
     collection(db, USERS_COLLECTION),
     where("createdBy", "==", createdByUid)
@@ -83,6 +84,7 @@ export async function listUsersByCreator(
  * Lista todos los jefes (para superAdmin).
  */
 export async function listAllJefes(): Promise<UserProfile[]> {
+  if (!db) return [];
   const q = query(
     collection(db, USERS_COLLECTION),
     where("role", "==", "jefe")

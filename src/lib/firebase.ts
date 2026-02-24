@@ -11,18 +11,25 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
-let app: FirebaseApp;
-let auth: Auth;
-let db: Firestore;
+/** Solo inicializamos Firebase cuando hay API key (evita auth/invalid-api-key en build de Vercel). */
+const hasConfig =
+  typeof process.env.NEXT_PUBLIC_FIREBASE_API_KEY === "string" &&
+  process.env.NEXT_PUBLIC_FIREBASE_API_KEY.length > 0;
 
-if (getApps().length === 0) {
-  app = initializeApp(firebaseConfig);
-  auth = getAuth(app);
-  db = getFirestore(app);
-} else {
-  app = getApps()[0] as FirebaseApp;
-  auth = getAuth(app);
-  db = getFirestore(app);
+let app: FirebaseApp | null = null;
+let auth: Auth | null = null;
+let db: Firestore | null = null;
+
+if (hasConfig) {
+  if (getApps().length === 0) {
+    app = initializeApp(firebaseConfig);
+    auth = getAuth(app);
+    db = getFirestore(app);
+  } else {
+    app = getApps()[0] as FirebaseApp;
+    auth = getAuth(app);
+    db = getFirestore(app);
+  }
 }
 
 export { app, auth, db };
