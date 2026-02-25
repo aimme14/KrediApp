@@ -76,15 +76,17 @@ export default function SuperAdminDashboard() {
 
   return (
     <>
-      <div className="card flex justify-between items-center">
-        <h2 style={{ margin: 0 }}>Panel Super Administrador</h2>
-        <button
-          type="button"
-          className="btn btn-primary"
-          onClick={() => setShowForm((v) => !v)}
-        >
-          {showForm ? "Cancelar" : "Crear jefe"}
-        </button>
+      <div className="card">
+        <div className="card-header-row">
+          <h2>Panel Super Administrador</h2>
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={() => setShowForm((v) => !v)}
+          >
+            {showForm ? "Cancelar" : "Crear jefe"}
+          </button>
+        </div>
       </div>
 
       {showForm && (
@@ -143,7 +145,7 @@ export default function SuperAdminDashboard() {
             <tbody>
               {jefes.length === 0 ? (
                 <tr>
-                  <td colSpan={4} style={{ color: "#a1a1aa" }}>
+                  <td colSpan={4} style={{ color: "var(--text-muted)" }}>
                     No hay jefes. Crea uno con el botón &quot;Crear jefe&quot;.
                   </td>
                 </tr>

@@ -62,15 +62,17 @@ export default function AdminDashboard() {
 
   return (
     <>
-      <div className="card flex justify-between items-center">
-        <h2 style={{ margin: 0 }}>Panel Administrador</h2>
-        <button
-          type="button"
-          className="btn btn-primary"
-          onClick={() => setShowForm((v) => !v)}
-        >
-          {showForm ? "Cancelar" : "Crear trabajador"}
-        </button>
+      <div className="card">
+        <div className="card-header-row">
+          <h2>Panel Administrador</h2>
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={() => setShowForm((v) => !v)}
+          >
+            {showForm ? "Cancelar" : "Crear trabajador"}
+          </button>
+        </div>
       </div>
 
       {showForm && (
@@ -127,7 +129,7 @@ export default function AdminDashboard() {
             <tbody>
               {trabajadores.length === 0 ? (
                 <tr>
-                  <td colSpan={2} style={{ color: "#a1a1aa" }}>
+                  <td colSpan={2} style={{ color: "var(--text-muted)" }}>
                     No hay trabajadores. Crea uno con el botón &quot;Crear trabajador&quot;.
                   </td>
                 </tr>

@@ -62,15 +62,17 @@ export default function JefeDashboard() {
 
   return (
     <>
-      <div className="card flex justify-between items-center">
-        <h2 style={{ margin: 0 }}>Panel Jefe</h2>
-        <button
-          type="button"
-          className="btn btn-primary"
-          onClick={() => setShowForm((v) => !v)}
-        >
-          {showForm ? "Cancelar" : "Crear administrador"}
-        </button>
+      <div className="card">
+        <div className="card-header-row">
+          <h2>Panel Jefe</h2>
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={() => setShowForm((v) => !v)}
+          >
+            {showForm ? "Cancelar" : "Crear administrador"}
+          </button>
+        </div>
       </div>
 
       {showForm && (
@@ -127,7 +129,7 @@ export default function JefeDashboard() {
             <tbody>
               {admins.length === 0 ? (
                 <tr>
-                  <td colSpan={2} style={{ color: "#a1a1aa" }}>
+                  <td colSpan={2} style={{ color: "var(--text-muted)" }}>
                     No hay administradores. Crea uno con el botón &quot;Crear administrador&quot;.
                   </td>
                 </tr>

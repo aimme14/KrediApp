@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import ThemeToggle from "@/components/ThemeToggle";
 
 export default function SetupSuperAdminPage() {
   const [status, setStatus] = useState<"loading" | "available" | "unavailable" | "error">("loading");
@@ -72,7 +73,10 @@ export default function SetupSuperAdminPage() {
 
   if (status === "loading") {
     return (
-      <div className="container" style={{ paddingTop: "4rem", textAlign: "center" }}>
+      <div className="container" style={{ paddingTop: "4rem", textAlign: "center", position: "relative" }}>
+        <div style={{ position: "absolute", top: "1rem", right: "1.5rem" }}>
+          <ThemeToggle />
+        </div>
         <p>Cargando...</p>
       </div>
     );
@@ -80,11 +84,14 @@ export default function SetupSuperAdminPage() {
 
   if (status === "error") {
     return (
-      <div className="container" style={{ paddingTop: "4rem" }}>
+      <div className="container" style={{ paddingTop: "4rem", position: "relative" }}>
+        <div style={{ position: "absolute", top: "1rem", right: "1.5rem" }}>
+          <ThemeToggle />
+        </div>
         <div className="card" style={{ maxWidth: 400, margin: "0 auto" }}>
-          <h1 style={{ marginTop: 0 }}>Configuración inicial</h1>
+          <h1 className="page-title">Configuración inicial</h1>
           <p className="error-msg">{serverError || "No se pudo comprobar el estado."}</p>
-          <p style={{ fontSize: "0.875rem", color: "#a1a1aa", marginTop: "0.5rem" }}>
+          <p style={{ fontSize: "0.875rem", color: "var(--text-muted)", marginTop: "0.5rem" }}>
             Comprueba que en la raíz del proyecto exista <code>.env.local</code> con
             FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL y FIREBASE_PRIVATE_KEY. Reinicia el servidor (<code>npm run dev</code>) después de cambiar las variables.
           </p>
@@ -98,10 +105,13 @@ export default function SetupSuperAdminPage() {
 
   if (status === "unavailable") {
     return (
-      <div className="container" style={{ paddingTop: "4rem" }}>
+      <div className="container" style={{ paddingTop: "4rem", position: "relative" }}>
+        <div style={{ position: "absolute", top: "1rem", right: "1.5rem" }}>
+          <ThemeToggle />
+        </div>
         <div className="card" style={{ maxWidth: 400, margin: "0 auto" }}>
-          <h1 style={{ marginTop: 0 }}>Configuración inicial</h1>
-          <p style={{ color: "#a1a1aa", marginBottom: "1.5rem" }}>
+          <h1 className="page-title">Configuración inicial</h1>
+          <p style={{ color: "var(--text-muted)", marginBottom: "1.5rem" }}>
             Ya existe un Super Administrador. Inicia sesión con tu cuenta.
           </p>
           <Link href="/" className="btn btn-primary">
@@ -114,9 +124,12 @@ export default function SetupSuperAdminPage() {
 
   if (success) {
     return (
-      <div className="container" style={{ paddingTop: "4rem" }}>
+      <div className="container" style={{ paddingTop: "4rem", position: "relative" }}>
+        <div style={{ position: "absolute", top: "1rem", right: "1.5rem" }}>
+          <ThemeToggle />
+        </div>
         <div className="card" style={{ maxWidth: 400, margin: "0 auto" }}>
-          <h1 style={{ marginTop: 0 }}>Super Admin creado</h1>
+          <h1 className="page-title">Super Admin creado</h1>
           <p style={{ color: "#86efac", marginBottom: "1.5rem" }}>
             La cuenta de Super Administrador se creó correctamente. Ya puedes iniciar sesión.
           </p>
@@ -129,10 +142,13 @@ export default function SetupSuperAdminPage() {
   }
 
   return (
-    <div className="container" style={{ paddingTop: "4rem" }}>
+    <div className="container" style={{ paddingTop: "4rem", position: "relative" }}>
+      <div style={{ position: "absolute", top: "1rem", right: "1.5rem" }}>
+        <ThemeToggle />
+      </div>
       <div className="card" style={{ maxWidth: 400, margin: "0 auto" }}>
-        <h1 style={{ marginTop: 0, marginBottom: "0.5rem" }}>Crear Super Administrador</h1>
-        <p style={{ color: "#a1a1aa", marginBottom: "1.5rem", fontSize: "0.95rem" }}>
+        <h1 className="page-title" style={{ marginBottom: "0.5rem" }}>Crear Super Administrador</h1>
+        <p style={{ color: "var(--text-muted)", marginBottom: "1.5rem", fontSize: "0.95rem" }}>
           Primera vez: crea la cuenta que podrá gestionar jefes y la aplicación.
         </p>
         <form onSubmit={handleSubmit}>

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { roleLabel } from "@/types/roles";
+import ThemeToggle from "@/components/ThemeToggle";
 
 export default function DashboardLayout({
   children,
@@ -35,17 +36,20 @@ export default function DashboardLayout({
 
   return (
     <div className="container" style={{ paddingTop: "1rem" }}>
-      <header className="flex justify-between items-center mb-2" style={{ marginBottom: "1.5rem" }}>
-        <div className="flex items-center gap-2">
-          <Link href="/dashboard" style={{ fontWeight: 600, color: "#e4e4e7" }}>
+      <header className="dashboard-header">
+        <div className="header-left">
+          <Link href="/dashboard" style={{ fontWeight: 600, color: "var(--text)" }}>
             KrediApp
           </Link>
           <span className={`badge badge-${profile.role}`} style={{ textTransform: "capitalize" }}>
             {roleLabel(profile.role)}
           </span>
         </div>
-        <div className="flex items-center gap-2">
-          <span style={{ color: "#a1a1aa", fontSize: "0.875rem" }}>{profile.email}</span>
+        <div className="header-right">
+          <ThemeToggle />
+          <span style={{ color: "var(--text-muted)", fontSize: "0.875rem", wordBreak: "break-all" }}>
+            {profile.email}
+          </span>
           <button type="button" className="btn btn-secondary" onClick={() => signOut()}>
             Cerrar sesión
           </button>

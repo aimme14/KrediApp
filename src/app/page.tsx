@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 import LoginForm from "@/components/LoginForm";
+import ThemeToggle from "@/components/ThemeToggle";
 
 function LoginFormSignOut() {
   const { signOut } = useAuth();
@@ -30,7 +31,10 @@ export default function HomePage() {
 
   if (loading) {
     return (
-      <div className="container" style={{ paddingTop: "4rem", textAlign: "center" }}>
+      <div className="container" style={{ paddingTop: "4rem", textAlign: "center", position: "relative" }}>
+        <div style={{ position: "absolute", top: "1rem", right: "1.5rem" }}>
+          <ThemeToggle />
+        </div>
         <p>Cargando...</p>
       </div>
     );
@@ -38,7 +42,10 @@ export default function HomePage() {
 
   if (user && profile) {
     return (
-      <div className="container" style={{ paddingTop: "4rem", textAlign: "center" }}>
+      <div className="container" style={{ paddingTop: "4rem", textAlign: "center", position: "relative" }}>
+        <div style={{ position: "absolute", top: "1rem", right: "1.5rem" }}>
+          <ThemeToggle />
+        </div>
         <p>Redirigiendo al panel...</p>
       </div>
     );
@@ -47,9 +54,12 @@ export default function HomePage() {
   // Usuario autenticado pero sin perfil en Firestore (no puede entrar al panel)
   if (user && !profile) {
     return (
-      <div className="container" style={{ paddingTop: "4rem" }}>
+      <div className="container" style={{ paddingTop: "4rem", position: "relative" }}>
+        <div style={{ position: "absolute", top: "1rem", right: "1.5rem" }}>
+          <ThemeToggle />
+        </div>
         <div className="card" style={{ maxWidth: 400, margin: "0 auto" }}>
-          <h1 style={{ marginTop: 0, marginBottom: "1rem" }}>KrediApp</h1>
+          <h1 className="page-title">KrediApp</h1>
           <p className="error-msg" style={{ marginBottom: "1rem" }}>
             Tu cuenta no tiene un perfil asignado en la aplicación. Contacta al Super Administrador o al responsable para que te den de alta.
           </p>
@@ -60,10 +70,13 @@ export default function HomePage() {
   }
 
   return (
-    <div className="container" style={{ paddingTop: "4rem" }}>
+    <div className="container" style={{ paddingTop: "4rem", position: "relative" }}>
+      <div style={{ position: "absolute", top: "1rem", right: "1.5rem" }}>
+        <ThemeToggle />
+      </div>
       <div className="card" style={{ maxWidth: 400, margin: "0 auto" }}>
-        <h1 style={{ marginTop: 0, marginBottom: "1rem" }}>KrediApp</h1>
-        <p style={{ color: "#a1a1aa", marginBottom: "1.5rem" }}>
+        <h1 className="page-title">KrediApp</h1>
+        <p style={{ color: "var(--text-muted)", marginBottom: "1.5rem" }}>
           Inicia sesión con tu cuenta
         </p>
         <LoginForm />
