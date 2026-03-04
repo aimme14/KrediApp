@@ -1,6 +1,21 @@
 # Reglas de Firestore para KrediApp
 
-Cualquier usuario autenticado (Super Administrador, Jefe, Administrador o Trabajador) puede **leer** los datos almacenados. La **escritura** solo la hace el backend (API).
+Cualquier usuario autenticado puede **leer** los datos. La **escritura** solo la hace el backend (API).
+
+## Estructura de datos
+
+```
+/superAdmin/{uid}           - Super Administradores (fuera de empresas)
+/users/{uid}                - Índice de auth (empresaId, role, email...)
+/empresas/{empresaId}
+  ├── nombre, logo, dueño, sedePrincipal, fechaCreacion, activa, dueñoUid
+  ├── /usuarios/{usuarioId} - jefes, admins, empleados de la empresa
+  ├── /rutas/{rutaId}
+  ├── /clientes/{clienteId}
+  ├── /prestamos/{prestamoId}
+  │     └── /pagos/{pagoId}
+  └── /gastos/{gastoId}
+```
 
 ## Cómo aplicar las reglas en Firebase
 
@@ -10,26 +25,8 @@ Cualquier usuario autenticado (Super Administrador, Jefe, Administrador o Trabaj
 2. Selecciona tu proyecto (**krediapp-b9d26**).
 3. Menú izquierdo → **Firestore Database** (Base de datos).
 4. Arriba, pestaña **Reglas**.
-5. **Borra todo** lo que haya en el editor y pega **exactamente** las reglas de abajo (sin recortar nada).
+5. **Borra todo** lo que haya en el editor y pega **exactamente** las reglas del archivo `firestore.rules`.
 6. Pulsa **Publicar** (o **Publicar cambios**).
-
-### Reglas a copiar y pegar (copiar TODO el bloque)
-
-```
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    match /users/{userId} {
-      allow read: if request.auth != null;
-      allow write: if false;
-    }
-  }
-}
-```
-
-**Importante:**  
-- No cambies `request.auth.uid` por `request.au` ni recortes texto.  
-- Si tenías `myProfile()` devolviendo solo `get(...)` sin `.data`, estas reglas nuevas no usan esa función y evitan ese error.
 
 ### Opción 2: Con Firebase CLI
 
@@ -39,4 +36,20 @@ firebase deploy --only firestore:rules
 
 ---
 
-Después de publicar, recarga la página del panel (`/dashboard`). El mensaje "Missing or insufficient permissions" debería desaparecer y todos los roles podrán ver los datos almacenados.
+## Reglas de Storage (imágenes)
+
+Para subir imágenes (logos de empresa, avatares, etc.) a Firebase Storage:
+
+1. En Firebase Console → **Storage** (si no está activado, actívalo).
+2. Asegúrate de tener `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET` en `.env.local`.
+
+### Desplegar reglas con Firebase CLI
+
+```bash
+firebase deploy --only storage
+```
+
+Las reglas están en `storage.rules` y permiten:
+- **empresas/{jefeUid}/**: cada jefe solo escribe en su carpeta (logos).
+- **avatars/{userId}/**: cada usuario solo escribe en su carpeta.
+- **usuarios/{userId}/**: carpeta genérica por usuario.

@@ -1,0 +1,20 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Logos y recursos de empresas: cada jefe escribe solo en su carpeta
+    match /empresas/{jefeUid}/{allPaths=**} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == jefeUid;
+    }
+    // Avatares de usuarios: cada usuario escribe solo en su carpeta
+    match /avatars/{userId}/{allPaths=**} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+    // Carpeta genérica para documentos/imágenes por usuario
+    match /usuarios/{userId}/{allPaths=**} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+  }
+}

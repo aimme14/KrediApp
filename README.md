@@ -71,17 +71,25 @@ En Firebase Console > **Firestore** > **Reglas**, pega el contenido de `firestor
 
 ### 2.5 Primer Super Administrador
 
-El primer usuario con rol **Super Admin** se crea a mano:
+El primer usuario con rol **Super Admin** se crea a mano o con el script:
 
+**Opción A — Script (recomendado):**
+```bash
+$env:SETUP_EMAIL="super@tudominio.com"; $env:SETUP_PASSWORD="TuClave123"; npm run create-super-admin
+```
+
+**Opción B — Manual:**
 1. En **Authentication** > **Users** > **Add user**: crea un usuario con email y contraseña. Copia el **User UID**.
-2. En **Firestore** > **Start collection** > id de colección: `users`.
+2. En **Firestore** > **Start collection** > id de colección: `superAdmin`.
 3. **Add document** con ID = ese **User UID** y los campos:
 
    - `email` (string): el mismo correo del usuario.
    - `role` (string): `superAdmin`
    - `enabled` (boolean): `true`
-   - `createdBy` (string): `""` o el mismo UID.
+   - `createdBy` (string): `""`
    - `createdAt` (timestamp): fecha actual.
+   - `updatedAt` (timestamp): fecha actual.
+   - `emailVerified` (boolean): `true`
 
 Guarda. Ese usuario ya puede iniciar sesión y actuar como Super Admin (crear jefes, habilitar/deshabilitar).
 

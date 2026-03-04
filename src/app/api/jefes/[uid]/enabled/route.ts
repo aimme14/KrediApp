@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminFirestore } from "@/lib/firebase-admin";
-
-const USERS_COLLECTION = "users";
+import { SUPER_ADMIN_COLLECTION } from "@/types/superAdmin";
+import { EMPRESAS_COLLECTION, USUARIOS_SUBCOLLECTION, USERS_COLLECTION } from "@/lib/empresas-db";
 
 export async function PATCH(
   _request: NextRequest,
@@ -20,7 +20,7 @@ export async function PATCH(
     }
 
     const db = getAdminFirestore();
-    const superRef = db.collection(USERS_COLLECTION).doc(superAdminUid);
+    const superRef = db.collection(SUPER_ADMIN_COLLECTION).doc(superAdminUid);
     const superSnap = await superRef.get();
     if (!superSnap.exists || superSnap.data()?.role !== "superAdmin") {
       return NextResponse.json(
@@ -35,7 +35,25 @@ export async function PATCH(
       return NextResponse.json({ error: "El usuario no es un jefe" }, { status: 403 });
     }
 
-    await jefeRef.update({ enabled, updatedAt: new Date() });
+    const now = new Date();
+    await jefeRef.update({ enabled, updatedAt: now });
+
+    // Actualizar también en empresas/{jefeUid}/usuarios/{jefeUid} y empresa.activa
+    const usuarioRef = db
+      .collection(EMPRESAS_COLLECTION)
+      .doc(jefeUid)
+      .collection(USUARIOS_SUBCOLLECTION)
+      .doc(jefeUid);
+    const usuarioSnap = await usuarioRef.get();
+    if (usuarioSnap.exists) {
+      await usuarioRef.update({ activo: enabled });
+    }
+    const empRef = db.collection(EMPRESAS_COLLECTION).doc(jefeUid);
+    const empSnap = await empRef.get();
+    if (empSnap.exists) {
+      await empRef.update({ activa: enabled });
+    }
+
     return NextResponse.json({ ok: true });
   } catch (e) {
     const message = e instanceof Error ? e.message : "Error al actualizar";

@@ -418,3 +418,295 @@ th {
   width: 1.25rem;
   height: 1.25rem;
 }
+
+/* Panel Jefe: menú hamburguesa y drawer móvil */
+.jefe-wrapper {
+  position: relative;
+  min-height: 100%;
+}
+
+.jefe-nav-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  padding: 0.25rem 0;
+}
+
+.jefe-hamburger {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  border: none;
+  border-radius: 12px;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  color: #dc2626;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.15s;
+  flex-shrink: 0;
+}
+
+.jefe-hamburger:hover {
+  background: var(--btn-secondary-hover);
+}
+
+.jefe-hamburger[aria-expanded="true"] {
+  background: var(--btn-secondary-hover);
+}
+
+.jefe-hamburger-line {
+  display: block;
+  width: 22px;
+  height: 2.5px;
+  background: currentColor;
+  border-radius: 2px;
+  transition: transform 0.2s;
+}
+
+.jefe-hamburger-line:not(:last-child) {
+  margin-bottom: 5px;
+}
+
+.jefe-nav-title {
+  font-weight: 600;
+  font-size: 1.125rem;
+  color: var(--text);
+}
+
+.jefe-drawer {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 100;
+  width: min(280px, 85vw);
+  max-width: 280px;
+  height: 100%;
+  background: var(--card-bg);
+  border-right: 1px solid var(--card-border);
+  border-radius: 0 16px 16px 0;
+  box-shadow: 4px 0 24px rgba(0, 0, 0, 0.15);
+  transform: translateX(-100%);
+  transition: transform 0.25s ease-out;
+  overflow: hidden;
+}
+
+.jefe-drawer-open {
+  transform: translateX(0);
+}
+
+.jefe-drawer-inner {
+  padding: 1.25rem 0;
+  padding-top: max(1.25rem, env(safe-area-inset-top));
+}
+
+.jefe-drawer-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.jefe-drawer-link {
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+  padding: 0.875rem 1.25rem;
+  color: var(--text);
+  text-decoration: none;
+  font-weight: 500;
+  transition: background 0.15s, color 0.15s;
+  border: none;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  cursor: pointer;
+}
+
+.jefe-drawer-link:hover {
+  background: var(--btn-secondary-hover);
+}
+
+.jefe-drawer-link-active {
+  background: rgba(220, 38, 38, 0.12);
+  color: #dc2626;
+}
+
+.jefe-drawer-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  border-radius: 10px;
+  background: rgba(220, 38, 38, 0.1);
+  color: #dc2626;
+}
+
+.jefe-drawer-link-active .jefe-drawer-icon {
+  background: rgba(220, 38, 38, 0.2);
+}
+
+.jefe-drawer-label {
+  flex: 1;
+}
+
+.jefe-drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 99;
+  background: rgba(0, 0, 0, 0.4);
+  border: none;
+  cursor: pointer;
+  padding: 0;
+}
+
+.jefe-main {
+  padding-bottom: 2rem;
+}
+
+/* Permisos: lista de admins */
+.jefe-permisos-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.jefe-permisos-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.875rem 0;
+  border-bottom: 1px solid var(--table-border);
+}
+
+.jefe-permisos-item:last-child {
+  border-bottom: none;
+}
+
+.jefe-permisos-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.jefe-permisos-name {
+  display: block;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.jefe-permisos-email {
+  display: block;
+  font-size: 0.875rem;
+  color: var(--text-muted);
+}
+
+@media (max-width: 480px) {
+  .jefe-permisos-item {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+/* Resumen económico: pestañas y placeholder */
+.jefe-resumen-tabs {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.jefe-resumen-tab {
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  border: 1px solid var(--card-border);
+  background: var(--btn-secondary-bg);
+  color: var(--text);
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.jefe-resumen-tab:hover {
+  background: var(--btn-secondary-hover);
+}
+
+.jefe-resumen-tab-active {
+  background: rgba(220, 38, 38, 0.15);
+  border-color: #dc2626;
+  color: #dc2626;
+}
+
+.jefe-resumen-placeholder {
+  padding: 1rem;
+  background: var(--input-bg);
+  border-radius: 8px;
+  border: 1px dashed var(--card-border);
+  color: var(--text-muted);
+  font-size: 0.875rem;
+}
+
+/* Perfil empresa: logo (cargar imagen o URL) */
+.empresa-logo-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.empresa-logo-upload {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.empresa-logo-file-input {
+  position: absolute;
+  width: 0.1px;
+  height: 0.1px;
+  opacity: 0;
+  overflow: hidden;
+  z-index: -1;
+}
+
+.empresa-logo-hint {
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+}
+
+.empresa-logo-divider {
+  font-size: 0.875rem;
+  color: var(--text-muted);
+}
+
+.empresa-logo-options input[type="url"] {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  min-height: 44px;
+  border: 1px solid var(--input-border);
+  border-radius: 8px;
+  background: var(--input-bg);
+  color: var(--text);
+  font: inherit;
+}
+
+.empresa-logo-options input[type="url"]:focus {
+  outline: none;
+  border-color: #7c3aed;
+}
+
+.empresa-logo-preview {
+  margin-top: 0.75rem;
+}
+
+.empresa-logo-preview img {
+  max-height: 80px;
+  max-width: 160px;
+  object-fit: contain;
+  border-radius: 8px;
+  border: 1px solid var(--card-border);
+}

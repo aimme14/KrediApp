@@ -8,9 +8,12 @@ import {
   signOut as firebaseSignOut,
   createUserWithEmailAndPassword,
 } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, collection, query, where, getDocs } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 import type { UserProfile, Role } from "@/types/roles";
+import { SUPER_ADMIN_COLLECTION } from "@/types/superAdmin";
+
+const USERS_COLLECTION = "users";
 
 interface AuthState {
   user: User | null;
@@ -29,24 +32,88 @@ interface AuthContextValue extends AuthState {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-const PROFILE_COLLECTION = "users";
+async function fetchUserProfile(
+  uid: string,
+  email?: string | null
+): Promise<UserProfile | null> {
+  if (!db) {
+    if (typeof window !== "undefined") {
+      console.error("[Auth] Firestore no está configurado. Verifica las variables NEXT_PUBLIC_FIREBASE_* en .env.local");
+    }
+    return null;
+  }
 
-async function fetchUserProfile(uid: string): Promise<UserProfile | null> {
-  if (!db) return null;
-  const ref = doc(db, PROFILE_COLLECTION, uid);
-  const snap = await getDoc(ref);
-  if (!snap.exists()) return null;
-  const data = snap.data();
-  return {
-    uid: snap.id,
-    email: data.email ?? "",
-    displayName: data.displayName,
-    role: data.role as Role,
-    enabled: data.enabled !== false,
-    createdBy: data.createdBy ?? "",
-    createdAt: data.createdAt?.toDate?.() ?? new Date(),
-    updatedAt: data.updatedAt?.toDate?.(),
-  };
+  try {
+    // Super Admin: datos en /superAdmin/{adminID}
+    const superRef = doc(db, SUPER_ADMIN_COLLECTION, uid);
+    const superSnap = await getDoc(superRef);
+    if (superSnap.exists()) {
+      const data = superSnap.data();
+      return {
+        uid: superSnap.id,
+        email: data.email ?? "",
+        displayName: data.displayName,
+        role: "superAdmin" as Role,
+        enabled: data.enabled !== false,
+        createdBy: data.createdBy ?? "",
+        createdAt: data.createdAt?.toDate?.() ?? new Date(),
+        updatedAt: data.updatedAt?.toDate?.(),
+      };
+    }
+
+    // Fallback: buscar Super Admin por email (por si el UID no coincide)
+    if (email) {
+      const q = query(
+        collection(db, SUPER_ADMIN_COLLECTION),
+        where("email", "==", email)
+      );
+      const emailSnap = await getDocs(q);
+      if (!emailSnap.empty) {
+        const docSnap = emailSnap.docs[0];
+        const data = docSnap.data();
+        return {
+          uid, // Mantener el uid del usuario autenticado
+          email: data.email ?? "",
+          displayName: data.displayName,
+          role: "superAdmin" as Role,
+          enabled: data.enabled !== false,
+          createdBy: data.createdBy ?? "",
+          createdAt: data.createdAt?.toDate?.() ?? new Date(),
+          updatedAt: data.updatedAt?.toDate?.(),
+        };
+      }
+    }
+
+    // Usuarios de empresas: índice en /users/{userId} (nueva estructura)
+    // o datos completos (estructura antigua)
+    const userRef = doc(db, USERS_COLLECTION, uid);
+    const userSnap = await getDoc(userRef);
+    if (!userSnap.exists()) return null;
+    const data = userSnap.data();
+    const roleRaw = data.role as string;
+    // Mapear "empleado" (Firestore) a "trabajador" (Role) para compatibilidad
+    const role: Role = roleRaw === "empleado" ? "trabajador" : (roleRaw as Role);
+    return {
+      uid: userSnap.id,
+      email: data.email ?? "",
+      displayName: data.displayName,
+      role,
+      enabled: data.enabled !== false,
+      createdBy: data.createdBy ?? "",
+      createdAt: data.createdAt?.toDate?.() ?? new Date(),
+      updatedAt: data.updatedAt?.toDate?.(),
+      empresaId: data.empresaId,
+      cedula: data.cedula,
+      lugar: data.lugar,
+      base: data.base,
+      adminId: data.adminId,
+    };
+  } catch (err) {
+    if (typeof window !== "undefined") {
+      console.error("[Auth] Error al obtener perfil:", err);
+    }
+    throw err;
+  }
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -68,7 +135,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
       try {
-        const profile = await fetchUserProfile(user.uid);
+        const profile = await fetchUserProfile(user.uid, user.email ?? undefined);
         setState((s) => ({ ...s, user, profile, loading: false, error: null }));
       } catch {
         setState((s) => ({ ...s, user, profile: null, loading: false, error: null }));

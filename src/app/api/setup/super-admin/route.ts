@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminAuth, getAdminFirestore } from "@/lib/firebase-admin";
-
-const USERS_COLLECTION = "users";
+import { SUPER_ADMIN_COLLECTION } from "@/types/superAdmin";
 
 /**
  * GET: Indica si aún se puede crear el primer Super Admin (no existe ninguno).
@@ -9,11 +8,7 @@ const USERS_COLLECTION = "users";
 export async function GET() {
   try {
     const db = getAdminFirestore();
-    const snapshot = await db
-      .collection(USERS_COLLECTION)
-      .where("role", "==", "superAdmin")
-      .limit(1)
-      .get();
+    const snapshot = await db.collection(SUPER_ADMIN_COLLECTION).limit(1).get();
 
     const available = snapshot.empty;
     return NextResponse.json({ available });
@@ -27,6 +22,8 @@ export async function GET() {
 /**
  * POST: Crea el primer usuario Super Admin (solo si aún no existe ninguno).
  * Body: { email: string, password: string }
+ *
+ * La contraseña se envía a Firebase Auth únicamente; NUNCA se almacena en Firestore.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -53,11 +50,7 @@ export async function POST(request: NextRequest) {
     const auth = getAdminAuth();
     const db = getAdminFirestore();
 
-    const snapshot = await db
-      .collection(USERS_COLLECTION)
-      .where("role", "==", "superAdmin")
-      .limit(1)
-      .get();
+    const snapshot = await db.collection(SUPER_ADMIN_COLLECTION).limit(1).get();
 
     if (!snapshot.empty) {
       return NextResponse.json(
@@ -73,14 +66,16 @@ export async function POST(request: NextRequest) {
     });
     const uid = userRecord.uid;
 
-    await db.collection(USERS_COLLECTION).doc(uid).set({
+    const now = new Date();
+    await db.collection(SUPER_ADMIN_COLLECTION).doc(uid).set({
       uid,
       email: trimmedEmail,
       role: "superAdmin",
       enabled: true,
       createdBy: "",
-      createdAt: new Date(),
-      updatedAt: new Date(),
+      createdAt: now,
+      updatedAt: now,
+      emailVerified: true,
     });
 
     return NextResponse.json({

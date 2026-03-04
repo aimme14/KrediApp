@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "create-super-admin": "node scripts/create-super-admin.js"
+    "create-super-admin": "node scripts/create-super-admin.js",
+    "migrate-super-admin": "node scripts/migrate-super-admin-to-collection.js",
+    "migrate-empresas": "node scripts/migrate-to-empresas-structure.js"
   },
   "dependencies": {
     "firebase": "^10.14.0",

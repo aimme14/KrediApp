@@ -7,8 +7,17 @@ import {
 } from "firebase/firestore";
 import { db } from "./firebase";
 import type { Role, UserProfile } from "@/types/roles";
+import { USERS_COLLECTION } from "./empresas-db";
 
-const USERS_COLLECTION = "users";
+/** Mapea rol de Firestore (empleado) a Role de la app (trabajador) */
+function fromRolFirestore(role: string): Role {
+  return role === "empleado" ? "trabajador" : (role as Role);
+}
+
+/** Mapea Role de la app a rol en Firestore para consultas */
+function toRolFirestore(role: Role): string {
+  return role === "trabajador" ? "empleado" : role;
+}
 
 export interface CreateUserParams {
   email: string;
@@ -16,6 +25,10 @@ export interface CreateUserParams {
   displayName?: string;
   role: Role;
   createdByUid: string;
+  /** Opcional: para administradores creados por jefe */
+  cedula?: string;
+  lugar?: string;
+  base?: string;
 }
 
 /**
@@ -50,6 +63,23 @@ export async function setJefeEnabled(
 }
 
 /**
+ * Habilita o deshabilita un administrador. Solo el jefe que lo creó puede hacerlo.
+ */
+export async function setAdminEnabled(
+  adminUid: string,
+  enabled: boolean,
+  jefeUid: string
+): Promise<void> {
+  const res = await fetch(`/api/users/${adminUid}/enabled`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ enabled, jefeUid }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error ?? "Error al actualizar administrador");
+}
+
+/**
  * Lista usuarios por rol (opcional) creados por un usuario dado.
  */
 export async function listUsersByCreator(
@@ -62,7 +92,7 @@ export async function listUsersByCreator(
     where("createdBy", "==", createdByUid)
   );
   if (role) {
-    q = query(q, where("role", "==", role));
+    q = query(q, where("role", "==", toRolFirestore(role)));
   }
   const snap = await getDocs(q);
   return snap.docs.map((d) => {
@@ -71,11 +101,16 @@ export async function listUsersByCreator(
       uid: d.id,
       email: data.email ?? "",
       displayName: data.displayName,
-      role: data.role as Role,
+      role: fromRolFirestore(data.role ?? ""),
       enabled: data.enabled !== false,
       createdBy: data.createdBy ?? "",
       createdAt: data.createdAt?.toDate?.() ?? new Date(),
       updatedAt: data.updatedAt?.toDate?.(),
+      empresaId: data.empresaId,
+      cedula: data.cedula,
+      lugar: data.lugar,
+      base: data.base,
+      adminId: data.adminId,
     };
   });
 }
@@ -96,11 +131,12 @@ export async function listAllJefes(): Promise<UserProfile[]> {
       uid: d.id,
       email: data.email ?? "",
       displayName: data.displayName,
-      role: data.role as Role,
+      role: fromRolFirestore(data.role ?? ""),
       enabled: data.enabled !== false,
       createdBy: data.createdBy ?? "",
       createdAt: data.createdAt?.toDate?.() ?? new Date(),
       updatedAt: data.updatedAt?.toDate?.(),
+      empresaId: data.empresaId,
     };
   });
 }

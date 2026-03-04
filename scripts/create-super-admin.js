@@ -83,14 +83,16 @@ function main() {
       });
       const uid = userRecord.uid;
 
-      await db.collection("users").doc(uid).set({
+      const now = admin.firestore.FieldValue.serverTimestamp();
+      await db.collection("superAdmin").doc(uid).set({
         uid,
         email,
         role: "superAdmin",
         enabled: true,
         createdBy: "",
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        createdAt: now,
+        updatedAt: now,
+        emailVerified: true,
       });
 
       console.log("\n✅ Super Admin creado correctamente.\n");
@@ -102,7 +104,7 @@ function main() {
       const msg = err.message || String(err);
       if (err.code === "auth/email-already-exists") {
         console.error("\n❌ Ese correo ya está registrado en Firebase Auth.");
-        console.error("   Crea el documento en Firestore: colección 'users', id = UID del usuario, con role: 'superAdmin', enabled: true.\n");
+        console.error("   Crea el documento en Firestore: colección 'superAdmin', id = UID del usuario, con role: 'superAdmin', enabled: true, emailVerified: true.\n");
       } else if (msg.includes("no configuration") || msg.includes("provided identifier")) {
         console.error("\n❌ Firebase no reconoce la configuración. Comprueba:\n");
         console.error("   1. Firebase Console > Authentication > Sign-in method: activa 'Correo/contraseña'.\n");
