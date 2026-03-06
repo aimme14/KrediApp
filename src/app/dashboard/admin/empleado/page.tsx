@@ -3,11 +3,13 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { listUsersByCreator, createUser } from "@/lib/users";
+import { listRutas, type RutaItem } from "@/lib/empresa-api";
 import type { UserProfile } from "@/types/roles";
 
-export default function AdminDashboard() {
-  const { profile } = useAuth();
+export default function EmpleadoPage() {
+  const { user, profile } = useAuth();
   const [trabajadores, setTrabajadores] = useState<UserProfile[]>([]);
+  const [rutas, setRutas] = useState<RutaItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
@@ -17,6 +19,7 @@ export default function AdminDashboard() {
   const [telefono, setTelefono] = useState("");
   const [cedula, setCedula] = useState("");
   const [base, setBase] = useState("");
+  const [rutaId, setRutaId] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [creating, setCreating] = useState(false);
@@ -37,11 +40,22 @@ export default function AdminDashboard() {
     return () => { cancelled = true; };
   }, [profile]);
 
+  useEffect(() => {
+    if (!user) return;
+    user.getIdToken().then((token) => {
+      listRutas(token).then(setRutas).catch(() => {});
+    });
+  }, [user]);
+
   const handleCreateTrabajador = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!profile) return;
     setError(null);
     setCreating(true);
+    if (!rutaId.trim()) {
+      setError("Debes seleccionar una ruta para el empleado");
+      return;
+    }
     try {
       await createUser({
         email,
@@ -54,6 +68,7 @@ export default function AdminDashboard() {
         direccion: direccion.trim() || undefined,
         telefono: telefono.trim() || undefined,
         base: base.trim() || undefined,
+        rutaId: rutaId.trim(),
       });
       setDisplayName("");
       setUbicacion("");
@@ -61,38 +76,41 @@ export default function AdminDashboard() {
       setTelefono("");
       setCedula("");
       setBase("");
+      setRutaId("");
       setEmail("");
       setPassword("");
       setShowForm(false);
       const list = await listUsersByCreator(profile.uid, "trabajador");
       setTrabajadores(list);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Error al crear trabajador");
+      setError(e instanceof Error ? e.message : "Error al crear empleado");
     } finally {
       setCreating(false);
     }
   };
 
-  if (loading) return <div className="card"><p>Cargando trabajadores...</p></div>;
+  if (!profile || profile.role !== "admin") return null;
 
   return (
-    <>
-      <div className="card">
-        <div className="card-header-row">
-          <h2>Panel Administrador</h2>
-          <button
-            type="button"
-            className="btn btn-primary"
-            onClick={() => setShowForm((v) => !v)}
-          >
-            {showForm ? "Cancelar" : "Crear trabajador"}
-          </button>
-        </div>
+    <div className="card">
+      <h2 style={{ marginTop: 0 }}>Empleado</h2>
+      <p style={{ color: "var(--text-muted)", fontSize: "0.875rem", marginBottom: "1.25rem" }}>
+        Crea empleados con nombre, ubicación, dirección, teléfono, cédula, base, ruta, correo y contraseña (credenciales de ingreso).
+      </p>
+
+      <div style={{ marginBottom: "1.25rem" }}>
+        <button
+          type="button"
+          className="btn btn-primary"
+          onClick={() => setShowForm((v) => !v)}
+        >
+          {showForm ? "Cancelar" : "Nuevo empleado"}
+        </button>
       </div>
 
       {showForm && (
-        <div className="card">
-          <h3 style={{ marginTop: 0 }}>Nuevo trabajador</h3>
+        <div className="card" style={{ marginBottom: "1.25rem" }}>
+          <h3 style={{ marginTop: 0 }}>Nuevo empleado</h3>
           <p style={{ color: "var(--text-muted)", fontSize: "0.875rem", marginBottom: "1.25rem" }}>
             El correo y la contraseña son las credenciales para que el empleado ingrese al sistema.
           </p>
@@ -104,7 +122,7 @@ export default function AdminDashboard() {
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
                 required
-                placeholder="Nombre completo del empleado"
+                placeholder="Nombre completo"
               />
             </div>
             <div className="form-group">
@@ -153,6 +171,22 @@ export default function AdminDashboard() {
               />
             </div>
             <div className="form-group">
+              <label>Ruta asignada</label>
+              <select
+                value={rutaId}
+                onChange={(e) => setRutaId(e.target.value)}
+                required
+                style={{ width: "100%", padding: "0.5rem" }}
+              >
+                <option value="">Seleccionar ruta</option>
+                {rutas.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.nombre} {r.ubicacion ? `· ${r.ubicacion}` : ""}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="form-group">
               <label>Correo (credencial de ingreso)</label>
               <input
                 type="email"
@@ -175,7 +209,7 @@ export default function AdminDashboard() {
             </div>
             {error && <p className="error-msg">{error}</p>}
             <button type="submit" className="btn btn-primary" disabled={creating}>
-              {creating ? "Creando..." : "Crear trabajador"}
+              {creating ? "Creando..." : "Crear empleado"}
             </button>
           </form>
         </div>
@@ -184,42 +218,46 @@ export default function AdminDashboard() {
       {!showForm && error && <p className="error-msg">{error}</p>}
 
       <div className="card">
-        <h3 style={{ marginTop: 0 }}>Trabajadores creados por mí</h3>
-        <div className="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Nombre</th>
-                <th>Correo</th>
-                <th>Ubicación</th>
-                <th>Teléfono</th>
-                <th>Cédula</th>
-                <th>Base</th>
-              </tr>
-            </thead>
-            <tbody>
-              {trabajadores.length === 0 ? (
+        <h3 style={{ marginTop: 0 }}>Empleados creados por mí</h3>
+        {loading ? (
+          <p>Cargando...</p>
+        ) : (
+          <div className="table-wrap">
+            <table>
+              <thead>
                 <tr>
-                  <td colSpan={6} style={{ color: "var(--text-muted)" }}>
-                    No hay trabajadores. Crea uno con el botón &quot;Crear trabajador&quot;.
-                  </td>
+                  <th>Nombre</th>
+                  <th>Correo</th>
+                  <th>Ubicación</th>
+                  <th>Teléfono</th>
+                  <th>Cédula</th>
+                  <th>Base</th>
                 </tr>
-              ) : (
-                trabajadores.map((t) => (
-                  <tr key={t.uid}>
-                    <td>{t.displayName ?? "—"}</td>
-                    <td>{t.email}</td>
-                    <td>{t.lugar ?? "—"}</td>
-                    <td>{t.telefono ?? "—"}</td>
-                    <td>{t.cedula ?? "—"}</td>
-                    <td>{t.base ?? "—"}</td>
+              </thead>
+              <tbody>
+                {trabajadores.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} style={{ color: "var(--text-muted)" }}>
+                      No hay empleados. Crea uno con el botón &quot;Nuevo empleado&quot;.
+                    </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+                ) : (
+                  trabajadores.map((t) => (
+                    <tr key={t.uid}>
+                      <td>{t.displayName ?? "—"}</td>
+                      <td>{t.email}</td>
+                      <td>{t.lugar ?? "—"}</td>
+                      <td>{t.telefono ?? "—"}</td>
+                      <td>{t.cedula ?? "—"}</td>
+                      <td>{t.base ?? "—"}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
-    </>
+    </div>
   );
 }

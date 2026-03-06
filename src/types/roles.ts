@@ -18,12 +18,16 @@ export interface UserProfile {
   updatedAt?: Date;
   /** ID de la empresa (solo para jefe, admin, empleado) */
   empresaId?: string;
-  /** Solo para admins creados por jefe */
+  /** Solo para admins/empleados creados por jefe/admin */
   cedula?: string;
   lugar?: string;
+  direccion?: string;
+  telefono?: string;
   base?: string;
   /** Solo para empleados: UID del admin asignado */
   adminId?: string;
+  /** Solo para empleados: ID de la ruta asignada */
+  rutaId?: string;
 }
 
 /** Quién puede crear a quién */

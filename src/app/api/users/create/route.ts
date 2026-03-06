@@ -19,7 +19,7 @@ function toRolFirestore(role: Role): "jefe" | "admin" | "empleado" {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { email, password, displayName, role, createdByUid, cedula, lugar, base, adminId } = body as {
+    const { email, password, displayName, role, createdByUid, cedula, lugar, direccion, telefono, base, rutaId, adminId } = body as {
       email: string;
       password: string;
       displayName?: string;
@@ -27,7 +27,10 @@ export async function POST(request: NextRequest) {
       createdByUid: string;
       cedula?: string;
       lugar?: string;
+      direccion?: string;
+      telefono?: string;
       base?: string;
+      rutaId?: string; // para empleados: ruta asignada
       adminId?: string; // para empleados: admin asignado
     };
 
@@ -117,7 +120,10 @@ export async function POST(request: NextRequest) {
     };
     if (cedula !== undefined) usuarioEmpresaData.cedula = cedula;
     if (lugar !== undefined) usuarioEmpresaData.lugar = lugar;
+    if (direccion !== undefined) usuarioEmpresaData.direccion = direccion;
+    if (telefono !== undefined) usuarioEmpresaData.telefono = telefono;
     if (base !== undefined) usuarioEmpresaData.base = base;
+    if (rolFirestore === "empleado" && rutaId) usuarioEmpresaData.rutaId = rutaId;
     if (rolFirestore === "empleado" && adminId) usuarioEmpresaData.adminId = adminId;
 
     await adminDb
@@ -140,7 +146,10 @@ export async function POST(request: NextRequest) {
     };
     if (cedula !== undefined) userAuthData.cedula = cedula;
     if (lugar !== undefined) userAuthData.lugar = lugar;
+    if (direccion !== undefined) userAuthData.direccion = direccion;
+    if (telefono !== undefined) userAuthData.telefono = telefono;
     if (base !== undefined) userAuthData.base = base;
+    if (rolFirestore === "empleado" && rutaId) userAuthData.rutaId = rutaId;
     if (rolFirestore === "empleado" && adminId) userAuthData.adminId = adminId;
 
     await adminDb.collection(USERS_COLLECTION).doc(uid).set(userAuthData);

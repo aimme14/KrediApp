@@ -30,7 +30,10 @@ export interface UsuarioEmpresaDoc {
   adminId?: string; // solo si rol === "empleado"
   cedula?: string;
   lugar?: string;
+  direccion?: string;
+  telefono?: string;
   base?: string;
+  rutaId?: string; // solo si rol === "empleado"
   fechaCreacion?: Date;
 }
 
@@ -47,9 +50,11 @@ export interface UserAuthIndex {
 /** Ruta de cobranza */
 export interface RutaDoc {
   nombre: string;
-  descripcion: string;
+  ubicacion?: string;
+  base?: string;
+  descripcion?: string;
   adminId: string;
-  empleadoId: string; // quien cobra la ruta
+  empleadoId?: string; // quien cobra la ruta (opcional al crear)
   fechaCreacion: Date;
 }
 
@@ -64,6 +69,8 @@ export interface ClienteDoc {
   adminId: string;
   prestamo_activo: boolean;
   fechaCreacion: Date;
+  /** Si true, cliente excluido de la ruta normal (caso especial, no volver a prestar) */
+  moroso?: boolean;
 }
 
 /** Estado del préstamo */
@@ -81,6 +88,7 @@ export interface PrestamoDoc {
   monto: number;
   interes: number; // porcentaje
   modalidad: ModalidadPago;
+  numeroCuotas: number;
   totalAPagar: number;
   saldoPendiente: number;
   estado: EstadoPrestamo;
@@ -92,12 +100,19 @@ export interface PrestamoDoc {
 /** Tipo de pago */
 export type TipoPago = "pago" | "mora";
 
+/** Método de pago al cobrar (efectivo/transferencia) */
+export type MetodoPago = "efectivo" | "transferencia";
+
 /** Pago dentro de un préstamo */
 export interface PagoDoc {
   monto: number;
   fecha: Date;
   empleadoId: string;
   tipo: TipoPago;
+  /** Efectivo o transferencia (para cobro del trabajador) */
+  metodoPago?: MetodoPago;
+  /** URL de la foto de la evidencia del cobro */
+  evidencia?: string;
 }
 
 /** Tipo de gasto */
@@ -114,4 +129,6 @@ export interface GastoDoc {
   rutaId?: string; // si aplica
   adminId: string;
   empleadoId?: string; // null si lo hace el admin
+  /** URL de la foto del comprobante/factura */
+  evidencia?: string;
 }

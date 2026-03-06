@@ -25,10 +25,14 @@ export interface CreateUserParams {
   displayName?: string;
   role: Role;
   createdByUid: string;
-  /** Opcional: para administradores creados por jefe */
+  /** Opcional: datos del empleado/trabajador */
   cedula?: string;
   lugar?: string;
+  direccion?: string;
+  telefono?: string;
   base?: string;
+  /** ID de la ruta asignada al empleado */
+  rutaId?: string;
 }
 
 /**
@@ -109,7 +113,10 @@ export async function listUsersByCreator(
       empresaId: data.empresaId,
       cedula: data.cedula,
       lugar: data.lugar,
+      direccion: data.direccion,
+      telefono: data.telefono,
       base: data.base,
+      rutaId: data.rutaId,
       adminId: data.adminId,
     };
   });

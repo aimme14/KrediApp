@@ -4,8 +4,6 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import SuperAdminDashboard from "@/components/dashboard/SuperAdminDashboard";
-import AdminDashboard from "@/components/dashboard/AdminDashboard";
-import TrabajadorDashboard from "@/components/dashboard/TrabajadorDashboard";
 
 export default function DashboardPage() {
   const { profile } = useAuth();
@@ -14,6 +12,14 @@ export default function DashboardPage() {
   useEffect(() => {
     if (profile?.role === "jefe") {
       router.replace("/dashboard/jefe");
+      return;
+    }
+    if (profile?.role === "admin") {
+      router.replace("/dashboard/admin");
+      return;
+    }
+    if (profile?.role === "trabajador") {
+      router.replace("/dashboard/trabajador");
       return;
     }
   }, [profile, router]);
@@ -27,14 +33,16 @@ export default function DashboardPage() {
       </div>
     );
   }
+  if (profile.role === "admin") {
+    return <div className="card"><p>Redirigiendo al panel administrador...</p></div>;
+  }
+  if (profile.role === "trabajador") {
+    return <div className="card"><p>Redirigiendo al panel trabajador...</p></div>;
+  }
 
   switch (profile.role) {
     case "superAdmin":
       return <SuperAdminDashboard />;
-    case "admin":
-      return <AdminDashboard />;
-    case "trabajador":
-      return <TrabajadorDashboard />;
     default:
       return (
         <div className="card">
