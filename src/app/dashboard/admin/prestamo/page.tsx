@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { listClientes, listPrestamos, createPrestamo, type ClienteItem, type PrestamoItem } from "@/lib/empresa-api";
 
@@ -88,6 +88,11 @@ export default function PrestamoPage() {
   };
 
   const clientesSinPrestamo = clientes.filter((c) => !c.prestamo_activo && !c.moroso);
+  const nombrePorClienteId = useMemo(() => {
+    const m: Record<string, string> = {};
+    clientes.forEach((c) => { m[c.id] = c.nombre; });
+    return m;
+  }, [clientes]);
 
   if (!profile || profile.role !== "admin") return null;
 
@@ -244,7 +249,7 @@ export default function PrestamoPage() {
             <table>
               <thead>
                 <tr>
-                  <th>Cliente ID</th>
+                  <th>Cliente</th>
                   <th>Monto</th>
                   <th>Total a pagar</th>
                   <th>Saldo</th>
@@ -255,7 +260,7 @@ export default function PrestamoPage() {
               <tbody>
                 {prestamos.slice(0, 20).map((p) => (
                   <tr key={p.id}>
-                    <td>{p.clienteId}</td>
+                    <td>{nombrePorClienteId[p.clienteId] ?? p.clienteId}</td>
                     <td>{p.monto}</td>
                     <td>{p.totalAPagar.toFixed(2)}</td>
                     <td>{p.saldoPendiente.toFixed(2)}</td>
