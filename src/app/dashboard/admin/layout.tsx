@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 
 const NAV_ITEMS = [
+  { href: "/dashboard/admin", label: "Inicio", icon: "home" },
   { href: "/dashboard/admin/rutas", label: "Rutas", icon: "route" },
   { href: "/dashboard/admin/empleado", label: "Empleado", icon: "user" },
   { href: "/dashboard/admin/cliente", label: "Cliente", icon: "client" },
@@ -19,6 +20,13 @@ const NAV_ITEMS = [
 function NavIcon({ name }: { name: string }) {
   const size = 22;
   switch (name) {
+    case "home":
+      return (
+        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+          <polyline points="9 22 9 12 15 12 15 22" />
+        </svg>
+      );
     case "route":
       return (
         <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>

@@ -9,6 +9,14 @@ const MODALIDADES = [
   { value: "mensual", label: "Mensual" },
 ] as const;
 
+/** Formato moneda: miles con punto, decimales con coma (ej: 1.234,56) */
+function formatMoneda(n: number): string {
+  if (typeof n !== "number" || isNaN(n)) return "";
+  const [entero, dec = ""] = n.toFixed(2).split(".");
+  const conPuntos = entero.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  return `${conPuntos},${dec}`;
+}
+
 function calcularTotal(monto: number, interesPct: number, numeroCuotas: number, modalidad: string) {
   const totalAPagar = monto * (1 + interesPct / 100);
   let cuota = 0;
@@ -22,13 +30,16 @@ export default function SimulacroPrestamoPage() {
   const { profile } = useAuth();
   const [fechaInicio, setFechaInicio] = useState(() => new Date().toISOString().slice(0, 10));
   const [modalidad, setModalidad] = useState<"diario" | "semanal" | "mensual">("mensual");
-  const [numeroCuotas, setNumeroCuotas] = useState(12);
-  const [interes, setInteres] = useState(0);
+  const [numeroCuotas, setNumeroCuotas] = useState("");
+  const [interes, setInteres] = useState("");
   const [monto, setMonto] = useState("");
+  const [montoFocused, setMontoFocused] = useState(false);
 
   const montoNum = parseFloat(monto.replace(",", ".")) || 0;
+  const nCuotas = Math.max(1, parseInt(numeroCuotas, 10) || 1);
+  const iVal = parseFloat(interes.replace(",", ".")) || 0;
   const { totalAPagar, cuota } = montoNum > 0
-    ? calcularTotal(montoNum, interes, numeroCuotas, modalidad)
+    ? calcularTotal(montoNum, iVal, nCuotas, modalidad)
     : { totalAPagar: 0, cuota: 0 };
 
   if (!profile || profile.role !== "trabajador") return null;
@@ -54,23 +65,72 @@ export default function SimulacroPrestamoPage() {
         </div>
         <div className="form-group">
           <label>Número de cuotas</label>
-          <input type="number" min={1} value={numeroCuotas} onChange={(e) => setNumeroCuotas(parseInt(e.target.value, 10) || 1)} />
+          <input
+            type="number"
+            inputMode="numeric"
+            min={1}
+            max={9999}
+            value={numeroCuotas}
+            onChange={(e) => {
+              const v = e.target.value.replace(/\D/g, "");
+              if (v === "" || /^\d+$/.test(v)) setNumeroCuotas(v);
+            }}
+            onKeyDown={(e) => {
+              const k = e.key;
+              if (k === "e" || k === "E" || k === "+" || k === "-" || k === "." || k === ",") e.preventDefault();
+            }}
+            placeholder="Ej: 12"
+            aria-label="Número de cuotas"
+          />
         </div>
         <div className="form-group">
           <label>Interés (%)</label>
-          <input type="number" min={0} step={0.1} value={interes} onChange={(e) => setInteres(parseFloat(e.target.value) || 0)} />
+          <input
+            type="number"
+            inputMode="decimal"
+            min={0}
+            step={0.1}
+            max={999.99}
+            value={interes}
+            onChange={(e) => {
+              const v = e.target.value.replace(",", ".");
+              if (v === "" || /^\d*\.?\d*$/.test(v)) setInteres(e.target.value);
+            }}
+            onKeyDown={(e) => {
+              const k = e.key;
+              if (k === "e" || k === "E" || k === "+" || k === "-") e.preventDefault();
+            }}
+            placeholder="Ej: 10"
+            aria-label="Interés en porcentaje"
+          />
         </div>
         <div className="form-group">
           <label>Cantidad a prestar</label>
-          <input type="text" inputMode="decimal" value={monto} onChange={(e) => setMonto(e.target.value)} placeholder="Monto" />
+          <input
+            type="text"
+            inputMode="decimal"
+            value={
+              montoFocused
+                ? monto
+                : (monto ? formatMoneda(parseFloat(monto.replace(",", ".")) || 0) : "")
+            }
+            onChange={(e) => {
+              let v = e.target.value.replace(/\./g, "").replace(/[^\d,]/g, "");
+              if ((v.match(/,/g) || []).length > 1) return;
+              setMonto(v);
+            }}
+            onFocus={() => setMontoFocused(true)}
+            onBlur={() => setMontoFocused(false)}
+            placeholder="0,00"
+          />
         </div>
       </div>
 
       {montoNum > 0 && (
         <div className="card" style={{ background: "var(--success-bg, #f0fdf4)", border: "1px solid var(--success-text, #16a34a)" }}>
           <h3 style={{ marginTop: 0 }}>Resultado del simulacro</h3>
-          <p><strong>Total a pagar:</strong> {totalAPagar.toFixed(2)}</p>
-          <p><strong>Cuota por período ({modalidad}):</strong> {cuota.toFixed(2)}</p>
+          <p><strong>Total a pagar:</strong> {formatMoneda(totalAPagar)}</p>
+          <p><strong>Cuota por período ({modalidad}):</strong> {formatMoneda(cuota)}</p>
           <p style={{ color: "var(--text-muted)", fontSize: "0.875rem" }}>Este cálculo es solo orientativo. No se ha creado ningún préstamo.</p>
         </div>
       )}

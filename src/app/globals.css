@@ -569,6 +569,12 @@ th {
   padding-bottom: 2rem;
 }
 
+/* Admin dashboard: accesos rápidos */
+.admin-quick-link:hover {
+  background: var(--btn-secondary-hover) !important;
+  border-color: rgba(220, 38, 38, 0.3) !important;
+}
+
 /* Permisos: lista de admins */
 .jefe-permisos-list {
   list-style: none;
