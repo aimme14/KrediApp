@@ -12,6 +12,8 @@ export type RutaItem = {
   adminId: string;
   empleadoId: string;
   fechaCreacion: string | null;
+  /** Código legible (ej. RT-001-002). Id técnico sigue siendo id. */
+  codigo?: string;
 };
 
 export type ClienteItem = {
@@ -26,7 +28,20 @@ export type ClienteItem = {
   prestamo_activo: boolean;
   moroso?: boolean;
   fechaCreacion: string | null;
+  /** Código legible (ej. CL-001-002-045). Id técnico sigue siendo id. */
+  codigo?: string;
 };
+
+/**
+ * Para admin/trabajador: código corto CL-{ruta}-{cliente} (ej. CL-002-045).
+ * Para jefe conviene mostrar el codigo completo (CL-001-002-045).
+ */
+export function formatClienteCodigoCorto(codigo: string | undefined): string {
+  if (!codigo || typeof codigo !== "string") return "—";
+  const m = codigo.match(/^CL-(\d+)-(\d+)-(\d+)$/);
+  if (!m) return codigo;
+  return `CL-${m[2]}-${m[3]}`;
+}
 
 export type PrestamoItem = {
   id: string;
@@ -53,6 +68,8 @@ export type GastoItem = {
   fecha: string | null;
   tipo: string;
   creadoPor: string;
+  /** Nombre de quien registró el gasto (solo en listado para admin) */
+  creadoPorNombre?: string;
   rol: string;
   rutaId: string;
   adminId: string;

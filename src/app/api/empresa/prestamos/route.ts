@@ -134,7 +134,10 @@ export async function POST(request: NextRequest) {
 
   const adminIdPrestamo = apiUser.role === "empleado" && apiUser.adminId ? apiUser.adminId : apiUser.uid;
   const empleadoIdPrestamo = apiUser.role === "empleado" ? apiUser.uid : (empleadoId ?? apiUser.uid).toString().trim();
-  const rutaIdPrestamo = (rutaId ?? "").trim() || (apiUser.role === "empleado" && apiUser.rutaId ? apiUser.rutaId : "");
+  let rutaIdPrestamo = (rutaId ?? "").trim() || (apiUser.role === "empleado" && apiUser.rutaId ? apiUser.rutaId : "");
+  if (!rutaIdPrestamo && clienteSnap.exists) {
+    rutaIdPrestamo = (clienteSnap.data()?.rutaId as string) ?? "";
+  }
 
   await ref.set({
     clienteId: clienteId.trim(),

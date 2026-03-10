@@ -2,6 +2,7 @@ import {
   collection,
   doc,
   getDocs,
+  getDocsFromServer,
   query,
   where,
 } from "firebase/firestore";
@@ -33,6 +34,8 @@ export interface CreateUserParams {
   base?: string;
   /** ID de la ruta asignada al empleado */
   rutaId?: string;
+  /** UID del admin al que reporta el empleado (para que los clientes que cree el empleado los vea el admin) */
+  adminId?: string;
 }
 
 /**
@@ -118,12 +121,16 @@ export async function listUsersByCreator(
       base: data.base,
       rutaId: data.rutaId,
       adminId: data.adminId,
+      codigo: data.codigo,
+      jefeCodigo: data.jefeCodigo,
     };
   });
 }
 
 /**
  * Lista todos los jefes (para superAdmin).
+ * Usa getDocsFromServer para que los jefes creados por la API (servidor) se vean de inmediato,
+ * ya que getDocs() puede devolver caché local que aún no tiene esos documentos.
  */
 export async function listAllJefes(): Promise<UserProfile[]> {
   if (!db) return [];
@@ -131,7 +138,7 @@ export async function listAllJefes(): Promise<UserProfile[]> {
     collection(db, USERS_COLLECTION),
     where("role", "==", "jefe")
   );
-  const snap = await getDocs(q);
+  const snap = await getDocsFromServer(q);
   return snap.docs.map((d) => {
     const data = d.data();
     return {
@@ -144,6 +151,7 @@ export async function listAllJefes(): Promise<UserProfile[]> {
       createdAt: data.createdAt?.toDate?.() ?? new Date(),
       updatedAt: data.updatedAt?.toDate?.(),
       empresaId: data.empresaId,
+      codigo: data.codigo,
     };
   });
 }

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/context/AuthContext";
-import { listClientes, createCliente, type ClienteItem } from "@/lib/empresa-api";
+import { listClientes, createCliente, formatClienteCodigoCorto, type ClienteItem } from "@/lib/empresa-api";
 
 export default function ClienteTrabajadorPage() {
   const { user, profile } = useAuth();
@@ -117,6 +117,7 @@ export default function ClienteTrabajadorPage() {
             <table>
               <thead>
                 <tr>
+                  <th>Código</th>
                   <th>Nombre</th>
                   <th>Ubicación</th>
                   <th>Teléfono</th>
@@ -126,6 +127,9 @@ export default function ClienteTrabajadorPage() {
               <tbody>
                 {clientes.map((c) => (
                   <tr key={c.id}>
+                    <td title={c.codigo ?? undefined}>
+                      {formatClienteCodigoCorto(c.codigo)}
+                    </td>
                     <td>{c.nombre}</td>
                     <td>{c.ubicacion || "—"}</td>
                     <td>{c.telefono || "—"}</td>

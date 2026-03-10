@@ -28,6 +28,10 @@ export interface UserProfile {
   adminId?: string;
   /** Solo para empleados: ID de la ruta asignada */
   rutaId?: string;
+  /** Código de identificación (JF-001 jefe, AD-001 admin) */
+  codigo?: string;
+  /** Código del jefe que creó a este admin (ej. JF-001). Solo para rol admin. */
+  jefeCodigo?: string;
 }
 
 /** Quién puede crear a quién */

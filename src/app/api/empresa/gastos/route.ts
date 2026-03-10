@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminFirestore } from "@/lib/firebase-admin";
 import { getApiUser } from "@/lib/api-auth";
-import { EMPRESAS_COLLECTION, GASTOS_SUBCOLLECTION } from "@/lib/empresas-db";
+import { EMPRESAS_COLLECTION, GASTOS_SUBCOLLECTION, USERS_COLLECTION } from "@/lib/empresas-db";
 import type { TipoGasto } from "@/types/firestore";
 
-/** GET: lista gastos. Empleado: los que él generó. Admin/Jefe: los suyos */
+/** GET: lista gastos. Empleado: los que él generó. Admin/Jefe: los suyos. Solo para admin se resuelve el nombre de quien hizo el gasto. */
 export async function GET(request: NextRequest) {
   const apiUser = await getApiUser(request);
   if (!apiUser) {
@@ -34,6 +34,21 @@ export async function GET(request: NextRequest) {
       evidencia: data.evidencia ?? "",
     };
   });
+
+  if (apiUser.role === "admin" && list.length > 0) {
+    const uids = [...new Set(list.map((g) => g.creadoPor).filter(Boolean))];
+    const nombres: Record<string, string> = {};
+    await Promise.all(
+      uids.map(async (uid) => {
+        const userSnap = await db.collection(USERS_COLLECTION).doc(uid).get();
+        const d = userSnap.data();
+        nombres[uid] = (d?.displayName as string)?.trim() || (d?.email as string) || uid;
+      })
+    );
+    list.forEach((g) => {
+      (g as Record<string, unknown>).creadoPorNombre = nombres[g.creadoPor] ?? g.creadoPor;
+    });
+  }
 
   list.sort((a, b) => (b.fecha ? new Date(b.fecha).getTime() : 0) - (a.fecha ? new Date(a.fecha).getTime() : 0));
   const gastos = list.map((g) => ({ ...g, fecha: g.fecha?.toISOString?.() ?? null }));

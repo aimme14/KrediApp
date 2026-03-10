@@ -136,6 +136,7 @@ export default function SuperAdminDashboard() {
           <table>
             <thead>
               <tr>
+                <th>Código</th>
                 <th>Correo</th>
                 <th>Nombre</th>
                 <th>Estado</th>
@@ -145,13 +146,18 @@ export default function SuperAdminDashboard() {
             <tbody>
               {jefes.length === 0 ? (
                 <tr>
-                  <td colSpan={4} style={{ color: "var(--text-muted)" }}>
+                  <td colSpan={5} style={{ color: "var(--text-muted)" }}>
                     No hay jefes. Crea uno con el botón &quot;Crear jefe&quot;.
                   </td>
                 </tr>
               ) : (
                 jefes.map((j) => (
                   <tr key={j.uid}>
+                    <td>
+                      <code className="user-code" title="JF = Jefe, número secuencial">
+                        {j.codigo ?? "—"}
+                      </code>
+                    </td>
                     <td>{j.email}</td>
                     <td>{j.displayName ?? "—"}</td>
                     <td>

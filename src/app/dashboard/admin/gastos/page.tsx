@@ -217,6 +217,7 @@ export default function GastosPage() {
                   <th>Motivo</th>
                   <th>Tipo</th>
                   <th>Monto</th>
+                  <th>Hecho por</th>
                   <th>Evidencia</th>
                 </tr>
               </thead>
@@ -227,6 +228,7 @@ export default function GastosPage() {
                     <td>{g.descripcion}</td>
                     <td>{g.tipo}</td>
                     <td>{g.monto.toFixed(2)}</td>
+                    <td>{g.creadoPorNombre ?? "—"}</td>
                     <td>
                       {g.evidencia ? (
                         <a href={g.evidencia} target="_blank" rel="noopener noreferrer">
