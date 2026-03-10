@@ -75,21 +75,27 @@ export async function GET(request: NextRequest) {
     const rutasSnap = await empresaRef.collection(RUTAS_SUBCOLLECTION).where("adminId", "==", apiUser.uid).get();
     const rutaIds = rutasSnap.docs.map((d) => d.id);
     const byId = new Map<string, (typeof list)[0]>();
+    /** Convierte valor Firestore (Timestamp o Date) a Date | null */
+    const toDateOrNull = (v: unknown): Date | null => {
+      if (v == null) return null;
+      const t = v as { toDate?: () => Date };
+      return typeof t.toDate === "function" ? t.toDate() : null;
+    };
     const add = (d: { id: string; data: () => Record<string, unknown> | undefined }) => {
       const data = d.data();
-      const item = {
+      const item: (typeof list)[0] = {
         id: d.id,
-        nombre: data?.nombre ?? "",
-        ubicacion: data?.ubicacion ?? "",
-        direccion: data?.direccion ?? "",
-        telefono: data?.telefono ?? "",
-        cedula: data?.cedula ?? "",
-        rutaId: data?.rutaId ?? "",
-        adminId: data?.adminId ?? "",
+        nombre: String(data?.nombre ?? ""),
+        ubicacion: String(data?.ubicacion ?? ""),
+        direccion: String(data?.direccion ?? ""),
+        telefono: String(data?.telefono ?? ""),
+        cedula: String(data?.cedula ?? ""),
+        rutaId: String(data?.rutaId ?? ""),
+        adminId: String(data?.adminId ?? ""),
         prestamo_activo: data?.prestamo_activo === true,
         moroso: data?.moroso === true,
-        fechaCreacion: data?.fechaCreacion?.toDate?.() ?? null,
-        codigo: data?.codigo ?? undefined,
+        fechaCreacion: toDateOrNull(data?.fechaCreacion) ?? null,
+        codigo: data?.codigo != null ? String(data.codigo) : undefined,
       };
       byId.set(d.id, item);
     };

@@ -7,6 +7,7 @@ const COUNTERS_COLLECTION = "counters";
 
 /** Obtiene el número de admin (001, 002...) desde adminNum o parseando codigo AD-001 */
 function getAdminNumForRuta(data: Record<string, unknown> | undefined): number {
+  if (!data) return 0;
   if (data.adminNum != null && typeof data.adminNum === "number") return data.adminNum;
   const codigo = data.codigo;
   if (typeof codigo === "string") {

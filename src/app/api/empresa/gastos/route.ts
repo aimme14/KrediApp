@@ -36,7 +36,7 @@ export async function GET(request: NextRequest) {
   });
 
   if (apiUser.role === "admin" && list.length > 0) {
-    const uids = [...new Set(list.map((g) => g.creadoPor).filter(Boolean))];
+    const uids = Array.from(new Set(list.map((g) => g.creadoPor).filter(Boolean)));
     const nombres: Record<string, string> = {};
     await Promise.all(
       uids.map(async (uid) => {
