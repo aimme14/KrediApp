@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { roleLabel } from "@/types/roles";
 import ThemeToggle from "@/components/ThemeToggle";
+import Logo from "@/components/Logo";
 
 export default function DashboardLayout({
   children,
@@ -38,19 +39,19 @@ export default function DashboardLayout({
     <div className="container" style={{ paddingTop: "1rem" }}>
       <header className="dashboard-header">
         <div className="header-left">
-          <Link href="/dashboard" style={{ fontWeight: 600, color: "var(--text)" }}>
-            KrediApp
+          <Link href="/dashboard" style={{ display: "flex", alignItems: "center" }} aria-label="KrediApp - Inicio">
+            <Logo variant="header" />
           </Link>
-          <span className={`badge badge-${profile.role}`} style={{ textTransform: "capitalize" }}>
+          <span className={`badge badge-${profile.role} dashboard-header-badge`} style={{ textTransform: "capitalize" }}>
             {roleLabel(profile.role)}
           </span>
         </div>
         <div className="header-right">
           <ThemeToggle />
-          <span style={{ color: "var(--text-muted)", fontSize: "0.875rem", wordBreak: "break-all" }}>
+          <span className="dashboard-header-email" title={profile.email}>
             {profile.email}
           </span>
-          <button type="button" className="btn btn-secondary" onClick={() => signOut()}>
+          <button type="button" className="btn btn-secondary dashboard-header-btn" onClick={() => signOut()}>
             Cerrar sesión
           </button>
         </div>

@@ -6,6 +6,10 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "KrediApp - Gestión por roles",
   description: "Aplicación con roles: Super Admin, Jefe, Admin y Trabajador",
+  icons: {
+    icon: "/krediapp-icon.png",
+    apple: "/krediapp-icon.png",
+  },
 };
 
 export const viewport: Viewport = {

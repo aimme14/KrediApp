@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 import LoginForm from "@/components/LoginForm";
 import ThemeToggle from "@/components/ThemeToggle";
+import Logo from "@/components/Logo";
 
 function LoginFormSignOut() {
   const { signOut } = useAuth();
@@ -59,8 +60,10 @@ export default function HomePage() {
           <ThemeToggle />
         </div>
         <div className="card" style={{ maxWidth: 400, margin: "0 auto" }}>
-          <h1 className="page-title">KrediApp</h1>
-          <p className="error-msg" style={{ marginBottom: "1rem" }}>
+          <div className="page-title" style={{ display: "flex", justifyContent: "center", marginBottom: "1rem" }}>
+          <Logo variant="page" priority />
+        </div>
+        <p className="error-msg" style={{ marginBottom: "1rem" }}>
             Tu cuenta no tiene un perfil asignado en la aplicación. Contacta al Super Administrador o al responsable para que te den de alta.
           </p>
           <LoginFormSignOut />
@@ -75,7 +78,9 @@ export default function HomePage() {
         <ThemeToggle />
       </div>
       <div className="card" style={{ maxWidth: 400, margin: "0 auto" }}>
-        <h1 className="page-title">KrediApp</h1>
+        <div className="page-title" style={{ display: "flex", justifyContent: "center", marginBottom: "1rem" }}>
+          <Logo variant="page" priority />
+        </div>
         <p style={{ color: "var(--text-muted)", marginBottom: "1.5rem" }}>
           Inicia sesión con tu cuenta
         </p>
