@@ -15,6 +15,7 @@ export async function getEmpresa(jefeUid: string): Promise<EmpresaProfile | null
     logo: d.logo ?? "",
     dueño: d.dueño ?? "",
     sedePrincipal: d.sedePrincipal ?? "",
+    activa: d.activa !== false,
   };
 }
 
