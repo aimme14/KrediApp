@@ -9,12 +9,13 @@ const MODALIDADES = [
   { value: "mensual", label: "Mensual" },
 ] as const;
 
-/** Formato moneda: miles con punto, decimales con coma (ej: 1.234,56) */
+/** Formato moneda: miles con punto; decimales con coma solo si son distintos de cero (ej: 1.234 o 1.234,56) */
 function formatMoneda(n: number): string {
   if (typeof n !== "number" || isNaN(n)) return "";
   const [entero, dec = ""] = n.toFixed(2).split(".");
   const conPuntos = entero.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
-  return `${conPuntos},${dec}`;
+  const decTrim = dec.replace(/0+$/, "");
+  return decTrim ? `${conPuntos},${decTrim}` : conPuntos;
 }
 
 function calcularTotal(monto: number, interesPct: number, numeroCuotas: number, modalidad: string) {

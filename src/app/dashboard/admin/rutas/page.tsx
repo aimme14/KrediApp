@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/context/AuthContext";
-import { listRutas, createRuta, listClientes, listPrestamos, type RutaItem, type ClienteItem, type PrestamoItem } from "@/lib/empresa-api";
+import { listRutas, createRuta, listClientes, listPrestamos, formatClienteCodigoCorto, type RutaItem, type ClienteItem, type PrestamoItem } from "@/lib/empresa-api";
 
 export default function RutasPage() {
   const { user, profile } = useAuth();
@@ -149,7 +149,17 @@ export default function RutasPage() {
                   textAlign: "left",
                 }}
               >
-                <span style={{ fontWeight: 600 }}>{ruta.nombre}</span>
+                <span style={{ display: "flex", alignItems: "center", gap: "0.75rem", flex: 1, minWidth: 0 }}>
+                  {ruta.codigo && (
+                    <code
+                      className="user-code ruta-code"
+                      title="RT = Ruta, primer número = Admin, segundo = N° Ruta"
+                    >
+                      {ruta.codigo}
+                    </code>
+                  )}
+                  <span style={{ fontWeight: 600 }}>{ruta.nombre}</span>
+                </span>
                 <span style={{ color: "var(--text-muted)", fontSize: "0.875rem" }}>
                   {ruta.ubicacion || "—"}
                 </span>
@@ -168,6 +178,7 @@ export default function RutasPage() {
                       <table>
                         <thead>
                           <tr>
+                            <th>Código</th>
                             <th>Nombre</th>
                             <th>Ubicación</th>
                             <th>Dirección</th>
@@ -181,6 +192,9 @@ export default function RutasPage() {
                             const prestamo = getPrestamoForCliente(ruta.id, c.id);
                             return (
                               <tr key={c.id}>
+                                <td title={c.codigo ?? undefined}>
+                                  {formatClienteCodigoCorto(c.codigo)}
+                                </td>
                                 <td>{c.nombre}</td>
                                 <td>{c.ubicacion || "—"}</td>
                                 <td>{c.direccion || "—"}</td>

@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminFirestore } from "@/lib/firebase-admin";
 import { getApiUser } from "@/lib/api-auth";
-import { EMPRESAS_COLLECTION, GASTOS_SUBCOLLECTION } from "@/lib/empresas-db";
+import { EMPRESAS_COLLECTION, GASTOS_SUBCOLLECTION, USERS_COLLECTION } from "@/lib/empresas-db";
 import type { TipoGasto } from "@/types/firestore";
 
-/** GET: lista gastos. Empleado: los que él generó. Admin/Jefe: los suyos */
+/** GET: lista gastos. Empleado: los que él generó. Admin/Jefe: los suyos. Solo para admin se resuelve el nombre de quien hizo el gasto. */
 export async function GET(request: NextRequest) {
   const apiUser = await getApiUser(request);
   if (!apiUser) {
@@ -27,6 +27,7 @@ export async function GET(request: NextRequest) {
       fecha: data.fecha?.toDate?.() ?? null,
       tipo: data.tipo ?? "otro",
       creadoPor: data.creadoPor ?? "",
+      creadoPorNombre: data.creadoPorNombre ?? "",
       rol: data.rol ?? "admin",
       rutaId: data.rutaId ?? "",
       adminId: data.adminId ?? "",
@@ -34,6 +35,28 @@ export async function GET(request: NextRequest) {
       evidencia: data.evidencia ?? "",
     };
   });
+
+  // Para admin: rellenar creadoPorNombre solo si no está guardado (gastos antiguos)
+  if (apiUser.role !== "empleado" && list.length > 0) {
+    const sinNombre = list.filter((g) => !(g as { creadoPorNombre?: string }).creadoPorNombre?.trim());
+    if (sinNombre.length > 0) {
+      const uids = Array.from(new Set(sinNombre.map((g) => g.creadoPor).filter(Boolean)));
+      const nombres: Record<string, string> = {};
+      await Promise.all(
+        uids.map(async (uid) => {
+          const userSnap = await db.collection(USERS_COLLECTION).doc(uid).get();
+          const d = userSnap.data();
+          nombres[uid] = (d?.displayName as string)?.trim() || (d?.email as string) || uid;
+        })
+      );
+      list.forEach((g) => {
+        const gAny = g as { creadoPorNombre?: string };
+        if (!gAny.creadoPorNombre?.trim()) {
+          gAny.creadoPorNombre = nombres[g.creadoPor] ?? g.creadoPor;
+        }
+      });
+    }
+  }
 
   list.sort((a, b) => (b.fecha ? new Date(b.fecha).getTime() : 0) - (a.fecha ? new Date(a.fecha).getTime() : 0));
   const gastos = list.map((g) => ({ ...g, fecha: g.fecha?.toISOString?.() ?? null }));
@@ -68,6 +91,13 @@ export async function POST(request: NextRequest) {
   const fechaDate = fecha ? new Date(fecha) : new Date();
 
   const db = getAdminFirestore();
+  const userSnap = await db.collection(USERS_COLLECTION).doc(apiUser.uid).get();
+  const userData = userSnap.data();
+  const creadoPorNombre =
+    (typeof userData?.displayName === "string" && userData.displayName.trim()) ||
+    (typeof userData?.email === "string" && userData.email.trim()) ||
+    apiUser.uid;
+
   const ref = db
     .collection(EMPRESAS_COLLECTION)
     .doc(apiUser.empresaId)
@@ -81,6 +111,7 @@ export async function POST(request: NextRequest) {
     fecha: fechaDate,
     tipo: tipoValido,
     creadoPor: apiUser.uid,
+    creadoPorNombre: creadoPorNombre.trim() || apiUser.uid,
     rol: isEmpleado ? "empleado" : "admin",
     adminId: isEmpleado && apiUser.adminId ? apiUser.adminId : apiUser.uid,
     empleadoId: isEmpleado ? apiUser.uid : null,

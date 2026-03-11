@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 
 const NAV_ITEMS = [
+  { href: "/dashboard/jefe/inicio", label: "Inicio", icon: "home" },
   { href: "/dashboard/jefe/empresa", label: "Perfil de la empresa", icon: "building" },
   { href: "/dashboard/jefe/administradores", label: "Administradores", icon: "users" },
   { href: "/dashboard/jefe/permisos", label: "Permisos", icon: "lock" },
@@ -15,6 +16,13 @@ const NAV_ITEMS = [
 function NavIcon({ name }: { name: string }) {
   const size = 22;
   switch (name) {
+    case "home":
+      return (
+        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+          <polyline points="9 22 9 12 15 12 15 22" />
+        </svg>
+      );
     case "building":
       return (
         <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
@@ -110,7 +118,7 @@ export default function JefeLayout({
         <div className="jefe-drawer-inner">
           <nav className="jefe-drawer-nav">
             {NAV_ITEMS.map((item) => {
-              const isActive = pathname === item.href;
+              const isActive = pathname === item.href || (item.href === "/dashboard/jefe/inicio" && pathname === "/dashboard/jefe");
               return (
                 <Link
                   key={item.href}

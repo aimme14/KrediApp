@@ -10,7 +10,7 @@ const NAV_ITEMS = [
   { href: "/dashboard/admin/rutas", label: "Rutas", icon: "route" },
   { href: "/dashboard/admin/empleado", label: "Empleado", icon: "user" },
   { href: "/dashboard/admin/cliente", label: "Cliente", icon: "client" },
-  { href: "/dashboard/admin/prestamo", label: "Creación de préstamo", icon: "loan" },
+  { href: "/dashboard/admin/prestamo", label: "Prestamos", icon: "loan" },
   { href: "/dashboard/admin/gastos", label: "Gastos operativos", icon: "expense" },
   { href: "/dashboard/admin/resumen", label: "Resumen Económico", icon: "chart" },
   { href: "/dashboard/admin/permisos", label: "Permisos", icon: "lock" },

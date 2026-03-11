@@ -18,7 +18,6 @@ export default function EmpleadoPage() {
   const [direccion, setDireccion] = useState("");
   const [telefono, setTelefono] = useState("");
   const [cedula, setCedula] = useState("");
-  const [base, setBase] = useState("");
   const [rutaId, setRutaId] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -63,11 +62,11 @@ export default function EmpleadoPage() {
         displayName: displayName.trim() || undefined,
         role: "trabajador",
         createdByUid: profile.uid,
+        adminId: profile.uid,
         cedula: cedula.trim() || undefined,
         lugar: ubicacion.trim() || undefined,
         direccion: direccion.trim() || undefined,
         telefono: telefono.trim() || undefined,
-        base: base.trim() || undefined,
         rutaId: rutaId.trim(),
       });
       setDisplayName("");
@@ -75,7 +74,6 @@ export default function EmpleadoPage() {
       setDireccion("");
       setTelefono("");
       setCedula("");
-      setBase("");
       setRutaId("");
       setEmail("");
       setPassword("");
@@ -95,7 +93,7 @@ export default function EmpleadoPage() {
     <div className="card">
       <h2 style={{ marginTop: 0 }}>Empleado</h2>
       <p style={{ color: "var(--text-muted)", fontSize: "0.875rem", marginBottom: "1.25rem" }}>
-        Crea empleados con nombre, ubicación, dirección, teléfono, cédula, base, ruta, correo y contraseña (credenciales de ingreso).
+        Crea empleados con nombre, ubicación, dirección, teléfono, cédula, ruta, correo y contraseña (credenciales de ingreso).
       </p>
 
       <div style={{ marginBottom: "1.25rem" }}>
@@ -162,15 +160,6 @@ export default function EmpleadoPage() {
               />
             </div>
             <div className="form-group">
-              <label>Base</label>
-              <input
-                type="text"
-                value={base}
-                onChange={(e) => setBase(e.target.value)}
-                placeholder="Base asignada"
-              />
-            </div>
-            <div className="form-group">
               <label>Ruta asignada</label>
               <select
                 value={rutaId}
@@ -231,13 +220,12 @@ export default function EmpleadoPage() {
                   <th>Ubicación</th>
                   <th>Teléfono</th>
                   <th>Cédula</th>
-                  <th>Base</th>
                 </tr>
               </thead>
               <tbody>
                 {trabajadores.length === 0 ? (
                   <tr>
-                    <td colSpan={6} style={{ color: "var(--text-muted)" }}>
+                    <td colSpan={5} style={{ color: "var(--text-muted)" }}>
                       No hay empleados. Crea uno con el botón &quot;Nuevo empleado&quot;.
                     </td>
                   </tr>
@@ -249,7 +237,6 @@ export default function EmpleadoPage() {
                       <td>{t.lugar ?? "—"}</td>
                       <td>{t.telefono ?? "—"}</td>
                       <td>{t.cedula ?? "—"}</td>
-                      <td>{t.base ?? "—"}</td>
                     </tr>
                   ))
                 )}

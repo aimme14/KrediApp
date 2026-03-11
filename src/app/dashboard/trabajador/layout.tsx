@@ -6,10 +6,11 @@ import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 
 const NAV_ITEMS = [
+  { href: "/dashboard/trabajador", label: "Inicio", icon: "home" },
   { href: "/dashboard/trabajador/ruta", label: "Ruta del día", icon: "route" },
   { href: "/dashboard/trabajador/resumen", label: "Resumen del día", icon: "chart" },
   { href: "/dashboard/trabajador/cliente", label: "Cliente", icon: "client" },
-  { href: "/dashboard/trabajador/prestamo", label: "Creación de préstamo", icon: "loan" },
+  { href: "/dashboard/trabajador/prestamo", label: "Prestamos", icon: "loan" },
   { href: "/dashboard/trabajador/simulacro", label: "Simulacro de préstamo", icon: "calc" },
   { href: "/dashboard/trabajador/gastos", label: "Gastos operativos", icon: "expense" },
   { href: "/dashboard/trabajador/cliente-moroso", label: "Cliente moroso", icon: "alert" },
@@ -18,6 +19,13 @@ const NAV_ITEMS = [
 function NavIcon({ name }: { name: string }) {
   const size = 22;
   switch (name) {
+    case "home":
+      return (
+        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+          <polyline points="9 22 9 12 15 12 15 22" />
+        </svg>
+      );
     case "route":
       return (
         <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
@@ -100,6 +108,8 @@ export default function TrabajadorLayout({ children }: { children: React.ReactNo
     );
   }
 
+  const isInicio = pathname === "/dashboard/trabajador";
+
   return (
     <div className="jefe-wrapper">
       <div className="jefe-nav-bar">
@@ -108,6 +118,14 @@ export default function TrabajadorLayout({ children }: { children: React.ReactNo
           <span className="jefe-hamburger-line" />
           <span className="jefe-hamburger-line" />
         </button>
+        <Link
+          href="/dashboard/trabajador"
+          className={`trabajador-nav-inicio ${isInicio ? "trabajador-nav-inicio-active" : ""}`}
+          aria-label="Volver al inicio"
+        >
+          <span className="trabajador-nav-inicio-icon"><NavIcon name="home" /></span>
+          <span className="trabajador-nav-inicio-text">Inicio</span>
+        </Link>
         <span className="jefe-nav-title">Panel Trabajador</span>
       </div>
       <aside className={`jefe-drawer ${menuOpen ? "jefe-drawer-open" : ""}`} aria-hidden={!menuOpen}>

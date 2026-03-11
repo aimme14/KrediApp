@@ -167,28 +167,38 @@ export default function AdministradoresPage() {
           <table>
             <thead>
               <tr>
+                <th>Código</th>
                 <th>Nombre</th>
                 <th>Cédula</th>
                 <th>Lugar</th>
                 <th>Base</th>
                 <th>Correo</th>
+                <th>Creado por</th>
               </tr>
             </thead>
             <tbody>
               {admins.length === 0 ? (
                 <tr>
-                  <td colSpan={5} style={{ color: "var(--text-muted)" }}>
+                  <td colSpan={7} style={{ color: "var(--text-muted)" }}>
                     No hay administradores. Crea uno con el botón &quot;Crear administrador&quot;.
                   </td>
                 </tr>
               ) : (
                 admins.map((a) => (
                   <tr key={a.uid}>
+                    <td>
+                      <code className="user-code" title="AD = Admin, número secuencial">
+                        {a.codigo ?? "—"}
+                      </code>
+                    </td>
                     <td>{a.displayName ?? "—"}</td>
                     <td>{a.cedula ?? "—"}</td>
                     <td>{a.lugar ?? "—"}</td>
                     <td>{a.base ?? "—"}</td>
                     <td>{a.email}</td>
+                    <td title="Código del jefe que creó a este administrador">
+                      {a.jefeCodigo ?? "—"}
+                    </td>
                   </tr>
                 ))
               )}

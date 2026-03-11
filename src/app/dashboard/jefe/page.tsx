@@ -7,7 +7,7 @@ export default function JefeHubPage() {
   const router = useRouter();
 
   useEffect(() => {
-    router.replace("/dashboard/jefe/empresa");
+    router.replace("/dashboard/jefe/inicio");
   }, [router]);
 
   return (

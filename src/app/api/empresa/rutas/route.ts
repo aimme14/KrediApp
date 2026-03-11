@@ -1,7 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminFirestore } from "@/lib/firebase-admin";
 import { getApiUser } from "@/lib/api-auth";
-import { EMPRESAS_COLLECTION, RUTAS_SUBCOLLECTION } from "@/lib/empresas-db";
+import { EMPRESAS_COLLECTION, RUTAS_SUBCOLLECTION, USERS_COLLECTION } from "@/lib/empresas-db";
+
+const COUNTERS_COLLECTION = "counters";
+
+/** Obtiene el número de admin (001, 002...) desde adminNum o parseando codigo AD-001 */
+function getAdminNumForRuta(data: Record<string, unknown> | undefined): number {
+  if (!data) return 0;
+  if (data.adminNum != null && typeof data.adminNum === "number") return data.adminNum;
+  const codigo = data.codigo;
+  if (typeof codigo === "string") {
+    const match = codigo.match(/^AD-(\d+)$/);
+    if (match) return parseInt(match[1], 10);
+  }
+  return 0;
+}
 
 /** GET: lista rutas de la empresa del usuario */
 export async function GET(request: NextRequest) {
@@ -28,6 +42,7 @@ export async function GET(request: NextRequest) {
       adminId: data.adminId ?? "",
       empleadoId: data.empleadoId ?? "",
       fechaCreacion: data.fechaCreacion?.toDate?.() ?? null,
+      codigo: data.codigo ?? undefined,
     };
   });
 
@@ -53,6 +68,23 @@ export async function POST(request: NextRequest) {
 
   const db = getAdminFirestore();
   const now = new Date();
+
+  // Número del admin para código RT-{adminNum}-{routeNum} (desde adminNum o codigo AD-001)
+  const adminSnap = await db.collection(USERS_COLLECTION).doc(apiUser.uid).get();
+  const adminNum = getAdminNumForRuta(adminSnap.data());
+
+  // Secuencial de rutas por admin
+  const counterRef = db.collection(COUNTERS_COLLECTION).doc(`rutas_${apiUser.uid}`);
+  const routeNum = await db.runTransaction(async (tx) => {
+    const snap = await tx.get(counterRef);
+    const lastNum = snap.exists ? (snap.data()?.lastNum ?? 0) : 0;
+    const next = lastNum + 1;
+    tx.set(counterRef, { lastNum: next }, { merge: true });
+    return next;
+  });
+
+  const codigo = `RT-${String(adminNum).padStart(3, "0")}-${String(routeNum).padStart(3, "0")}`;
+
   const ref = db
     .collection(EMPRESAS_COLLECTION)
     .doc(apiUser.empresaId)
@@ -64,6 +96,7 @@ export async function POST(request: NextRequest) {
     ubicacion: (ubicacion ?? "").trim() || null,
     adminId: apiUser.uid,
     fechaCreacion: now,
+    codigo,
   });
 
   return NextResponse.json({ id: ref.id });

@@ -56,6 +56,8 @@ export interface RutaDoc {
   adminId: string;
   empleadoId?: string; // quien cobra la ruta (opcional al crear)
   fechaCreacion: Date;
+  /** Código legible RT-{adminNum}-{routeNum} (id técnico es el doc id) */
+  codigo?: string;
 }
 
 /** Cliente */
@@ -71,6 +73,8 @@ export interface ClienteDoc {
   fechaCreacion: Date;
   /** Si true, cliente excluido de la ruta normal (caso especial, no volver a prestar) */
   moroso?: boolean;
+  /** Código legible CL-{adminNum}-{rutaNum}-{clienteNum} */
+  codigo?: string;
 }
 
 /** Estado del préstamo */
