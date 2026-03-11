@@ -43,6 +43,16 @@ export function formatClienteCodigoCorto(codigo: string | undefined): string {
   return `CL-${m[2]}-${m[3]}`;
 }
 
+/**
+ * Extrae las últimas tres cifras del código de cliente (número dentro de la ruta).
+ * Ej: clienteNumFromCodigo("CL-001-002-045") → "045"
+ */
+export function clienteNumFromCodigo(codigo: string | undefined): string {
+  if (!codigo || typeof codigo !== "string") return "";
+  const m = codigo.match(/^CL-\d+-\d+-(\d+)$/);
+  return m ? m[1] : "";
+}
+
 export type PrestamoItem = {
   id: string;
   clienteId: string;

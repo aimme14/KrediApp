@@ -6,6 +6,11 @@ import {
   CLIENTES_SUBCOLLECTION,
   PRESTAMOS_SUBCOLLECTION,
 } from "@/lib/empresas-db";
+import {
+  getNextWorkingDay,
+  addWorkingDays,
+  FESTIVOS,
+} from "@/lib/fechas-laborables";
 import type { ModalidadPago } from "@/types/firestore";
 
 /** GET: lista préstamos. Empleado: los de su ruta. Admin/Jefe: los suyos */
@@ -117,13 +122,20 @@ export async function POST(request: NextRequest) {
   const interesPct = typeof interes === "number" ? interes : 0;
   const totalAPagar = monto * (1 + interesPct / 100);
   const inicio = fechaInicio ? new Date(fechaInicio) : new Date();
+  inicio.setHours(0, 0, 0, 0);
+
+  // Fin previsto (referencia, no forzado): solo días laborables (lun-sáb, sin festivos)
   let fechaVencimiento: Date;
   if (mod === "diario") {
-    fechaVencimiento = addDays(inicio, numeroCuotas);
+    const primerDiaCobro = getNextWorkingDay(inicio, FESTIVOS);
+    fechaVencimiento = addWorkingDays(primerDiaCobro, numeroCuotas - 1, FESTIVOS);
   } else if (mod === "semanal") {
-    fechaVencimiento = addDays(inicio, numeroCuotas * 7);
+    const primerDiaCobro = getNextWorkingDay(inicio, FESTIVOS);
+    const ultimaCuotaCalendar = addDays(primerDiaCobro, (numeroCuotas - 1) * 7);
+    fechaVencimiento = getNextWorkingDay(ultimaCuotaCalendar, FESTIVOS);
   } else {
-    fechaVencimiento = addMonths(inicio, numeroCuotas);
+    const ultimaCuotaCalendar = addMonths(inicio, numeroCuotas - 1);
+    fechaVencimiento = getNextWorkingDay(ultimaCuotaCalendar, FESTIVOS);
   }
 
   const ref = db

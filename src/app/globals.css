@@ -274,6 +274,70 @@ td {
   }
 }
 
+/* Tabla de historial: contenido centrado y ordenado */
+.table-historial th,
+.table-historial td {
+  text-align: center;
+  vertical-align: middle;
+  padding: 0.65rem 0.5rem;
+}
+.table-historial th {
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.table-historial td {
+  font-variant-numeric: tabular-nums;
+}
+.table-wrap.table-historial-wrap {
+  margin: 0;
+}
+.table-wrap.table-historial-wrap + p {
+  text-align: center;
+  margin-top: 0.75rem;
+}
+
+/* Columna del botón expandir: ancho fijo y centrado para alinear todas las filas */
+.table-historial thead tr th:first-child,
+.table-historial tbody tr td:first-child {
+  width: 2.25rem;
+  min-width: 2.25rem;
+  max-width: 2.25rem;
+  text-align: center;
+  padding-left: 0.35rem;
+  padding-right: 0.35rem;
+}
+
+/* Botón expandir historial por cliente */
+.table-historial .btn-expand-historial {
+  padding: 0.2rem 0.4rem;
+  font-size: 0.75rem;
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius);
+  background: var(--card-bg);
+  color: var(--text);
+  cursor: pointer;
+  line-height: 1;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.table-historial .btn-expand-historial:hover {
+  background: var(--btn-secondary-hover, rgba(0 0 0 / 0.06));
+  border-color: var(--text-muted);
+}
+.table-historial .btn-expand-historial:focus-visible {
+  outline: 2px solid var(--link);
+  outline-offset: 2px;
+}
+
+/* Lista de otros préstamos al expandir */
+.historial-prestamos-list ul {
+  margin: 0;
+  padding-left: 1.25rem;
+  list-style: disc;
+}
+.historial-prestamos-list li {
+  margin-bottom: 0.25rem;
+}
+
 th {
   color: var(--text-muted);
   font-weight: 500;

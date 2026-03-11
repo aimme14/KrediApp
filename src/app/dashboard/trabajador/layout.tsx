@@ -9,7 +9,7 @@ const NAV_ITEMS = [
   { href: "/dashboard/trabajador/ruta", label: "Ruta del día", icon: "route" },
   { href: "/dashboard/trabajador/resumen", label: "Resumen del día", icon: "chart" },
   { href: "/dashboard/trabajador/cliente", label: "Cliente", icon: "client" },
-  { href: "/dashboard/trabajador/prestamo", label: "Creación de préstamo", icon: "loan" },
+  { href: "/dashboard/trabajador/prestamo", label: "Prestamos", icon: "loan" },
   { href: "/dashboard/trabajador/simulacro", label: "Simulacro de préstamo", icon: "calc" },
   { href: "/dashboard/trabajador/gastos", label: "Gastos operativos", icon: "expense" },
   { href: "/dashboard/trabajador/cliente-moroso", label: "Cliente moroso", icon: "alert" },
