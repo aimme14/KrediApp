@@ -1,12 +1,14 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { roleLabel } from "@/types/roles";
 import Logo from "@/components/Logo";
 import DashboardSettings from "@/components/DashboardSettings";
+import { DashboardHeaderProvider } from "@/context/DashboardHeaderContext";
+import type { ReactNode } from "react";
 
 export default function DashboardLayout({
   children,
@@ -15,6 +17,10 @@ export default function DashboardLayout({
 }) {
   const { user, profile, loading, isEnabled } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
+  const [headerLeftSlot, setHeaderLeftSlot] = useState<ReactNode>(null);
+
+  const isGastosPage = pathname?.includes("/gastos") ?? false;
 
   useEffect(() => {
     if (loading) return;
@@ -35,16 +41,15 @@ export default function DashboardLayout({
     );
   }
 
-  const pathname = usePathname();
-  const isGastosPage = pathname?.includes("/gastos") ?? false;
-
   return (
-    <div className={`container${isGastosPage ? " dashboard-page-gastos" : ""}`} style={{ paddingTop: "1rem" }}>
-      <header className="dashboard-header">
-        <div className="header-left">
-          <Link href="/dashboard" style={{ display: "flex", alignItems: "center" }} aria-label="KrediApp - Inicio">
-            <Logo variant="header" />
-          </Link>
+    <DashboardHeaderProvider value={setHeaderLeftSlot}>
+      <div className={`container container-dashboard${isGastosPage ? " dashboard-page-gastos" : ""}`}>
+        <header className="dashboard-header">
+          <div className="header-left">
+            {headerLeftSlot}
+            <Link href="/dashboard" style={{ display: "flex", alignItems: "center" }} aria-label="KrediApp - Inicio">
+              <Logo variant="header" />
+            </Link>
           <span className={`badge badge-${profile.role} dashboard-header-badge`} style={{ textTransform: "capitalize" }}>
             {roleLabel(profile.role)}
           </span>
@@ -55,5 +60,6 @@ export default function DashboardLayout({
       </header>
       {children}
     </div>
+    </DashboardHeaderProvider>
   );
 }

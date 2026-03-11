@@ -46,25 +46,25 @@ export default function ResumenDelDiaPage() {
             <thead>
               <tr>
                 <th>Concepto</th>
-                <th>Monto</th>
+                <th className="col-num">Monto</th>
               </tr>
             </thead>
             <tbody>
               <tr>
                 <td>Lo recogido (cobrado a clientes)</td>
-                <td>{recogidoHoy.toFixed(2)}</td>
+                <td className="col-num">{recogidoHoy.toFixed(2)}</td>
               </tr>
               <tr>
                 <td>Lo que falta por recoger (saldo pendiente)</td>
-                <td>{faltaRecoger.toFixed(2)}</td>
+                <td className="col-num">{faltaRecoger.toFixed(2)}</td>
               </tr>
               <tr>
                 <td>Gastos generados (hoy)</td>
-                <td>{gastosHoy.toFixed(2)}</td>
+                <td className="col-num">{gastosHoy.toFixed(2)}</td>
               </tr>
               <tr>
                 <td>Gastos totales (historial)</td>
-                <td>{gastosTotal.toFixed(2)}</td>
+                <td className="col-num">{gastosTotal.toFixed(2)}</td>
               </tr>
             </tbody>
           </table>

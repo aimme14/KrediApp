@@ -333,9 +333,9 @@ export default function PrestamoPage() {
                   <table>
                     <thead>
                       <tr>
-                        <th>Monto</th>
-                        <th>Total a pagar</th>
-                        <th>Saldo</th>
+                        <th className="col-num">Monto</th>
+                        <th className="col-num">Total a pagar</th>
+                        <th className="col-num">Saldo</th>
                         <th>Estado</th>
                         <th>Frecuencia</th>
                       </tr>
@@ -343,9 +343,9 @@ export default function PrestamoPage() {
                     <tbody>
                       {prestamosDelCliente.map((p) => (
                         <tr key={p.id}>
-                          <td>{formatMoneda(p.monto)}</td>
-                          <td>{formatMoneda(p.totalAPagar)}</td>
-                          <td>{formatMoneda(p.saldoPendiente)}</td>
+                          <td className="col-num">{formatMoneda(p.monto)}</td>
+                          <td className="col-num">{formatMoneda(p.totalAPagar)}</td>
+                          <td className="col-num">{formatMoneda(p.saldoPendiente)}</td>
                           <td>{p.estado}</td>
                           <td>{p.modalidad}</td>
                         </tr>
@@ -609,10 +609,10 @@ export default function PrestamoPage() {
                   <th aria-label="Expandir historial" />
                   <th>Código</th>
                   <th>Cliente</th>
-                  <th>Monto</th>
-                  <th>Total a pagar</th>
-                  <th>Saldo</th>
-                  <th>Cuotas</th>
+                  <th className="col-num">Monto</th>
+                  <th className="col-num">Total a pagar</th>
+                  <th className="col-num">Saldo</th>
+                  <th className="col-num">Cuotas</th>
                   <th>Estado</th>
                   <th>Frecuencia</th>
                 </tr>
@@ -650,10 +650,10 @@ export default function PrestamoPage() {
                         </td>
                         <td>{codigoDisplay}</td>
                         <td>{nombre}</td>
-                        <td>{formatMoneda(principal.monto)}</td>
-                        <td>{formatMoneda(principal.totalAPagar)}</td>
-                        <td>{formatMoneda(principal.saldoPendiente)}</td>
-                        <td title="Cuotas pagadas / total">{pagadas} / {principal.numeroCuotas}</td>
+                        <td className="col-num">{formatMoneda(principal.monto)}</td>
+                        <td className="col-num">{formatMoneda(principal.totalAPagar)}</td>
+                        <td className="col-num">{formatMoneda(principal.saldoPendiente)}</td>
+                        <td className="col-num" title="Cuotas pagadas / total">{pagadas} / {principal.numeroCuotas}</td>
                         <td>{principal.estado}</td>
                         <td>{principal.modalidad}</td>
                       </tr>

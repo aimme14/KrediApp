@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
+import { useDashboardHeaderSlot } from "@/context/DashboardHeaderContext";
 
 const NAV_ITEMS = [
   { href: "/dashboard/admin", label: "Inicio", icon: "home" },
@@ -123,9 +124,29 @@ export default function AdminLayout({
     }
   }, [user, profile, loading, isEnabled, router]);
 
+  const setHeaderLeftSlot = useDashboardHeaderSlot();
+
   useEffect(() => {
     setMenuOpen(false);
   }, [pathname]);
+
+  useEffect(() => {
+    if (!setHeaderLeftSlot) return;
+    setHeaderLeftSlot(
+      <button
+        type="button"
+        className="jefe-hamburger jefe-hamburger-in-header"
+        onClick={() => setMenuOpen((o) => !o)}
+        aria-expanded={menuOpen}
+        aria-label={menuOpen ? "Cerrar menú" : "Abrir menú"}
+      >
+        <span className="jefe-hamburger-line" />
+        <span className="jefe-hamburger-line" />
+        <span className="jefe-hamburger-line" />
+      </button>
+    );
+    return () => setHeaderLeftSlot(null);
+  }, [setHeaderLeftSlot, menuOpen]);
 
   if (loading || !profile || profile.role !== "admin") {
     return (
@@ -137,21 +158,6 @@ export default function AdminLayout({
 
   return (
     <div className="jefe-wrapper">
-      <div className="jefe-nav-bar">
-        <button
-          type="button"
-          className="jefe-hamburger"
-          onClick={() => setMenuOpen((o) => !o)}
-          aria-expanded={menuOpen}
-          aria-label={menuOpen ? "Cerrar menú" : "Abrir menú"}
-        >
-          <span className="jefe-hamburger-line" />
-          <span className="jefe-hamburger-line" />
-          <span className="jefe-hamburger-line" />
-        </button>
-        <span className="jefe-nav-title">Panel Administrador</span>
-      </div>
-
       <aside
         className={`jefe-drawer ${menuOpen ? "jefe-drawer-open" : ""}`}
         aria-hidden={!menuOpen}

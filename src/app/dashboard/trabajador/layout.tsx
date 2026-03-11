@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
+import { useDashboardHeaderSlot } from "@/context/DashboardHeaderContext";
 
 const NAV_ITEMS = [
   { href: "/dashboard/trabajador", label: "Inicio", icon: "home" },
@@ -96,9 +97,29 @@ export default function TrabajadorLayout({ children }: { children: React.ReactNo
     if (!isEnabled()) router.push("/deshabilitado");
   }, [user, profile, loading, isEnabled, router]);
 
+  const setHeaderLeftSlot = useDashboardHeaderSlot();
+
   useEffect(() => {
     setMenuOpen(false);
   }, [pathname]);
+
+  useEffect(() => {
+    if (!setHeaderLeftSlot) return;
+    setHeaderLeftSlot(
+      <button
+        type="button"
+        className="jefe-hamburger jefe-hamburger-in-header"
+        onClick={() => setMenuOpen((o) => !o)}
+        aria-expanded={menuOpen}
+        aria-label={menuOpen ? "Cerrar menú" : "Abrir menú"}
+      >
+        <span className="jefe-hamburger-line" />
+        <span className="jefe-hamburger-line" />
+        <span className="jefe-hamburger-line" />
+      </button>
+    );
+    return () => setHeaderLeftSlot(null);
+  }, [setHeaderLeftSlot, menuOpen]);
 
   if (loading || !profile || profile.role !== "trabajador") {
     return (
@@ -112,22 +133,18 @@ export default function TrabajadorLayout({ children }: { children: React.ReactNo
 
   return (
     <div className="jefe-wrapper">
-      <div className="jefe-nav-bar">
-        <button type="button" className="jefe-hamburger" onClick={() => setMenuOpen((o) => !o)} aria-expanded={menuOpen} aria-label={menuOpen ? "Cerrar menú" : "Abrir menú"}>
-          <span className="jefe-hamburger-line" />
-          <span className="jefe-hamburger-line" />
-          <span className="jefe-hamburger-line" />
-        </button>
-        <Link
-          href="/dashboard/trabajador"
-          className={`trabajador-nav-inicio ${isInicio ? "trabajador-nav-inicio-active" : ""}`}
-          aria-label="Volver al inicio"
-        >
-          <span className="trabajador-nav-inicio-icon"><NavIcon name="home" /></span>
-          <span className="trabajador-nav-inicio-text">Inicio</span>
-        </Link>
-        <span className="jefe-nav-title">Panel Trabajador</span>
-      </div>
+      {!isInicio && (
+        <div className="jefe-nav-bar jefe-nav-bar-slim">
+          <Link
+            href="/dashboard/trabajador"
+            className={`trabajador-nav-inicio ${isInicio ? "trabajador-nav-inicio-active" : ""}`}
+            aria-label="Volver al inicio"
+          >
+            <span className="trabajador-nav-inicio-icon"><NavIcon name="home" /></span>
+            <span className="trabajador-nav-inicio-text">Inicio</span>
+          </Link>
+        </div>
+      )}
       <aside className={`jefe-drawer ${menuOpen ? "jefe-drawer-open" : ""}`} aria-hidden={!menuOpen}>
         <div className="jefe-drawer-inner">
           <nav className="jefe-drawer-nav">

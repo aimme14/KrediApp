@@ -78,7 +78,7 @@ export default function SuperAdminDashboard() {
     <>
       <div className="card">
         <div className="card-header-row">
-          <h2>Panel Super Administrador</h2>
+          <span style={{ flex: 1 }} />
           <button
             type="button"
             className="btn btn-primary"

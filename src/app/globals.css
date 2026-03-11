@@ -113,9 +113,10 @@ button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 0.5rem 1rem;
-  min-height: 44px;
-  border-radius: 8px;
+  padding: 0.35rem 0.75rem;
+  min-height: 36px;
+  font-size: 0.875rem;
+  border-radius: 6px;
   border: none;
   font-weight: 500;
   transition: background 0.2s, color 0.2s;
@@ -123,8 +124,8 @@ button {
 
 @media (max-width: 768px) {
   .btn {
-    min-height: 44px;
-    padding: 0.625rem 1rem;
+    min-height: 38px;
+    padding: 0.4rem 0.8rem;
   }
 }
 
@@ -193,9 +194,367 @@ button {
   }
 }
 
-.form-group input:focus {
+.form-group input:focus,
+.form-group select:focus {
   outline: none;
-  border-color: #7c3aed;
+  border-color: var(--link);
+  box-shadow: 0 0 0 2px var(--link);
+}
+
+/* Formulario: campos requeridos, hints y acciones */
+.form-required {
+  color: #f87171;
+}
+.form-hint {
+  display: block;
+  margin-top: 0.2rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+.form-required-hint {
+  margin: 0 0 0.5rem 0;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+.gastos-form-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.gastos-form-select {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  min-height: 44px;
+  border: 1px solid var(--input-border);
+  border-radius: 8px;
+  background: var(--input-bg);
+  color: var(--text);
+  font: inherit;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.gastos-form-select:focus {
+  outline: none;
+  border-color: var(--link);
+  box-shadow: 0 0 0 2px var(--link);
+}
+.gastos-form-file {
+  display: block;
+  margin-top: 0.25rem;
+  width: 100%;
+  font-size: 0.875rem;
+}
+
+/* Formulario gastos: fila Fecha + Monto */
+.gastos-form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+.gastos-form-row .form-group {
+  margin-bottom: 0;
+}
+
+/* Tipo de gasto: botones con iconos */
+.gastos-tipo-label {
+  display: block;
+  margin-bottom: 0.5rem;
+  color: var(--text-muted);
+  font-size: 0.875rem;
+}
+.gastos-tipo-buttons {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.gastos-tipo-btn {
+  flex: 1;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.65rem 0.85rem;
+  border-radius: 10px;
+  border: 2px solid var(--input-border);
+  background: var(--input-bg);
+  color: var(--text);
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s, color 0.2s;
+}
+.gastos-tipo-btn:hover {
+  border-color: var(--link);
+  background: rgba(124, 58, 237, 0.08);
+}
+.gastos-tipo-btn:focus-visible {
+  outline: none;
+  border-color: var(--link);
+  box-shadow: 0 0 0 2px var(--link);
+}
+.gastos-tipo-btn-active {
+  border-color: var(--link);
+  background: rgba(124, 58, 237, 0.15);
+  color: var(--link);
+}
+.gastos-tipo-btn svg {
+  flex-shrink: 0;
+}
+
+/* Zona de subida de evidencia (moderna) */
+.gastos-form-file-hidden {
+  position: absolute;
+  width: 0.1px;
+  height: 0.1px;
+  opacity: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  pointer-events: none;
+}
+.gastos-upload-zone {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 120px;
+  padding: 1.25rem;
+  border: 2px dashed var(--input-border);
+  border-radius: 12px;
+  background: var(--input-bg);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s, color 0.2s;
+}
+.gastos-upload-zone:hover,
+.gastos-upload-zone:focus-visible {
+  outline: none;
+  border-color: var(--link);
+  background: rgba(124, 58, 237, 0.06);
+  color: var(--text);
+}
+.gastos-upload-zone:focus-visible {
+  box-shadow: 0 0 0 2px var(--link);
+}
+.gastos-upload-dragover {
+  border-color: var(--link);
+  background: rgba(124, 58, 237, 0.12);
+  color: var(--link);
+}
+.gastos-upload-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 0.5rem;
+  color: var(--text-muted);
+}
+.gastos-upload-zone:hover .gastos-upload-icon,
+.gastos-upload-dragover .gastos-upload-icon {
+  color: var(--link);
+}
+.gastos-upload-text {
+  font-size: 0.9375rem;
+  font-weight: 500;
+  margin-bottom: 0.2rem;
+}
+.gastos-upload-hint {
+  font-size: 0.75rem;
+  opacity: 0.85;
+}
+.gastos-upload-has-file {
+  min-height: 100px;
+  padding: 0.75rem;
+}
+.gastos-upload-preview {
+  position: relative;
+  width: 100%;
+  max-width: 220px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--card-bg);
+}
+.gastos-upload-preview img {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 160px;
+  object-fit: contain;
+  border-radius: 8px;
+}
+.gastos-upload-remove {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  width: 2rem;
+  height: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  cursor: pointer;
+  transition: background 0.2s;
+  font-size: 0.875rem;
+}
+.gastos-upload-remove:hover {
+  background: rgba(0, 0, 0, 0.85);
+}
+
+/* Evidencia: dos opciones (Subir foto / Tomar foto) */
+.gastos-evidencia-preview-wrap {
+  margin-bottom: 0.25rem;
+}
+.gastos-evidencia-options {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.25rem;
+}
+.gastos-evidencia-btn {
+  flex: 1;
+  min-width: 120px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.85rem 1rem;
+  border: 2px solid var(--input-border);
+  border-radius: 12px;
+  background: var(--input-bg);
+  color: var(--text);
+  font-size: 0.9375rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s, color 0.2s;
+}
+.gastos-evidencia-btn:hover {
+  border-color: var(--link);
+  background: rgba(124, 58, 237, 0.08);
+  color: var(--link);
+}
+.gastos-evidencia-btn:focus-visible {
+  outline: none;
+  border-color: var(--link);
+  box-shadow: 0 0 0 2px var(--link);
+}
+.gastos-evidencia-btn.gastos-upload-dragover {
+  border-color: var(--link);
+  background: rgba(124, 58, 237, 0.12);
+  color: var(--link);
+}
+.gastos-evidencia-btn svg {
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+.gastos-evidencia-btn:hover svg,
+.gastos-evidencia-btn.gastos-upload-dragover svg {
+  color: var(--link);
+}
+.gastos-upload-hint-inline {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-top: 0.15rem;
+}
+
+/* Modal cámara para tomar foto */
+.gastos-camera-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+.gastos-camera-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  cursor: pointer;
+}
+.gastos-camera-box {
+  position: relative;
+  width: 100%;
+  max-width: 420px;
+  background: var(--card-bg);
+  border-radius: 12px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.35);
+  overflow: hidden;
+}
+.gastos-camera-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--table-border);
+}
+.gastos-camera-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+}
+.gastos-camera-close {
+  width: 2.25rem;
+  height: 2.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+.gastos-camera-close:hover {
+  background: var(--btn-secondary-hover);
+  color: var(--text);
+}
+.gastos-camera-video {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4/3;
+  background: #000;
+  object-fit: cover;
+}
+.gastos-camera-error {
+  padding: 2rem 1rem;
+  margin: 0;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.875rem;
+  background: var(--input-bg);
+}
+.gastos-camera-actions {
+  display: flex;
+  gap: 0.5rem;
+  padding: 1rem;
+  border-top: 1px solid var(--table-border);
+  justify-content: flex-end;
+}
+
+@media (max-width: 480px) {
+  .gastos-form-row {
+    grid-template-columns: 1fr;
+  }
+  .gastos-tipo-buttons {
+    flex-direction: column;
+  }
+  .gastos-tipo-btn {
+    justify-content: flex-start;
+  }
+  .gastos-evidencia-options {
+    flex-direction: column;
+  }
+  .gastos-evidencia-btn {
+    min-width: 0;
+  }
 }
 
 .password-input-wrap {
@@ -263,35 +622,85 @@ td {
   border-bottom: 1px solid var(--table-border);
 }
 
+/* Todas las tablas dentro de .table-wrap: compactas, menos espacio en bordes y títulos */
+.table-wrap table {
+  font-size: 0.8125rem;
+  table-layout: fixed;
+}
+.table-wrap table th,
+.table-wrap table td {
+  padding: 0.28rem 0.4rem;
+  vertical-align: middle;
+  border-bottom: 1px solid var(--table-border);
+  text-align: left;
+}
+.table-wrap table th {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  white-space: nowrap;
+  letter-spacing: 0.02em;
+}
+.table-wrap table th:first-child,
+.table-wrap table td:first-child {
+  padding-left: 0.4rem;
+}
+/* Columna numérica: alineación derecha y números tabulares (montos, cuotas, etc.) */
+.table-wrap table .col-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  padding-right: 0.4rem;
+}
+
 @media (max-width: 768px) {
-  th,
-  td {
-    padding: 0.5rem 0.5rem;
-    font-size: 0.875rem;
+  .table-wrap table th,
+  .table-wrap table td {
+    padding: 0.22rem 0.35rem;
+    font-size: 0.7875rem;
+  }
+  .table-wrap table th {
+    font-size: 0.7125rem;
+  }
+  .table-wrap table th:first-child,
+  .table-wrap table td:first-child {
+    padding-left: 0.35rem;
+  }
+  .table-wrap table .col-num {
+    padding-right: 0.35rem;
   }
 }
 
 @media (max-width: 480px) {
-  th,
-  td {
-    padding: 0.4rem 0.35rem;
-    font-size: 0.8125rem;
+  .table-wrap table th,
+  .table-wrap table td {
+    padding: 0.2rem 0.28rem;
+    font-size: 0.75rem;
+  }
+  .table-wrap table th {
+    font-size: 0.6875rem;
   }
 }
 
-/* Tabla de historial: contenido centrado y ordenado */
+/* Tabla de historial (préstamos): mismo padding reducido, títulos pequeños */
 .table-historial th,
 .table-historial td {
   text-align: center;
   vertical-align: middle;
-  padding: 0.65rem 0.5rem;
+  padding: 0.28rem 0.4rem;
+  font-size: 0.8125rem;
 }
 .table-historial th {
+  font-size: 0.75rem;
   font-weight: 600;
+  color: var(--text-muted);
   letter-spacing: 0.02em;
 }
 .table-historial td {
   font-variant-numeric: tabular-nums;
+}
+.table-historial .col-num {
+  text-align: right;
+  padding-right: 0.4rem;
 }
 .table-wrap.table-historial-wrap {
   margin: 0;
@@ -301,26 +710,110 @@ td {
   margin-top: 0.75rem;
 }
 
-/* Tabla gastos: ancho completo y sin scroll horizontal */
+@media (max-width: 768px) {
+  .table-historial th,
+  .table-historial td {
+    padding: 0.22rem 0.35rem;
+    font-size: 0.7875rem;
+  }
+  .table-historial th {
+    font-size: 0.7125rem;
+  }
+}
+
+/* Tabla gastos: compacta, menos espacio en bordes y títulos */
 .gastos-table-wrap {
   overflow-x: visible;
+  margin-top: 0.5rem;
 }
 .gastos-table {
   width: 100%;
   table-layout: fixed;
+  font-size: 0.8125rem;
 }
 .gastos-table th,
 .gastos-table td {
-  text-align: center;
+  padding: 0.28rem 0.4rem;
   vertical-align: middle;
+  border-bottom: 1px solid var(--table-border);
+}
+.gastos-table th {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  white-space: nowrap;
+  letter-spacing: 0.02em;
+}
+/* Columna 1 – Nombre: ancho acotado, resto repartido de forma uniforme */
+.gastos-table th.gastos-col-nombre,
+.gastos-table td.gastos-col-nombre {
+  text-align: left;
+  padding-left: 0.4rem;
+  width: 18%;
+  min-width: 4rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Columna 2 – Fecha */
+.gastos-table th.gastos-col-fecha,
+.gastos-table td.gastos-col-fecha {
+  text-align: left;
+  padding-left: 0.4rem;
+  white-space: nowrap;
+  width: 14%;
+  min-width: 4.5rem;
+}
+/* Columna 3 – Tipo */
+.gastos-table th.gastos-col-tipo,
+.gastos-table td.gastos-col-tipo {
+  text-align: center;
+  width: 16%;
+  min-width: 4.5rem;
+}
+/* Columna 4 – Monto: alineado a la derecha, desplazado ~40% a la izquierda respecto al borde */
+.gastos-table th.gastos-col-monto,
+.gastos-table td.gastos-col-monto {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  padding-right: 6.4%;
+  padding-left: 0.4rem;
+  white-space: nowrap;
+  width: 16%;
+  min-width: 5rem;
+}
+/* Columna 5 – Evidencia: centrado y alineado con el título, espacio a la izquierda respecto a Monto */
+.gastos-table th.gastos-col-evidencia,
+.gastos-table td.gastos-col-evidencia {
+  text-align: center;
+  padding-left: 0.8rem;
+  padding-right: 0.8rem;
+  width: 16%;
+  min-width: 4rem;
+}
+/* Columna 6 – Motivo (botón Ver) */
+.gastos-table th:last-child,
+.gastos-table td:last-child {
+  text-align: center;
+  width: 20%;
+  min-width: 4.5rem;
+}
+/* Enlaces y botones de acción centrados en su celda */
+.gastos-table td.gastos-col-evidencia a,
+.gastos-table td:last-child .gastos-ver-motivo-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 .gastos-table .gastos-ver-motivo-btn {
-  margin: 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* Tabla gastos: botón Ver motivo (compacto) */
 .gastos-ver-motivo-btn {
-  padding: 0.25rem 0.5rem;
+  padding: 0.2rem 0.45rem;
   font-size: 0.8125rem;
   font-weight: 500;
   color: var(--link);
@@ -336,7 +829,172 @@ td {
   border-color: var(--link);
 }
 
-/* Overlay motivo del gasto */
+/* Card gastos: cabecera, total y acciones */
+.gastos-card-header {
+  margin-bottom: 0.5rem;
+  gap: 0.75rem;
+  align-items: flex-start;
+}
+.gastos-card-header h3 {
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+.gastos-registros-msg {
+  margin: 0.15rem 0 0 0;
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+}
+.gastos-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-shrink: 0;
+}
+.gastos-total-box {
+  padding: 0.4rem 0.65rem;
+  background: var(--input-bg);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius, 8px);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  min-width: 6rem;
+}
+.gastos-total-label {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-muted);
+}
+.gastos-total-value {
+  font-size: 1rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+.gastos-card-header .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.4rem 0.65rem;
+  min-height: 2.25rem;
+  flex-shrink: 0;
+}
+.gastos-card-header .btn svg {
+  width: 1.125rem;
+  height: 1.125rem;
+}
+.gastos-btn-agregar-text {
+  font-size: 0.8125rem;
+}
+
+/* Formulario registrar gasto: botón X para cerrar en la esquina superior derecha (rojo) */
+.gastos-form-card .gastos-form-close-btn {
+  width: 2.25rem;
+  min-width: 2.25rem;
+  height: 2.25rem;
+  padding: 0;
+  flex-shrink: 0;
+  color: #dc2626;
+  border-color: rgba(220, 38, 38, 0.4);
+}
+.gastos-form-card .gastos-form-close-btn:hover {
+  color: #b91c1c;
+  background: rgba(220, 38, 38, 0.12);
+  border-color: #dc2626;
+}
+.gastos-form-card .gastos-form-close-btn svg {
+  width: 1.125rem;
+  height: 1.125rem;
+}
+
+@media (max-width: 480px) {
+  .gastos-btn-agregar-text {
+    display: none;
+  }
+  .gastos-card-header .btn {
+    width: 2.25rem;
+    min-width: 2.25rem;
+    padding: 0;
+  }
+  .gastos-total-box {
+    min-width: 4.5rem;
+    padding: 0.3rem 0.5rem;
+  }
+  .gastos-total-value {
+    font-size: 0.875rem;
+  }
+}
+
+/* Buscador gastos: compacto */
+.gastos-buscador-wrap {
+  margin-bottom: 0.75rem;
+}
+.gastos-buscador-wrap input {
+  width: 100%;
+  max-width: 360px;
+  padding: 0.4rem 0.6rem;
+  font-size: 0.875rem;
+  border-radius: var(--radius, 6px);
+  border: 1px solid var(--input-border);
+  background: var(--input-bg);
+  color: var(--text);
+}
+.gastos-buscador-wrap .gastos-resultados-msg {
+  margin-top: 0.25rem;
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+}
+
+.gastos-loading-msg,
+.gastos-empty-msg {
+  color: var(--text-muted);
+  font-size: 0.875rem;
+  margin: 0;
+}
+
+@media (max-width: 768px) {
+  .gastos-table th,
+  .gastos-table td {
+    padding: 0.22rem 0.35rem;
+    font-size: 0.7875rem;
+  }
+  .gastos-table th {
+    font-size: 0.7125rem;
+  }
+  .gastos-table th:first-child,
+  .gastos-table td:first-child {
+    padding-left: 0.35rem;
+  }
+  .gastos-table .gastos-col-monto {
+    padding-right: 6%;
+    padding-left: 0.35rem;
+  }
+  .gastos-table .gastos-col-evidencia {
+    padding-left: 0.7rem;
+    padding-right: 0.7rem;
+  }
+}
+
+/* En móvil: ocultar columnas secundarias para ganar espacio */
+@media (max-width: 480px) {
+  .gastos-table .gastos-col-evidencia {
+    display: none;
+  }
+}
+
+/* Página gastos: cards un poco más compactos */
+.dashboard-page-gastos .card {
+  padding: 1.25rem;
+}
+@media (max-width: 480px) {
+  .dashboard-page-gastos .card {
+    padding: 1rem;
+  }
+}
+
+/* Overlay motivo del gasto: compacto y claro */
 .gastos-motivo-overlay {
   position: fixed;
   inset: 0;
@@ -354,24 +1012,38 @@ td {
 }
 .gastos-motivo-overlay-box {
   position: relative;
-  max-width: min(400px, 100%);
+  max-width: min(340px, 100%);
   width: 100%;
-  padding: 1.25rem;
+  padding: 1rem 1.125rem;
   background: var(--card-bg);
   border: 1px solid var(--card-border);
-  border-radius: 12px;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.25);
+  border-radius: 10px;
+  box-shadow: 0 16px 32px rgba(0, 0, 0, 0.3);
+}
+.gastos-motivo-overlay-label {
+  display: block;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  margin-bottom: 0.35rem;
 }
 .gastos-motivo-overlay-text {
-  margin: 0 0 1rem 0;
+  margin: 0 0 0.75rem 0;
   font-size: 0.9375rem;
-  line-height: 1.5;
+  line-height: 1.45;
   color: var(--text);
   white-space: pre-wrap;
   word-break: break-word;
+  max-height: 12rem;
+  overflow-y: auto;
 }
 .gastos-motivo-overlay-box .btn {
-  width: 100%;
+  width: auto;
+  min-width: 5rem;
+  padding: 0.4rem 1rem;
+  font-size: 0.8125rem;
 }
 
 /* Columna del botón expandir: ancho fijo y centrado para alinear todas las filas */
@@ -496,35 +1168,58 @@ th {
 .items-center { align-items: center; }
 .justify-between { justify-content: space-between; }
 
-/* Dashboard header: adaptable en móvil */
+/* Dashboard: menos espacio superior para aprovechar la pantalla */
+.container-dashboard {
+  padding-top: 0.5rem;
+}
+
+@media (max-width: 768px) {
+  .container-dashboard {
+    padding-top: 0.5rem;
+  }
+}
+
+/* Dashboard header: compacto, adaptable en móvil */
 .dashboard-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   flex-wrap: wrap;
-  gap: 0.75rem;
-  margin-bottom: 1.5rem;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  min-height: 0;
 }
 
 .dashboard-header .header-left {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.375rem;
   min-width: 0;
 }
 
 .dashboard-header .header-right {
   display: flex;
   align-items: center;
-  gap: 0.375rem;
+  gap: 0.25rem;
   flex-wrap: nowrap;
   min-width: 0;
 }
 
+/* Controles del header más compactos para no aumentar la altura */
+.dashboard-header .dashboard-settings .dashboard-settings-trigger {
+  width: 36px;
+  height: 36px;
+}
+
+.dashboard-header .dashboard-settings .dashboard-settings-trigger svg {
+  width: 1rem;
+  height: 1rem;
+}
+
 /* Más compacto: badge, tema, correo y cerrar sesión en una sola hilera */
 .dashboard-header-badge {
-  padding: 0.2rem 0.4rem !important;
-  font-size: 0.7rem !important;
+  padding: 0.15rem 0.35rem !important;
+  font-size: 0.65rem !important;
 }
 
 .dashboard-header-email {
@@ -542,20 +1237,20 @@ th {
 }
 
 .dashboard-header .header-right .theme-toggle {
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
 }
 
 .dashboard-header .header-right .theme-toggle svg {
-  width: 1rem;
-  height: 1rem;
+  width: 0.875rem;
+  height: 0.875rem;
 }
 
 @media (max-width: 768px) {
   .dashboard-header {
     flex-direction: column;
     align-items: stretch;
-    gap: 0.75rem;
+    gap: 0.5rem;
   }
 
   .dashboard-header .header-right {
@@ -590,6 +1285,16 @@ th {
 .card-header-row h2,
 .card-header-row h3 {
   margin: 0;
+}
+
+/* Títulos de sección más compactos (menos espacio) */
+.card h2 {
+  font-size: 1.0625rem;
+  font-weight: 600;
+}
+.card h3 {
+  font-size: 0.9375rem;
+  font-weight: 600;
 }
 
 @media (max-width: 480px) {
@@ -780,6 +1485,27 @@ th {
 
 .jefe-hamburger-line:not(:last-child) {
   margin-bottom: 5px;
+}
+
+/* Hamburger en el encabezado: más compacto a la izquierda del logo */
+.jefe-hamburger-in-header {
+  width: 40px;
+  height: 40px;
+  margin-right: 0.25rem;
+  flex-shrink: 0;
+}
+.jefe-hamburger-in-header .jefe-hamburger-line {
+  width: 18px;
+  height: 2px;
+}
+.jefe-hamburger-in-header .jefe-hamburger-line:not(:last-child) {
+  margin-bottom: 4px;
+}
+
+/* Barra slim (solo enlace Inicio del trabajador, sin hamburger) */
+.jefe-nav-bar-slim {
+  margin-bottom: 0.5rem;
+  padding: 0.2rem 0;
 }
 
 .jefe-nav-title {

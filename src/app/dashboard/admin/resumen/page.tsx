@@ -42,12 +42,12 @@ export default function ResumenPage() {
               <tr>
                 <th>Ruta</th>
                 <th>Ubicación</th>
-                <th>Ingreso</th>
-                <th>Egreso</th>
-                <th>Gastos</th>
-                <th>Salidas</th>
-                <th>Inversión</th>
-                <th>Bolsa</th>
+                <th className="col-num">Ingreso</th>
+                <th className="col-num">Egreso</th>
+                <th className="col-num">Gastos</th>
+                <th className="col-num">Salidas</th>
+                <th className="col-num">Inversión</th>
+                <th className="col-num">Bolsa</th>
               </tr>
             </thead>
             <tbody>
@@ -55,12 +55,12 @@ export default function ResumenPage() {
                 <tr key={r.rutaId}>
                   <td>{r.nombre}</td>
                   <td>{r.ubicacion || "—"}</td>
-                  <td>{r.ingreso.toFixed(2)}</td>
-                  <td>{r.egreso.toFixed(2)}</td>
-                  <td>{r.gastos.toFixed(2)}</td>
-                  <td>{r.salidas.toFixed(2)}</td>
-                  <td>{r.inversion.toFixed(2)}</td>
-                  <td>{r.bolsa.toFixed(2)}</td>
+                  <td className="col-num">{r.ingreso.toFixed(2)}</td>
+                  <td className="col-num">{r.egreso.toFixed(2)}</td>
+                  <td className="col-num">{r.gastos.toFixed(2)}</td>
+                  <td className="col-num">{r.salidas.toFixed(2)}</td>
+                  <td className="col-num">{r.inversion.toFixed(2)}</td>
+                  <td className="col-num">{r.bolsa.toFixed(2)}</td>
                 </tr>
               ))}
             </tbody>
