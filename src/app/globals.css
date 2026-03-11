@@ -75,6 +75,11 @@ button {
   width: 100%;
 }
 
+/* Página de gastos: contenedor más ancho para ver la tabla completa sin scroll */
+.container.dashboard-page-gastos {
+  max-width: 960px;
+}
+
 @media (max-width: 768px) {
   .container {
     padding: 1rem;
@@ -294,6 +299,79 @@ td {
 .table-wrap.table-historial-wrap + p {
   text-align: center;
   margin-top: 0.75rem;
+}
+
+/* Tabla gastos: ancho completo y sin scroll horizontal */
+.gastos-table-wrap {
+  overflow-x: visible;
+}
+.gastos-table {
+  width: 100%;
+  table-layout: fixed;
+}
+.gastos-table th,
+.gastos-table td {
+  text-align: center;
+  vertical-align: middle;
+}
+.gastos-table .gastos-ver-motivo-btn {
+  margin: 0 auto;
+}
+
+/* Tabla gastos: botón Ver motivo (compacto) */
+.gastos-ver-motivo-btn {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--link);
+  background: transparent;
+  border: 1px solid var(--input-border);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+.gastos-ver-motivo-btn:hover {
+  background: var(--btn-secondary-hover);
+  border-color: var(--link);
+}
+
+/* Overlay motivo del gasto */
+.gastos-motivo-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+.gastos-motivo-overlay-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  cursor: pointer;
+}
+.gastos-motivo-overlay-box {
+  position: relative;
+  max-width: min(400px, 100%);
+  width: 100%;
+  padding: 1.25rem;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 12px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.25);
+}
+.gastos-motivo-overlay-text {
+  margin: 0 0 1rem 0;
+  font-size: 0.9375rem;
+  line-height: 1.5;
+  color: var(--text);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.gastos-motivo-overlay-box .btn {
+  width: 100%;
 }
 
 /* Columna del botón expandir: ancho fijo y centrado para alinear todas las filas */
@@ -516,6 +594,105 @@ th {
   height: 1.25rem;
 }
 
+/* Configuración del dashboard: botón engranaje + menú */
+.dashboard-settings {
+  position: relative;
+}
+
+.dashboard-settings-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  background: var(--btn-secondary-bg);
+  color: var(--text);
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.dashboard-settings-trigger:hover {
+  background: var(--btn-secondary-hover);
+}
+
+.dashboard-settings-trigger:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--link);
+}
+
+.dashboard-settings-trigger svg {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.dashboard-settings-menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 0.5rem;
+  min-width: 220px;
+  padding: 0.5rem 0;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 12px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+  z-index: 50;
+}
+
+.dashboard-settings-email {
+  padding: 0.5rem 1rem 0.75rem;
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+  word-break: break-all;
+  border-bottom: 1px solid var(--card-border);
+}
+
+.dashboard-settings-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 0.9375rem;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.dashboard-settings-item:hover {
+  background: var(--btn-secondary-hover);
+}
+
+.dashboard-settings-item-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.25rem;
+  height: 1.25rem;
+  flex-shrink: 0;
+}
+
+.dashboard-settings-item-icon svg {
+  width: 1.125rem;
+  height: 1.125rem;
+}
+
+.dashboard-settings-item-danger {
+  color: #dc2626;
+}
+
+.dashboard-settings-item-danger:hover {
+  background: rgba(220, 38, 38, 0.12);
+}
+
 /* Panel Jefe: menú hamburguesa y drawer móvil */
 .jefe-wrapper {
   position: relative;
@@ -570,9 +747,55 @@ th {
 }
 
 .jefe-nav-title {
+  flex: 1;
+  min-width: 0;
   font-weight: 600;
   font-size: 1.125rem;
   color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Botón Inicio rápido en barra del trabajador */
+.trabajador-nav-inicio {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 48px;
+  padding: 0 0.875rem;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 12px;
+  color: #dc2626;
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 0.9375rem;
+  transition: background 0.2s, border-color 0.2s, color 0.2s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.trabajador-nav-inicio:hover {
+  background: var(--btn-secondary-hover);
+  border-color: rgba(220, 38, 38, 0.3);
+}
+
+.trabajador-nav-inicio-active {
+  background: rgba(220, 38, 38, 0.15);
+  border-color: rgba(220, 38, 38, 0.4);
+  color: #dc2626;
+}
+
+.trabajador-nav-inicio-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+}
+
+.trabajador-nav-inicio-text {
+  white-space: nowrap;
 }
 
 .jefe-drawer {
@@ -721,6 +944,106 @@ th {
 
 .jefe-inicio-hint a {
   font-weight: 500;
+}
+
+/* Inicio Trabajador: accesos rápidos (móvil-first) */
+.trabajador-inicio {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.trabajador-inicio-header {
+  margin-bottom: 1.5rem;
+}
+
+.trabajador-inicio-title {
+  margin: 0 0 0.25rem 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.25;
+}
+
+.trabajador-inicio-subtitle {
+  margin: 0;
+  font-size: 0.9375rem;
+  color: var(--text-muted);
+}
+
+.trabajador-inicio-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.875rem;
+}
+
+@media (min-width: 480px) {
+  .trabajador-inicio-grid {
+    gap: 1rem;
+  }
+}
+
+@media (min-width: 640px) {
+  .trabajador-inicio-grid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.125rem;
+  }
+}
+
+.trabajador-inicio-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 112px;
+  padding: 1rem 0.75rem;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 14px;
+  color: var(--text);
+  text-decoration: none;
+  transition: background 0.2s, border-color 0.2s, transform 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+@media (min-width: 480px) {
+  .trabajador-inicio-card {
+    min-height: 120px;
+    padding: 1.25rem 1rem;
+  }
+}
+
+.trabajador-inicio-card:hover {
+  background: var(--btn-secondary-hover);
+  border-color: rgba(220, 38, 38, 0.25);
+}
+
+.trabajador-inicio-card:active {
+  transform: scale(0.98);
+}
+
+.trabajador-inicio-card-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  margin-bottom: 0.625rem;
+  border-radius: 14px;
+  background: rgba(220, 38, 38, 0.12);
+  color: #dc2626;
+  flex-shrink: 0;
+}
+
+.trabajador-inicio-card-label {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  text-align: center;
+  line-height: 1.3;
+}
+
+@media (min-width: 480px) {
+  .trabajador-inicio-card-label {
+    font-size: 0.875rem;
+  }
 }
 
 /* Admin dashboard: accesos rápidos */

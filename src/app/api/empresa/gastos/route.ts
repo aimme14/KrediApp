@@ -27,6 +27,7 @@ export async function GET(request: NextRequest) {
       fecha: data.fecha?.toDate?.() ?? null,
       tipo: data.tipo ?? "otro",
       creadoPor: data.creadoPor ?? "",
+      creadoPorNombre: data.creadoPorNombre ?? "",
       rol: data.rol ?? "admin",
       rutaId: data.rutaId ?? "",
       adminId: data.adminId ?? "",
@@ -35,19 +36,26 @@ export async function GET(request: NextRequest) {
     };
   });
 
-  if (apiUser.role === "admin" && list.length > 0) {
-    const uids = Array.from(new Set(list.map((g) => g.creadoPor).filter(Boolean)));
-    const nombres: Record<string, string> = {};
-    await Promise.all(
-      uids.map(async (uid) => {
-        const userSnap = await db.collection(USERS_COLLECTION).doc(uid).get();
-        const d = userSnap.data();
-        nombres[uid] = (d?.displayName as string)?.trim() || (d?.email as string) || uid;
-      })
-    );
-    list.forEach((g) => {
-      (g as Record<string, unknown>).creadoPorNombre = nombres[g.creadoPor] ?? g.creadoPor;
-    });
+  // Para admin: rellenar creadoPorNombre solo si no está guardado (gastos antiguos)
+  if (apiUser.role !== "empleado" && list.length > 0) {
+    const sinNombre = list.filter((g) => !(g as { creadoPorNombre?: string }).creadoPorNombre?.trim());
+    if (sinNombre.length > 0) {
+      const uids = Array.from(new Set(sinNombre.map((g) => g.creadoPor).filter(Boolean)));
+      const nombres: Record<string, string> = {};
+      await Promise.all(
+        uids.map(async (uid) => {
+          const userSnap = await db.collection(USERS_COLLECTION).doc(uid).get();
+          const d = userSnap.data();
+          nombres[uid] = (d?.displayName as string)?.trim() || (d?.email as string) || uid;
+        })
+      );
+      list.forEach((g) => {
+        const gAny = g as { creadoPorNombre?: string };
+        if (!gAny.creadoPorNombre?.trim()) {
+          gAny.creadoPorNombre = nombres[g.creadoPor] ?? g.creadoPor;
+        }
+      });
+    }
   }
 
   list.sort((a, b) => (b.fecha ? new Date(b.fecha).getTime() : 0) - (a.fecha ? new Date(a.fecha).getTime() : 0));
@@ -83,6 +91,13 @@ export async function POST(request: NextRequest) {
   const fechaDate = fecha ? new Date(fecha) : new Date();
 
   const db = getAdminFirestore();
+  const userSnap = await db.collection(USERS_COLLECTION).doc(apiUser.uid).get();
+  const userData = userSnap.data();
+  const creadoPorNombre =
+    (typeof userData?.displayName === "string" && userData.displayName.trim()) ||
+    (typeof userData?.email === "string" && userData.email.trim()) ||
+    apiUser.uid;
+
   const ref = db
     .collection(EMPRESAS_COLLECTION)
     .doc(apiUser.empresaId)
@@ -96,6 +111,7 @@ export async function POST(request: NextRequest) {
     fecha: fechaDate,
     tipo: tipoValido,
     creadoPor: apiUser.uid,
+    creadoPorNombre: creadoPorNombre.trim() || apiUser.uid,
     rol: isEmpleado ? "empleado" : "admin",
     adminId: isEmpleado && apiUser.adminId ? apiUser.adminId : apiUser.uid,
     empleadoId: isEmpleado ? apiUser.uid : null,

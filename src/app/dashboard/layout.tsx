@@ -1,18 +1,18 @@
 "use client";
 
 import { useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { roleLabel } from "@/types/roles";
-import ThemeToggle from "@/components/ThemeToggle";
+import DashboardSettings from "@/components/DashboardSettings";
 
 export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const { user, profile, loading, isEnabled, signOut } = useAuth();
+  const { user, profile, loading, isEnabled } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
@@ -34,8 +34,11 @@ export default function DashboardLayout({
     );
   }
 
+  const pathname = usePathname();
+  const isGastosPage = pathname?.includes("/gastos") ?? false;
+
   return (
-    <div className="container" style={{ paddingTop: "1rem" }}>
+    <div className={`container${isGastosPage ? " dashboard-page-gastos" : ""}`} style={{ paddingTop: "1rem" }}>
       <header className="dashboard-header">
         <div className="header-left">
           <Link href="/dashboard" style={{ fontWeight: 600, color: "var(--text)" }}>
@@ -46,13 +49,7 @@ export default function DashboardLayout({
           </span>
         </div>
         <div className="header-right">
-          <ThemeToggle />
-          <span style={{ color: "var(--text-muted)", fontSize: "0.875rem", wordBreak: "break-all" }}>
-            {profile.email}
-          </span>
-          <button type="button" className="btn btn-secondary" onClick={() => signOut()}>
-            Cerrar sesión
-          </button>
+          <DashboardSettings />
         </div>
       </header>
       {children}

@@ -11,6 +11,28 @@ const TIPOS = [
   { value: "otro", label: "Otro" },
 ] as const;
 
+function PlusIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+    </svg>
+  );
+}
+
+function CloseIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+    </svg>
+  );
+}
+
+const MOTIVO_MAX_LEN = 25;
+function truncarMotivo(s: string) {
+  if (!s) return "—";
+  return s.length <= MOTIVO_MAX_LEN ? s : s.slice(0, MOTIVO_MAX_LEN) + "…";
+}
+
 export default function GastosTrabajadorPage() {
   const { user, profile } = useAuth();
   const [gastos, setGastos] = useState<GastoItem[]>([]);
@@ -24,6 +46,7 @@ export default function GastosTrabajadorPage() {
   const [evidenciaFile, setEvidenciaFile] = useState<File | null>(null);
   const [evidenciaPreview, setEvidenciaPreview] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+  const [motivoOverlay, setMotivoOverlay] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const loadGastos = useCallback(async () => {
@@ -96,15 +119,6 @@ export default function GastosTrabajadorPage() {
   return (
     <div className="card">
       <h2 style={{ marginTop: 0 }}>Gastos operativos</h2>
-      <p style={{ color: "var(--text-muted)", fontSize: "0.875rem", marginBottom: "1.25rem" }}>
-        Añade fecha, motivo, monto y evidencia (foto de factura o comprobante). Aquí se muestra tu historial de gastos.
-      </p>
-
-      <div style={{ marginBottom: "1rem" }}>
-        <button type="button" className="btn btn-primary" onClick={() => setShowForm((v) => !v)}>
-          {showForm ? "Cancelar" : "Nuevo gasto"}
-        </button>
-      </div>
 
       {showForm && (
         <div className="card" style={{ marginBottom: "1rem" }}>
@@ -148,23 +162,46 @@ export default function GastosTrabajadorPage() {
       {!showForm && error && <p className="error-msg">{error}</p>}
 
       <div className="card">
-        <h3 style={{ marginTop: 0 }}>Historial de gastos</h3>
+        <div className="card-header-row" style={{ marginBottom: "1rem" }}>
+          <h3 style={{ marginTop: 0 }}>Historial de gastos</h3>
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={() => setShowForm((v) => !v)}
+            aria-label={showForm ? "Cerrar formulario" : "Nuevo gasto"}
+            title={showForm ? "Cerrar" : "Nuevo gasto"}
+          >
+            {showForm ? <CloseIcon /> : <PlusIcon />}
+          </button>
+        </div>
         {loading ? <p>Cargando...</p> : gastos.length === 0 ? (
           <p style={{ color: "var(--text-muted)" }}>No hay gastos registrados.</p>
         ) : (
-          <div className="table-wrap">
-            <table>
+          <div className="table-wrap gastos-table-wrap">
+            <table className="gastos-table">
               <thead>
-                <tr><th>Fecha</th><th>Motivo</th><th>Tipo</th><th>Monto</th><th>Evidencia</th></tr>
+                <tr><th>Fecha</th><th>Motivo</th><th>Tipo</th><th>Monto</th><th>Evidencia</th><th>Motivo</th></tr>
               </thead>
               <tbody>
                 {gastos.map((g) => (
                   <tr key={g.id}>
                     <td>{g.fecha ? new Date(g.fecha).toLocaleDateString() : "—"}</td>
-                    <td>{g.descripcion}</td>
+                    <td>{truncarMotivo(g.descripcion ?? "")}</td>
                     <td>{g.tipo}</td>
                     <td>{g.monto.toFixed(2)}</td>
                     <td>{g.evidencia ? <a href={g.evidencia} target="_blank" rel="noopener noreferrer">Ver comprobante</a> : "—"}</td>
+                    <td>
+                      {g.descripcion ? (
+                        <button
+                          type="button"
+                          className="gastos-ver-motivo-btn"
+                          onClick={() => setMotivoOverlay(g.descripcion)}
+                          aria-label="Ver motivo completo"
+                        >
+                          Ver
+                        </button>
+                      ) : "—"}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -172,6 +209,18 @@ export default function GastosTrabajadorPage() {
           </div>
         )}
       </div>
+
+      {motivoOverlay !== null && (
+        <div className="gastos-motivo-overlay" role="dialog" aria-modal="true" aria-label="Motivo del gasto">
+          <div className="gastos-motivo-overlay-backdrop" onClick={() => setMotivoOverlay(null)} aria-hidden />
+          <div className="gastos-motivo-overlay-box">
+            <p className="gastos-motivo-overlay-text">{motivoOverlay}</p>
+            <button type="button" className="btn btn-primary" onClick={() => setMotivoOverlay(null)}>
+              Cerrar
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
