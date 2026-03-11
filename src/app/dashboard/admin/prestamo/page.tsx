@@ -418,7 +418,6 @@ export default function PrestamoPage() {
             inputMode="decimal"
             min={0}
             step={0.1}
-            max={999.99}
             value={interes}
             onChange={(e) => {
               const v = e.target.value.replace(",", ".");
