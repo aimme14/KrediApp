@@ -8,6 +8,7 @@ import {
   runTransaction,
   Timestamp,
   where,
+  type Firestore,
   type QueryDocumentSnapshot,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -26,7 +27,7 @@ type CuotaDoc = CuotaFinancieraExtension & {
   cuotaTotal: number;
 };
 
-function ensureDb(): typeof db {
+function ensureDb(): Firestore {
   if (!db) {
     throw new Error("Firestore no está inicializado");
   }

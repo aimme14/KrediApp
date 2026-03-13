@@ -42,6 +42,7 @@ export function useRuta(): UseRutaState {
       return;
     }
 
+    const firestore = db;
     const currentUser = user;
     const currentProfile = profile;
     let cancelled = false;
@@ -51,7 +52,7 @@ export function useRuta(): UseRutaState {
       try {
         setState((s) => ({ ...s, loading: true, error: null }));
         const empresaId = currentProfile.empresaId!;
-        const rutasCol = collection(db, EMPRESAS_COLLECTION, empresaId, RUTAS_SUBCOLLECTION);
+        const rutasCol = collection(firestore, EMPRESAS_COLLECTION, empresaId, RUTAS_SUBCOLLECTION);
 
         let rutaId: string | null = currentProfile.rutaId ?? null;
 

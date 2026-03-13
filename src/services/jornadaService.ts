@@ -10,6 +10,7 @@ import {
   Timestamp,
   where,
   type DocumentData,
+  type Firestore,
   type QueryDocumentSnapshot,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -19,7 +20,7 @@ import {
 } from "@/lib/empresas-db";
 import type { Jornada, Movimiento, TipoMovimiento } from "@/types/finanzas";
 
-function ensureDb(): typeof db {
+function ensureDb(): Firestore {
   if (!db) {
     throw new Error("Firestore no está inicializado");
   }

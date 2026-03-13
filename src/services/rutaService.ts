@@ -9,6 +9,7 @@ import {
   Timestamp,
   where,
   type DocumentSnapshot,
+  type Firestore,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import {
@@ -21,7 +22,7 @@ import type { RutaFinanciera } from "@/types/finanzas";
 
 type RutaDocData = Omit<RutaFinanciera, "id">;
 
-function ensureDb(): typeof db {
+function ensureDb(): Firestore {
   if (!db) {
     throw new Error("Firestore no está inicializado");
   }
@@ -215,6 +216,7 @@ export async function agregarEmpleadoARuta(
     if (!rutaSnap.exists()) {
       throw new Error("Ruta no encontrada");
     }
+    const rutaData = rutaSnap.data() as RutaDocData;
     tx.update(rutaRef, {
       empleadosIds: arrayUnion(empleadoId),
       ultimaActualizacion: now,
@@ -226,7 +228,7 @@ export async function agregarEmpleadoARuta(
     );
     tx.set(
       usuarioEmpresaRef,
-      { rutaId, fechaCreacion: data.fechaCreacion ?? now },
+      { rutaId, fechaCreacion: rutaData.fechaCreacion ?? now },
       { merge: true } as any
     );
   });

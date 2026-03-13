@@ -85,7 +85,7 @@ export function useRutaDia(): UseRutaDiaState {
             clienteId: p.clienteId,
             clienteNombre: c?.nombre ?? `Cliente ${p.clienteId.slice(0, 8)}`,
             clienteDireccion: c?.direccion ?? "",
-            zona: c?.ubicacion || c?.base || "",
+            zona: c?.ubicacion ?? "",
             monto: p.saldoPendiente ?? 0,
             fechaVencimiento: fechaV as any,
             estado,
