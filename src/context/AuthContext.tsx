@@ -7,6 +7,8 @@ import {
   signInWithEmailAndPassword,
   signOut as firebaseSignOut,
   createUserWithEmailAndPassword,
+  reauthenticateWithCredential,
+  EmailAuthProvider,
 } from "firebase/auth";
 import { doc, getDoc, collection, query, where, getDocs } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
@@ -25,6 +27,7 @@ interface AuthState {
 interface AuthContextValue extends AuthState {
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
+  reauthWithPassword: (password: string) => Promise<void>;
   clearError: () => void;
   hasRole: (role: Role) => boolean;
   isEnabled: () => boolean;
@@ -162,6 +165,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setState({ user: null, profile: null, loading: false, error: null });
   };
 
+  /** Re-autentica al usuario actual con su contraseña (p. ej. tras bloqueo por inactividad). */
+  const reauthWithPassword = async (password: string) => {
+    if (!auth || !state.user) throw new Error("No hay sesión activa.");
+    const email = state.user.email ?? state.profile?.email;
+    if (!email) throw new Error("No se puede re-autenticar: falta el correo del usuario.");
+    const credential = EmailAuthProvider.credential(email, password);
+    await reauthenticateWithCredential(auth, state.user, credential);
+  };
+
   const clearError = () => setState((s) => ({ ...s, error: null }));
 
   const hasRole = (role: Role) => state.profile?.role === role;
@@ -171,6 +183,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     ...state,
     signIn,
     signOut,
+    reauthWithPassword,
     clearError,
     hasRole,
     isEnabled,

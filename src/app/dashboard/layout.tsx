@@ -7,6 +7,7 @@ import { useAuth } from "@/context/AuthContext";
 import { roleLabel } from "@/types/roles";
 import Logo from "@/components/Logo";
 import DashboardSettings from "@/components/DashboardSettings";
+import InactivityLock from "@/components/InactivityLock";
 import { DashboardHeaderProvider } from "@/context/DashboardHeaderContext";
 import { getEmpresa } from "@/lib/empresa";
 import type { ReactNode } from "react";
@@ -60,42 +61,44 @@ export default function DashboardLayout({
   const nombreEmpresa = empresa?.nombre?.trim() || "Empresa";
 
   return (
-    <DashboardHeaderProvider value={setHeaderLeftSlot}>
-      <div className={`container container-dashboard${isGastosPage ? " dashboard-page-gastos" : ""}`}>
-        <header className="dashboard-header">
-          <div className="header-left">
-            {headerLeftSlot}
-            {showEmpresaEnHeader ? (
-              <Link href="/dashboard/jefe/inicio" className="dashboard-header-empresa" aria-label={`${nombreEmpresa} - Inicio`}>
-                <div className="dashboard-header-empresa-logo">
-                  {empresa?.logo ? (
-                    <img src={empresa.logo} alt="" />
-                  ) : (
-                    <span className="dashboard-header-empresa-iniciales">
-                      {nombreEmpresa.slice(0, 2).toUpperCase()}
-                    </span>
-                  )}
-                </div>
-                <span className="dashboard-header-empresa-nombre">{nombreEmpresa}</span>
-              </Link>
-            ) : (
-              <Link href="/dashboard" style={{ display: "flex", alignItems: "center" }} aria-label="KrediApp - Inicio">
+    <InactivityLock>
+      <DashboardHeaderProvider value={setHeaderLeftSlot}>
+        <div className={`container container-dashboard${isGastosPage ? " dashboard-page-gastos" : ""}`}>
+          <header className="dashboard-header">
+            <div className="header-left">
+              {headerLeftSlot}
+              {showEmpresaEnHeader ? (
+                <Link href="/dashboard/jefe/inicio" className="dashboard-header-empresa" aria-label={`${nombreEmpresa} - Inicio`}>
+                  <div className="dashboard-header-empresa-logo">
+                    {empresa?.logo ? (
+                      <img src={empresa.logo} alt="" />
+                    ) : (
+                      <span className="dashboard-header-empresa-iniciales">
+                        {nombreEmpresa.slice(0, 2).toUpperCase()}
+                      </span>
+                    )}
+                  </div>
+                  <span className="dashboard-header-empresa-nombre">{nombreEmpresa}</span>
+                </Link>
+              ) : (
+                <Link href="/dashboard" style={{ display: "flex", alignItems: "center" }} aria-label="KrediApp - Inicio">
+                  <Logo variant="header" />
+                </Link>
+              )}
+              <span className={`badge badge-${profile.role} dashboard-header-badge`} style={{ textTransform: "capitalize" }}>
+                {roleLabel(profile.role)}
+              </span>
+            </div>
+            <div className="header-right">
+              <DashboardSettings />
+              <Link href="/dashboard" className="dashboard-header-logo-plataforma" aria-label="KrediApp">
                 <Logo variant="header" />
               </Link>
-            )}
-            <span className={`badge badge-${profile.role} dashboard-header-badge`} style={{ textTransform: "capitalize" }}>
-              {roleLabel(profile.role)}
-            </span>
-          </div>
-          <div className="header-right">
-            <DashboardSettings />
-            <Link href="/dashboard" className="dashboard-header-logo-plataforma" aria-label="KrediApp">
-              <Logo variant="header" />
-            </Link>
-          </div>
-        </header>
-        {children}
-      </div>
-    </DashboardHeaderProvider>
+            </div>
+          </header>
+          {children}
+        </div>
+      </DashboardHeaderProvider>
+    </InactivityLock>
   );
 }

@@ -2827,6 +2827,49 @@ th {
   margin-top: 1rem;
 }
 
+/* Bloqueo por inactividad (dashboard, todos los roles) */
+.inactivity-lock-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1100;
+  padding: 1rem;
+}
+
+.inactivity-lock-modal {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 12px;
+  padding: 1.25rem;
+  max-width: 380px;
+  width: 100%;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+}
+
+.inactivity-lock-title {
+  margin: 0 0 0.35rem 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.inactivity-lock-desc {
+  margin: 0 0 0.5rem 0;
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+.inactivity-lock-email {
+  margin: 0 0 0.75rem 0;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  word-break: break-all;
+}
+
 .gf-btn-actualizar {
   display: inline-flex;
   align-items: center;
