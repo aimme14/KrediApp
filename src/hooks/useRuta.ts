@@ -42,20 +42,22 @@ export function useRuta(): UseRutaState {
       return;
     }
 
+    const currentUser = user;
+    const currentProfile = profile;
     let cancelled = false;
     let unsubscribe: (() => void) | null = null;
 
     async function resolveRutaAndSubscribe() {
       try {
         setState((s) => ({ ...s, loading: true, error: null }));
-        const empresaId = profile.empresaId!;
+        const empresaId = currentProfile.empresaId!;
         const rutasCol = collection(db, EMPRESAS_COLLECTION, empresaId, RUTAS_SUBCOLLECTION);
 
-        let rutaId: string | null = profile.rutaId ?? null;
+        let rutaId: string | null = currentProfile.rutaId ?? null;
 
         // Fallback 1: rutas con empleadoId (modelo antiguo)
         if (!rutaId) {
-          const q1 = query(rutasCol, where("empleadoId", "==", user.uid));
+          const q1 = query(rutasCol, where("empleadoId", "==", currentUser.uid));
           const snap1 = await getDocs(q1);
           if (!snap1.empty) {
             rutaId = snap1.docs[0].id;
@@ -64,7 +66,7 @@ export function useRuta(): UseRutaState {
 
         // Fallback 2: rutas con empleadosIds (nuevo modelo)
         if (!rutaId) {
-          const q2 = query(rutasCol, where("empleadosIds", "array-contains", user.uid));
+          const q2 = query(rutasCol, where("empleadosIds", "array-contains", currentUser.uid));
           const snap2 = await getDocs(q2);
           if (!snap2.empty) {
             rutaId = snap2.docs[0].id;
