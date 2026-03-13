@@ -14,6 +14,7 @@ const NAV_ITEMS = [
   { href: "/dashboard/trabajador/prestamo", label: "Prestamos", icon: "loan" },
   { href: "/dashboard/trabajador/simulacro", label: "Simulacro de préstamo", icon: "calc" },
   { href: "/dashboard/trabajador/gastos", label: "Gastos operativos", icon: "expense" },
+  { href: "/dashboard/trabajador/registrar-gasto", label: "Registrar gasto", icon: "expense" },
   { href: "/dashboard/trabajador/cliente-moroso", label: "Cliente moroso", icon: "alert" },
 ] as const;
 

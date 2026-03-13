@@ -179,6 +179,24 @@ export async function registrarPago(
   return { saldoPendiente: data.saldoPendiente ?? 0 };
 }
 
+/** Registra un intento sin pago en la subcolección pagos del préstamo (tipo no_pago). */
+export async function registrarNoPago(
+  token: string,
+  prestamoId: string,
+  params: { motivoNoPago: string; nota?: string }
+): Promise<void> {
+  const res = await fetchWithAuth(`/api/empresa/prestamos/${encodeURIComponent(prestamoId)}/pagos`, token, {
+    method: "POST",
+    body: JSON.stringify({
+      tipo: "no_pago",
+      motivoNoPago: params.motivoNoPago,
+      nota: params.nota?.trim() || undefined,
+    }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error ?? "Error al registrar no pago");
+}
+
 export async function createPrestamo(
   token: string,
   params: {

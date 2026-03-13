@@ -101,22 +101,33 @@ export interface PrestamoDoc {
   multaMora: number; // porcentaje
 }
 
-/** Tipo de pago */
-export type TipoPago = "pago" | "mora";
+/** Tipo de pago / registro en subcolección pagos */
+export type TipoPago = "pago" | "mora" | "no_pago";
+
+/** Motivo cuando el cliente no pagó */
+export type MotivoNoPago =
+  | "sin_fondos"
+  | "no_estaba"
+  | "promesa_pago"
+  | "otro";
 
 /** Método de pago al cobrar (efectivo/transferencia) */
 export type MetodoPago = "efectivo" | "transferencia";
 
-/** Pago dentro de un préstamo */
+/** Pago dentro de un préstamo (o registro de intento sin pago) */
 export interface PagoDoc {
   monto: number;
   fecha: Date;
   empleadoId: string;
   tipo: TipoPago;
-  /** Efectivo o transferencia (para cobro del trabajador) */
+  /** Efectivo o transferencia (solo si tipo === "pago") */
   metodoPago?: MetodoPago;
-  /** URL de la foto de la evidencia del cobro */
+  /** URL de la foto de la evidencia del cobro (solo si tipo === "pago") */
   evidencia?: string;
+  /** Motivo por el que no pagó (solo si tipo === "no_pago") */
+  motivoNoPago?: MotivoNoPago;
+  /** Nota adicional (solo si tipo === "no_pago") */
+  nota?: string;
 }
 
 /** Tipo de gasto */
@@ -136,3 +147,4 @@ export interface GastoDoc {
   /** URL de la foto del comprobante/factura */
   evidencia?: string;
 }
+

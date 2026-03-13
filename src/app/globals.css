@@ -3638,3 +3638,239 @@ th {
 .perfil-empresa-btn-save:hover:not(:disabled) {
   background: var(--perfil-empresa-primary-hover);
 }
+
+/* ── Ruta del día ───────────────────────────────────────────────────────── */
+.ruta-dia-card {
+  max-width: 480px;
+  margin: 0 auto;
+}
+.ruta-dia-header {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+.ruta-dia-title {
+  margin: 0 0 0.25rem 0;
+  font-size: 1.5rem;
+}
+.ruta-dia-subtitle {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--text-muted);
+}
+.ruta-dia-summary {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.25rem;
+  font-size: 0.875rem;
+  color: var(--text-muted);
+}
+.ruta-dia-filtros {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+}
+.ruta-dia-chip {
+  padding: 0.4rem 0.75rem;
+  border-radius: 999px;
+  border: 1px solid var(--card-border);
+  background: var(--card-bg);
+  color: var(--text);
+  font-size: 0.875rem;
+}
+.ruta-dia-chip-active {
+  background: var(--text);
+  color: var(--bg);
+  border-color: var(--text);
+}
+.ruta-dia-list {
+  margin-bottom: 4rem;
+}
+.ruta-dia-section {
+  margin-bottom: 1.25rem;
+}
+.ruta-dia-section-title {
+  margin: 0 0 0.5rem 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+}
+.ruta-dia-section-1 { color: #dc2626; }
+.ruta-dia-section-2 { color: #ea580c; }
+.ruta-dia-section-3 { color: #2563eb; }
+.ruta-dia-section-4 { color: var(--text-muted); }
+.ruta-dia-section-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.ruta-dia-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  border-radius: 8px;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  margin-bottom: 0.5rem;
+  cursor: pointer;
+}
+.ruta-dia-item:hover {
+  background: var(--input-bg);
+}
+.ruta-dia-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 0.875rem;
+  flex-shrink: 0;
+}
+.ruta-dia-avatar.prioridad-1 { background: #fef2f2; color: #dc2626; }
+.ruta-dia-avatar.prioridad-2 { background: #fff7ed; color: #ea580c; }
+.ruta-dia-avatar.prioridad-3 { background: #eff6ff; color: #2563eb; }
+.ruta-dia-avatar.prioridad-4 { background: var(--input-bg); color: var(--text-muted); }
+.ruta-dia-item-main {
+  flex: 1;
+  min-width: 0;
+}
+.ruta-dia-item-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+}
+.ruta-dia-item-nombre { font-weight: 600; }
+.ruta-dia-item-monto { font-weight: 600; }
+.ruta-dia-item-secondary { margin-top: 0.25rem; }
+.ruta-dia-item-sub { font-size: 0.8125rem; color: var(--text-muted); }
+.ruta-dia-badge {
+  font-size: 0.6875rem;
+  padding: 0.2rem 0.4rem;
+  border-radius: 4px;
+  font-weight: 600;
+}
+.ruta-dia-badge.estado-mora { background: #fef2f2; color: #dc2626; }
+.ruta-dia-badge.estado-pagada { background: #f0fdf4; color: #16a34a; }
+.ruta-dia-badge.estado-activo { background: #eff6ff; color: #2563eb; }
+.ruta-dia-footer {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: space-around;
+  padding: 0.75rem 1rem;
+  background: var(--card-bg);
+  border-top: 1px solid var(--card-border);
+  z-index: 10;
+}
+.ruta-dia-footer-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+}
+.ruta-dia-footer-label { font-size: 0.75rem; color: var(--text-muted); }
+.ruta-dia-footer-value { font-weight: 600; }
+
+/* ── Cobrar cliente ─────────────────────────────────────────────────────── */
+.cobrar-card { max-width: 420px; margin: 0 auto; }
+.cobrar-header { margin-bottom: 1.25rem; }
+.cobrar-back {
+  display: inline-block;
+  margin-bottom: 0.5rem;
+  font-size: 0.875rem;
+  color: var(--link);
+}
+.cobrar-title { margin: 0 0 0.25rem 0; font-size: 1.35rem; }
+.cobrar-subtitle { margin: 0; font-size: 0.875rem; color: var(--text-muted); }
+.cobrar-metricas {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+.cobrar-metrica {
+  padding: 0.75rem;
+  background: var(--input-bg);
+  border-radius: 8px;
+  border: 1px solid var(--card-border);
+}
+.cobrar-metrica-total { grid-column: 1 / -1; font-weight: 600; }
+.cobrar-metrica-label { display: block; font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.25rem; }
+.cobrar-metrica-value { font-size: 1.1rem; }
+.cobrar-form .form-group { margin-bottom: 1rem; }
+.cobrar-input, .cobrar-select { width: 100%; padding: 0.5rem 0.75rem; border-radius: 6px; border: 1px solid var(--input-border); background: var(--input-bg); color: var(--text); }
+.cobrar-input-monto { font-size: 1.25rem; }
+.cobrar-distribucion {
+  padding: 0.75rem;
+  background: var(--input-bg);
+  border-radius: 8px;
+  margin-bottom: 1rem;
+  font-size: 0.875rem;
+}
+.cobrar-distribucion-title { margin: 0 0 0.5rem 0; font-weight: 600; }
+.cobrar-excedente { margin: 0.5rem 0 0 0; color: var(--text-muted); }
+.cobrar-file { display: block; margin-top: 0.25rem; }
+.cobrar-actions { display: flex; gap: 0.75rem; margin-top: 1.25rem; flex-wrap: wrap; }
+.cobrar-actions .btn { flex: 1; min-width: 120px; }
+.cobrar-confirmacion p { margin-bottom: 1rem; }
+
+.cobrar-evidencia-hint { margin: 0.25rem 0 0 0; font-size: 0.875rem; color: var(--text-muted); }
+.cobrar-evidencia-progress { margin: 0.25rem 0 0.5rem 0; font-size: 0.8125rem; font-weight: 600; }
+.cobrar-evidencia-slots { display: flex; flex-direction: column; gap: 1rem; }
+.cobrar-evidencia-slot { border: 1px solid var(--card-border); border-radius: 8px; padding: 0.75rem; background: var(--input-bg); }
+.cobrar-evidencia-slot-label { display: block; font-size: 0.75rem; font-weight: 600; margin-bottom: 0.5rem; color: var(--text-muted); }
+.cobrar-evidencia-preview { position: relative; display: inline-block; }
+.cobrar-evidencia-preview img { display: block; max-width: 100%; max-height: 160px; border-radius: 6px; }
+.cobrar-evidencia-remove {
+  position: absolute; top: 0.25rem; right: 0.25rem;
+  width: 28px; height: 28px; border-radius: 50%; border: none; background: rgba(0,0,0,0.6); color: #fff;
+  display: flex; align-items: center; justify-content: center; cursor: pointer;
+}
+.cobrar-evidencia-buttons { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.cobrar-file-hidden { position: absolute; width: 0; height: 0; opacity: 0; pointer-events: none; }
+.cobrar-evidencia-btn {
+  display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.5rem 0.75rem;
+  border-radius: 8px; border: 1px solid var(--input-border); background: var(--card-bg); color: var(--text);
+  font-size: 0.875rem; cursor: pointer;
+}
+.cobrar-evidencia-btn:hover { background: var(--btn-secondary-hover); }
+.cobrar-camera-overlay { position: fixed; inset: 0; z-index: 100; display: flex; align-items: center; justify-content: center; padding: 1rem; }
+.cobrar-camera-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,0.7); }
+.cobrar-camera-box { position: relative; background: var(--card-bg); border-radius: 12px; padding: 1rem; max-width: 100%; width: 360px; }
+.cobrar-camera-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; }
+.cobrar-camera-title { margin: 0; font-size: 1rem; }
+.cobrar-camera-close { background: none; border: none; color: var(--text); cursor: pointer; padding: 0.25rem; }
+.cobrar-camera-video { width: 100%; border-radius: 8px; background: #000; display: block; }
+.cobrar-camera-error { margin: 0.5rem 0; color: #dc2626; font-size: 0.875rem; }
+.cobrar-camera-actions { display: flex; gap: 0.5rem; margin-top: 0.75rem; justify-content: flex-end; }
+.form-required { color: #dc2626; }
+
+/* ── Registrar gasto (jornada) ────────────────────────────────────────────── */
+.registrar-gasto-card { max-width: 420px; margin: 0 auto; }
+.registrar-gasto-header { margin-bottom: 1.25rem; }
+.registrar-gasto-back {
+  display: inline-block;
+  margin-bottom: 0.5rem;
+  font-size: 0.875rem;
+  color: var(--link);
+}
+.registrar-gasto-title { margin: 0 0 0.25rem 0; font-size: 1.35rem; }
+.registrar-gasto-saldo { margin: 0; font-size: 0.875rem; color: var(--text-muted); }
+.registrar-gasto-sin-jornada { margin-bottom: 1rem; }
+.registrar-gasto-form .form-group { margin-bottom: 1rem; }
+.registrar-gasto-input, .registrar-gasto-select { width: 100%; padding: 0.5rem 0.75rem; border-radius: 6px; border: 1px solid var(--input-border); background: var(--input-bg); color: var(--text); }
+.registrar-gasto-actions { display: flex; gap: 0.75rem; margin-top: 1rem; flex-wrap: wrap; }
+.registrar-gasto-confirmacion p { margin-bottom: 1rem; }

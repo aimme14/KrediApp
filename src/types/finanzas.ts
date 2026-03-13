@@ -1,0 +1,169 @@
+import type { Timestamp } from "firebase/firestore";
+
+/**
+ * Tipos financieros de nivel ruta/jornada/cobros.
+ * Estos tipos representan la forma en la que se guardan
+ * los datos en Firestore bajo /empresas/{empresaId}.
+ *
+ * Nota: el capital del jefe/empresa es la suma de
+ * capitalTotal de todas las rutas.
+ */
+
+// ── Ruta ──────────────────────────────
+export interface RutaFinanciera {
+  id: string;
+  nombre: string;
+  zonaId: string;
+  empleadosIds: string[];
+  adminId: string;
+
+  // Capital (siempre debe cuadrar)
+  cajaRuta: number;
+  cajasEmpleados: number;
+  inversiones: number;
+  capitalTotal: number;
+
+  // Acumulados históricos para la ruta
+  ganancias: number;
+  gastos: number;
+  perdidas: number;
+
+  fechaCreacion: Timestamp;
+  ultimaActualizacion: Timestamp;
+}
+
+// ── Jornada ───────────────────────────
+export type EstadoJornada = "activa" | "cerrada";
+
+export interface Jornada {
+  id: string;
+  rutaId: string;
+  empleadoId: string;
+  empleadoNombre: string;
+  fecha: Timestamp;
+  estado: EstadoJornada;
+
+  // Caja del empleado durante la jornada
+  entregaInicial: number;
+  cobrosDelDia: number;
+  gastosDelDia: number;
+  cajaActual: number; // entregaInicial + cobrosDelDia − gastosDelDia
+  devueltoAlCierre: number;
+
+  // Resumen de gestión
+  clientesVisitados: number;
+  clientesCobrados: number;
+  clientesNoPagaron: number;
+}
+
+// ── Movimiento ────────────────────────
+export type TipoMovimiento =
+  | "entrega_inicial"
+  | "cobro_cuota"
+  | "gasto"
+  | "cierre";
+
+export type CategoriaGastoMovimiento = "transporte" | "alimentacion" | "otro";
+
+export interface Movimiento {
+  id: string;
+  tipo: TipoMovimiento;
+  monto: number;
+  descripcion: string;
+  fecha: Timestamp;
+
+  // Solo si tipo == "cobro_cuota"
+  prestamoId?: string;
+  cuotaId?: string;
+  clienteId?: string;
+  clienteNombre?: string;
+  cuotaCapital?: number;
+  cuotaGanancia?: number;
+
+  // Solo si tipo == "gasto"
+  categoriaGasto?: CategoriaGastoMovimiento;
+}
+
+// ── Estados y tipos de cuota / cobros ─
+export type FrecuenciaCuota = "diario" | "semanal" | "quincenal" | "mensual";
+
+export type EstadoCuota =
+  | "pendiente"
+  | "parcial"
+  | "mora"
+  | "pagada"
+  | "incobrable";
+
+export type ResultadoIntentoCobro = "pagado" | "no_pagado";
+
+export type MetodoPagoIntento = "efectivo" | "transferencia";
+
+export type MotivoNoPago =
+  | "sin_fondos"
+  | "no_estaba"
+  | "promesa_pago"
+  | "otro";
+
+// ── Extensiones previstas para Cuota ──
+/**
+ * Campos adicionales que se deben agregar a la interfaz de Cuota
+ * existente en el modelo de préstamos cuando se implemente
+ * la subcolección de cuotas por préstamo.
+ */
+export interface CuotaFinancieraExtension {
+  cobradorId: string;
+  clienteNombre: string;
+  clienteDireccion: string;
+  frecuencia: FrecuenciaCuota;
+  estado: EstadoCuota;
+  montoAbonado: number;
+  saldoPendiente: number;
+  numeroCuota: number;
+  totalCuotas: number;
+  fechaVencimiento: Timestamp;
+  fechaPago?: Timestamp;
+}
+
+// ── Extensiones para IntentoCobro ─────
+export interface DistribucionCuotas {
+  cuotasCerradas: string[];
+  cuotaParcial?: {
+    cuotaId: string;
+    montoAbonado: number;
+    saldoPendiente: number;
+  };
+  excedente: number;
+}
+
+export interface IntentoCobroExtension {
+  resultado: ResultadoIntentoCobro;
+  metodoPago?: MetodoPagoIntento;
+  montoPagado?: number;
+  motivoNoPago?: MotivoNoPago;
+  nota?: string;
+  distribucion?: DistribucionCuotas;
+}
+
+// ── ClienteRuta (pantalla ruta del día) ─
+export type PrioridadClienteRuta = 1 | 2 | 3 | 4;
+
+export interface ClienteRuta {
+  cuotaId: string;
+  prestamoId: string;
+  clienteId: string;
+  clienteNombre: string;
+  clienteDireccion: string;
+  /** Zona del cobrador/cliente (ej. barrio o base) */
+  zona?: string;
+  monto: number;
+  fechaVencimiento: Timestamp;
+  estado: string;
+  frecuencia: string;
+  numeroCuota: number;
+  totalCuotas: number;
+  diasMora: number;
+  intentosFallidos: number;
+  prioridad: PrioridadClienteRuta;
+  visitado: boolean;
+}
+

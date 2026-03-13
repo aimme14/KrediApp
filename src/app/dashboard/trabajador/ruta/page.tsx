@@ -1,180 +1,182 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useMemo } from "react";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
-import { listClientes, listPrestamos, registrarPago } from "@/lib/empresa-api";
-import { uploadImage, getImageAccept } from "@/lib/storage";
-import type { ClienteItem } from "@/lib/empresa-api";
-import type { PrestamoItem } from "@/lib/empresa-api";
+import { useRuta } from "@/hooks/useRuta";
+import { useRutaDia } from "@/hooks/useRutaDia";
 
-type StatusColor = "red" | "yellow" | "green";
+const filtros: { id: "todos" | "mora" | "hoy" | "pendientes" | "cobrados"; label: string }[] = [
+  { id: "todos", label: "Todos" },
+  { id: "mora", label: "En mora" },
+  { id: "hoy", label: "Vencen hoy" },
+  { id: "pendientes", label: "Pendientes" },
+  { id: "cobrados", label: "Cobrados" },
+];
 
-function getStatusColor(prestamo: PrestamoItem | null): StatusColor {
-  if (!prestamo) return "green";
-  if (prestamo.estado === "mora") return "red";
-  if (prestamo.saldoPendiente <= 0) return "green";
-  return "yellow";
+function formatCurrency(value: number): string {
+  return value.toLocaleString("es-CO", {
+    style: "currency",
+    currency: "COP",
+    maximumFractionDigits: 0,
+  });
 }
 
 export default function RutaDelDiaPage() {
-  const { user, profile } = useAuth();
-  const [clientes, setClientes] = useState<ClienteItem[]>([]);
-  const [prestamos, setPrestamos] = useState<PrestamoItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [selectedCliente, setSelectedCliente] = useState<ClienteItem | null>(null);
-  const [prestamoCliente, setPrestamoCliente] = useState<PrestamoItem | null>(null);
-  const [monto, setMonto] = useState("");
-  const [metodoPago, setMetodoPago] = useState<"efectivo" | "transferencia">("efectivo");
-  const [evidenciaFile, setEvidenciaFile] = useState<File | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-
-  const load = useCallback(async () => {
-    if (!user) return;
-    const token = await user.getIdToken();
-    Promise.all([listClientes(token), listPrestamos(token)])
-      .then(([c, p]) => {
-        setClientes(c);
-        setPrestamos(p);
-      })
-      .catch((e) => setError(e instanceof Error ? e.message : "Error al cargar"))
-      .finally(() => setLoading(false));
-  }, [user]);
-
-  useEffect(() => {
-    load();
-  }, [load]);
-
-  const getPrestamoForCliente = (clienteId: string) =>
-    prestamos.find((p) => p.clienteId === clienteId && p.estado !== "pagado") ?? null;
-
-  const handleSelectCliente = (c: ClienteItem) => {
-    setSelectedCliente(c);
-    setPrestamoCliente(getPrestamoForCliente(c.id));
-    setMonto("");
-    setEvidenciaFile(null);
-  };
-
-  const handleRegistrarPago = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!user || !prestamoCliente || !selectedCliente) return;
-    const montoNum = parseFloat(monto.replace(",", "."));
-    if (isNaN(montoNum) || montoNum <= 0) {
-      setError("Monto debe ser positivo");
-      return;
-    }
-    setError(null);
-    setSubmitting(true);
-    try {
-      let evidenciaUrl = "";
-      if (evidenciaFile) {
-        evidenciaUrl = await uploadImage(evidenciaFile, {
-          folder: "pagos",
-          ownerId: user.uid,
-          filename: "auto",
-        });
-      }
-      const token = await user.getIdToken();
-      await registrarPago(token, prestamoCliente.id, {
-        monto: montoNum,
-        metodoPago,
-        evidencia: evidenciaUrl || undefined,
-      });
-      setMonto("");
-      setSelectedCliente(null);
-      setPrestamoCliente(null);
-      setEvidenciaFile(null);
-      await load();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Error al registrar pago");
-    } finally {
-      setSubmitting(false);
-    }
-  };
+  const { profile } = useAuth();
+  const router = useRouter();
+  const { ruta } = useRuta();
+  const { clientes, filtro, setFiltro, clientesFiltrados, loading } = useRutaDia();
 
   if (!profile || profile.role !== "trabajador") return null;
 
-  return (
-    <div className="card">
-      <h2 style={{ marginTop: 0 }}>Ruta del día</h2>
-      <p style={{ color: "var(--text-muted)", fontSize: "0.875rem", marginBottom: "1.25rem" }}>
-        Clientes a visitar. Rojo: no pagó / mora. Amarillo: pendiente de cobro. Verde: al día. Selecciona un cliente para registrar el pago (efectivo o transferencia y foto de evidencia).
-      </p>
+  const hoy = new Date();
+  const fechaLabel = hoy.toLocaleDateString("es-ES", {
+    weekday: "long",
+    day: "numeric",
+    month: "short",
+  });
 
-      {error && <p className="error-msg">{error}</p>}
+  const totalClientes = clientes.length;
+  const totalCobrados = clientes.filter((c) => c.estado === "pagada").length;
+  const totalCobrado = clientes
+    .filter((c) => c.estado === "pagada")
+    .reduce((sum, c) => sum + c.monto, 0);
+
+  const gruposPorPrioridad = useMemo(() => {
+    const grupos: Record<number, typeof clientesFiltrados> = {
+      1: [],
+      2: [],
+      3: [],
+      4: [],
+    };
+    for (const c of clientesFiltrados) {
+      grupos[c.prioridad].push(c);
+    }
+    return grupos;
+  }, [clientesFiltrados]);
+
+  const secciones = [
+    { prioridad: 1, titulo: "URGENTE · EN MORA" },
+    { prioridad: 2, titulo: "VENCEN HOY" },
+    { prioridad: 3, titulo: "MAÑANA" },
+    { prioridad: 4, titulo: "ESTA SEMANA" },
+  ];
+
+  const handleClickCliente = (clienteId: string, prestamoId: string) => {
+    router.push(`/dashboard/trabajador/cobrar?clienteId=${encodeURIComponent(clienteId)}&prestamoId=${encodeURIComponent(prestamoId)}`);
+  };
+
+  return (
+    <div className="card ruta-dia-card">
+      <header className="ruta-dia-header">
+        <div>
+          <h2 className="ruta-dia-title">Ruta del día</h2>
+          <p className="ruta-dia-subtitle">
+            {fechaLabel} · {ruta?.nombre ?? "Sin ruta"}
+          </p>
+        </div>
+        <div className="ruta-dia-summary">
+          <span>{totalClientes} clientes</span>
+          <span>{formatCurrency(totalCobrado)} cobrado</span>
+        </div>
+      </header>
+
+      <div className="ruta-dia-filtros">
+        {filtros.map((f) => (
+          <button
+            key={f.id}
+            type="button"
+            className={`ruta-dia-chip ${filtro === f.id ? "ruta-dia-chip-active" : ""}`}
+            onClick={() => setFiltro(f.id)}
+          >
+            {f.label}
+          </button>
+        ))}
+      </div>
 
       {loading ? (
         <p>Cargando clientes...</p>
-      ) : clientes.length === 0 ? (
-        <p style={{ color: "var(--text-muted)" }}>No tienes clientes asignados en tu ruta.</p>
+      ) : clientesFiltrados.length === 0 ? (
+        <p className="ruta-dia-empty">No hay clientes para mostrar en este filtro.</p>
       ) : (
-        <>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", marginBottom: "1rem" }}>
-            {clientes.map((c) => {
-              const p = getPrestamoForCliente(c.id);
-              const color = getStatusColor(p);
-              return (
-                <button
-                  key={c.id}
-                  type="button"
-                  onClick={() => handleSelectCliente(c)}
-                  style={{
-                    padding: "0.5rem 1rem",
-                    borderRadius: "8px",
-                    border: `2px solid ${color === "red" ? "#dc2626" : color === "yellow" ? "#ca8a04" : "#16a34a"}`,
-                    background: selectedCliente?.id === c.id ? (color === "red" ? "#fef2f2" : color === "yellow" ? "#fefce8" : "#f0fdf4") : "transparent",
-                    cursor: "pointer",
-                    fontWeight: selectedCliente?.id === c.id ? 600 : 400,
-                  }}
-                >
-                  {c.nombre}
-                </button>
-              );
-            })}
-          </div>
+        <div className="ruta-dia-list">
+          {secciones.map(({ prioridad, titulo }) => {
+            const list = gruposPorPrioridad[prioridad] ?? [];
+            if (list.length === 0) return null;
+            return (
+              <section key={prioridad} className="ruta-dia-section">
+                <h3 className={`ruta-dia-section-title ruta-dia-section-${prioridad}`}>{titulo}</h3>
+                <ul className="ruta-dia-section-list">
+                  {list.map((c) => {
+                    const initials = c.clienteNombre
+                      .split(" ")
+                      .filter(Boolean)
+                      .slice(0, 2)
+                      .map((p) => p[0]?.toUpperCase())
+                      .join("");
+                    const badgeLabel =
+                      c.estado === "mora"
+                        ? "Mora"
+                        : c.estado === "pagada"
+                        ? "Pagada"
+                        : prioridad === 2
+                        ? "Hoy"
+                        : prioridad === 3
+                        ? "Mañana"
+                        : "Pronto";
 
-          {selectedCliente && (
-            <div className="card" style={{ marginTop: "1rem" }}>
-              <h3 style={{ marginTop: 0 }}>{selectedCliente.nombre}</h3>
-              <p style={{ margin: "0 0 0.5rem 0" }}>Tel: {selectedCliente.telefono || "—"} · Cédula: {selectedCliente.cedula || "—"}</p>
-              {prestamoCliente ? (
-                <>
-                  <p style={{ margin: "0 0 1rem 0" }}>
-                    Préstamo: saldo pendiente <strong>{prestamoCliente.saldoPendiente.toFixed(2)}</strong> · Estado: {prestamoCliente.estado}
-                  </p>
-                  <form onSubmit={handleRegistrarPago}>
-                    <div className="form-group">
-                      <label>Monto a cobrar</label>
-                      <input type="text" inputMode="decimal" value={monto} onChange={(e) => setMonto(e.target.value)} required placeholder="0.00" />
-                    </div>
-                    <div className="form-group">
-                      <label>Tipo de pago</label>
-                      <select value={metodoPago} onChange={(e) => setMetodoPago(e.target.value as "efectivo" | "transferencia")} style={{ width: "100%", padding: "0.5rem" }}>
-                        <option value="efectivo">Efectivo</option>
-                        <option value="transferencia">Transferencia</option>
-                      </select>
-                    </div>
-                    <div className="form-group">
-                      <label>Evidencia (foto)</label>
-                      <input
-                        type="file"
-                        accept={getImageAccept()}
-                        onChange={(e) => setEvidenciaFile(e.target.files?.[0] ?? null)}
-                        style={{ display: "block" }}
-                      />
-                    </div>
-                    <button type="submit" className="btn btn-primary" disabled={submitting}>
-                      {submitting ? "Registrando..." : "Registrar pago"}
-                    </button>
-                  </form>
-                </>
-              ) : (
-                <p style={{ color: "var(--text-muted)" }}>Sin préstamo activo (al día).</p>
-              )}
-            </div>
-          )}
-        </>
+                    const subtituloParts: string[] = [];
+                    subtituloParts.push(`${c.frecuencia} · ${c.estado}`);
+                    if (c.diasMora > 0) {
+                      subtituloParts.push(`${c.diasMora} días de mora`);
+                    }
+
+                    return (
+                      <li
+                        key={c.cuotaId}
+                        className="ruta-dia-item"
+                        onClick={() => handleClickCliente(c.clienteId, c.prestamoId)}
+                      >
+                        <div className={`ruta-dia-avatar prioridad-${prioridad}`}>
+                          <span>{initials || "?"}</span>
+                        </div>
+                        <div className="ruta-dia-item-main">
+                          <div className="ruta-dia-item-row">
+                            <span className="ruta-dia-item-nombre">{c.clienteNombre}</span>
+                            <span className="ruta-dia-item-monto">{formatCurrency(c.monto)}</span>
+                          </div>
+                          <div className="ruta-dia-item-row ruta-dia-item-secondary">
+                            <span className="ruta-dia-item-sub">
+                              {subtituloParts.join(" · ")}
+                            </span>
+                            <span className={`ruta-dia-badge estado-${c.estado.toLowerCase()}`}>{badgeLabel}</span>
+                          </div>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </section>
+            );
+          })}
+        </div>
       )}
+
+      <footer className="ruta-dia-footer">
+        <div className="ruta-dia-footer-item">
+          <span className="ruta-dia-footer-label">Cobrados</span>
+          <span className="ruta-dia-footer-value">{totalCobrados}</span>
+        </div>
+        <div className="ruta-dia-footer-item">
+          <span className="ruta-dia-footer-label">Pendientes</span>
+          <span className="ruta-dia-footer-value">{totalClientes - totalCobrados}</span>
+        </div>
+        <div className="ruta-dia-footer-item">
+          <span className="ruta-dia-footer-label">Total cobrado</span>
+          <span className="ruta-dia-footer-value">{formatCurrency(totalCobrado)}</span>
+        </div>
+      </footer>
     </div>
   );
 }

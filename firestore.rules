@@ -44,6 +44,18 @@ service cloud.firestore {
         allow read: if request.auth != null;
         allow write: if false;
       }
+      // Jornadas de cobranza
+      match /jornadas/{jornadaId} {
+        allow read: if request.auth != null
+          && (resource.data.empleadoId == request.auth.uid
+              || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.empresaId == empresaId);
+        allow write: if false;
+        match /movimientos/{movimientoId} {
+          allow read: if request.auth != null
+            && (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.empresaId == empresaId);
+          allow write: if false;
+        }
+      }
     }
   }
 }

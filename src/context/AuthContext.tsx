@@ -107,6 +107,7 @@ async function fetchUserProfile(
       lugar: data.lugar,
       base: data.base,
       adminId: data.adminId,
+      rutaId: data.rutaId ?? undefined,
     };
   } catch (err) {
     if (typeof window !== "undefined") {
