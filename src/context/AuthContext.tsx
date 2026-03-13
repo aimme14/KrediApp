@@ -171,7 +171,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const email = state.user.email ?? state.profile?.email;
     if (!email) throw new Error("No se puede re-autenticar: falta el correo del usuario.");
     const credential = EmailAuthProvider.credential(email, password);
-    await reauthenticateWithCredential(auth, state.user, credential);
+    await reauthenticateWithCredential(state.user, credential);
   };
 
   const clearError = () => setState((s) => ({ ...s, error: null }));
