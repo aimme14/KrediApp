@@ -45,6 +45,10 @@ export async function GET(request: NextRequest) {
       fechaInicio: data.fechaInicio?.toDate?.()?.toISOString?.() ?? null,
       fechaVencimiento: data.fechaVencimiento?.toDate?.()?.toISOString?.() ?? null,
       multaMora: data.multaMora ?? 0,
+      /** Adelanto aplicado a la(s) siguiente(s) cuota(s). Si > 0, la próxima sugerencia es valorCuota - (adelanto % valorCuota). */
+      adelantoCuota: data.adelantoCuota ?? 0,
+      /** Fecha del último pago (para semáforo "cuota del día pagada" en ruta del día). */
+      ultimoPagoFecha: data.ultimoPagoFecha?.toDate?.()?.toISOString?.() ?? null,
     };
   });
 
@@ -166,6 +170,7 @@ export async function POST(request: NextRequest) {
     fechaInicio: inicio,
     fechaVencimiento,
     multaMora: typeof multaMora === "number" ? multaMora : 0,
+    adelantoCuota: 0,
   });
 
   // Marcar cliente con préstamo activo (reutilizamos clienteRef del chequeo de moroso)

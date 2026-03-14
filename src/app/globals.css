@@ -3712,11 +3712,52 @@ th {
   font-size: 0.875rem;
   color: var(--text-muted);
 }
+.ruta-dia-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
 .ruta-dia-filtros {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
-  margin-bottom: 1.25rem;
+}
+.ruta-dia-refresh-btn {
+  padding: 0.4rem 0.75rem;
+  border-radius: 8px;
+  border: 1px solid var(--card-border);
+  background: var(--card-bg);
+  color: var(--text);
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+.ruta-dia-refresh-btn:hover:not(:disabled) {
+  background: var(--input-bg);
+}
+.ruta-dia-refresh-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.ruta-dia-error,
+.ruta-dia-loading {
+  margin: 0 0 1rem 0;
+  font-size: 0.875rem;
+  color: var(--text-muted);
+}
+.ruta-dia-error {
+  color: var(--error, #dc2626);
+}
+.ruta-dia-error-wrap {
+  margin-bottom: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.ruta-dia-empty-no-ruta {
+  font-weight: 500;
 }
 .ruta-dia-chip {
   padding: 0.4rem 0.75rem;
@@ -3768,7 +3809,47 @@ th {
 .ruta-dia-item:hover {
   background: var(--input-bg);
 }
+/* Semáforo: rojo = mora, amarillo = pendiente por cobrar, verde = ya pagó */
+.ruta-dia-semaforo {
+  flex-shrink: 0;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid var(--card-bg);
+  box-shadow: 0 0 0 1px var(--card-border);
+}
+.ruta-dia-semaforo-rojo {
+  background: #dc2626;
+}
+.ruta-dia-semaforo-amarillo {
+  background: #eab308;
+}
+.ruta-dia-semaforo-verde {
+  background: #16a34a;
+}
+/* Borde izquierdo opcional por estado (refuerzo visual) */
+.ruta-dia-item-semaforo-rojo {
+  border-left: 3px solid #dc2626;
+}
+.ruta-dia-item-semaforo-amarillo {
+  border-left: 3px solid #eab308;
+}
+.ruta-dia-item-semaforo-verde {
+  border-left: 3px solid #16a34a;
+}
+.ruta-dia-item-visitado {
+  opacity: 0.85;
+}
+.ruta-dia-item-visitado .ruta-dia-item-nombre {
+  font-weight: 500;
+}
+.ruta-dia-item-cuotas {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-muted);
+}
 .ruta-dia-avatar {
+  position: relative;
   width: 40px;
   height: 40px;
   border-radius: 50%;
@@ -3783,6 +3864,16 @@ th {
 .ruta-dia-avatar.prioridad-2 { background: #fff7ed; color: #ea580c; }
 .ruta-dia-avatar.prioridad-3 { background: #eff6ff; color: #2563eb; }
 .ruta-dia-avatar.prioridad-4 { background: var(--input-bg); color: var(--text-muted); }
+.ruta-dia-avatar-check {
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--success, #16a34a);
+  border: 1.5px solid var(--card-bg);
+}
 .ruta-dia-item-main {
   flex: 1;
   min-width: 0;
@@ -3814,6 +3905,7 @@ th {
   display: flex;
   justify-content: space-around;
   padding: 0.75rem 1rem;
+  padding-bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));
   background: var(--card-bg);
   border-top: 1px solid var(--card-border);
   z-index: 10;
@@ -3851,8 +3943,13 @@ th {
   border: 1px solid var(--card-border);
 }
 .cobrar-metrica-total { grid-column: 1 / -1; font-weight: 600; }
+.cobrar-metrica-sugerencia { border-color: var(--link); background: var(--input-bg); }
 .cobrar-metrica-label { display: block; font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.25rem; }
 .cobrar-metrica-value { font-size: 1.1rem; }
+.cobrar-metrica-hint { display: block; font-size: 0.7rem; color: var(--text-muted); margin-top: 0.35rem; line-height: 1.3; }
+.cobrar-monto-row { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+.cobrar-monto-row .cobrar-input { flex: 1; min-width: 120px; }
+.cobrar-usar-sugerencia { flex-shrink: 0; padding: 0.5rem 0.75rem; font-size: 0.875rem; }
 .cobrar-form .form-group { margin-bottom: 1rem; }
 .cobrar-input, .cobrar-select { width: 100%; padding: 0.5rem 0.75rem; border-radius: 6px; border: 1px solid var(--input-border); background: var(--input-bg); color: var(--text); }
 .cobrar-input-monto { font-size: 1.25rem; }
@@ -3900,6 +3997,253 @@ th {
 .cobrar-camera-error { margin: 0.5rem 0; color: #dc2626; font-size: 0.875rem; }
 .cobrar-camera-actions { display: flex; gap: 0.5rem; margin-top: 0.75rem; justify-content: flex-end; }
 .form-required { color: #dc2626; }
+
+/* Historial de últimos pagos (expandible) */
+.cobrar-historial-wrap {
+  margin-bottom: 1.25rem;
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--input-bg);
+}
+.cobrar-historial-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 0.75rem;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+}
+.cobrar-historial-toggle:hover { background: var(--btn-secondary-hover); }
+.cobrar-historial-toggle-label { flex: 1; }
+.cobrar-historial-toggle-badge { font-size: 0.75rem; color: var(--text-muted); font-weight: 500; }
+.cobrar-historial-toggle-icon { font-size: 0.7rem; color: var(--text-muted); }
+.cobrar-historial-list { padding: 0 0.75rem 0.75rem; border-top: 1px solid var(--card-border); }
+.cobrar-historial-empty { margin: 0.5rem 0 0; font-size: 0.875rem; color: var(--text-muted); }
+.cobrar-historial-ul { list-style: none; margin: 0.5rem 0 0; padding: 0; }
+.cobrar-historial-li {
+  display: grid;
+  grid-template-columns: 1fr auto auto 1fr;
+  gap: 0.5rem;
+  align-items: center;
+  padding: 0.4rem 0;
+  font-size: 0.8125rem;
+  border-bottom: 1px solid var(--card-border);
+}
+.cobrar-historial-li:last-child { border-bottom: none; }
+.cobrar-historial-fecha { color: var(--text-muted); }
+.cobrar-historial-monto { font-weight: 600; }
+.cobrar-historial-metodo { color: var(--text-muted); text-transform: capitalize; }
+.cobrar-historial-registrado { color: var(--text-muted); font-size: 0.75rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Resumen post-cobro y comprobante */
+.cobrar-resumen-post {
+  padding: 0.75rem 1rem;
+  background: var(--input-bg);
+  border-radius: 8px;
+  margin-bottom: 1rem;
+  font-size: 0.9375rem;
+}
+.cobrar-resumen-post p { margin: 0.35rem 0; }
+.comprobante-cobro {
+  padding: 1rem 1.25rem;
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  background: var(--card-bg);
+  margin-bottom: 1.25rem;
+  max-width: 360px;
+}
+
+/* Voucher tipo Nequi / documento (fondo claro para captura e impresión) */
+.comprobante-voucher {
+  max-width: 380px;
+  padding: 0;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+  border: 1px solid #e5e7eb;
+  background: #ffffff !important;
+  color: #111827 !important;
+}
+.voucher-header {
+  text-align: center;
+  padding: 1.5rem 1.25rem 1rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+.voucher-icon {
+  width: 48px;
+  height: 48px;
+  margin: 0 auto 0.75rem;
+  border-radius: 50%;
+  background: #059669;
+  color: #fff;
+  font-size: 1.5rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+.voucher-title {
+  margin: 0 0 0.25rem 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #111827;
+}
+.voucher-subtitle {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: #6b7280;
+}
+.voucher-monto {
+  padding: 1.25rem 1.25rem 1rem;
+  text-align: center;
+  background: #f9fafb;
+  border-bottom: 1px solid #e5e7eb;
+}
+.voucher-monto-label {
+  display: block;
+  font-size: 0.75rem;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 0.35rem;
+}
+.voucher-monto-value {
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: #111827;
+}
+.voucher-rows {
+  padding: 0.5rem 1.25rem 1rem;
+}
+.voucher-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid #f3f4f6;
+  gap: 0.75rem;
+}
+.voucher-row:last-child { border-bottom: none; }
+.voucher-row-label {
+  font-size: 0.8125rem;
+  color: #6b7280;
+  flex-shrink: 0;
+}
+.voucher-row-value {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: #111827;
+  text-align: right;
+}
+.voucher-footer {
+  padding: 1rem 1.25rem;
+  background: #f9fafb;
+  border-top: 1px solid #e5e7eb;
+}
+.voucher-fecha {
+  margin: 0 0 0.35rem 0;
+  font-size: 0.8125rem;
+  color: #6b7280;
+}
+.voucher-brand {
+  margin: 0;
+  font-size: 0.75rem;
+  color: #9ca3af;
+}
+
+.comprobante-imagen-wrap {
+  max-width: 380px;
+  margin-bottom: 1.25rem;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+  border: 1px solid var(--card-border);
+}
+.comprobante-imagen {
+  display: block;
+  width: 100%;
+  height: auto;
+  vertical-align: top;
+}
+.comprobante-generando-msg {
+  margin: 0 0 0.5rem 0;
+  font-size: 0.875rem;
+  color: var(--text-muted);
+}
+
+.comprobante-title { margin: 0 0 1rem 0; font-size: 1.1rem; font-weight: 700; border-bottom: 1px solid var(--card-border); padding-bottom: 0.5rem; }
+.comprobante-section { margin-bottom: 0.75rem; }
+.comprobante-label { margin: 0 0 0.2rem 0; font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.02em; }
+.comprobante-value { margin: 0; font-size: 1rem; font-weight: 600; }
+.comprobante-muted { margin: 0.15rem 0 0 0; font-size: 0.8125rem; color: var(--text-muted); }
+.comprobante-fecha { margin: 1rem 0 0 0; font-size: 0.8125rem; color: var(--text-muted); }
+.cobrar-confirmacion-actions { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; }
+.cobrar-confirmacion-actions .btn { min-width: 140px; }
+
+/* Menú Compartir (dropdown) */
+.compartir-wrap { position: relative; display: inline-block; }
+.compartir-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 0.35rem;
+  min-width: 200px;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+  z-index: 50;
+  padding: 0.35rem 0;
+  display: flex;
+  flex-direction: column;
+}
+.compartir-opcion {
+  display: block;
+  width: 100%;
+  padding: 0.5rem 1rem;
+  border: none;
+  background: none;
+  color: var(--text);
+  font-size: 0.9375rem;
+  text-align: left;
+  cursor: pointer;
+  text-decoration: none;
+}
+.compartir-opcion:hover { background: var(--btn-secondary-hover); }
+.compartir-opcion:not(:last-child) { border-bottom: 1px solid var(--card-border); }
+.compartir-opcion-icono {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.compartir-icono {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.compartir-icono-wa { color: #25d366; }
+.compartir-icono-mail { color: var(--text); }
+.compartir-dropdown-iconos .compartir-opcion { padding: 0.6rem 1rem; }
+
+@media print {
+  .cobrar-confirmacion-actions,
+  .cobrar-back,
+  .cobrar-resumen-post { display: none !important; }
+  .comprobante-voucher {
+    box-shadow: none;
+    border: 1px solid #d1d5db;
+    max-width: 100%;
+  }
+}
 
 /* ── Registrar gasto (jornada) ────────────────────────────────────────────── */
 .registrar-gasto-card { max-width: 420px; margin: 0 auto; }

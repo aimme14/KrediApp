@@ -17,6 +17,31 @@ import { SUPER_ADMIN_COLLECTION } from "@/types/superAdmin";
 
 const USERS_COLLECTION = "users";
 
+/** Convierte errores de Firebase Auth a mensajes en español genéricos (sin revelar si el email existe). */
+function getAuthErrorMessage(e: unknown): string {
+  const err = e as { code?: string; message?: string } | null;
+  const code = err?.code ?? "";
+  switch (code) {
+    case "auth/invalid-email":
+      return "El correo no es válido.";
+    case "auth/user-disabled":
+      return "Esta cuenta está deshabilitada. Contacta al administrador.";
+    case "auth/user-not-found":
+    case "auth/wrong-password":
+    case "auth/invalid-credential":
+    case "auth/invalid-login-credentials":
+      return "Correo o contraseña incorrectos.";
+    case "auth/too-many-requests":
+      return "Demasiados intentos. Espera un momento e inténtalo de nuevo.";
+    case "auth/network-request-failed":
+      return "Error de conexión. Revisa tu internet e inténtalo de nuevo.";
+    default:
+      return err?.message && typeof err.message === "string" && err.message.length > 0
+        ? err.message
+        : "Error al iniciar sesión. Inténtalo de nuevo.";
+  }
+}
+
 interface AuthState {
   user: User | null;
   profile: UserProfile | null;
@@ -154,7 +179,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       await signInWithEmailAndPassword(auth, email, password);
     } catch (e: unknown) {
-      const message = e instanceof Error ? e.message : "Error al iniciar sesión";
+      const message = getAuthErrorMessage(e);
       setState((s) => ({ ...s, error: message }));
       throw e;
     }

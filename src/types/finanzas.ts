@@ -156,7 +156,8 @@ export interface ClienteRuta {
   /** Zona del cobrador/cliente (ej. barrio o base) */
   zona?: string;
   monto: number;
-  fechaVencimiento: Timestamp;
+  /** Fecha de vencimiento en capa de aplicación (si viene de API como ISO string se convierte a Date) */
+  fechaVencimiento: Date | null;
   estado: string;
   frecuencia: string;
   numeroCuota: number;
@@ -165,5 +166,27 @@ export interface ClienteRuta {
   intentosFallidos: number;
   prioridad: PrioridadClienteRuta;
   visitado: boolean;
+  /** True si el último pago del préstamo fue hoy (semáforo verde en ruta del día). */
+  cuotaPagadaHoy: boolean;
+}
+
+/** Grupo de ítems de ruta agrupados por cliente (una fila por cliente en la UI) */
+export interface ClienteRutaGrupo {
+  clienteId: string;
+  clienteNombre: string;
+  clienteDireccion: string;
+  zona?: string;
+  /** Suma de saldos pendientes de todos los préstamos del cliente */
+  totalMonto: number;
+  /** Número de préstamos/cuotas pendientes */
+  cantidadPrestamos: number;
+  /** Prioridad más urgente del grupo (1 = más urgente) */
+  prioridadMax: PrioridadClienteRuta;
+  /** Máximos días de mora entre los ítems */
+  diasMoraMax: number;
+  /** Si el cobrador ya visitó a este cliente hoy (localStorage) */
+  visitado: boolean;
+  /** Ítems del grupo; el primero es el "principal" para abrir cobro */
+  items: ClienteRuta[];
 }
 
