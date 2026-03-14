@@ -44,7 +44,7 @@ export function addVisitadoHoy(clienteId: string): void {
     const key = getVisitadosKey();
     const set = new Set(getVisitadosHoy());
     set.add(clienteId);
-    localStorage.setItem(key, JSON.stringify([...set]));
+    localStorage.setItem(key, JSON.stringify(Array.from(set)));
   } catch {
     // ignore
   }

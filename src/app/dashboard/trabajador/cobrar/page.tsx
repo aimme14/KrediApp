@@ -477,7 +477,8 @@ export default function CobrarClientePage() {
                     try {
                       const blob = comprobanteBlobRef.current ?? await getImageBlob(comprobanteImageUrl);
                       const file = new File([blob], "comprobante-pago.png", { type: blob.type || "image/png" });
-                      const canShare = typeof navigator !== "undefined" && navigator.share && navigator.canShare?.({ files: [file] });
+                      const hasShareApi = typeof navigator !== "undefined" && "share" in navigator;
+                      const canShare = hasShareApi && (typeof navigator.canShare === "function" ? navigator.canShare({ files: [file] }) : true);
                       if (canShare) {
                         await navigator.share({ files: [file], title: "Comprobante de pago" });
                       } else {
@@ -509,7 +510,8 @@ export default function CobrarClientePage() {
                     try {
                       const blob = comprobanteBlobRef.current ?? await getImageBlob(comprobanteImageUrl);
                       const file = new File([blob], "comprobante-pago.png", { type: blob.type || "image/png" });
-                      const canShare = typeof navigator !== "undefined" && navigator.share && navigator.canShare?.({ files: [file] });
+                      const hasShareApi = typeof navigator !== "undefined" && "share" in navigator;
+                      const canShare = hasShareApi && (typeof navigator.canShare === "function" ? navigator.canShare({ files: [file] }) : true);
                       if (canShare) {
                         await navigator.share({ files: [file], title: "Comprobante de pago" });
                       } else {
