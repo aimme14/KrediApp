@@ -86,6 +86,7 @@ export async function POST(
     nota,
     registradoPorUid,
     registradoPorNombre,
+    idempotencyKey,
   } = body as {
     tipo?: "pago" | "no_pago";
     monto?: number;
@@ -95,6 +96,7 @@ export async function POST(
     nota?: string;
     registradoPorUid?: string;
     registradoPorNombre?: string;
+    idempotencyKey?: string;
   };
   const uidRegistro = (registradoPorUid ?? apiUser.uid).trim() ? (registradoPorUid ?? apiUser.uid).trim() : apiUser.uid;
   const nombreRegistro = (registradoPorNombre ?? "").trim() || null;
@@ -167,7 +169,26 @@ export async function POST(
       : 0;
   const adelantoParaGuardar = nuevoSaldo <= 0 ? 0 : adelantoNuevo;
 
-  const pagoRef = await prestamoRef.collection(PAGOS_SUBCOLLECTION).add({
+  const keyTrimmed = typeof idempotencyKey === "string" ? idempotencyKey.trim() : "";
+  if (keyTrimmed) {
+    const existentes = await prestamoRef
+      .collection(PAGOS_SUBCOLLECTION)
+      .where("idempotencyKey", "==", keyTrimmed)
+      .limit(1)
+      .get();
+    if (!existentes.empty) {
+      const existingDoc = existentes.docs[0]!;
+      const prestamoData = (await prestamoRef.get()).data()!;
+      return NextResponse.json({
+        ok: true,
+        saldoPendiente: (prestamoData.saldoPendiente as number) ?? 0,
+        adelantoCuota: (prestamoData.adelantoCuota as number) ?? 0,
+        pagoId: existingDoc.id,
+      });
+    }
+  }
+
+  const pagoData: Record<string, unknown> = {
     monto: montoAplicar,
     fecha: now,
     empleadoId: apiUser.uid,
@@ -176,7 +197,10 @@ export async function POST(
     evidencia: (evidencia ?? "").trim() || null,
     registradoPorUid: uidRegistro,
     registradoPorNombre: nombreRegistro,
-  });
+  };
+  if (keyTrimmed) pagoData.idempotencyKey = keyTrimmed;
+
+  const pagoRef = await prestamoRef.collection(PAGOS_SUBCOLLECTION).add(pagoData);
 
   await prestamoRef.update({
     saldoPendiente: nuevoSaldo,

@@ -8,7 +8,7 @@ const QUICK_ACTIONS = [
   { href: "/dashboard/trabajador/resumen", label: "Resumen del día", icon: "chart", desc: "Estadísticas del día" },
   { href: "/dashboard/trabajador/cliente", label: "Cliente", icon: "client", desc: "Gestión de clientes" },
   { href: "/dashboard/trabajador/prestamo", label: "Préstamos", icon: "loan", desc: "Registrar y ver préstamos" },
-  { href: "/dashboard/trabajador/simulacro", label: "Simulacro de préstamo", icon: "calc", desc: "Calcular cuotas" },
+  { href: "/dashboard/trabajador/simulacro", label: "Simulador de Crédito", icon: "calc", desc: "Calcular cuotas" },
   { href: "/dashboard/trabajador/gastos", label: "Gastos operativos", icon: "expense", desc: "Registrar gastos" },
   { href: "/dashboard/trabajador/cliente-moroso", label: "Cliente moroso", icon: "alert", desc: "Alertas de morosidad" },
 ] as const;

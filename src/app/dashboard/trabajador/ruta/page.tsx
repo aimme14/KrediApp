@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useCallback } from "react";
+import { useMemo, useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { useRuta } from "@/hooks/useRuta";
@@ -32,13 +32,12 @@ function getSemaforoLabel(semaforo: SemaforoRuta): string {
   }
 }
 
-const filtros: {
-  id: "todos" | "mora" | "hoy" | "pendientes" | "cobrados";
+const FILTROS_OPCIONES: {
+  id: "todos" | "mora" | "pendientes" | "cobrados";
   label: string;
 }[] = [
   { id: "todos", label: "Todos" },
   { id: "mora", label: "En mora" },
-  { id: "hoy", label: "Vencen hoy" },
   { id: "pendientes", label: "Pendientes" },
   { id: "cobrados", label: "Cobrados" },
 ];
@@ -85,10 +84,8 @@ export default function RutaDelDiaPage() {
     markVisitado,
   } = useRutaDia();
 
-  const totalClientesUnicos = useMemo(
-    () => new Set(clientes.map((c) => c.clienteId)).size,
-    [clientes]
-  );
+  /** Número de préstamos/cuotas en la ruta del día */
+  const totalPrestamos = clientes.length;
   /** Cuotas/préstamos con pago registrado hoy (semáforo verde) */
   const totalCobrados = clientes.filter((c) => c.cuotaPagadaHoy).length;
   /** Total cobrado hoy: no disponible sin API; se deja en 0 */
@@ -145,8 +142,11 @@ export default function RutaDelDiaPage() {
     month: "short",
   });
 
+  const [filtroExpandido, setFiltroExpandido] = useState(false);
+  const filtroActualLabel =
+    FILTROS_OPCIONES.find((f) => f.id === filtro)?.label ?? (filtro === "hoy" ? "Todos" : "Todos");
   const filtroLabel =
-    filtros.find((f) => f.id === filtro)?.label?.toLowerCase() ?? "este filtro";
+    FILTROS_OPCIONES.find((f) => f.id === filtro)?.label?.toLowerCase() ?? (filtro === "hoy" ? "vencen hoy" : "este filtro");
   const emptySinClientes = clientes.length === 0;
   const emptyFiltro =
     !emptySinClientes && clientesFiltrados.length === 0;
@@ -161,8 +161,8 @@ export default function RutaDelDiaPage() {
           </p>
         </div>
         <div className="ruta-dia-summary">
-          <span>{totalClientesUnicos} clientes</span>
-          <span>{formatCurrency(totalCobrado)} cobrado</span>
+          <span className="ruta-dia-summary-clientes">{totalPrestamos} préstamos</span>
+          <span className="ruta-dia-summary-monto">{formatCurrency(totalCobrado)}</span>
         </div>
       </header>
 
@@ -189,28 +189,38 @@ export default function RutaDelDiaPage() {
       )}
 
       <div className="ruta-dia-toolbar">
-        <div className="ruta-dia-filtros" role="group" aria-label="Filtrar lista">
-          {filtros.map((f) => (
+        <div className="ruta-dia-filtros-wrap">
+          {!filtroExpandido ? (
             <button
-              key={f.id}
               type="button"
-              className={`ruta-dia-chip ${filtro === f.id ? "ruta-dia-chip-active" : ""}`}
-              onClick={() => setFiltro(f.id)}
-              aria-pressed={filtro === f.id}
+              className="ruta-dia-filtro-trigger"
+              onClick={() => setFiltroExpandido(true)}
+              aria-expanded={false}
+              aria-haspopup="listbox"
+              aria-label={`Filtro: ${filtroActualLabel}. Pulsar para ver opciones`}
             >
-              {f.label}
+              <span className="ruta-dia-filtro-trigger-label">{filtroActualLabel}</span>
+              <span className="ruta-dia-filtro-trigger-icon" aria-hidden> &gt;</span>
             </button>
-          ))}
+          ) : (
+            <div className="ruta-dia-filtros" role="group" aria-label="Opciones de filtro">
+              {FILTROS_OPCIONES.map((f) => (
+                <button
+                  key={f.id}
+                  type="button"
+                  className={`ruta-dia-chip ${filtro === f.id ? "ruta-dia-chip-active" : ""}`}
+                  onClick={() => {
+                    setFiltro(f.id);
+                    setFiltroExpandido(false);
+                  }}
+                  aria-pressed={filtro === f.id}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
-        <button
-          type="button"
-          className="ruta-dia-refresh-btn"
-          onClick={refetch}
-          disabled={loading}
-          aria-label="Actualizar lista de la ruta"
-        >
-          Actualizar
-        </button>
       </div>
 
       {loading ? (
@@ -328,7 +338,7 @@ export default function RutaDelDiaPage() {
       <footer className="ruta-dia-footer">
         <div className="ruta-dia-footer-item">
           <span className="ruta-dia-footer-label">Cobrados</span>
-          <span className="ruta-dia-footer-value">{totalCobrados}</span>
+          <span className="ruta-dia-footer-value ruta-dia-footer-value-green">{totalCobrados}</span>
         </div>
         <div className="ruta-dia-footer-item">
           <span className="ruta-dia-footer-label">Pendientes</span>
@@ -338,7 +348,7 @@ export default function RutaDelDiaPage() {
         </div>
         <div className="ruta-dia-footer-item">
           <span className="ruta-dia-footer-label">Total cobrado</span>
-          <span className="ruta-dia-footer-value">
+          <span className="ruta-dia-footer-value ruta-dia-footer-value-green">
             {formatCurrency(totalCobrado)}
           </span>
         </div>

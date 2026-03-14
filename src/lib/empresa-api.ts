@@ -197,6 +197,8 @@ export async function registrarPago(
     evidencia?: string;
     registradoPorUid?: string;
     registradoPorNombre?: string;
+    /** Clave de idempotencia: mismo key = misma respuesta, sin duplicar pago */
+    idempotencyKey?: string;
   }
 ): Promise<{ saldoPendiente: number; adelantoCuota?: number; pagoId?: string }> {
   const res = await fetchWithAuth(`/api/empresa/prestamos/${encodeURIComponent(prestamoId)}/pagos`, token, {

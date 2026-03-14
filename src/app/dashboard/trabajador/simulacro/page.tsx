@@ -20,16 +20,12 @@ function formatMoneda(n: number): string {
 
 function calcularTotal(monto: number, interesPct: number, numeroCuotas: number, modalidad: string) {
   const totalAPagar = monto * (1 + interesPct / 100);
-  let cuota = 0;
-  if (modalidad === "diario") cuota = totalAPagar / numeroCuotas;
-  else if (modalidad === "semanal") cuota = totalAPagar / numeroCuotas;
-  else cuota = totalAPagar / numeroCuotas;
+  const cuota = totalAPagar / numeroCuotas;
   return { totalAPagar, cuota };
 }
 
 export default function SimulacroPrestamoPage() {
   const { profile } = useAuth();
-  const [fechaInicio, setFechaInicio] = useState(() => new Date().toISOString().slice(0, 10));
   const [modalidad, setModalidad] = useState<"diario" | "semanal" | "mensual">("mensual");
   const [numeroCuotas, setNumeroCuotas] = useState("");
   const [interes, setInteres] = useState("");
@@ -47,64 +43,10 @@ export default function SimulacroPrestamoPage() {
 
   return (
     <div className="card">
-      <h2 style={{ marginTop: 0 }}>Simulacro de préstamo</h2>
-      <p style={{ color: "var(--text-muted)", fontSize: "0.875rem", marginBottom: "1.25rem" }}>
-        Misma información que la creación de préstamo, pero solo para mostrar al cliente cuánto quedaría la deuda sin generar el préstamo.
-      </p>
+      <h2 style={{ marginTop: 0 }}>Simulador de Crédito</h2>
 
       <div className="card" style={{ marginBottom: "1rem" }}>
-        <h3 style={{ marginTop: 0 }}>Datos del simulacro</h3>
-        <div className="form-group">
-          <label>Fecha del préstamo</label>
-          <input type="date" value={fechaInicio} onChange={(e) => setFechaInicio(e.target.value)} />
-        </div>
-        <div className="form-group">
-          <label>Frecuencia de pago</label>
-          <select value={modalidad} onChange={(e) => setModalidad(e.target.value as "diario" | "semanal" | "mensual")} style={{ width: "100%", padding: "0.5rem" }}>
-            {MODALIDADES.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
-          </select>
-        </div>
-        <div className="form-group">
-          <label>Número de cuotas</label>
-          <input
-            type="number"
-            inputMode="numeric"
-            min={1}
-            max={9999}
-            value={numeroCuotas}
-            onChange={(e) => {
-              const v = e.target.value.replace(/\D/g, "");
-              if (v === "" || /^\d+$/.test(v)) setNumeroCuotas(v);
-            }}
-            onKeyDown={(e) => {
-              const k = e.key;
-              if (k === "e" || k === "E" || k === "+" || k === "-" || k === "." || k === ",") e.preventDefault();
-            }}
-            placeholder="Ej: 12"
-            aria-label="Número de cuotas"
-          />
-        </div>
-        <div className="form-group">
-          <label>Interés (%)</label>
-          <input
-            type="number"
-            inputMode="decimal"
-            min={0}
-            step={0.1}
-            max={999.99}
-            value={interes}
-            onChange={(e) => {
-              const v = e.target.value.replace(",", ".");
-              if (v === "" || /^\d*\.?\d*$/.test(v)) setInteres(e.target.value);
-            }}
-            onKeyDown={(e) => {
-              const k = e.key;
-              if (k === "e" || k === "E" || k === "+" || k === "-") e.preventDefault();
-            }}
-            placeholder="Ej: 10"
-            aria-label="Interés en porcentaje"
-          />
-        </div>
+        <h3 style={{ marginTop: 0 }}>Datos del simulador</h3>
         <div className="form-group">
           <label>Cantidad a prestar</label>
           <input
@@ -123,16 +65,65 @@ export default function SimulacroPrestamoPage() {
             onFocus={() => setMontoFocused(true)}
             onBlur={() => setMontoFocused(false)}
             placeholder="0,00"
+            aria-label="Cantidad a prestar"
           />
+        </div>
+        <div className="simulador-form-row">
+          <div className="form-group">
+            <label>Número de cuotas</label>
+            <input
+              type="number"
+              inputMode="numeric"
+              min={1}
+              max={9999}
+              value={numeroCuotas}
+              onChange={(e) => {
+                const v = e.target.value.replace(/\D/g, "");
+                if (v === "" || /^\d+$/.test(v)) setNumeroCuotas(v);
+              }}
+              onKeyDown={(e) => {
+                const k = e.key;
+                if (k === "e" || k === "E" || k === "+" || k === "-" || k === "." || k === ",") e.preventDefault();
+              }}
+              placeholder="Ej: 12"
+              aria-label="Número de cuotas"
+            />
+          </div>
+          <div className="form-group">
+            <label>Interés (%)</label>
+            <input
+              type="number"
+              inputMode="decimal"
+              min={0}
+              step={0.1}
+              max={999.99}
+              value={interes}
+              onChange={(e) => {
+                const v = e.target.value.replace(",", ".");
+                if (v === "" || /^\d*\.?\d*$/.test(v)) setInteres(e.target.value);
+              }}
+              onKeyDown={(e) => {
+                const k = e.key;
+                if (k === "e" || k === "E" || k === "+" || k === "-") e.preventDefault();
+              }}
+              placeholder="Ej: 10"
+              aria-label="Interés en porcentaje"
+            />
+          </div>
+        </div>
+        <div className="form-group">
+          <label>Frecuencia de pago</label>
+          <select value={modalidad} onChange={(e) => setModalidad(e.target.value as "diario" | "semanal" | "mensual")} style={{ width: "100%", padding: "0.5rem" }} aria-label="Frecuencia de pago">
+            {MODALIDADES.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
+          </select>
         </div>
       </div>
 
       {montoNum > 0 && (
-        <div className="card" style={{ background: "var(--success-bg, #f0fdf4)", border: "1px solid var(--success-text, #16a34a)" }}>
-          <h3 style={{ marginTop: 0 }}>Resultado del simulacro</h3>
-          <p><strong>Total a pagar:</strong> {formatMoneda(totalAPagar)}</p>
+        <div className="card simulador-resultado-card">
+          <h3 style={{ marginTop: 0 }}>Resultado</h3>
           <p><strong>Cuota por período ({modalidad}):</strong> {formatMoneda(cuota)}</p>
-          <p style={{ color: "var(--text-muted)", fontSize: "0.875rem" }}>Este cálculo es solo orientativo. No se ha creado ningún préstamo.</p>
+          <p><strong>Total a pagar:</strong> {formatMoneda(totalAPagar)}</p>
         </div>
       )}
     </div>

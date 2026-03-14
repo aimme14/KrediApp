@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
-import { useDashboardHeaderSlot } from "@/context/DashboardHeaderContext";
 
 const NAV_ITEMS = [
   { href: "/dashboard/trabajador", label: "Inicio", icon: "home" },
@@ -12,11 +11,18 @@ const NAV_ITEMS = [
   { href: "/dashboard/trabajador/resumen", label: "Resumen del día", icon: "chart" },
   { href: "/dashboard/trabajador/cliente", label: "Cliente", icon: "client" },
   { href: "/dashboard/trabajador/prestamo", label: "Prestamos", icon: "loan" },
-  { href: "/dashboard/trabajador/simulacro", label: "Simulacro de préstamo", icon: "calc" },
+  { href: "/dashboard/trabajador/simulacro", label: "Simulador de Crédito", icon: "calc" },
   { href: "/dashboard/trabajador/gastos", label: "Gastos operativos", icon: "expense" },
   { href: "/dashboard/trabajador/registrar-gasto", label: "Registrar gasto", icon: "expense" },
   { href: "/dashboard/trabajador/cliente-moroso", label: "Cliente moroso", icon: "alert" },
 ] as const;
+
+const BOTTOM_NAV_ITEMS = [
+  { href: "/dashboard/trabajador", label: "Inicio", icon: "home" },
+  { href: "/dashboard/trabajador/ruta", label: "Ruta", icon: "route" },
+  { href: "/dashboard/trabajador/resumen", label: "Resumen", icon: "chart" },
+  { type: "menu" as const, label: "Más", icon: "menu" },
+];
 
 function NavIcon({ name }: { name: string }) {
   const size = 22;
@@ -74,6 +80,12 @@ function NavIcon({ name }: { name: string }) {
           <line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
         </svg>
       );
+    case "menu":
+      return (
+        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+          <line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" />
+        </svg>
+      );
     default:
       return null;
   }
@@ -98,29 +110,9 @@ export default function TrabajadorLayout({ children }: { children: React.ReactNo
     if (!isEnabled()) router.push("/deshabilitado");
   }, [user, profile, loading, isEnabled, router]);
 
-  const setHeaderLeftSlot = useDashboardHeaderSlot();
-
   useEffect(() => {
     setMenuOpen(false);
   }, [pathname]);
-
-  useEffect(() => {
-    if (!setHeaderLeftSlot) return;
-    setHeaderLeftSlot(
-      <button
-        type="button"
-        className="jefe-hamburger jefe-hamburger-in-header"
-        onClick={() => setMenuOpen((o) => !o)}
-        aria-expanded={menuOpen}
-        aria-label={menuOpen ? "Cerrar menú" : "Abrir menú"}
-      >
-        <span className="jefe-hamburger-line" />
-        <span className="jefe-hamburger-line" />
-        <span className="jefe-hamburger-line" />
-      </button>
-    );
-    return () => setHeaderLeftSlot(null);
-  }, [setHeaderLeftSlot, menuOpen]);
 
   if (loading || !profile || profile.role !== "trabajador") {
     return (
@@ -130,22 +122,8 @@ export default function TrabajadorLayout({ children }: { children: React.ReactNo
     );
   }
 
-  const isInicio = pathname === "/dashboard/trabajador";
-
   return (
     <div className="jefe-wrapper">
-      {!isInicio && (
-        <div className="jefe-nav-bar jefe-nav-bar-slim">
-          <Link
-            href="/dashboard/trabajador"
-            className={`trabajador-nav-inicio ${isInicio ? "trabajador-nav-inicio-active" : ""}`}
-            aria-label="Volver al inicio"
-          >
-            <span className="trabajador-nav-inicio-icon"><NavIcon name="home" /></span>
-            <span className="trabajador-nav-inicio-text">Inicio</span>
-          </Link>
-        </div>
-      )}
       <aside className={`jefe-drawer ${menuOpen ? "jefe-drawer-open" : ""}`} aria-hidden={!menuOpen}>
         <div className="jefe-drawer-inner">
           <nav className="jefe-drawer-nav">
@@ -160,6 +138,32 @@ export default function TrabajadorLayout({ children }: { children: React.ReactNo
       </aside>
       {menuOpen && <button type="button" className="jefe-drawer-backdrop" onClick={() => setMenuOpen(false)} aria-label="Cerrar menú" />}
       <main className="jefe-main">{children}</main>
+      <nav className="trabajador-bottom-nav" aria-label="Navegación principal">
+        {BOTTOM_NAV_ITEMS.map((item) =>
+          item.type === "menu" ? (
+            <button
+              key="menu"
+              type="button"
+              className={`trabajador-bottom-nav-item ${menuOpen ? "active" : ""}`}
+              onClick={() => setMenuOpen((o) => !o)}
+              aria-label={menuOpen ? "Cerrar menú" : "Abrir menú"}
+            >
+              <span className="trabajador-bottom-nav-icon"><NavIcon name="menu" /></span>
+              <span className="trabajador-bottom-nav-label">{item.label}</span>
+            </button>
+          ) : (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={`trabajador-bottom-nav-item ${pathname === item.href ? "active" : ""}`}
+              aria-current={pathname === item.href ? "page" : undefined}
+            >
+              <span className="trabajador-bottom-nav-icon"><NavIcon name={item.icon} /></span>
+              <span className="trabajador-bottom-nav-label">{item.label}</span>
+            </Link>
+          )
+        )}
+      </nav>
     </div>
   );
 }
