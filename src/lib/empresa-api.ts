@@ -69,6 +69,10 @@ export type PrestamoItem = {
   fechaInicio: string | null;
   fechaVencimiento: string | null;
   multaMora: number;
+  /** Adelanto aplicado a la(s) siguiente(s) cuota(s). La próxima sugerencia es valorCuota - (adelanto % valorCuota). */
+  adelantoCuota?: number;
+  /** Fecha del último pago (ISO). Para semáforo "cuota del día pagada" en ruta del día. */
+  ultimoPagoFecha?: string | null;
 };
 
 export type GastoItem = {
@@ -85,6 +89,17 @@ export type GastoItem = {
   adminId: string;
   empleadoId: string;
   evidencia: string;
+};
+
+/** Item de la subcolección pagos de un préstamo (historial de cobros / no pago). */
+export type PagoItem = {
+  id: string;
+  monto: number;
+  fecha: string | null;
+  tipo: "pago" | "no_pago";
+  metodoPago: string | null;
+  registradoPorUid: string | null;
+  registradoPorNombre: string | null;
 };
 
 async function fetchWithAuth(
@@ -164,26 +179,70 @@ export async function listPrestamos(token: string): Promise<PrestamoItem[]> {
   return data.prestamos ?? [];
 }
 
+/** Lista los últimos pagos de un préstamo (para historial). */
+export async function listPagos(token: string, prestamoId: string): Promise<PagoItem[]> {
+  const res = await fetchWithAuth(`/api/empresa/prestamos/${encodeURIComponent(prestamoId)}/pagos`, token);
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error ?? "Error al cargar pagos");
+  return data.pagos ?? [];
+}
+
 /** Registra un pago (cobro) en un préstamo. */
 export async function registrarPago(
   token: string,
   prestamoId: string,
-  params: { monto: number; metodoPago: "efectivo" | "transferencia"; evidencia?: string }
-): Promise<{ saldoPendiente: number }> {
+  params: {
+    monto: number;
+    metodoPago: "efectivo" | "transferencia";
+    evidencia?: string;
+    registradoPorUid?: string;
+    registradoPorNombre?: string;
+    /** Clave de idempotencia: mismo key = misma respuesta, sin duplicar pago */
+    idempotencyKey?: string;
+  }
+): Promise<{ saldoPendiente: number; adelantoCuota?: number; pagoId?: string }> {
   const res = await fetchWithAuth(`/api/empresa/prestamos/${encodeURIComponent(prestamoId)}/pagos`, token, {
     method: "POST",
     body: JSON.stringify(params),
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error ?? "Error al registrar pago");
-  return { saldoPendiente: data.saldoPendiente ?? 0 };
+  return {
+    saldoPendiente: data.saldoPendiente ?? 0,
+    adelantoCuota: data.adelantoCuota,
+    pagoId: data.pagoId,
+  };
+}
+
+/** Actualiza el comprobante (URL de la imagen) de un pago. */
+export async function actualizarComprobantePago(
+  token: string,
+  prestamoId: string,
+  pagoId: string,
+  comprobanteUrl: string
+): Promise<void> {
+  const res = await fetchWithAuth(
+    `/api/empresa/prestamos/${encodeURIComponent(prestamoId)}/pagos/${encodeURIComponent(pagoId)}`,
+    token,
+    {
+      method: "PATCH",
+      body: JSON.stringify({ comprobanteUrl }),
+    }
+  );
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error ?? "Error al guardar comprobante");
 }
 
 /** Registra un intento sin pago en la subcolección pagos del préstamo (tipo no_pago). */
 export async function registrarNoPago(
   token: string,
   prestamoId: string,
-  params: { motivoNoPago: string; nota?: string }
+  params: {
+    motivoNoPago: string;
+    nota?: string;
+    registradoPorUid?: string;
+    registradoPorNombre?: string;
+  }
 ): Promise<void> {
   const res = await fetchWithAuth(`/api/empresa/prestamos/${encodeURIComponent(prestamoId)}/pagos`, token, {
     method: "POST",
@@ -191,6 +250,8 @@ export async function registrarNoPago(
       tipo: "no_pago",
       motivoNoPago: params.motivoNoPago,
       nota: params.nota?.trim() || undefined,
+      registradoPorUid: params.registradoPorUid,
+      registradoPorNombre: params.registradoPorNombre,
     }),
   });
   const data = await res.json();

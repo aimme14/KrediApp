@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { FieldValue } from "firebase-admin/firestore";
 import { getAdminFirestore } from "@/lib/firebase-admin";
 import { getApiUser } from "@/lib/api-auth";
 import {
@@ -9,6 +10,60 @@ import {
 } from "@/lib/empresas-db";
 
 const MOTIVOS_NO_PAGO = ["sin_fondos", "no_estaba", "promesa_pago", "otro"] as const;
+const MAX_PAGOS_LIST = 50;
+
+/** GET: listar últimos pagos del préstamo (para historial). Empleado o admin de la ruta/empresa. */
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const apiUser = await getApiUser(request);
+  if (!apiUser) {
+    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  }
+
+  const { id: prestamoId } = await params;
+  const db = getAdminFirestore();
+  const prestamoRef = db
+    .collection(EMPRESAS_COLLECTION)
+    .doc(apiUser.empresaId)
+    .collection(PRESTAMOS_SUBCOLLECTION)
+    .doc(prestamoId);
+
+  const prestamoSnap = await prestamoRef.get();
+  if (!prestamoSnap.exists) {
+    return NextResponse.json({ error: "Préstamo no encontrado" }, { status: 404 });
+  }
+
+  const data = prestamoSnap.data()!;
+  if (apiUser.role === "empleado" && apiUser.rutaId && data.rutaId !== apiUser.rutaId) {
+    return NextResponse.json({ error: "No puedes ver pagos de préstamos de otra ruta" }, { status: 403 });
+  }
+  if (apiUser.role !== "empleado" && data.adminId !== apiUser.uid) {
+    return NextResponse.json({ error: "No puedes ver este préstamo" }, { status: 403 });
+  }
+
+  const pagosSnap = await prestamoRef
+    .collection(PAGOS_SUBCOLLECTION)
+    .orderBy("fecha", "desc")
+    .limit(MAX_PAGOS_LIST)
+    .get();
+
+  const pagos = pagosSnap.docs.map((doc) => {
+    const d = doc.data();
+    return {
+      id: doc.id,
+      monto: d.monto ?? 0,
+      fecha: d.fecha?.toDate?.()?.toISOString() ?? null,
+      tipo: d.tipo ?? "pago",
+      metodoPago: d.metodoPago ?? null,
+      registradoPorUid: d.registradoPorUid ?? d.empleadoId ?? null,
+      registradoPorNombre: d.registradoPorNombre ?? null,
+    };
+  });
+
+  return NextResponse.json({ pagos });
+}
 
 /** POST: registrar un pago (cobro) o un intento sin pago. Empleado o admin. */
 export async function POST(
@@ -29,6 +84,9 @@ export async function POST(
     evidencia,
     motivoNoPago,
     nota,
+    registradoPorUid,
+    registradoPorNombre,
+    idempotencyKey,
   } = body as {
     tipo?: "pago" | "no_pago";
     monto?: number;
@@ -36,7 +94,12 @@ export async function POST(
     evidencia?: string;
     motivoNoPago?: string;
     nota?: string;
+    registradoPorUid?: string;
+    registradoPorNombre?: string;
+    idempotencyKey?: string;
   };
+  const uidRegistro = (registradoPorUid ?? apiUser.uid).trim() ? (registradoPorUid ?? apiUser.uid).trim() : apiUser.uid;
+  const nombreRegistro = (registradoPorNombre ?? "").trim() || null;
 
   const db = getAdminFirestore();
   const prestamoRef = db
@@ -73,6 +136,8 @@ export async function POST(
       tipo: "no_pago",
       motivoNoPago: motivo,
       nota: (nota ?? "").trim() || null,
+      registradoPorUid: uidRegistro,
+      registradoPorNombre: nombreRegistro,
     });
 
     await prestamoRef.update({
@@ -92,19 +157,58 @@ export async function POST(
   const montoAplicar = Math.min(monto, saldoPendiente);
   const nuevoSaldo = Math.round((saldoPendiente - montoAplicar) * 100) / 100;
 
-  await prestamoRef.collection(PAGOS_SUBCOLLECTION).add({
+  const totalAPagar = (data.totalAPagar as number) ?? 0;
+  const numeroCuotas = (data.numeroCuotas as number) ?? 0;
+  const valorCuota = numeroCuotas > 0 ? totalAPagar / numeroCuotas : 0;
+  const adelantoActual = (data.adelantoCuota as number) ?? 0;
+  const totalDisponible = montoAplicar + adelantoActual;
+  const cuotasCubiertas = valorCuota > 0 ? Math.floor(totalDisponible / valorCuota) : 0;
+  const adelantoNuevo =
+    valorCuota > 0
+      ? Math.round((totalDisponible - cuotasCubiertas * valorCuota) * 100) / 100
+      : 0;
+  const adelantoParaGuardar = nuevoSaldo <= 0 ? 0 : adelantoNuevo;
+
+  const keyTrimmed = typeof idempotencyKey === "string" ? idempotencyKey.trim() : "";
+  if (keyTrimmed) {
+    const existentes = await prestamoRef
+      .collection(PAGOS_SUBCOLLECTION)
+      .where("idempotencyKey", "==", keyTrimmed)
+      .limit(1)
+      .get();
+    if (!existentes.empty) {
+      const existingDoc = existentes.docs[0]!;
+      const prestamoData = (await prestamoRef.get()).data()!;
+      return NextResponse.json({
+        ok: true,
+        saldoPendiente: (prestamoData.saldoPendiente as number) ?? 0,
+        adelantoCuota: (prestamoData.adelantoCuota as number) ?? 0,
+        pagoId: existingDoc.id,
+      });
+    }
+  }
+
+  const pagoData: Record<string, unknown> = {
     monto: montoAplicar,
     fecha: now,
     empleadoId: apiUser.uid,
     tipo: "pago",
     metodoPago: metodo,
     evidencia: (evidencia ?? "").trim() || null,
-  });
+    registradoPorUid: uidRegistro,
+    registradoPorNombre: nombreRegistro,
+  };
+  if (keyTrimmed) pagoData.idempotencyKey = keyTrimmed;
+
+  const pagoRef = await prestamoRef.collection(PAGOS_SUBCOLLECTION).add(pagoData);
 
   await prestamoRef.update({
     saldoPendiente: nuevoSaldo,
     estado: nuevoSaldo <= 0 ? "pagado" : data.estado,
     updatedAt: now,
+    adelantoCuota: adelantoParaGuardar,
+    /** Fecha del último pago (para semáforo "cuota del día pagada" en ruta) */
+    ultimoPagoFecha: FieldValue.serverTimestamp(),
   });
 
   if (nuevoSaldo <= 0) {
@@ -117,5 +221,10 @@ export async function POST(
     await clienteRef.update({ prestamo_activo: false });
   }
 
-  return NextResponse.json({ ok: true, saldoPendiente: nuevoSaldo });
+  return NextResponse.json({
+    ok: true,
+    saldoPendiente: nuevoSaldo,
+    adelantoCuota: adelantoParaGuardar,
+    pagoId: pagoRef.id,
+  });
 }

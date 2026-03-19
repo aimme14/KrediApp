@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo, Fragment } from "react";
+import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import {
   listClientes,
@@ -615,6 +616,7 @@ export default function PrestamoPage() {
                   <th className="col-num">Cuotas</th>
                   <th>Estado</th>
                   <th>Frecuencia</th>
+                  <th>Acción</th>
                 </tr>
               </thead>
               <tbody>
@@ -656,16 +658,32 @@ export default function PrestamoPage() {
                         <td className="col-num" title="Cuotas pagadas / total">{pagadas} / {principal.numeroCuotas}</td>
                         <td>{principal.estado}</td>
                         <td>{principal.modalidad}</td>
+                        <td>
+                          {(principal.estado === "activo" || principal.estado === "mora") && (
+                            <Link
+                              href={`/dashboard/admin/cobrar?clienteId=${grupo.clienteId}&prestamoId=${principal.id}`}
+                              className="btn btn-primary"
+                              style={{ padding: "0.3rem 0.5rem", fontSize: "0.8125rem", minWidth: "auto" }}
+                            >
+                              Registrar cobro
+                            </Link>
+                          )}
+                        </td>
                       </tr>
                       {tieneMas && expandido && (
                         <tr id={`historial-cliente-${grupo.clienteId}`} aria-labelledby={`btn-expand-${grupo.clienteId}`}>
-                          <td colSpan={9} style={{ padding: "0.5rem 0.75rem", backgroundColor: "var(--bg)", borderBottom: "1px solid var(--table-border)", verticalAlign: "top" }}>
+                          <td colSpan={10} style={{ padding: "0.5rem 0.75rem", backgroundColor: "var(--bg)", borderBottom: "1px solid var(--table-border)", verticalAlign: "top" }}>
                             <div className="historial-prestamos-list" style={{ fontSize: "0.8125rem", color: "var(--text-muted)" }}>
                               <span style={{ fontWeight: 600, color: "var(--text)", marginBottom: "0.35rem", display: "block" }}>Otros préstamos</span>
                               <ul>
                                 {otros.map((p) => (
-                                    <li key={p.id}>
+                                    <li key={p.id} style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
                                       {formatMoneda(p.monto)} · {p.estado} · {p.numeroCuotas} cuotas
+                                      {(p.estado === "activo" || p.estado === "mora") && (
+                                        <Link href={`/dashboard/admin/cobrar?clienteId=${grupo.clienteId}&prestamoId=${p.id}`} className="btn btn-primary" style={{ padding: "0.2rem 0.4rem", fontSize: "0.75rem", minWidth: "auto" }}>
+                                          Registrar cobro
+                                        </Link>
+                                      )}
                                     </li>
                                   ))}
                               </ul>

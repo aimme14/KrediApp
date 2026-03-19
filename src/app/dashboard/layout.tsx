@@ -5,8 +5,8 @@ import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { roleLabel } from "@/types/roles";
-import Logo from "@/components/Logo";
 import DashboardSettings from "@/components/DashboardSettings";
+import InactivityLock from "@/components/InactivityLock";
 import { DashboardHeaderProvider } from "@/context/DashboardHeaderContext";
 import { getEmpresa } from "@/lib/empresa";
 import type { ReactNode } from "react";
@@ -25,6 +25,8 @@ export default function DashboardLayout({
 
   const isGastosPage = pathname?.includes("/gastos") ?? false;
   const isJefe = profile?.role === "jefe";
+  const isTrabajador = profile?.role === "trabajador";
+  const isAdmin = profile?.role === "admin";
 
   useEffect(() => {
     if (loading) return;
@@ -37,16 +39,17 @@ export default function DashboardLayout({
     }
   }, [user, profile, loading, isEnabled, router]);
 
+  const empresaDocId = isJefe ? profile?.uid : profile?.empresaId;
   useEffect(() => {
-    if (!isJefe || !profile?.uid) return;
+    if (!empresaDocId) return;
     let cancelled = false;
-    getEmpresa(profile.uid)
+    getEmpresa(empresaDocId)
       .then((data) => {
         if (!cancelled && data) setEmpresa(data);
       })
       .catch(() => {});
     return () => { cancelled = true; };
-  }, [isJefe, profile?.uid]);
+  }, [empresaDocId]);
 
   if (loading || !profile) {
     return (
@@ -56,46 +59,47 @@ export default function DashboardLayout({
     );
   }
 
-  const showEmpresaEnHeader = isJefe && (empresa?.nombre?.trim() || empresa?.logo?.trim());
+  const showEmpresaEnHeader = (isJefe || isTrabajador || isAdmin) && (empresa?.nombre?.trim() || empresa?.logo?.trim());
   const nombreEmpresa = empresa?.nombre?.trim() || "Empresa";
+  const empresaLinkHref = isJefe ? "/dashboard/jefe/inicio" : isTrabajador ? "/dashboard/trabajador" : "/dashboard/admin";
+  const empresaCompact = isTrabajador || isAdmin;
 
   return (
-    <DashboardHeaderProvider value={setHeaderLeftSlot}>
-      <div className={`container container-dashboard${isGastosPage ? " dashboard-page-gastos" : ""}`}>
-        <header className="dashboard-header">
-          <div className="header-left">
-            {headerLeftSlot}
-            {showEmpresaEnHeader ? (
-              <Link href="/dashboard/jefe/inicio" className="dashboard-header-empresa" aria-label={`${nombreEmpresa} - Inicio`}>
-                <div className="dashboard-header-empresa-logo">
-                  {empresa?.logo ? (
-                    <img src={empresa.logo} alt="" />
-                  ) : (
-                    <span className="dashboard-header-empresa-iniciales">
-                      {nombreEmpresa.slice(0, 2).toUpperCase()}
-                    </span>
-                  )}
-                </div>
-                <span className="dashboard-header-empresa-nombre">{nombreEmpresa}</span>
-              </Link>
-            ) : (
-              <Link href="/dashboard" style={{ display: "flex", alignItems: "center" }} aria-label="KrediApp - Inicio">
-                <Logo variant="header" />
-              </Link>
-            )}
-            <span className={`badge badge-${profile.role} dashboard-header-badge`} style={{ textTransform: "capitalize" }}>
-              {roleLabel(profile.role)}
-            </span>
-          </div>
-          <div className="header-right">
-            <DashboardSettings />
-            <Link href="/dashboard" className="dashboard-header-logo-plataforma" aria-label="KrediApp">
-              <Logo variant="header" />
-            </Link>
-          </div>
-        </header>
-        {children}
-      </div>
-    </DashboardHeaderProvider>
+    <InactivityLock>
+      <DashboardHeaderProvider value={setHeaderLeftSlot}>
+        <div className={`container container-dashboard${isGastosPage ? " dashboard-page-gastos" : ""}`}>
+          <header className="dashboard-header">
+            <div className="header-left">
+              {headerLeftSlot}
+              {showEmpresaEnHeader ? (
+                <Link
+                  href={empresaLinkHref}
+                  className={`dashboard-header-empresa ${empresaCompact ? "dashboard-header-empresa-compact" : ""}`}
+                  aria-label={`${nombreEmpresa} - Inicio`}
+                >
+                  <div className="dashboard-header-empresa-logo">
+                    {empresa?.logo ? (
+                      <img src={empresa.logo} alt="" />
+                    ) : (
+                      <span className="dashboard-header-empresa-iniciales">
+                        {nombreEmpresa.slice(0, 2).toUpperCase()}
+                      </span>
+                    )}
+                  </div>
+                  <span className="dashboard-header-empresa-nombre">{nombreEmpresa}</span>
+                </Link>
+              ) : null}
+              <span className={`badge badge-${profile.role} dashboard-header-badge`} style={{ textTransform: "capitalize" }}>
+                {roleLabel(profile.role)}
+              </span>
+            </div>
+            <div className="header-right">
+              <DashboardSettings />
+            </div>
+          </header>
+          {children}
+        </div>
+      </DashboardHeaderProvider>
+    </InactivityLock>
   );
 }
