@@ -60,6 +60,7 @@ export default function AdministradoresPage() {
     base: "",
     email: "",
     password: "",
+    montoAsignado: "",
   });
 
   useEffect(() => {
@@ -87,6 +88,7 @@ export default function AdministradoresPage() {
     setSuccess(false);
     setCreating(true);
     try {
+      const montoNum = form.montoAsignado.trim() ? parseFloat(form.montoAsignado.replace(",", ".")) : undefined;
       await createUser({
         email: form.email,
         password: form.password,
@@ -96,8 +98,9 @@ export default function AdministradoresPage() {
         cedula: form.cedula || undefined,
         lugar: form.lugar || undefined,
         base: form.base || undefined,
+        montoAsignado: typeof montoNum === "number" && !Number.isNaN(montoNum) && montoNum > 0 ? montoNum : undefined,
       });
-      setForm({ displayName: "", cedula: "", lugar: "", base: "", email: "", password: "" });
+      setForm({ displayName: "", cedula: "", lugar: "", base: "", email: "", password: "", montoAsignado: "" });
       setShowForm(false);
       const list = await listUsersByCreator(profile.uid, "admin");
       setAdmins(list);
@@ -213,6 +216,19 @@ export default function AdministradoresPage() {
                   autoComplete="email"
                   aria-required="true"
                 />
+              </div>
+              <div className="form-group">
+                <label htmlFor="admin-montoAsignado" className="admin-jefe-label">CAPITAL A ASIGNAR (OPCIONAL)</label>
+                <input
+                  id="admin-montoAsignado"
+                  type="text"
+                  inputMode="decimal"
+                  value={form.montoAsignado}
+                  onChange={(e) => setForm((f) => ({ ...f, montoAsignado: e.target.value }))}
+                  placeholder="Ej: 5000000 (sale de caja empresa)"
+                  className="admin-jefe-input"
+                />
+                <span className="admin-jefe-hint">Si ingresas un monto, se descontará de tu caja empresa y quedará como capital del administrador.</span>
               </div>
               <div className="form-group">
                 <label htmlFor="admin-password" className="admin-jefe-label">CONTRASEÑA *</label>

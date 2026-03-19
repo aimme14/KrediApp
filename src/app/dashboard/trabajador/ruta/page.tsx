@@ -135,7 +135,7 @@ export default function RutaDelDiaPage() {
                     return (
                       <li
                         key={c.cuotaId}
-                        className="ruta-dia-item"
+                        className={`ruta-dia-item estado-${c.estado.toLowerCase()}`}
                         onClick={() => handleClickCliente(c.clienteId, c.prestamoId)}
                       >
                         <div className={`ruta-dia-avatar prioridad-${prioridad}`}>

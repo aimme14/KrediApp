@@ -18,6 +18,11 @@ export type ResumenRutaItem = {
   salidas: number;
   inversion: number;
   bolsa: number;
+  cajaRuta: number;
+  cajasEmpleados: number;
+  ganancias: number;
+  perdidas: number;
+  utilidad: number;
 };
 
 /** GET: resumen económico por ruta (ingreso, egreso, gastos, salidas, inversión, bolsa) */
@@ -62,15 +67,20 @@ export async function GET(request: NextRequest) {
     const nombre = data.nombre ?? "";
     const ubicacion = data.ubicacion ?? "";
 
+    const cajaRuta = typeof data.cajaRuta === "number" ? data.cajaRuta : 0;
+    const cajasEmpleados = typeof data.cajasEmpleados === "number" ? data.cajasEmpleados : 0;
+    const inversion = typeof data.inversiones === "number" ? data.inversiones : 0;
+    const ganancias = typeof data.ganancias === "number" ? data.ganancias : 0;
+    const perdidas = typeof data.perdidas === "number" ? data.perdidas : 0;
+
     const ingreso = prestamos
       .filter((p) => p.rutaId === rutaId)
       .reduce((sum, p) => sum + (p.totalAPagar - p.saldoPendiente), 0);
     const gastosRuta = gastos
       .filter((g) => g.rutaId === rutaId)
       .reduce((sum, g) => sum + g.monto, 0);
-    const gastosSinRuta = gastos
-      .filter((g) => !g.rutaId || g.rutaId === "")
-      .reduce((sum, g) => sum + g.monto, 0);
+
+    const utilidad = ganancias - gastosRuta - perdidas;
 
     return {
       rutaId,
@@ -80,10 +90,20 @@ export async function GET(request: NextRequest) {
       egreso: 0,
       gastos: gastosRuta,
       salidas: 0,
-      inversion: 0,
-      bolsa: 0,
+      inversion,
+      bolsa: ganancias,
+      cajaRuta,
+      cajasEmpleados,
+      ganancias,
+      perdidas,
+      utilidad: Math.round(utilidad * 100) / 100,
     };
   });
 
-  return NextResponse.json({ rutas });
+  const utilidadGlobal = rutas.reduce((sum, r) => sum + r.utilidad, 0);
+
+  return NextResponse.json({
+    rutas,
+    utilidadGlobal: Math.round(utilidadGlobal * 100) / 100,
+  });
 }

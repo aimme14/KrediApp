@@ -111,7 +111,7 @@ export async function listRutas(token: string): Promise<RutaItem[]> {
 
 export async function createRuta(
   token: string,
-  params: { nombre: string; ubicacion?: string }
+  params: { nombre: string; ubicacion?: string; capitalInicial?: number }
 ): Promise<string> {
   const res = await fetchWithAuth("/api/empresa/rutas", token, {
     method: "POST",
@@ -227,6 +227,14 @@ export async function listGastos(token: string): Promise<GastoItem[]> {
   return data.gastos ?? [];
 }
 
+/** Obtiene la caja del administrador (solo role admin). */
+export async function getCajaAdmin(token: string): Promise<number> {
+  const res = await fetchWithAuth("/api/empresa/admin-caja", token);
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error ?? "Error al cargar la caja del administrador");
+  return typeof data.cajaAdmin === "number" ? data.cajaAdmin : 0;
+}
+
 export type ResumenRutaItem = {
   rutaId: string;
   nombre: string;
@@ -237,13 +245,26 @@ export type ResumenRutaItem = {
   salidas: number;
   inversion: number;
   bolsa: number;
+  cajaRuta: number;
+  cajasEmpleados: number;
+  ganancias: number;
+  perdidas: number;
+  utilidad: number;
 };
 
-export async function getResumenEconomico(token: string): Promise<ResumenRutaItem[]> {
+export type ResumenEconomicoResponse = {
+  rutas: ResumenRutaItem[];
+  utilidadGlobal: number;
+};
+
+export async function getResumenEconomico(token: string): Promise<ResumenEconomicoResponse> {
   const res = await fetchWithAuth("/api/empresa/resumen", token);
   const data = await res.json();
   if (!res.ok) throw new Error(data.error ?? "Error al cargar resumen");
-  return data.rutas ?? [];
+  return {
+    rutas: data.rutas ?? [],
+    utilidadGlobal: typeof data.utilidadGlobal === "number" ? data.utilidadGlobal : 0,
+  };
 }
 
 export async function createGasto(
@@ -291,4 +312,66 @@ export async function setClienteMoroso(
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error ?? "Error al actualizar cliente");
+}
+
+// ── Cierres mensuales ───────────────────────────────────────────────────────
+
+export type CierreRutaSnapshot = {
+  rutaId: string;
+  nombre: string;
+  cajaRuta: number;
+  cajasEmpleados: number;
+  inversiones: number;
+  ganancias: number;
+  perdidas: number;
+  gastos: number;
+  utilidad: number;
+  capitalTotal: number;
+};
+
+export type CierreMensualItem = {
+  periodo: string;
+  fechaCierre: string | null;
+  utilidadGlobal?: number;
+  rutasCount?: number;
+};
+
+export type CierreMensualDetalle = {
+  periodo: string;
+  fechaCierre: string | null;
+  rutas: CierreRutaSnapshot[];
+  cajaEmpresa?: number;
+  capitalAsignadoAdmins?: number;
+  utilidadGlobal?: number;
+};
+
+export async function getCierresMensuales(token: string): Promise<CierreMensualItem[]> {
+  const res = await fetchWithAuth("/api/empresa/cierres", token);
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error ?? "Error al cargar cierres");
+  return data.cierres ?? [];
+}
+
+export async function getCierreMensual(
+  token: string,
+  periodo: string
+): Promise<CierreMensualDetalle> {
+  const res = await fetchWithAuth(`/api/empresa/cierres?periodo=${encodeURIComponent(periodo)}`, token);
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error ?? "Error al cargar cierre");
+  return data;
+}
+
+export async function crearCierreMensual(
+  token: string,
+  periodo?: string
+): Promise<{ periodo: string; fechaCierre: string; utilidadGlobal: number; rutasCount: number }> {
+  const res = await fetchWithAuth("/api/empresa/cierres", token, {
+    method: "POST",
+    body: JSON.stringify(periodo ? { periodo } : {}),
+    headers: { "Content-Type": "application/json" },
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error ?? "Error al crear cierre");
+  return data;
 }

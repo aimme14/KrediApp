@@ -1,104 +1,172 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminFirestore } from "@/lib/firebase-admin";
 import { getApiUser } from "@/lib/api-auth";
-import { EMPRESAS_COLLECTION, CAPITAL_SUBCOLLECTION, CAPITAL_DOC_ID } from "@/lib/empresas-db";
+import {
+  EMPRESAS_COLLECTION,
+  CAPITAL_SUBCOLLECTION,
+  CAPITAL_DOC_ID,
+} from "@/lib/empresas-db";
+import {
+  getCapitalEmpresa,
+  setCapitalInicial,
+  ajustarCapital,
+  registrarSalida,
+} from "@/lib/jefe-capital";
 
-/** GET: obtiene el capital de empresa del jefe. Solo el jefe puede verlo. */
+/** GET: obtiene el capital de empresa del jefe (capitalTotal, cajaEmpresa, capitalAsignadoAdmins). */
 export async function GET(request: NextRequest) {
-  const apiUser = await getApiUser(request);
-  if (!apiUser) {
-    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-  }
-  if (apiUser.role !== "jefe") {
-    return NextResponse.json({ error: "Solo el jefe puede ver el capital de empresa" }, { status: 403 });
-  }
+  try {
+    const apiUser = await getApiUser(request);
+    if (!apiUser) {
+      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+    }
+    if (apiUser.role !== "jefe") {
+      return NextResponse.json(
+        { error: "Solo el jefe puede ver el capital de empresa" },
+        { status: 403 }
+      );
+    }
 
-  const db = getAdminFirestore();
-  const capitalRef = db
-    .collection(EMPRESAS_COLLECTION)
-    .doc(apiUser.uid)
-    .collection(CAPITAL_SUBCOLLECTION)
-    .doc(CAPITAL_DOC_ID);
+    const db = getAdminFirestore();
+    const doc = await getCapitalEmpresa(db, apiUser.uid);
 
-  const snap = await capitalRef.get();
-  if (!snap.exists) {
-    return NextResponse.json({ monto: 0, updatedAt: null, historial: [] });
+    const historial = (doc.historial ?? []).slice(0, 6).map((h) => ({
+      montoAnterior: h.montoAnterior,
+      montoNuevo: h.montoNuevo,
+      at: h.at instanceof Date ? h.at.toISOString() : null,
+    }));
+
+    return NextResponse.json({
+      capitalTotal: doc.capitalTotal,
+      cajaEmpresa: doc.cajaEmpresa,
+      capitalAsignadoAdmins: doc.capitalAsignadoAdmins,
+      monto: doc.capitalTotal,
+      updatedAt: doc.updatedAt ? doc.updatedAt.toISOString() : null,
+      historial,
+    });
+  } catch (e) {
+    return NextResponse.json(
+      { error: e instanceof Error ? e.message : "Error al obtener el capital" },
+      { status: 500 }
+    );
   }
-
-  const data = snap.data()!;
-  const updatedAt = data.updatedAt?.toDate?.();
-  const historial = Array.isArray(data.historial) ? data.historial : [];
-  return NextResponse.json({
-    monto: typeof data.monto === "number" ? data.monto : 0,
-    updatedAt: updatedAt ? updatedAt.toISOString() : null,
-    historial: historial.slice(0, 6).map((h: { montoAnterior?: number; montoNuevo?: number; at?: { toDate?: () => Date } }) => ({
-      montoAnterior: typeof h.montoAnterior === "number" ? h.montoAnterior : 0,
-      montoNuevo: typeof h.montoNuevo === "number" ? h.montoNuevo : 0,
-      at: h.at?.toDate?.()?.toISOString?.() ?? null,
-    })),
-  });
 }
 
-/** PUT: actualiza el capital de empresa. Solo el jefe. Body: { monto: number } */
+/**
+ * PUT: actualiza el capital.
+ * Body:
+ * - { monto: number }: establecer capital (inicial o nuevo total; si ya hay asignado a admins, monto debe ser >= asignado).
+ * - { ajuste: number }: sumar/restar al capital (restar solo hasta lo disponible en caja empresa).
+ * - { salida: number }: retiro de caja (reduce caja y capital total).
+ */
 export async function PUT(request: NextRequest) {
   const apiUser = await getApiUser(request);
   if (!apiUser) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
   if (apiUser.role !== "jefe") {
-    return NextResponse.json({ error: "Solo el jefe puede actualizar el capital de empresa" }, { status: 403 });
+    return NextResponse.json(
+      { error: "Solo el jefe puede actualizar el capital de empresa" },
+      { status: 403 }
+    );
   }
 
-  const body = await request.json();
-  const monto = typeof body.monto === "number" ? body.monto : Number(String(body.monto).replace(/,/g, ""));
-  if (Number.isNaN(monto) || monto <= 0) {
-    return NextResponse.json({ error: "El monto debe ser un número mayor a 0" }, { status: 400 });
-  }
-
+  const body = await request.json().catch(() => ({}));
   const db = getAdminFirestore();
-  const now = new Date();
-  const capitalRef = db
-    .collection(EMPRESAS_COLLECTION)
-    .doc(apiUser.uid)
-    .collection(CAPITAL_SUBCOLLECTION)
-    .doc(CAPITAL_DOC_ID);
 
-  const snap = await capitalRef.get();
-  const montoAnterior = snap.exists && typeof snap.data()?.monto === "number" ? snap.data()!.monto : 0;
-  const historialActual = Array.isArray(snap.data()?.historial) ? snap.data()!.historial : [];
-  const nuevaEntrada = { montoAnterior, montoNuevo: monto, at: now };
-  const historial = [nuevaEntrada, ...historialActual].slice(0, 6);
+  if (typeof body.salida === "number" && body.salida > 0) {
+    try {
+      const doc = await registrarSalida(db, apiUser.uid, body.salida);
+      return NextResponse.json({
+        ok: true,
+        capitalTotal: doc.capitalTotal,
+        cajaEmpresa: doc.cajaEmpresa,
+        capitalAsignadoAdmins: doc.capitalAsignadoAdmins,
+        monto: doc.capitalTotal,
+        updatedAt: doc.updatedAt.toISOString(),
+        historial: (doc.historial ?? []).slice(0, 6).map((h) => ({
+          montoAnterior: h.montoAnterior,
+          montoNuevo: h.montoNuevo,
+          at: h.at instanceof Date ? h.at.toISOString() : null,
+        })),
+      });
+    } catch (e) {
+      return NextResponse.json(
+        { error: e instanceof Error ? e.message : "Error al registrar salida" },
+        { status: 400 }
+      );
+    }
+  }
 
-  await capitalRef.set(
-    {
-      monto,
-      jefeUid: apiUser.uid,
-      updatedAt: now,
-      historial,
-    },
-    { merge: true }
-  );
+  if (typeof body.ajuste === "number" && body.ajuste !== 0) {
+    try {
+      const doc = await ajustarCapital(db, apiUser.uid, body.ajuste);
+      return NextResponse.json({
+        ok: true,
+        capitalTotal: doc.capitalTotal,
+        cajaEmpresa: doc.cajaEmpresa,
+        capitalAsignadoAdmins: doc.capitalAsignadoAdmins,
+        monto: doc.capitalTotal,
+        updatedAt: doc.updatedAt.toISOString(),
+        historial: (doc.historial ?? []).slice(0, 6).map((h) => ({
+          montoAnterior: h.montoAnterior,
+          montoNuevo: h.montoNuevo,
+          at: h.at instanceof Date ? h.at.toISOString() : null,
+        })),
+      });
+    } catch (e) {
+      return NextResponse.json(
+        { error: e instanceof Error ? e.message : "Error al ajustar capital" },
+        { status: 400 }
+      );
+    }
+  }
 
-  return NextResponse.json({
-    ok: true,
-    monto,
-    updatedAt: now.toISOString(),
-    historial: historial.map((h: { montoAnterior: number; montoNuevo: number; at: Date }) => ({
-      montoAnterior: h.montoAnterior,
-      montoNuevo: h.montoNuevo,
-      at: h.at?.toISOString?.() ?? null,
-    })),
-  });
+  const monto =
+    typeof body.monto === "number"
+      ? body.monto
+      : Number(String(body.monto ?? "").replace(/,/g, ""));
+  if (Number.isNaN(monto) || monto < 0) {
+    return NextResponse.json(
+      { error: "El monto debe ser un número mayor o igual a 0" },
+      { status: 400 }
+    );
+  }
+
+  try {
+    const doc = await setCapitalInicial(db, apiUser.uid, monto);
+    return NextResponse.json({
+      ok: true,
+      capitalTotal: doc.capitalTotal,
+      cajaEmpresa: doc.cajaEmpresa,
+      capitalAsignadoAdmins: doc.capitalAsignadoAdmins,
+      monto: doc.capitalTotal,
+      updatedAt: doc.updatedAt.toISOString(),
+      historial: (doc.historial ?? []).slice(0, 6).map((h) => ({
+        montoAnterior: h.montoAnterior,
+        montoNuevo: h.montoNuevo,
+        at: h.at instanceof Date ? h.at.toISOString() : null,
+      })),
+    });
+  } catch (e) {
+    return NextResponse.json(
+      { error: e instanceof Error ? e.message : "Error al actualizar el capital" },
+      { status: 400 }
+    );
+  }
 }
 
-/** PATCH: limpia el historial de capital. Solo el jefe. Body: { clearHistorial: true } */
+/** PATCH: limpia el historial. Body: { clearHistorial: true } */
 export async function PATCH(request: NextRequest) {
   const apiUser = await getApiUser(request);
   if (!apiUser) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
   if (apiUser.role !== "jefe") {
-    return NextResponse.json({ error: "Solo el jefe puede gestionar el capital" }, { status: 403 });
+    return NextResponse.json(
+      { error: "Solo el jefe puede gestionar el capital" },
+      { status: 403 }
+    );
   }
 
   const body = await request.json().catch(() => ({}));

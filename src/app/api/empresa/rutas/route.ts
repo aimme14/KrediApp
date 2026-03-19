@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAdminFirestore } from "@/lib/firebase-admin";
 import { getApiUser } from "@/lib/api-auth";
 import { EMPRESAS_COLLECTION, RUTAS_SUBCOLLECTION, USERS_COLLECTION } from "@/lib/empresas-db";
+import { descontarCajaAdmin } from "@/lib/admin-capital";
 
 const COUNTERS_COLLECTION = "counters";
 
@@ -52,28 +53,45 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({ rutas });
 }
 
-/** POST: crea una ruta */
+/** POST: crea una ruta. Opcional: capitalInicial (sale de caja del admin). */
 export async function POST(request: NextRequest) {
   const apiUser = await getApiUser(request);
   if (!apiUser) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
-  const body = await request.json();
-  const { nombre, ubicacion } = body as { nombre?: string; ubicacion?: string };
+  const body = await request.json().catch(() => ({}));
+  const { nombre, ubicacion, capitalInicial: capitalInicialBody } = body as {
+    nombre?: string;
+    ubicacion?: string;
+    capitalInicial?: number;
+  };
 
   if (!nombre || typeof nombre !== "string" || !nombre.trim()) {
     return NextResponse.json({ error: "El nombre es obligatorio" }, { status: 400 });
   }
 
+  const capitalInicial = typeof capitalInicialBody === "number" && capitalInicialBody >= 0
+    ? capitalInicialBody
+    : 0;
+
   const db = getAdminFirestore();
   const now = new Date();
 
-  // Número del admin para código RT-{adminNum}-{routeNum} (desde adminNum o codigo AD-001)
+  if (capitalInicial > 0) {
+    try {
+      await descontarCajaAdmin(db, apiUser.empresaId, apiUser.uid, capitalInicial, "Creación de ruta");
+    } catch (e) {
+      return NextResponse.json(
+        { error: e instanceof Error ? e.message : "Saldo insuficiente en caja del administrador" },
+        { status: 400 }
+      );
+    }
+  }
+
   const adminSnap = await db.collection(USERS_COLLECTION).doc(apiUser.uid).get();
   const adminNum = getAdminNumForRuta(adminSnap.data());
 
-  // Secuencial de rutas por admin
   const counterRef = db.collection(COUNTERS_COLLECTION).doc(`rutas_${apiUser.uid}`);
   const routeNum = await db.runTransaction(async (tx) => {
     const snap = await tx.get(counterRef);
@@ -91,12 +109,25 @@ export async function POST(request: NextRequest) {
     .collection(RUTAS_SUBCOLLECTION)
     .doc();
 
+  const zonaId = (ubicacion ?? "").trim() || "";
   await ref.set({
     nombre: nombre.trim(),
-    ubicacion: (ubicacion ?? "").trim() || null,
+    ubicacion: zonaId || null,
+    base: null,
+    descripcion: null,
     adminId: apiUser.uid,
     fechaCreacion: now,
     codigo,
+    zonaId,
+    empleadosIds: [],
+    cajaRuta: capitalInicial,
+    cajasEmpleados: 0,
+    inversiones: 0,
+    capitalTotal: capitalInicial,
+    ganancias: 0,
+    gastos: 0,
+    perdidas: 0,
+    ultimaActualizacion: now,
   });
 
   return NextResponse.json({ id: ref.id });

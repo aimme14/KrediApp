@@ -8,6 +8,7 @@ import {
   USUARIOS_SUBCOLLECTION,
   USERS_COLLECTION,
 } from "@/lib/empresas-db";
+import { asignarCapitalAAdmin } from "@/lib/jefe-capital";
 
 /** Colección de contadores para códigos secuenciales (JF-001, AD-001 por jefe) */
 const COUNTERS_COLLECTION = "counters";
@@ -27,7 +28,7 @@ function toRolFirestore(role: Role): "jefe" | "admin" | "empleado" {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { email, password, displayName, role, createdByUid, cedula, lugar, direccion, telefono, base, rutaId, adminId } = body as {
+    const { email, password, displayName, role, createdByUid, cedula, lugar, direccion, telefono, base, rutaId, adminId, montoAsignado } = body as {
       email: string;
       password: string;
       displayName?: string;
@@ -38,8 +39,9 @@ export async function POST(request: NextRequest) {
       direccion?: string;
       telefono?: string;
       base?: string;
-      rutaId?: string; // para empleados: ruta asignada
-      adminId?: string; // para empleados: admin asignado
+      rutaId?: string;
+      adminId?: string;
+      montoAsignado?: number; // solo para role === "admin": capital que el jefe asigna al nuevo admin
     };
 
     if (!email || !password || !role || !createdByUid) {
@@ -174,6 +176,27 @@ export async function POST(request: NextRequest) {
     if (codigoAdmin) usuarioEmpresaData.codigo = codigoAdmin;
     if (jefeCodigo) usuarioEmpresaData.jefeCodigo = jefeCodigo;
     if (adminNum !== null) usuarioEmpresaData.adminNum = adminNum;
+
+    if (role === "admin" && typeof montoAsignado === "number" && montoAsignado > 0) {
+      if (creatorRole !== "jefe") {
+        return NextResponse.json(
+          { error: "Solo el jefe puede asignar capital al crear un administrador" },
+          { status: 400 }
+        );
+      }
+      try {
+        await asignarCapitalAAdmin(adminDb, createdByUid, montoAsignado);
+      } catch (e) {
+        return NextResponse.json(
+          { error: e instanceof Error ? e.message : "Error al asignar capital al administrador" },
+          { status: 400 }
+        );
+      }
+      usuarioEmpresaData.cajaAdmin = montoAsignado;
+      usuarioEmpresaData.ultimaActualizacionCapital = now;
+    } else if (role === "admin") {
+      usuarioEmpresaData.cajaAdmin = 0;
+    }
 
     await adminDb
       .collection(EMPRESAS_COLLECTION)

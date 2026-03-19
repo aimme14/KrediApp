@@ -26,16 +26,15 @@ export interface CreateUserParams {
   displayName?: string;
   role: Role;
   createdByUid: string;
-  /** Opcional: datos del empleado/trabajador */
   cedula?: string;
   lugar?: string;
   direccion?: string;
   telefono?: string;
   base?: string;
-  /** ID de la ruta asignada al empleado */
   rutaId?: string;
-  /** UID del admin al que reporta el empleado (para que los clientes que cree el empleado los vea el admin) */
   adminId?: string;
+  /** Solo para role === "admin": capital que el jefe asigna al nuevo admin (sale de caja empresa) */
+  montoAsignado?: number;
 }
 
 /**

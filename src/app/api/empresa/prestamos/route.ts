@@ -6,6 +6,7 @@ import {
   CLIENTES_SUBCOLLECTION,
   PRESTAMOS_SUBCOLLECTION,
 } from "@/lib/empresas-db";
+import { registrarPrestamoEnRuta } from "@/lib/ruta-financiera-admin";
 import {
   getNextWorkingDay,
   addWorkingDays,
@@ -168,7 +169,17 @@ export async function POST(request: NextRequest) {
     multaMora: typeof multaMora === "number" ? multaMora : 0,
   });
 
-  // Marcar cliente con préstamo activo (reutilizamos clienteRef del chequeo de moroso)
+  if (rutaIdPrestamo) {
+    try {
+      await registrarPrestamoEnRuta(db, apiUser.empresaId, rutaIdPrestamo, monto);
+    } catch (e) {
+      return NextResponse.json(
+        { error: e instanceof Error ? e.message : "Error al impactar caja de la ruta" },
+        { status: 400 }
+      );
+    }
+  }
+
   if (clienteSnap.exists) {
     await clienteRef.update({ prestamo_activo: true });
   }

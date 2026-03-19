@@ -14,6 +14,7 @@ export default function RutasPage() {
   const [showForm, setShowForm] = useState(false);
   const [nombre, setNombre] = useState("");
   const [ubicacion, setUbicacion] = useState("");
+  const [capitalInicial, setCapitalInicial] = useState("");
   const [creating, setCreating] = useState(false);
   const [expandedRutaId, setExpandedRutaId] = useState<string | null>(null);
 
@@ -54,12 +55,15 @@ export default function RutasPage() {
     setCreating(true);
     try {
       const token = await user.getIdToken();
+      const capitalNum = capitalInicial.trim() ? parseFloat(capitalInicial.replace(",", ".")) : undefined;
       await createRuta(token, {
         nombre: nombre.trim(),
         ubicacion: ubicacion.trim() || undefined,
+        capitalInicial: typeof capitalNum === "number" && !Number.isNaN(capitalNum) && capitalNum >= 0 ? capitalNum : undefined,
       });
       setNombre("");
       setUbicacion("");
+      setCapitalInicial("");
       setShowForm(false);
       await loadRutas();
     } catch (e) {
@@ -113,6 +117,19 @@ export default function RutasPage() {
                 onChange={(e) => setUbicacion(e.target.value)}
                 placeholder="Zona o ciudad"
               />
+            </div>
+            <div className="form-group">
+              <label>Capital inicial (opcional)</label>
+              <input
+                type="text"
+                inputMode="decimal"
+                value={capitalInicial}
+                onChange={(e) => setCapitalInicial(e.target.value)}
+                placeholder="Ej: 2000000 (sale de tu caja)"
+              />
+              <p style={{ fontSize: "0.875rem", color: "var(--text-muted)", marginTop: "0.25rem" }}>
+                Si ingresas un monto, se descontará de tu caja y quedará en caja de la ruta.
+              </p>
             </div>
             {error && <p className="error-msg">{error}</p>}
             <button type="submit" className="btn btn-primary" disabled={creating}>

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAdminFirestore } from "@/lib/firebase-admin";
 import { getApiUser } from "@/lib/api-auth";
 import { EMPRESAS_COLLECTION, GASTOS_SUBCOLLECTION, USERS_COLLECTION } from "@/lib/empresas-db";
+import { descontarCajaAdmin } from "@/lib/admin-capital";
 import type { TipoGasto } from "@/types/firestore";
 
 /** GET: lista gastos. Empleado: los que él generó. Admin/Jefe: los suyos. Solo para admin se resuelve el nombre de quien hizo el gasto. */
@@ -91,6 +92,18 @@ export async function POST(request: NextRequest) {
   const fechaDate = fecha ? new Date(fecha) : new Date();
 
   const db = getAdminFirestore();
+
+  if (apiUser.role === "admin" && monto > 0) {
+    try {
+      await descontarCajaAdmin(db, apiUser.empresaId, apiUser.uid, monto, descripcion?.trim() || "Gasto operativo");
+    } catch (e) {
+      return NextResponse.json(
+        { error: e instanceof Error ? e.message : "Saldo insuficiente en caja del administrador" },
+        { status: 400 }
+      );
+    }
+  }
+
   const userSnap = await db.collection(USERS_COLLECTION).doc(apiUser.uid).get();
   const userData = userSnap.data();
   const creadoPorNombre =

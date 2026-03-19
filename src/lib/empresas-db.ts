@@ -15,4 +15,7 @@ export const CAPITAL_SUBCOLLECTION = "capital";
 /** Id del documento que guarda el capital actual de la empresa (empresas/{jefeUid}/capital/actual). */
 export const CAPITAL_DOC_ID = "actual";
 
+/** Subcolección de cierres mensuales: empresas/{empresaId}/cierresMensuales/{periodo} */
+export const CIERRES_MENSUALES_SUBCOLLECTION = "cierresMensuales";
+
 export const USERS_COLLECTION = "users"; // Índice de auth

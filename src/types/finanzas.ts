@@ -1,13 +1,58 @@
 import type { Timestamp } from "firebase/firestore";
 
 /**
- * Tipos financieros de nivel ruta/jornada/cobros.
- * Estos tipos representan la forma en la que se guardan
- * los datos en Firestore bajo /empresas/{empresaId}.
- *
- * Nota: el capital del jefe/empresa es la suma de
- * capitalTotal de todas las rutas.
+ * Tipos financieros de nivel empresa/jefe, admin, ruta/jornada/cobros.
+ * Se guardan en Firestore bajo /empresas/{empresaId} (o jefeUid para capital empresa).
  */
+
+// ── Capital empresa (Jefe) ───────────
+/** Documento empresas/{jefeUid}/capital/actual. Invariante: capitalTotal = cajaEmpresa + capitalAsignadoAdmins */
+export interface CapitalEmpresa {
+  capitalTotal: number;
+  cajaEmpresa: number;
+  capitalAsignadoAdmins: number;
+  jefeUid: string;
+  updatedAt: Timestamp;
+  historial?: CapitalHistorialEntry[];
+}
+
+export interface CapitalHistorialEntry {
+  montoAnterior: number;
+  montoNuevo: number;
+  at: Timestamp | Date;
+}
+
+// ── Admin financiero ─────────────────
+/** Datos financieros del admin. Ubicación: empresas/{empresaId}/usuarios/{adminUid} (campos cajaAdmin) o subcolección. */
+export interface AdminFinanciero {
+  cajaAdmin: number;
+  ultimaActualizacion: Timestamp;
+}
+
+// ── Cierre mensual ───────────────────
+/** Snapshot por ruta en un cierre. */
+export interface CierreRutaSnapshot {
+  rutaId: string;
+  nombre: string;
+  cajaRuta: number;
+  cajasEmpleados: number;
+  inversiones: number;
+  ganancias: number;
+  perdidas: number;
+  gastos: number;
+  utilidad: number;
+  capitalTotal: number;
+}
+
+/** Documento empresas/{empresaId}/cierresMensuales/{periodo}. periodo = "YYYY-MM" */
+export interface CierreMensual {
+  periodo: string;
+  fechaCierre: Timestamp;
+  rutas: CierreRutaSnapshot[];
+  cajaEmpresa?: number;
+  capitalAsignadoAdmins?: number;
+  utilidadGlobal?: number;
+}
 
 // ── Ruta ──────────────────────────────
 export interface RutaFinanciera {

@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { reauthenticateWithCredential, EmailAuthProvider } from "firebase/auth";
 import { useAuth } from "@/context/AuthContext";
 import { auth } from "@/lib/firebase";
-import { getCapital, setCapital, clearCapitalHistorial, type CapitalHistorialEntry } from "@/lib/capital";
+import { getCapital, setCapital, ajustarCapital, registrarSalidaCapital, clearCapitalHistorial, type CapitalHistorialEntry, type CapitalResponse } from "@/lib/capital";
 
 const MAX_HISTORIAL = 6;
 const TOAST_DURATION = 3000;
@@ -59,11 +59,7 @@ function parseMontoInput(value: string): { num: number; valid: boolean } {
 
 export default function GestionFinancieraPage() {
   const { user, profile } = useAuth();
-  const [capital, setCapitalState] = useState<{
-    monto: number;
-    updatedAt: string | null;
-    historial: CapitalHistorialEntry[];
-  } | null>(null);
+  const [capital, setCapitalState] = useState<CapitalResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [inputValue, setInputValue] = useState("");
@@ -80,6 +76,12 @@ export default function GestionFinancieraPage() {
   const [isConfirming, setIsConfirming] = useState(false);
   const [formActualizarAbierto, setFormActualizarAbierto] = useState(false);
   const [seccionActiva, setSeccionActiva] = useState<"capital" | "salidas" | "ingresos">("capital");
+  const [salidaMonto, setSalidaMonto] = useState("");
+  const [salidaSaving, setSalidaSaving] = useState(false);
+  const [salidaError, setSalidaError] = useState<string | null>(null);
+  const [ajusteInput, setAjusteInput] = useState("");
+  const [ajusteSaving, setAjusteSaving] = useState(false);
+  const [ajusteError, setAjusteError] = useState<string | null>(null);
 
   const loadCapital = useCallback(async () => {
     if (!user || !profile || profile.role !== "jefe") return;
@@ -165,7 +167,11 @@ export default function GestionFinancieraPage() {
       const token = await user.getIdToken();
       const data = await setCapital(token, montoPendiente);
       setCapitalState((prev) => ({
+        ...prev,
         monto: data.monto,
+        capitalTotal: data.capitalTotal,
+        cajaEmpresa: data.cajaEmpresa,
+        capitalAsignadoAdmins: data.capitalAsignadoAdmins,
         updatedAt: data.updatedAt,
         historial: data.historial,
       }));
@@ -207,7 +213,77 @@ export default function GestionFinancieraPage() {
     }
   };
 
-  const monto = capital?.monto ?? 0;
+  const handleRegistrarSalida = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user || !profile || profile.role !== "jefe") return;
+    const num = parseMontoInput(salidaMonto);
+    if (!num.valid || num.num <= 0) {
+      setSalidaError("Ingresa un monto válido mayor a 0.");
+      return;
+    }
+    if (num.num > cajaEmpresa) {
+      setSalidaError("El monto no puede superar la caja empresa disponible.");
+      return;
+    }
+    setSalidaError(null);
+    setSalidaSaving(true);
+    try {
+      const token = await user.getIdToken();
+      const data = await registrarSalidaCapital(token, num.num);
+      setCapitalState((prev) => (prev ? { ...prev, ...data } : null));
+      setSalidaMonto("");
+      setToast({ tipo: "reduccion", mensaje: "Salida registrada correctamente." });
+      setTimeout(() => setToast(null), TOAST_DURATION);
+    } catch (e) {
+      setSalidaError(e instanceof Error ? e.message : "Error al registrar salida");
+    } finally {
+      setSalidaSaving(false);
+    }
+  };
+
+  /** Parsea ajuste: acepta positivo (sumar) o negativo (restar). Ej: "500000" o "-300000" */
+  const parseAjusteInput = (value: string): { delta: number; valid: boolean } => {
+    const raw = value.replace(/\s/g, "").replace(/\./g, "").replace(",", ".");
+    if (raw === "" || raw === "-") return { delta: 0, valid: false };
+    const num = Number(raw);
+    if (Number.isNaN(num)) return { delta: 0, valid: false };
+    return { delta: num, valid: true };
+  };
+
+  const handleAjustarCapital = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user || !profile || profile.role !== "jefe") return;
+    const { delta, valid } = parseAjusteInput(ajusteInput);
+    if (!valid || delta === 0) {
+      setAjusteError("Ingresa un monto a sumar (ej. 500000) o restar (ej. -300000).");
+      return;
+    }
+    if (delta < 0 && -delta > cajaEmpresa) {
+      setAjusteError("No puedes restar más de lo disponible en caja empresa (sin tocar lo asignado a admins).");
+      return;
+    }
+    setAjusteError(null);
+    setAjusteSaving(true);
+    try {
+      const token = await user.getIdToken();
+      const data = await ajustarCapital(token, delta);
+      setCapitalState((prev) => (prev ? { ...prev, ...data } : null));
+      setAjusteInput("");
+      setToast({
+        tipo: delta > 0 ? "aumento" : "reduccion",
+        mensaje: delta > 0 ? "Capital aumentado correctamente." : "Capital reducido correctamente.",
+      });
+      setTimeout(() => setToast(null), TOAST_DURATION);
+    } catch (e) {
+      setAjusteError(e instanceof Error ? e.message : "Error al ajustar capital");
+    } finally {
+      setAjusteSaving(false);
+    }
+  };
+
+  const monto = capital?.capitalTotal ?? capital?.monto ?? 0;
+  const cajaEmpresa = capital?.cajaEmpresa ?? 0;
+  const capitalAsignadoAdmins = capital?.capitalAsignadoAdmins ?? 0;
   const historial = capital?.historial ?? [];
   const updatedAt = capital?.updatedAt ?? null;
   const tendencia = getTendencia(historial);
@@ -333,10 +409,14 @@ export default function GestionFinancieraPage() {
         ) : (
           <>
             <div className="gf-capital-display">
-              <span className="gf-capital-label">CAPITAL ACTUAL</span>
+              <span className="gf-capital-label">CAPITAL TOTAL</span>
               <span className="gf-capital-monto" aria-live="polite">
                 ${formatMonto(monto)}
               </span>
+              <div className="gf-capital-desglose" style={{ marginTop: "0.5rem", fontSize: "0.9rem", color: "var(--text-muted)" }}>
+                <span>Caja empresa: {formatMonto(cajaEmpresa)}</span>
+                <span style={{ marginLeft: "1rem" }}>Asignado a admins: {formatMonto(capitalAsignadoAdmins)}</span>
+              </div>
               <div className="gf-capital-indicators">
                 <span className="gf-capital-indicator">
                   <span className="gf-capital-indicator-icon" aria-hidden>🕐</span>
@@ -454,6 +534,37 @@ export default function GestionFinancieraPage() {
                 {btnState === "success" && "¡Guardado!"}
               </button>
             </form>
+
+            <div style={{ marginTop: "1.5rem", paddingTop: "1.5rem", borderTop: "1px solid var(--border)" }}>
+              <label htmlFor="gf-ajuste-monto" className="gf-capital-form-label">
+                AJUSTAR CAPITAL (SUMAR O RESTAR)
+              </label>
+              <p className="gf-capital-form-hint" style={{ marginBottom: "0.5rem" }}>
+                Número positivo para sumar a capital y caja; negativo para restar (solo hasta lo disponible en caja empresa).
+              </p>
+              <div className="gf-capital-input-wrap" style={{ maxWidth: "14rem" }}>
+                <span className="gf-capital-input-prefix">COP $</span>
+                <input
+                  id="gf-ajuste-monto"
+                  type="text"
+                  inputMode="decimal"
+                  value={ajusteInput}
+                  onChange={(e) => { setAjusteInput(e.target.value); setAjusteError(null); }}
+                  placeholder="Ej. 500000 o -300000"
+                  className={`gf-capital-input ${ajusteError ? "gf-capital-input-error" : ""}`}
+                  disabled={ajusteSaving}
+                />
+              </div>
+              {ajusteError && <p className="gf-capital-input-msg-error" role="alert">{ajusteError}</p>}
+              <button
+                type="button"
+                className="gf-btn-actualizar"
+                onClick={handleAjustarCapital}
+                disabled={ajusteSaving || !parseAjusteInput(ajusteInput).valid || parseAjusteInput(ajusteInput).delta === 0}
+              >
+                {ajusteSaving ? "Aplicando…" : "Aplicar ajuste"}
+              </button>
+            </div>
             </div>
           </>
         )}
@@ -522,8 +633,28 @@ export default function GestionFinancieraPage() {
             <span className="gf-salidas-icon" aria-hidden>📤</span>
             <h2 className="gf-salidas-title">Salidas</h2>
           </div>
-          <p className="gf-salidas-desc">Registro y control de salidas de dinero (egresos, retiros, gastos asignados).</p>
-          <p className="gf-salidas-empty">Contenido en desarrollo. Próximamente podrás gestionar las salidas desde aquí.</p>
+          <p className="gf-salidas-desc">Registro de retiros de caja empresa. Reduce el capital total y la caja disponible.</p>
+          <p style={{ marginBottom: "1rem", fontWeight: 600 }}>Caja empresa disponible: {formatMonto(cajaEmpresa)}</p>
+          <form onSubmit={handleRegistrarSalida} className="gf-capital-form" style={{ maxWidth: "20rem" }}>
+            <label htmlFor="gf-salida-monto" className="gf-capital-form-label">MONTO A RETIRAR</label>
+            <div className="gf-capital-input-wrap">
+              <span className="gf-capital-input-prefix">COP $</span>
+              <input
+                id="gf-salida-monto"
+                type="text"
+                inputMode="decimal"
+                value={salidaMonto}
+                onChange={(e) => { setSalidaMonto(e.target.value); setSalidaError(null); }}
+                placeholder="Ej. 500000"
+                className={`gf-capital-input ${salidaError ? "gf-capital-input-error" : ""}`}
+                disabled={salidaSaving}
+              />
+            </div>
+            {salidaError && <p className="gf-capital-input-msg-error" role="alert">{salidaError}</p>}
+            <button type="submit" className="gf-btn-actualizar" disabled={salidaSaving}>
+              {salidaSaving ? "Registrando…" : "Registrar salida"}
+            </button>
+          </form>
         </div>
       </div>
 

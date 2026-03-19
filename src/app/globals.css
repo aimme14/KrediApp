@@ -3725,6 +3725,55 @@ th {
 .ruta-dia-item:hover {
   background: var(--input-bg);
 }
+.ruta-dia-item.estado-mora {
+  background: #fef2f2;
+  border-color: rgba(220, 38, 38, 0.35);
+}
+.ruta-dia-item.estado-mora:hover {
+  background: #fee2e2;
+}
+
+.ruta-dia-item.estado-activo {
+  background: #fffbeb;
+  border-color: rgba(217, 119, 6, 0.35);
+}
+.ruta-dia-item.estado-activo:hover {
+  background: #fef3c7;
+}
+
+.ruta-dia-item.estado-pagada {
+  background: #f0fdf4;
+  border-color: rgba(22, 163, 74, 0.35);
+}
+.ruta-dia-item.estado-pagada:hover {
+  background: #dcfce7;
+}
+
+/* Modo noche: versiones con mejor contraste (menos fondo claro) */
+[data-theme="dark"] .ruta-dia-item.estado-mora {
+  background: rgba(220, 38, 38, 0.12);
+  border-color: rgba(220, 38, 38, 0.45);
+}
+[data-theme="dark"] .ruta-dia-item.estado-mora:hover {
+  background: rgba(220, 38, 38, 0.18);
+}
+
+[data-theme="dark"] .ruta-dia-item.estado-activo {
+  background: rgba(217, 119, 6, 0.14);
+  border-color: rgba(217, 119, 6, 0.45);
+}
+[data-theme="dark"] .ruta-dia-item.estado-activo:hover {
+  background: rgba(217, 119, 6, 0.20);
+}
+
+[data-theme="dark"] .ruta-dia-item.estado-pagada {
+  background: rgba(22, 163, 74, 0.13);
+  border-color: rgba(22, 163, 74, 0.45);
+}
+[data-theme="dark"] .ruta-dia-item.estado-pagada:hover {
+  background: rgba(22, 163, 74, 0.20);
+}
+
 .ruta-dia-avatar {
   width: 40px;
   height: 40px;
@@ -3740,6 +3789,20 @@ th {
 .ruta-dia-avatar.prioridad-2 { background: #fff7ed; color: #ea580c; }
 .ruta-dia-avatar.prioridad-3 { background: #eff6ff; color: #2563eb; }
 .ruta-dia-avatar.prioridad-4 { background: var(--input-bg); color: var(--text-muted); }
+
+[data-theme="dark"] .ruta-dia-avatar.prioridad-1 {
+  background: rgba(220, 38, 38, 0.18);
+  color: #f87171;
+}
+[data-theme="dark"] .ruta-dia-avatar.prioridad-2 {
+  background: rgba(217, 119, 6, 0.20);
+  color: #f59e0b;
+}
+[data-theme="dark"] .ruta-dia-avatar.prioridad-3 {
+  background: rgba(37, 99, 235, 0.20);
+  color: #60a5fa;
+}
+
 .ruta-dia-item-main {
   flex: 1;
   min-width: 0;
@@ -3762,7 +3825,21 @@ th {
 }
 .ruta-dia-badge.estado-mora { background: #fef2f2; color: #dc2626; }
 .ruta-dia-badge.estado-pagada { background: #f0fdf4; color: #16a34a; }
-.ruta-dia-badge.estado-activo { background: #eff6ff; color: #2563eb; }
+.ruta-dia-badge.estado-activo { background: #fffbeb; color: #d97706; }
+
+[data-theme="dark"] .ruta-dia-badge.estado-mora {
+  background: rgba(220, 38, 38, 0.16);
+  color: #f87171;
+}
+[data-theme="dark"] .ruta-dia-badge.estado-pagada {
+  background: rgba(22, 163, 74, 0.16);
+  color: #34d399;
+}
+[data-theme="dark"] .ruta-dia-badge.estado-activo {
+  background: rgba(217, 119, 6, 0.18);
+  color: #fbbf24;
+}
+
 .ruta-dia-footer {
   position: fixed;
   bottom: 0;
