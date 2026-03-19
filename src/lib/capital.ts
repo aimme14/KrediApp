@@ -30,6 +30,20 @@ function toCapitalResponse(json: Record<string, unknown>): CapitalResponse {
   };
 }
 
+function extractApiErrorMessage(
+  json: Record<string, unknown>,
+  fallbackMessage: string
+): string {
+  const rawError = (json as { error?: unknown }).error;
+  if (typeof rawError === "string") return rawError;
+  if (!rawError) return fallbackMessage;
+  if (typeof rawError === "object") {
+    const maybeMessage = (rawError as { message?: unknown }).message;
+    if (typeof maybeMessage === "string") return maybeMessage;
+  }
+  return fallbackMessage;
+}
+
 async function parseJsonResponse<T>(res: Response): Promise<T> {
   // Leemos como texto para poder manejar respuestas vacías o no-JSON
   // sin romper con "Unexpected end of JSON input".
@@ -51,7 +65,11 @@ export async function getCapital(token: string): Promise<CapitalResponse> {
     headers: { Authorization: `Bearer ${token}` },
   });
   const json = await parseJsonResponse<Record<string, unknown>>(res);
-  if (!res.ok) throw new Error((json as { error?: unknown }).error ?? "Error al obtener el capital");
+  if (!res.ok) {
+    throw new Error(
+      extractApiErrorMessage(json, "Error al obtener el capital")
+    );
+  }
   return toCapitalResponse(json);
 }
 
@@ -65,7 +83,11 @@ export async function setCapital(
     body: JSON.stringify({ monto }),
   });
   const json = await parseJsonResponse<Record<string, unknown>>(res);
-  if (!res.ok) throw new Error((json as { error?: unknown }).error ?? "Error al actualizar el capital");
+  if (!res.ok) {
+    throw new Error(
+      extractApiErrorMessage(json, "Error al actualizar el capital")
+    );
+  }
   return { ...toCapitalResponse(json), ok: (json as { ok?: unknown }).ok === true };
 }
 
@@ -79,7 +101,11 @@ export async function ajustarCapital(
     body: JSON.stringify({ ajuste: delta }),
   });
   const json = await parseJsonResponse<Record<string, unknown>>(res);
-  if (!res.ok) throw new Error((json as { error?: unknown }).error ?? "Error al ajustar el capital");
+  if (!res.ok) {
+    throw new Error(
+      extractApiErrorMessage(json, "Error al ajustar el capital")
+    );
+  }
   return { ...toCapitalResponse(json), ok: (json as { ok?: unknown }).ok === true };
 }
 
@@ -93,7 +119,11 @@ export async function registrarSalidaCapital(
     body: JSON.stringify({ salida: monto }),
   });
   const json = await parseJsonResponse<Record<string, unknown>>(res);
-  if (!res.ok) throw new Error((json as { error?: unknown }).error ?? "Error al registrar salida");
+  if (!res.ok) {
+    throw new Error(
+      extractApiErrorMessage(json, "Error al registrar salida")
+    );
+  }
   return { ...toCapitalResponse(json), ok: (json as { ok?: unknown }).ok === true };
 }
 
@@ -106,5 +136,9 @@ export async function clearCapitalHistorial(token: string): Promise<void> {
   // Se consume la respuesta para que el cliente no se quede esperando,
   // y falla con un error legible si el servidor no responde JSON.
   const json = await parseJsonResponse<Record<string, unknown>>(res);
-  if (!res.ok) throw new Error((json as { error?: unknown }).error ?? "Error al limpiar historial");
+  if (!res.ok) {
+    throw new Error(
+      extractApiErrorMessage(json, "Error al limpiar historial")
+    );
+  }
 }
