@@ -6,7 +6,7 @@ import { useAuth } from "@/context/AuthContext";
 import SuperAdminDashboard from "@/components/dashboard/SuperAdminDashboard";
 
 export default function DashboardPage() {
-  const { profile } = useAuth();
+  const { profile, loading } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
@@ -24,7 +24,13 @@ export default function DashboardPage() {
     }
   }, [profile, router]);
 
-  if (!profile) return null;
+  if (loading || !profile) {
+    return (
+      <div className="card">
+        <p>{loading ? "Cargando panel..." : "Preparando panel..."}</p>
+      </div>
+    );
+  }
 
   if (profile.role === "jefe") {
     return (

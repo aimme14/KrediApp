@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect } from "react";
-
+/**
+ * Captura errores en el layout raíz (donde error.tsx no alcanza).
+ * Debe definir html y body.
+ */
 export default function GlobalError({
   error,
   reset,
@@ -9,33 +11,25 @@ export default function GlobalError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
-  useEffect(() => {
-    console.error(error);
-  }, [error]);
-
   return (
     <html lang="es">
-      <body style={{ margin: 0, fontFamily: "system-ui, sans-serif", padding: "2rem" }}>
-        <div style={{ maxWidth: "480px", margin: "0 auto", textAlign: "center" }}>
-          <h1 style={{ marginBottom: "1rem" }}>Error de la aplicación</h1>
-          <p style={{ color: "#666", marginBottom: "1.5rem" }}>
-            {error.message || "Algo salió mal. Prueba a recargar la página."}
-          </p>
-          <button
-            type="button"
-            onClick={reset}
-            style={{
-              padding: "0.5rem 1rem",
-              cursor: "pointer",
-              background: "#111",
-              color: "#fff",
-              border: "none",
-              borderRadius: "6px",
-            }}
-          >
-            Reintentar
-          </button>
-        </div>
+      <body style={{ margin: 0, padding: "2rem", fontFamily: "system-ui, sans-serif", background: "#f4f4f5", color: "#18181b" }}>
+        <h2 style={{ marginBottom: "1rem" }}>Algo salió mal</h2>
+        <p style={{ color: "#52525b", marginBottom: "1.5rem" }}>{error.message || "Error inesperado al cargar la aplicación."}</p>
+        <button
+          type="button"
+          onClick={reset}
+          style={{
+            padding: "0.5rem 1rem",
+            cursor: "pointer",
+            background: "#18181b",
+            color: "#fafafa",
+            border: "none",
+            borderRadius: "6px",
+          }}
+        >
+          Reintentar
+        </button>
       </body>
     </html>
   );

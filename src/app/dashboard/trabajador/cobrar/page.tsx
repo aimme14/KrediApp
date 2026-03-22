@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback, Suspense } from "react";
 import { useSearchParams, usePathname } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
@@ -16,8 +16,17 @@ import {
   type PagoItem,
 } from "@/lib/empresa-api";
 import { uploadImage, getImageAccept } from "@/lib/storage";
-import html2canvas from "html2canvas";
 import type { MotivoNoPago } from "@/types/finanzas";
+
+/** Carga html2canvas solo en el cliente (evita fallos de bundle/SSR y reduce el JS inicial). */
+async function captureElementToCanvas(el: HTMLElement) {
+  const { default: html2canvas } = await import("html2canvas");
+  return html2canvas(el, {
+    scale: 2,
+    backgroundColor: "#ffffff",
+    logging: false,
+  });
+}
 
 function UploadIcon() {
   return (
@@ -94,7 +103,7 @@ const MOTIVOS_NO_PAGO: { value: MotivoNoPago; label: string }[] = [
   { value: "otro", label: "Otro motivo" },
 ];
 
-export default function CobrarClientePage() {
+function CobrarClientePageContent() {
   const { user, profile } = useAuth();
   const searchParams = useSearchParams();
   const pathname = usePathname();
@@ -256,11 +265,7 @@ export default function CobrarClientePage() {
     setComprobanteError(null);
     setComprobanteGenerando(true);
     try {
-      const canvas = await html2canvas(el, {
-        scale: 2,
-        backgroundColor: "#ffffff",
-        logging: false,
-      });
+      const canvas = await captureElementToCanvas(el);
       const blob = await new Promise<Blob | null>((res) =>
         canvas.toBlob((b) => res(b), "image/png", 0.95)
       );
@@ -305,11 +310,7 @@ export default function CobrarClientePage() {
     const el = comprobanteRef.current;
     if (!el) return;
     try {
-      const canvas = await html2canvas(el, {
-        scale: 2,
-        backgroundColor: "#ffffff",
-        logging: false,
-      });
+      const canvas = await captureElementToCanvas(el);
       canvas.toBlob((blob) => {
         if (!blob) return;
         comprobanteBlobRef.current = blob;
@@ -904,5 +905,20 @@ export default function CobrarClientePage() {
         </div>
       </form>
     </div>
+  );
+}
+
+/** useSearchParams requiere Suspense en el App Router para no dejar la ruta en blanco durante el render. */
+export default function CobrarClientePage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="container" style={{ paddingTop: "4rem", textAlign: "center" }}>
+          <p>Cargando cobro...</p>
+        </div>
+      }
+    >
+      <CobrarClientePageContent />
+    </Suspense>
   );
 }
