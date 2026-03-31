@@ -2,13 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useAuth } from "@/context/AuthContext";
-import {
-  listGastos,
-  createGasto,
-  listRutas,
-  type GastoItem,
-  type RutaItem,
-} from "@/lib/empresa-api";
+import { listGastos, createGasto, type GastoItem } from "@/lib/empresa-api";
 import { uploadImage, IMAGE_ACCEPT, getImageAccept } from "@/lib/storage";
 
 const TIPOS = [
@@ -114,9 +108,6 @@ export default function GastosPage() {
   const [creating, setCreating] = useState(false);
   const [motivoOverlay, setMotivoOverlay] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [rutas, setRutas] = useState<RutaItem[]>([]);
-  const [alcanceGasto, setAlcanceGasto] = useState<"admin" | "ruta">("admin");
-  const [rutaIdGasto, setRutaIdGasto] = useState("");
   const [showCamera, setShowCamera] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -167,19 +158,6 @@ export default function GastosPage() {
   useEffect(() => {
     loadGastos();
   }, [loadGastos]);
-
-  useEffect(() => {
-    if (!user || !profile || profile.role !== "admin") return;
-    (async () => {
-      const token = await user.getIdToken();
-      try {
-        const list = await listRutas(token);
-        setRutas(list);
-      } catch {
-        setRutas([]);
-      }
-    })();
-  }, [user, profile]);
 
   useEffect(() => {
     if (!showCamera) return;
@@ -267,10 +245,6 @@ export default function GastosPage() {
       setError("Monto debe ser un número mayor o igual a 0");
       return;
     }
-    if (alcanceGasto === "ruta" && !rutaIdGasto.trim()) {
-      setError("Selecciona la ruta a la que corresponde el gasto.");
-      return;
-    }
     setError(null);
     setCreating(true);
     try {
@@ -291,14 +265,10 @@ export default function GastosPage() {
         fecha: new Date().toISOString().slice(0, 10),
         tipo,
         evidencia: evidenciaUrl || undefined,
-        alcance: alcanceGasto,
-        rutaId: alcanceGasto === "ruta" ? rutaIdGasto.trim() : undefined,
       });
       setMotivo("");
       setMonto("");
       setTipo("otro");
-      setAlcanceGasto("admin");
-      setRutaIdGasto("");
       setEvidenciaFile(null);
       setEvidenciaPreview(null);
       setShowForm(false);
@@ -310,23 +280,13 @@ export default function GastosPage() {
     }
   };
 
-  if (!profile || profile.role !== "admin") return null;
-
-  function etiquetaAlcance(g: GastoItem): string {
-    const a = (g.alcance ?? "").trim();
-    if (a === "ruta") {
-      const r = rutas.find((r) => r.id === g.rutaId);
-      return r ? `Ruta: ${r.nombre}` : "Ruta";
-    }
-    if (a === "admin") return "Administrador";
-    return g.rutaId ? "Ruta (hist.)" : "Administrador";
-  }
+  if (!profile || profile.role !== "jefe") return null;
 
   return (
     <div className="card">
       <h2 style={{ marginTop: 0 }}>Gastos operativos</h2>
       <p style={{ color: "var(--text-muted)", marginTop: "-0.25rem", marginBottom: "1rem" }}>
-        Indica si el gasto es tuyo (administrador) o de una ruta específica. Se descuenta de tu caja.
+        Los montos se descuentan de la caja de la empresa.
       </p>
 
       {showForm && (
@@ -377,49 +337,6 @@ export default function GastosPage() {
                 ))}
               </div>
             </div>
-
-            <div className="form-group">
-              <span className="gastos-tipo-label">Ámbito del gasto <span className="form-required" aria-hidden>*</span></span>
-              <div className="gastos-tipo-buttons" role="group" aria-label="Ámbito del gasto">
-                <button
-                  type="button"
-                  className={`gastos-tipo-btn ${alcanceGasto === "admin" ? "gastos-tipo-btn-active" : ""}`}
-                  onClick={() => { setAlcanceGasto("admin"); setRutaIdGasto(""); }}
-                  aria-pressed={alcanceGasto === "admin"}
-                >
-                  <span>Administrador</span>
-                </button>
-                <button
-                  type="button"
-                  className={`gastos-tipo-btn ${alcanceGasto === "ruta" ? "gastos-tipo-btn-active" : ""}`}
-                  onClick={() => setAlcanceGasto("ruta")}
-                  aria-pressed={alcanceGasto === "ruta"}
-                >
-                  <span>Una ruta</span>
-                </button>
-              </div>
-            </div>
-
-            {alcanceGasto === "ruta" && (
-              <div className="form-group">
-                <label htmlFor="gastos-ruta">Ruta <span className="form-required" aria-hidden>*</span></label>
-                <select
-                  id="gastos-ruta"
-                  value={rutaIdGasto}
-                  onChange={(e) => setRutaIdGasto(e.target.value)}
-                  required
-                  aria-required="true"
-                >
-                  <option value="">— Seleccionar ruta —</option>
-                  {rutas.map((r) => (
-                    <option key={r.id} value={r.id}>
-                      {r.nombre ?? r.id}
-                      {r.codigo ? ` (${r.codigo})` : ""}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
 
             <div className="form-group">
               <label htmlFor="gastos-motivo">Motivo <span className="form-required" aria-hidden>*</span></label>
@@ -593,7 +510,6 @@ export default function GastosPage() {
                     <th className="gastos-col-nombre">Nombre</th>
                     <th className="gastos-col-fecha">Fecha</th>
                     <th className="gastos-col-tipo">Tipo</th>
-                    <th>Ámbito</th>
                     <th className="gastos-col-monto">Monto</th>
                     <th className="gastos-col-evidencia">Evidencia</th>
                     <th>Motivo</th>
@@ -605,7 +521,6 @@ export default function GastosPage() {
                     <td className="gastos-col-nombre" title={g.creadoPorNombre ?? undefined}>{g.creadoPorNombre ?? "—"}</td>
                     <td className="gastos-col-fecha">{g.fecha ? new Date(g.fecha).toLocaleDateString("es-CO") : "—"}</td>
                     <td className="gastos-col-tipo">{tipoLabel(g.tipo ?? "")}</td>
-                    <td>{etiquetaAlcance(g)}</td>
                     <td className="gastos-col-monto">{formatMoneda(g.monto ?? 0)}</td>
                     <td className="gastos-col-evidencia">
                       {g.evidencia ? (

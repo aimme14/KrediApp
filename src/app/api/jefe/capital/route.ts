@@ -4,7 +4,7 @@ import { getApiUser } from "@/lib/api-auth";
 import {
   EMPRESAS_COLLECTION,
   CAPITAL_SUBCOLLECTION,
-  CAPITAL_DOC_ID,
+  CAPITAL_CAJA_EMPRESA_DOC,
 } from "@/lib/empresas-db";
 import {
   getCapitalEmpresa,
@@ -13,7 +13,7 @@ import {
   registrarSalida,
 } from "@/lib/jefe-capital";
 
-/** GET: obtiene el capital de empresa del jefe (capitalTotal, cajaEmpresa, capitalAsignadoAdmins). */
+/** GET: capital de empresa (fórmula nueva + desglose). */
 export async function GET(request: NextRequest) {
   try {
     const apiUser = await getApiUser(request);
@@ -37,10 +37,13 @@ export async function GET(request: NextRequest) {
     }));
 
     return NextResponse.json({
-      capitalTotal: doc.capitalTotal,
+      capitalEmpresa: doc.capitalEmpresa,
+      capitalTotal: doc.capitalEmpresa,
       cajaEmpresa: doc.cajaEmpresa,
-      capitalAsignadoAdmins: doc.capitalAsignadoAdmins,
-      monto: doc.capitalTotal,
+      gastosEmpresa: doc.gastosEmpresa,
+      sumaCapitalAdmins: doc.sumaCapitalAdmins,
+      capitalAsignadoAdmins: doc.sumaCapitalAdmins,
+      monto: doc.capitalEmpresa,
       updatedAt: doc.updatedAt ? doc.updatedAt.toISOString() : null,
       historial,
     });
@@ -53,11 +56,11 @@ export async function GET(request: NextRequest) {
 }
 
 /**
- * PUT: actualiza el capital.
+ * PUT: actualiza caja / capital de empresa.
  * Body:
- * - { monto: number }: establecer capital (inicial o nuevo total; si ya hay asignado a admins, monto debe ser >= asignado).
- * - { ajuste: number }: sumar/restar al capital (restar solo hasta lo disponible en caja empresa).
- * - { salida: number }: retiro de caja (reduce caja y capital total).
+ * - { monto: number }: capital de empresa objetivo (capitalEmpresa); se deriva cajaEmpresa.
+ * - { ajuste: number }: sumar/restar solo a caja empresa.
+ * - { salida: number }: retiro de caja empresa.
  */
 export async function PUT(request: NextRequest) {
   const apiUser = await getApiUser(request);
@@ -74,22 +77,30 @@ export async function PUT(request: NextRequest) {
   const body = await request.json().catch(() => ({}));
   const db = getAdminFirestore();
 
+  const jsonDoc = async (doc: Awaited<ReturnType<typeof getCapitalEmpresa>>) => {
+    const historial = (doc.historial ?? []).slice(0, 6).map((h) => ({
+      montoAnterior: h.montoAnterior,
+      montoNuevo: h.montoNuevo,
+      at: h.at instanceof Date ? h.at.toISOString() : null,
+    }));
+    return {
+      ok: true,
+      capitalEmpresa: doc.capitalEmpresa,
+      capitalTotal: doc.capitalEmpresa,
+      cajaEmpresa: doc.cajaEmpresa,
+      gastosEmpresa: doc.gastosEmpresa,
+      sumaCapitalAdmins: doc.sumaCapitalAdmins,
+      capitalAsignadoAdmins: doc.sumaCapitalAdmins,
+      monto: doc.capitalEmpresa,
+      updatedAt: doc.updatedAt.toISOString(),
+      historial,
+    };
+  };
+
   if (typeof body.salida === "number" && body.salida > 0) {
     try {
       const doc = await registrarSalida(db, apiUser.uid, body.salida);
-      return NextResponse.json({
-        ok: true,
-        capitalTotal: doc.capitalTotal,
-        cajaEmpresa: doc.cajaEmpresa,
-        capitalAsignadoAdmins: doc.capitalAsignadoAdmins,
-        monto: doc.capitalTotal,
-        updatedAt: doc.updatedAt.toISOString(),
-        historial: (doc.historial ?? []).slice(0, 6).map((h) => ({
-          montoAnterior: h.montoAnterior,
-          montoNuevo: h.montoNuevo,
-          at: h.at instanceof Date ? h.at.toISOString() : null,
-        })),
-      });
+      return NextResponse.json(await jsonDoc(doc));
     } catch (e) {
       return NextResponse.json(
         { error: e instanceof Error ? e.message : "Error al registrar salida" },
@@ -101,19 +112,7 @@ export async function PUT(request: NextRequest) {
   if (typeof body.ajuste === "number" && body.ajuste !== 0) {
     try {
       const doc = await ajustarCapital(db, apiUser.uid, body.ajuste);
-      return NextResponse.json({
-        ok: true,
-        capitalTotal: doc.capitalTotal,
-        cajaEmpresa: doc.cajaEmpresa,
-        capitalAsignadoAdmins: doc.capitalAsignadoAdmins,
-        monto: doc.capitalTotal,
-        updatedAt: doc.updatedAt.toISOString(),
-        historial: (doc.historial ?? []).slice(0, 6).map((h) => ({
-          montoAnterior: h.montoAnterior,
-          montoNuevo: h.montoNuevo,
-          at: h.at instanceof Date ? h.at.toISOString() : null,
-        })),
-      });
+      return NextResponse.json(await jsonDoc(doc));
     } catch (e) {
       return NextResponse.json(
         { error: e instanceof Error ? e.message : "Error al ajustar capital" },
@@ -135,19 +134,7 @@ export async function PUT(request: NextRequest) {
 
   try {
     const doc = await setCapitalInicial(db, apiUser.uid, monto);
-    return NextResponse.json({
-      ok: true,
-      capitalTotal: doc.capitalTotal,
-      cajaEmpresa: doc.cajaEmpresa,
-      capitalAsignadoAdmins: doc.capitalAsignadoAdmins,
-      monto: doc.capitalTotal,
-      updatedAt: doc.updatedAt.toISOString(),
-      historial: (doc.historial ?? []).slice(0, 6).map((h) => ({
-        montoAnterior: h.montoAnterior,
-        montoNuevo: h.montoNuevo,
-        at: h.at instanceof Date ? h.at.toISOString() : null,
-      })),
-    });
+    return NextResponse.json(await jsonDoc(doc));
   } catch (e) {
     return NextResponse.json(
       { error: e instanceof Error ? e.message : "Error al actualizar el capital" },
@@ -179,7 +166,7 @@ export async function PATCH(request: NextRequest) {
     .collection(EMPRESAS_COLLECTION)
     .doc(apiUser.uid)
     .collection(CAPITAL_SUBCOLLECTION)
-    .doc(CAPITAL_DOC_ID);
+    .doc(CAPITAL_CAJA_EMPRESA_DOC);
 
   await capitalRef.set({ historial: [] }, { merge: true });
 

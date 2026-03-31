@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { listUsersByCreator, createUser } from "@/lib/users";
 import type { UserProfile } from "@/types/roles";
+import PasswordCreateFields from "@/components/PasswordCreateFields";
 
 export default function JefeDashboard() {
   const { profile } = useAuth();
@@ -13,6 +14,7 @@ export default function JefeDashboard() {
   const [showForm, setShowForm] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [passwordConfirm, setPasswordConfirm] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [creating, setCreating] = useState(false);
 
@@ -36,6 +38,10 @@ export default function JefeDashboard() {
     e.preventDefault();
     if (!profile) return;
     setError(null);
+    if (password !== passwordConfirm) {
+      setError("Las contraseñas no coinciden.");
+      return;
+    }
     setCreating(true);
     try {
       await createUser({
@@ -47,6 +53,7 @@ export default function JefeDashboard() {
       });
       setEmail("");
       setPassword("");
+      setPasswordConfirm("");
       setDisplayName("");
       setShowForm(false);
       const list = await listUsersByCreator(profile.uid, "admin");
@@ -88,16 +95,15 @@ export default function JefeDashboard() {
                 required
               />
             </div>
-            <div className="form-group">
-              <label>Contraseña</label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                minLength={6}
-              />
-            </div>
+            <PasswordCreateFields
+              password={password}
+              passwordConfirm={passwordConfirm}
+              onPasswordChange={setPassword}
+              onPasswordConfirmChange={setPasswordConfirm}
+              disabled={creating}
+              passwordId="jefe-dash-admin-password"
+              confirmId="jefe-dash-admin-password-confirm"
+            />
             <div className="form-group">
               <label>Nombre (opcional)</label>
               <input

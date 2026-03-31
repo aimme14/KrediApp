@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { listUsersByCreator, createUser } from "@/lib/users";
 import type { UserProfile } from "@/types/roles";
+import PasswordCreateFields from "@/components/PasswordCreateFields";
 
 export default function AdminDashboard() {
   const { profile } = useAuth();
@@ -19,6 +20,7 @@ export default function AdminDashboard() {
   const [base, setBase] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [passwordConfirm, setPasswordConfirm] = useState("");
   const [creating, setCreating] = useState(false);
 
   useEffect(() => {
@@ -41,6 +43,10 @@ export default function AdminDashboard() {
     e.preventDefault();
     if (!profile) return;
     setError(null);
+    if (password !== passwordConfirm) {
+      setError("Las contraseñas no coinciden.");
+      return;
+    }
     setCreating(true);
     try {
       await createUser({
@@ -63,6 +69,7 @@ export default function AdminDashboard() {
       setBase("");
       setEmail("");
       setPassword("");
+      setPasswordConfirm("");
       setShowForm(false);
       const list = await listUsersByCreator(profile.uid, "trabajador");
       setTrabajadores(list);
@@ -162,17 +169,17 @@ export default function AdminDashboard() {
                 placeholder="Correo para iniciar sesión"
               />
             </div>
-            <div className="form-group">
-              <label>Contraseña (credencial de ingreso)</label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                minLength={6}
-                placeholder="Mínimo 6 caracteres"
-              />
-            </div>
+            <PasswordCreateFields
+              password={password}
+              passwordConfirm={passwordConfirm}
+              onPasswordChange={setPassword}
+              onPasswordConfirmChange={setPasswordConfirm}
+              disabled={creating}
+              passwordId="admin-trab-password"
+              confirmId="admin-trab-password-confirm"
+              passwordLabel="Contraseña (credencial de ingreso)"
+              confirmLabel="Confirmar contraseña"
+            />
             {error && <p className="error-msg">{error}</p>}
             <button type="submit" className="btn btn-primary" disabled={creating}>
               {creating ? "Creando..." : "Crear trabajador"}

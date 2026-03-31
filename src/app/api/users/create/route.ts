@@ -7,8 +7,12 @@ import {
   EMPRESAS_COLLECTION,
   USUARIOS_SUBCOLLECTION,
   USERS_COLLECTION,
+  RUTAS_SUBCOLLECTION,
 } from "@/lib/empresas-db";
 import { asignarCapitalAAdmin } from "@/lib/jefe-capital";
+import { persistAggregatedCapitalDocs } from "@/lib/capital-aggregates";
+import { parseMontoBase } from "@/lib/parse-monto-base";
+import { upsertCapitalRutaSnapshot } from "@/lib/capital-ruta-snapshot";
 
 /** Colección de contadores para códigos secuenciales (JF-001, AD-001 por jefe) */
 const COUNTERS_COLLECTION = "counters";
@@ -177,7 +181,13 @@ export async function POST(request: NextRequest) {
     if (jefeCodigo) usuarioEmpresaData.jefeCodigo = jefeCodigo;
     if (adminNum !== null) usuarioEmpresaData.adminNum = adminNum;
 
-    if (role === "admin" && typeof montoAsignado === "number" && montoAsignado > 0) {
+    const montoDesdeBase = parseMontoBase(base);
+    const montoParaAdmin =
+      typeof montoAsignado === "number" && montoAsignado > 0
+        ? montoAsignado
+        : montoDesdeBase ?? 0;
+
+    if (role === "admin" && montoParaAdmin > 0) {
       if (creatorRole !== "jefe") {
         return NextResponse.json(
           { error: "Solo el jefe puede asignar capital al crear un administrador" },
@@ -185,17 +195,25 @@ export async function POST(request: NextRequest) {
         );
       }
       try {
-        await asignarCapitalAAdmin(adminDb, createdByUid, montoAsignado);
+        await asignarCapitalAAdmin(adminDb, createdByUid, montoParaAdmin);
       } catch (e) {
         return NextResponse.json(
           { error: e instanceof Error ? e.message : "Error al asignar capital al administrador" },
           { status: 400 }
         );
       }
-      usuarioEmpresaData.cajaAdmin = montoAsignado;
+      usuarioEmpresaData.cajaAdmin = montoParaAdmin;
       usuarioEmpresaData.ultimaActualizacionCapital = now;
     } else if (role === "admin") {
       usuarioEmpresaData.cajaAdmin = 0;
+    }
+    if (rolFirestore === "empleado") {
+      if (montoDesdeBase && montoDesdeBase > 0) {
+        usuarioEmpresaData.cajaEmpleado = montoDesdeBase;
+        usuarioEmpresaData.ultimaActualizacionCapital = now;
+      } else {
+        usuarioEmpresaData.cajaEmpleado = 0;
+      }
     }
 
     await adminDb
@@ -204,6 +222,52 @@ export async function POST(request: NextRequest) {
       .collection(USUARIOS_SUBCOLLECTION)
       .doc(uid)
       .set(usuarioEmpresaData);
+
+    if (
+      rolFirestore === "empleado" &&
+      rutaId &&
+      montoDesdeBase &&
+      montoDesdeBase > 0
+    ) {
+      const rutaRef = adminDb
+        .collection(EMPRESAS_COLLECTION)
+        .doc(empresaId)
+        .collection(RUTAS_SUBCOLLECTION)
+        .doc(rutaId);
+      const rutaSnap = await rutaRef.get();
+      if (rutaSnap.exists) {
+        const rd = rutaSnap.data() as Record<string, unknown>;
+        const cajaRuta = typeof rd.cajaRuta === "number" ? rd.cajaRuta : 0;
+        const inversiones = typeof rd.inversiones === "number" ? rd.inversiones : 0;
+        const ganancias = typeof rd.ganancias === "number" ? rd.ganancias : 0;
+        const perdidas = typeof rd.perdidas === "number" ? rd.perdidas : 0;
+        const oldCajas =
+          typeof rd.cajasEmpleados === "number" ? rd.cajasEmpleados : 0;
+        const cajasEmpleados = oldCajas + montoDesdeBase;
+        const prevCapital =
+          typeof rd.capitalTotal === "number"
+            ? rd.capitalTotal
+            : cajaRuta + oldCajas + inversiones + ganancias - perdidas;
+        const capitalTotal = prevCapital + montoDesdeBase;
+        const merged = { ...rd, cajasEmpleados, capitalTotal, ultimaActualizacion: now };
+        await rutaRef.set(
+          { cajasEmpleados, capitalTotal, ultimaActualizacion: now },
+          { merge: true }
+        );
+        await upsertCapitalRutaSnapshot(adminDb, empresaId, rutaId, merged);
+      }
+    }
+
+    if (role === "admin" && montoParaAdmin > 0) {
+      await persistAggregatedCapitalDocs(adminDb, empresaId);
+    }
+    if (
+      rolFirestore === "empleado" &&
+      montoDesdeBase &&
+      montoDesdeBase > 0
+    ) {
+      await persistAggregatedCapitalDocs(adminDb, empresaId);
+    }
 
     // Índice de auth en /users/{uid}
     const userAuthData: Record<string, unknown> = {

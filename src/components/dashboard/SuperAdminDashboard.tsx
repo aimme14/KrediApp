@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { listAllJefes, setJefeEnabled, createUser } from "@/lib/users";
 import type { UserProfile } from "@/types/roles";
-import { roleLabel } from "@/types/roles";
+import PasswordCreateFields from "@/components/PasswordCreateFields";
 
 export default function SuperAdminDashboard() {
   const { profile } = useAuth();
@@ -14,6 +14,7 @@ export default function SuperAdminDashboard() {
   const [showForm, setShowForm] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [passwordConfirm, setPasswordConfirm] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [creating, setCreating] = useState(false);
 
@@ -61,6 +62,7 @@ export default function SuperAdminDashboard() {
       });
       setEmail("");
       setPassword("");
+      setPasswordConfirm("");
       setDisplayName("");
       setShowForm(false);
       const list = await listAllJefes();
@@ -102,16 +104,15 @@ export default function SuperAdminDashboard() {
                 required
               />
             </div>
-            <div className="form-group">
-              <label>Contraseña</label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                minLength={6}
-              />
-            </div>
+            <PasswordCreateFields
+              password={password}
+              passwordConfirm={passwordConfirm}
+              onPasswordChange={setPassword}
+              onPasswordConfirmChange={setPasswordConfirm}
+              disabled={creating}
+              passwordId="super-jefe-password"
+              confirmId="super-jefe-password-confirm"
+            />
             <div className="form-group">
               <label>Nombre (opcional)</label>
               <input

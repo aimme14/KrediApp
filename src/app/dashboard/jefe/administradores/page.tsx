@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { listUsersByCreator, createUser } from "@/lib/users";
 import type { UserProfile } from "@/types/roles";
+import PasswordCreateFields from "@/components/PasswordCreateFields";
 
 function IconSearch() {
   return (
@@ -60,7 +61,7 @@ export default function AdministradoresPage() {
     base: "",
     email: "",
     password: "",
-    montoAsignado: "",
+    passwordConfirm: "",
   });
 
   useEffect(() => {
@@ -86,9 +87,12 @@ export default function AdministradoresPage() {
     if (!profile) return;
     setError(null);
     setSuccess(false);
+    if (form.password !== form.passwordConfirm) {
+      setError("Las contraseñas no coinciden.");
+      return;
+    }
     setCreating(true);
     try {
-      const montoNum = form.montoAsignado.trim() ? parseFloat(form.montoAsignado.replace(",", ".")) : undefined;
       await createUser({
         email: form.email,
         password: form.password,
@@ -98,9 +102,8 @@ export default function AdministradoresPage() {
         cedula: form.cedula || undefined,
         lugar: form.lugar || undefined,
         base: form.base || undefined,
-        montoAsignado: typeof montoNum === "number" && !Number.isNaN(montoNum) && montoNum > 0 ? montoNum : undefined,
       });
-      setForm({ displayName: "", cedula: "", lugar: "", base: "", email: "", password: "", montoAsignado: "" });
+      setForm({ displayName: "", cedula: "", lugar: "", base: "", email: "", password: "", passwordConfirm: "" });
       setShowForm(false);
       const list = await listUsersByCreator(profile.uid, "admin");
       setAdmins(list);
@@ -203,6 +206,8 @@ export default function AdministradoresPage() {
                   autoComplete="off"
                 />
               </div>
+            </div>
+            <div className="admin-jefe-form-credentials">
               <div className="form-group">
                 <label htmlFor="admin-email" className="admin-jefe-label">CORREO *</label>
                 <input
@@ -217,34 +222,18 @@ export default function AdministradoresPage() {
                   aria-required="true"
                 />
               </div>
-              <div className="form-group">
-                <label htmlFor="admin-montoAsignado" className="admin-jefe-label">CAPITAL A ASIGNAR (OPCIONAL)</label>
-                <input
-                  id="admin-montoAsignado"
-                  type="text"
-                  inputMode="decimal"
-                  value={form.montoAsignado}
-                  onChange={(e) => setForm((f) => ({ ...f, montoAsignado: e.target.value }))}
-                  placeholder="Ej: 5000000 (sale de caja empresa)"
-                  className="admin-jefe-input"
-                />
-                <span className="admin-jefe-hint">Si ingresas un monto, se descontará de tu caja empresa y quedará como capital del administrador.</span>
-              </div>
-              <div className="form-group">
-                <label htmlFor="admin-password" className="admin-jefe-label">CONTRASEÑA *</label>
-                <input
-                  id="admin-password"
-                  type="password"
-                  value={form.password}
-                  onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
-                  required
-                  minLength={6}
-                  placeholder="Mínimo 6 caracteres"
-                  className="admin-jefe-input"
-                  autoComplete="new-password"
-                  aria-required="true"
-                />
-              </div>
+              <PasswordCreateFields
+                password={form.password}
+                passwordConfirm={form.passwordConfirm}
+                onPasswordChange={(v) => setForm((f) => ({ ...f, password: v }))}
+                onPasswordConfirmChange={(v) => setForm((f) => ({ ...f, passwordConfirm: v }))}
+                disabled={creating}
+                inputClassName="admin-jefe-input"
+                passwordId="admin-password"
+                confirmId="admin-password-confirm"
+                passwordLabel="CONTRASEÑA *"
+                confirmLabel="CONFIRMAR CONTRASEÑA *"
+              />
             </div>
             {error && (
               <div className="admin-jefe-msg admin-jefe-msg-error" role="alert">

@@ -18,6 +18,7 @@ import {
   USUARIOS_SUBCOLLECTION,
   USERS_COLLECTION,
 } from "@/lib/empresas-db";
+import { syncCapitalRutaSnapshotClient } from "@/services/capitalRutaSnapshotClient";
 import type { RutaFinanciera } from "@/types/finanzas";
 
 type RutaDocData = Omit<RutaFinanciera, "id">;
@@ -130,6 +131,8 @@ export async function crearRuta(
       data.capitalTotal
     );
   });
+
+  await syncCapitalRutaSnapshotClient(empresaId, ref.id);
 
   console.log("[CAJA OK][crearRuta]", {
     cajaRuta,
@@ -280,6 +283,8 @@ export async function registrarPrestamo(
       ultimaActualizacion: Timestamp.now(),
     });
   });
+
+  await syncCapitalRutaSnapshotClient(empresaId, rutaId);
 }
 
 /**
@@ -348,5 +353,7 @@ export async function marcarIncobrable(
       ultimaActualizacion: Timestamp.now(),
     });
   });
+
+  await syncCapitalRutaSnapshotClient(empresaId, rutaId);
 }
 

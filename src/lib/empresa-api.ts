@@ -89,6 +89,8 @@ export type GastoItem = {
   adminId: string;
   empleadoId: string;
   evidencia: string;
+  /** empresa | admin | ruta (según subcolección / legacy) */
+  alcance?: string;
 };
 
 /** Item de la subcolección pagos de un préstamo (historial de cobros / no pago). */
@@ -296,6 +298,41 @@ export async function getCajaAdmin(token: string): Promise<number> {
   return typeof data.cajaAdmin === "number" ? data.cajaAdmin : 0;
 }
 
+/** Transfiere monto de la caja del admin a la caja de una ruta (solo rutas propias). */
+export async function invertirEnCajaRuta(
+  token: string,
+  params: { rutaId: string; monto: number }
+): Promise<{ cajaAdmin: number; cajaRuta: number; capitalTotal: number }> {
+  const res = await fetchWithAuth("/api/empresa/invertir-caja-ruta", token, {
+    method: "POST",
+    body: JSON.stringify(params),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error ?? "Error al invertir en la ruta");
+  return {
+    cajaAdmin: typeof data.cajaAdmin === "number" ? data.cajaAdmin : 0,
+    cajaRuta: typeof data.cajaRuta === "number" ? data.cajaRuta : 0,
+    capitalTotal: typeof data.capitalTotal === "number" ? data.capitalTotal : 0,
+  };
+}
+
+export type InversionCajaRutaItem = {
+  id: string;
+  rutaId: string;
+  rutaNombre: string;
+  monto: number;
+  fecha: string | null;
+  invertidoPorUid: string;
+  invertidoPorNombre: string;
+};
+
+export async function listInversionesCajaRuta(token: string): Promise<InversionCajaRutaItem[]> {
+  const res = await fetchWithAuth("/api/empresa/inversiones-caja-ruta", token);
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error ?? "Error al cargar historial de inversiones");
+  return Array.isArray(data.items) ? data.items : [];
+}
+
 export type ResumenRutaItem = {
   rutaId: string;
   nombre: string;
@@ -311,20 +348,30 @@ export type ResumenRutaItem = {
   ganancias: number;
   perdidas: number;
   utilidad: number;
+  capitalRuta: number;
+  adminId: string;
 };
 
 export type ResumenEconomicoResponse = {
   rutas: ResumenRutaItem[];
   utilidadGlobal: number;
+  /** Capital del administrador (solo role admin; en otros roles suele ser 0). */
+  capitalAdmin: number;
 };
 
 export async function getResumenEconomico(token: string): Promise<ResumenEconomicoResponse> {
   const res = await fetchWithAuth("/api/empresa/resumen", token);
   const data = await res.json();
   if (!res.ok) throw new Error(data.error ?? "Error al cargar resumen");
+  const rutas: ResumenRutaItem[] = (data.rutas ?? []).map((r: ResumenRutaItem) => ({
+    ...r,
+    capitalRuta: typeof r.capitalRuta === "number" ? r.capitalRuta : 0,
+    adminId: typeof r.adminId === "string" ? r.adminId : "",
+  }));
   return {
-    rutas: data.rutas ?? [],
+    rutas,
     utilidadGlobal: typeof data.utilidadGlobal === "number" ? data.utilidadGlobal : 0,
+    capitalAdmin: typeof data.capitalAdmin === "number" ? data.capitalAdmin : 0,
   };
 }
 
@@ -336,6 +383,9 @@ export async function createGasto(
     fecha?: string;
     tipo?: "transporte" | "alimentacion" | "otro";
     evidencia?: string;
+    /** Solo administrador: gasto de una ruta o gasto personal/administrativo */
+    alcance?: "ruta" | "admin";
+    rutaId?: string;
   }
 ): Promise<string> {
   const res = await fetchWithAuth("/api/empresa/gastos", token, {
@@ -402,6 +452,8 @@ export type CierreMensualDetalle = {
   fechaCierre: string | null;
   rutas: CierreRutaSnapshot[];
   cajaEmpresa?: number;
+  gastosEmpresa?: number;
+  capitalEmpresa?: number;
   capitalAsignadoAdmins?: number;
   utilidadGlobal?: number;
 };

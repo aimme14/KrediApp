@@ -10,7 +10,7 @@ export interface EmpresaProfile {
   dueñoUid?: string;
 }
 
-/** Capital de empresa: subcolección empresas/{jefeUid}/capital/actual. Solo lo ve y gestiona el jefe. */
+/** Capital de empresa: empresas/{jefeUid}/capital/cajaEmpresa y agregados (cajaAdmin, cajaEmpleado, capital/root/rutas). */
 export interface CapitalEmpresa {
   monto: number;
   jefeUid: string;

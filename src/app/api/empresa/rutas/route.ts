@@ -3,6 +3,7 @@ import { getAdminFirestore } from "@/lib/firebase-admin";
 import { getApiUser } from "@/lib/api-auth";
 import { EMPRESAS_COLLECTION, RUTAS_SUBCOLLECTION, USERS_COLLECTION } from "@/lib/empresas-db";
 import { descontarCajaAdmin } from "@/lib/admin-capital";
+import { upsertCapitalRutaSnapshot } from "@/lib/capital-ruta-snapshot";
 
 const COUNTERS_COLLECTION = "counters";
 
@@ -128,6 +129,17 @@ export async function POST(request: NextRequest) {
     gastos: 0,
     perdidas: 0,
     ultimaActualizacion: now,
+  });
+
+  await upsertCapitalRutaSnapshot(db, apiUser.empresaId, ref.id, {
+    nombre: nombre.trim(),
+    adminId: apiUser.uid,
+    cajaRuta: capitalInicial,
+    cajasEmpleados: 0,
+    inversiones: 0,
+    capitalTotal: capitalInicial,
+    ganancias: 0,
+    perdidas: 0,
   });
 
   return NextResponse.json({ id: ref.id });

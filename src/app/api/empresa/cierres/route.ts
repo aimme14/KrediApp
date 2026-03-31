@@ -4,11 +4,16 @@ import { getApiUser } from "@/lib/api-auth";
 import {
   EMPRESAS_COLLECTION,
   RUTAS_SUBCOLLECTION,
-  GASTOS_SUBCOLLECTION,
   CIERRES_MENSUALES_SUBCOLLECTION,
   CAPITAL_SUBCOLLECTION,
-  CAPITAL_DOC_ID,
+  CAPITAL_CAJA_EMPRESA_DOC,
 } from "@/lib/empresas-db";
+import { computeCapitalEmpresa } from "@/lib/capital-formulas";
+import { computeSumaCapitalAdminsDetalle } from "@/lib/capital-aggregates";
+import {
+  listarGastosConRutaParaEmpresa,
+  sumGastosEmpresaCollection,
+} from "@/lib/gastos-totals";
 
 function getPeriodoFromDate(d: Date): string {
   const y = d.getFullYear();
@@ -43,6 +48,8 @@ export async function GET(request: NextRequest) {
       fechaCierre: data.fechaCierre?.toDate?.()?.toISOString?.() ?? null,
       rutas: data.rutas ?? [],
       cajaEmpresa: data.cajaEmpresa,
+      gastosEmpresa: data.gastosEmpresa,
+      capitalEmpresa: data.capitalEmpresa,
       capitalAsignadoAdmins: data.capitalAsignadoAdmins,
       utilidadGlobal: data.utilidadGlobal,
     });
@@ -98,17 +105,12 @@ export async function POST(request: NextRequest) {
   }
 
   const rutasSnap = await empresaRef.collection(RUTAS_SUBCOLLECTION).get();
-  const gastosSnap = await empresaRef
-    .collection(GASTOS_SUBCOLLECTION)
-    .get();
 
+  const gastosConRuta = await listarGastosConRutaParaEmpresa(db, apiUser.empresaId);
   const gastosByRuta: Record<string, number> = {};
-  gastosSnap.docs.forEach((d) => {
-    const data = d.data();
-    const rutaId = (data.rutaId as string) ?? "";
-    const monto = (data.monto as number) ?? 0;
-    gastosByRuta[rutaId] = (gastosByRuta[rutaId] ?? 0) + monto;
-  });
+  for (const g of gastosConRuta) {
+    gastosByRuta[g.rutaId] = (gastosByRuta[g.rutaId] ?? 0) + g.monto;
+  }
 
   const rutas: Array<{
     rutaId: string;
@@ -158,16 +160,26 @@ export async function POST(request: NextRequest) {
 
   let cajaEmpresa: number | undefined;
   let capitalAsignadoAdmins: number | undefined;
+  let capitalEmpresa: number | undefined;
+  let gastosEmpresa: number | undefined;
 
   if (apiUser.role === "jefe") {
     const capitalSnap = await empresaRef
       .collection(CAPITAL_SUBCOLLECTION)
-      .doc(CAPITAL_DOC_ID)
+      .doc(CAPITAL_CAJA_EMPRESA_DOC)
       .get();
     if (capitalSnap.exists) {
       const cap = capitalSnap.data()!;
       cajaEmpresa = typeof cap.cajaEmpresa === "number" ? cap.cajaEmpresa : undefined;
-      capitalAsignadoAdmins = typeof cap.capitalAsignadoAdmins === "number" ? cap.capitalAsignadoAdmins : undefined;
+    }
+    gastosEmpresa = await sumGastosEmpresaCollection(db, apiUser.empresaId);
+    const { sumaCapitalAdmins } = await computeSumaCapitalAdminsDetalle(
+      db,
+      apiUser.empresaId
+    );
+    capitalAsignadoAdmins = sumaCapitalAdmins;
+    if (cajaEmpresa !== undefined) {
+      capitalEmpresa = computeCapitalEmpresa(cajaEmpresa, sumaCapitalAdmins);
     }
   }
 
@@ -177,6 +189,8 @@ export async function POST(request: NextRequest) {
     fechaCierre: now,
     rutas,
     cajaEmpresa,
+    gastosEmpresa,
+    capitalEmpresa,
     capitalAsignadoAdmins,
     utilidadGlobal,
   });

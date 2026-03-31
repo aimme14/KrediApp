@@ -11,8 +11,12 @@ export interface CapitalHistorialEntry {
 
 export interface CapitalResponse {
   monto: number;
+  /** Resultado: cajaEmpresa + suma(capital admin) − gastos empresa */
+  capitalEmpresa: number;
   capitalTotal: number;
   cajaEmpresa: number;
+  gastosEmpresa: number;
+  sumaCapitalAdmins: number;
   capitalAsignadoAdmins: number;
   updatedAt: string | null;
   historial: CapitalHistorialEntry[];
@@ -20,11 +24,29 @@ export interface CapitalResponse {
 
 function toCapitalResponse(json: Record<string, unknown>): CapitalResponse {
   const monto = typeof json.monto === "number" ? json.monto : 0;
+  const capitalTotal =
+    typeof json.capitalTotal === "number"
+      ? json.capitalTotal
+      : typeof json.capitalEmpresa === "number"
+        ? json.capitalEmpresa
+        : monto;
+  const capitalEmpresa =
+    typeof json.capitalEmpresa === "number" ? json.capitalEmpresa : capitalTotal;
   return {
     monto,
-    capitalTotal: typeof json.capitalTotal === "number" ? json.capitalTotal : monto,
-    cajaEmpresa: typeof json.cajaEmpresa === "number" ? json.cajaEmpresa : monto,
-    capitalAsignadoAdmins: typeof json.capitalAsignadoAdmins === "number" ? json.capitalAsignadoAdmins : 0,
+    capitalEmpresa,
+    capitalTotal,
+    cajaEmpresa:
+      typeof json.cajaEmpresa === "number" ? json.cajaEmpresa : monto,
+    gastosEmpresa: typeof json.gastosEmpresa === "number" ? json.gastosEmpresa : 0,
+    sumaCapitalAdmins:
+      typeof json.sumaCapitalAdmins === "number" ? json.sumaCapitalAdmins : 0,
+    capitalAsignadoAdmins:
+      typeof json.capitalAsignadoAdmins === "number"
+        ? json.capitalAsignadoAdmins
+        : typeof json.sumaCapitalAdmins === "number"
+          ? json.sumaCapitalAdmins
+          : 0,
     updatedAt: (json.updatedAt as string) ?? null,
     historial: Array.isArray(json.historial) ? (json.historial as CapitalHistorialEntry[]) : [],
   };
@@ -122,6 +144,30 @@ export async function registrarSalidaCapital(
   if (!res.ok) {
     throw new Error(
       extractApiErrorMessage(json, "Error al registrar salida")
+    );
+  }
+  return { ...toCapitalResponse(json), ok: (json as { ok?: unknown }).ok === true };
+}
+
+export type InvertirDestinoBody = {
+  destino: "empresa" | "admin";
+  monto: number;
+  adminUid?: string;
+};
+
+export async function invertirCajaJefe(
+  token: string,
+  body: InvertirDestinoBody
+): Promise<CapitalResponse & { ok: boolean }> {
+  const res = await fetch("/api/jefe/invertir", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    body: JSON.stringify(body),
+  });
+  const json = await parseJsonResponse<Record<string, unknown>>(res);
+  if (!res.ok) {
+    throw new Error(
+      extractApiErrorMessage(json, "Error al invertir")
     );
   }
   return { ...toCapitalResponse(json), ok: (json as { ok?: unknown }).ok === true };

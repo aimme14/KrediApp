@@ -5,6 +5,7 @@ import { useAuth } from "@/context/AuthContext";
 import { listUsersByCreator, createUser } from "@/lib/users";
 import { listRutas, type RutaItem } from "@/lib/empresa-api";
 import type { UserProfile } from "@/types/roles";
+import PasswordCreateFields from "@/components/PasswordCreateFields";
 
 export default function EmpleadoPage() {
   const { user, profile } = useAuth();
@@ -21,6 +22,7 @@ export default function EmpleadoPage() {
   const [rutaId, setRutaId] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [passwordConfirm, setPasswordConfirm] = useState("");
   const [creating, setCreating] = useState(false);
 
   useEffect(() => {
@@ -50,11 +52,15 @@ export default function EmpleadoPage() {
     e.preventDefault();
     if (!profile) return;
     setError(null);
-    setCreating(true);
     if (!rutaId.trim()) {
       setError("Debes seleccionar una ruta para el empleado");
       return;
     }
+    if (password !== passwordConfirm) {
+      setError("Las contraseñas no coinciden.");
+      return;
+    }
+    setCreating(true);
     try {
       await createUser({
         email,
@@ -77,6 +83,7 @@ export default function EmpleadoPage() {
       setRutaId("");
       setEmail("");
       setPassword("");
+      setPasswordConfirm("");
       setShowForm(false);
       const list = await listUsersByCreator(profile.uid, "trabajador");
       setTrabajadores(list);
@@ -185,17 +192,17 @@ export default function EmpleadoPage() {
                 placeholder="Correo para iniciar sesión"
               />
             </div>
-            <div className="form-group">
-              <label>Contraseña (credencial de ingreso)</label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                minLength={6}
-                placeholder="Mínimo 6 caracteres"
-              />
-            </div>
+            <PasswordCreateFields
+              password={password}
+              passwordConfirm={passwordConfirm}
+              onPasswordChange={setPassword}
+              onPasswordConfirmChange={setPasswordConfirm}
+              disabled={creating}
+              passwordId="admin-emp-password"
+              confirmId="admin-emp-password-confirm"
+              passwordLabel="Contraseña (credencial de ingreso)"
+              confirmLabel="Confirmar contraseña"
+            />
             {error && <p className="error-msg">{error}</p>}
             <button type="submit" className="btn btn-primary" disabled={creating}>
               {creating ? "Creando..." : "Crear empleado"}

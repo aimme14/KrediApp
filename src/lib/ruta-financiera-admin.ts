@@ -5,6 +5,7 @@
 
 import type { Firestore } from "firebase-admin/firestore";
 import { EMPRESAS_COLLECTION, RUTAS_SUBCOLLECTION } from "@/lib/empresas-db";
+import { upsertCapitalRutaSnapshot } from "@/lib/capital-ruta-snapshot";
 
 /**
  * Impacta la ruta por un nuevo préstamo: cajaRuta -= monto, inversiones += monto.
@@ -51,4 +52,9 @@ export async function registrarPrestamoEnRuta(
     inversiones,
     ultimaActualizacion: new Date(),
   });
+
+  const after = await rutaRef.get();
+  if (after.exists) {
+    await upsertCapitalRutaSnapshot(db, empresaId, rutaId, after.data()!);
+  }
 }

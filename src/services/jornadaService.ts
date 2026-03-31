@@ -18,6 +18,7 @@ import {
   EMPRESAS_COLLECTION,
   RUTAS_SUBCOLLECTION,
 } from "@/lib/empresas-db";
+import { syncCapitalRutaSnapshotClient } from "@/services/capitalRutaSnapshotClient";
 import type { Jornada, Movimiento, TipoMovimiento } from "@/types/finanzas";
 
 function ensureDb(): Firestore {
@@ -169,6 +170,8 @@ export async function iniciarJornada(
     });
   });
 
+  await syncCapitalRutaSnapshotClient(empresaId, rutaId);
+
   return jornadaRef.id;
 }
 
@@ -260,6 +263,8 @@ export async function registrarGasto(
       ultimaActualizacion: now,
     });
   });
+
+  await syncCapitalRutaSnapshotClient(empresaId, rutaId);
 }
 
 // ── Registrar cobro en jornada ──────────────────────────────────────────────
@@ -361,6 +366,8 @@ export async function registrarCobroEnJornada(
       ultimaActualizacion: now,
     });
   });
+
+  await syncCapitalRutaSnapshotClient(empresaId, rutaId);
 }
 
 // ── Otros helpers de jornada ────────────────────────────────────────────────
@@ -491,6 +498,8 @@ export async function cerrarJornada(
       ultimaActualizacion: now,
     });
   });
+
+  await syncCapitalRutaSnapshotClient(empresaId, rutaId);
 }
 
 export async function getJornadaActiva(

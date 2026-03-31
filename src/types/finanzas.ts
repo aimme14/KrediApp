@@ -6,11 +6,11 @@ import type { Timestamp } from "firebase/firestore";
  */
 
 // ── Capital empresa (Jefe) ───────────
-/** Documento empresas/{jefeUid}/capital/actual. Invariante: capitalTotal = cajaEmpresa + capitalAsignadoAdmins */
+/** Documento empresas/{jefeUid}/capital/cajaEmpresa. capitalEmpresa = cajaEmpresa + Σ(capitalAdmin) − gastosEmpresa */
 export interface CapitalEmpresa {
-  capitalTotal: number;
+  capitalEmpresa: number;
   cajaEmpresa: number;
-  capitalAsignadoAdmins: number;
+  gastosEmpresa: number;
   jefeUid: string;
   updatedAt: Timestamp;
   historial?: CapitalHistorialEntry[];
@@ -50,6 +50,9 @@ export interface CierreMensual {
   fechaCierre: Timestamp;
   rutas: CierreRutaSnapshot[];
   cajaEmpresa?: number;
+  gastosEmpresa?: number;
+  capitalEmpresa?: number;
+  /** Suma de capitalAdmin de todos los administradores */
   capitalAsignadoAdmins?: number;
   utilidadGlobal?: number;
 }
