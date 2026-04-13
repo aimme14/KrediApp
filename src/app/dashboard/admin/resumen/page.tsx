@@ -225,8 +225,8 @@ export default function ResumenPage() {
               <thead>
                 <tr>
                   <th>Ruta</th>
-                  <th className="col-num">Caja ruta</th>
-                  <th className="col-num">Cajas empleados</th>
+                  <th className="col-num">Base ruta</th>
+                  <th className="col-num">Bases empleados</th>
                   <th className="col-num">Inversiones</th>
                   <th className="col-num">Ganancias</th>
                   <th className="col-num">Pérdidas</th>

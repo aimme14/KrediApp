@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { collection, doc, onSnapshot, query, where, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/context/AuthContext";
+import { computeCapitalTotalRutaDesdeSaldos } from "@/lib/capital-formulas";
 import { EMPRESAS_COLLECTION, RUTAS_SUBCOLLECTION } from "@/lib/empresas-db";
 import type { RutaFinanciera } from "@/types/finanzas";
 
@@ -93,7 +94,15 @@ export function useRuta(): UseRutaState {
             const cajaRuta = data.cajaRuta ?? 0;
             const cajasEmpleados = data.cajasEmpleados ?? 0;
             const inversiones = data.inversiones ?? 0;
-            const capitalTotal = data.capitalTotal ?? cajaRuta + cajasEmpleados + inversiones;
+            const perdidas = data.perdidas ?? 0;
+            const capitalTotal =
+              data.capitalTotal ??
+              computeCapitalTotalRutaDesdeSaldos({
+                cajaRuta,
+                cajasEmpleados,
+                inversiones,
+                perdidas,
+              });
 
             setState({
               ruta: {

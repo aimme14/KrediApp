@@ -8,6 +8,7 @@ import { useDashboardHeaderSlot } from "@/context/DashboardHeaderContext";
 
 const NAV_ITEMS = [
   { href: "/dashboard/admin", label: "Inicio", icon: "home" },
+  { href: "/dashboard/admin/ruta-del-dia", label: "Ruta del día", icon: "ruta-dia" },
   { href: "/dashboard/admin/rutas", label: "Rutas", icon: "route" },
   { href: "/dashboard/admin/empleado", label: "Empleado", icon: "user" },
   { href: "/dashboard/admin/cliente", label: "Cliente", icon: "client" },
@@ -15,6 +16,7 @@ const NAV_ITEMS = [
   { href: "/dashboard/admin/gastos", label: "Gastos operativos", icon: "expense" },
   { href: "/dashboard/admin/gestion-financiera", label: "Gestión financiera", icon: "wallet" },
   { href: "/dashboard/admin/resumen", label: "Resumen Económico", icon: "chart" },
+  { href: "/dashboard/admin/reportes-dia", label: "Reportes del día", icon: "report" },
   { href: "/dashboard/admin/permisos", label: "Permisos", icon: "lock" },
   { href: "/dashboard/admin/cliente-moroso", label: "Cliente moroso", icon: "alert" },
 ] as const;
@@ -27,6 +29,13 @@ function NavIcon({ name }: { name: string }) {
         <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
           <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
           <polyline points="9 22 9 12 15 12 15 22" />
+        </svg>
+      );
+    case "ruta-dia":
+      return (
+        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+          <circle cx="12" cy="12" r="4" />
+          <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
         </svg>
       );
     case "route":
@@ -78,6 +87,16 @@ function NavIcon({ name }: { name: string }) {
           <line x1="18" y1="20" x2="18" y2="10" />
           <line x1="12" y1="20" x2="12" y2="4" />
           <line x1="6" y1="20" x2="6" y2="14" />
+        </svg>
+      );
+    case "report":
+      return (
+        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+          <polyline points="14 2 14 8 20 8" />
+          <line x1="16" y1="13" x2="8" y2="13" />
+          <line x1="16" y1="17" x2="8" y2="17" />
+          <line x1="10" y1="9" x2="8" y2="9" />
         </svg>
       );
     case "wallet":

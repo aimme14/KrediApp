@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
     if (apiUser.role !== "admin") {
-      return NextResponse.json({ error: "Solo el admin puede ver la caja" }, { status: 403 });
+      return NextResponse.json({ error: "Solo el admin puede ver la base" }, { status: 403 });
     }
 
     const db = getAdminFirestore();
@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ cajaAdmin });
   } catch (e) {
     return NextResponse.json(
-      { error: e instanceof Error ? e.message : "Error al obtener caja del administrador" },
+      { error: e instanceof Error ? e.message : "Error al obtener base del administrador" },
       { status: 500 }
     );
   }

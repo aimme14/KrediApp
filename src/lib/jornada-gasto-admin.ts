@@ -11,19 +11,26 @@ import {
   MOVIMIENTOS_SUBCOLLECTION,
   RUTAS_SUBCOLLECTION,
 } from "@/lib/empresas-db";
+import { computeCapitalTotalRutaDesdeSaldos } from "@/lib/capital-formulas";
 import { upsertCapitalRutaSnapshot } from "@/lib/capital-ruta-snapshot";
 
 function assertCapitalRuta(
   cajaRuta: number,
   cajasEmpleados: number,
   inversiones: number,
+  perdidas: number,
   capitalTotal: number
 ) {
-  if (cajaRuta < 0) throw new Error("Saldo insuficiente en cajaRuta");
-  if (cajasEmpleados < 0) throw new Error("Saldo insuficiente en cajaEmpleado");
+  if (cajaRuta < 0) throw new Error("Saldo insuficiente en la base de la ruta");
+  if (cajasEmpleados < 0) throw new Error("Saldo insuficiente en base del empleado");
   if (inversiones < 0) throw new Error("Saldo de inversiones negativo");
-  const suma = cajaRuta + cajasEmpleados + inversiones;
-  if (suma !== capitalTotal) {
+  const esperado = computeCapitalTotalRutaDesdeSaldos({
+    cajaRuta,
+    cajasEmpleados,
+    inversiones,
+    perdidas,
+  });
+  if (Math.abs(esperado - capitalTotal) > 0.02) {
     throw new Error("Capital descuadrado — revisar operación");
   }
 }
@@ -99,7 +106,7 @@ export async function registrarGastoJornadaDesdeApi(
     let gastosDelDia = (jornada.gastosDelDia as number) ?? 0;
 
     if (cajaActual < monto) {
-      throw new Error("Saldo insuficiente en caja del empleado");
+      throw new Error("Saldo insuficiente en base del empleado");
     }
 
     cajaActual -= monto;
@@ -110,14 +117,19 @@ export async function registrarGastoJornadaDesdeApi(
     const ruta = rutaSnap.data() as Record<string, unknown>;
 
     const cajaRuta = (ruta.cajaRuta as number) ?? 0;
-    const cajasEmpleados = (ruta.cajasEmpleados as number) ?? 0;
+    let cajasEmpleados = (ruta.cajasEmpleados as number) ?? 0;
     const inversiones = (ruta.inversiones as number) ?? 0;
-    let capitalTotal =
-      (ruta.capitalTotal as number) ?? cajaRuta + cajasEmpleados + inversiones;
+    const perdidas = (ruta.perdidas as number) ?? 0;
 
-    capitalTotal -= monto;
+    cajasEmpleados -= monto;
+    const capitalTotal = computeCapitalTotalRutaDesdeSaldos({
+      cajaRuta,
+      cajasEmpleados,
+      inversiones,
+      perdidas,
+    });
 
-    assertCapitalRuta(cajaRuta, cajasEmpleados, inversiones, capitalTotal);
+    assertCapitalRuta(cajaRuta, cajasEmpleados, inversiones, perdidas, capitalTotal);
 
     const now = Timestamp.now();
 
@@ -135,6 +147,7 @@ export async function registrarGastoJornadaDesdeApi(
     });
 
     tx.update(rutaRef, {
+      cajasEmpleados,
       gastos: ((ruta.gastos as number) ?? 0) + monto,
       capitalTotal,
       ultimaActualizacion: now,

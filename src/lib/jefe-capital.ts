@@ -177,7 +177,7 @@ export async function ajustarCapital(
   const newCaja = current.cajaEmpresa + delta;
   if (newCaja < 0) {
     throw new Error(
-      "Saldo insuficiente en caja empresa. No se puede restar más de lo disponible."
+      "Saldo insuficiente en base empresa. No se puede restar más de lo disponible."
     );
   }
 
@@ -220,7 +220,7 @@ export async function registrarSalida(
   const current = await getCapitalEmpresa(db, jefeUid);
   if (current.cajaEmpresa < monto) {
     throw new Error(
-      "Saldo insuficiente en caja empresa para esta salida"
+      "Saldo insuficiente en base empresa para esta salida"
     );
   }
 
@@ -240,7 +240,7 @@ export async function asignarCapitalAAdmin(
   if (monto <= 0) throw new Error("El monto a asignar debe ser mayor a 0");
   const current = await getCapitalEmpresa(db, jefeUid);
   if (current.cajaEmpresa < monto) {
-    throw new Error("Saldo insuficiente en caja empresa para asignar al administrador");
+    throw new Error("Saldo insuficiente en base empresa para asignar al administrador");
   }
 
   const ref = cajaEmpresaRef(db, jefeUid);
@@ -296,7 +296,7 @@ export async function invertirCajaEmpresaEnAdministrador(
     const cajaEmpresaRaw =
       typeof empData?.cajaEmpresa === "number" ? empData.cajaEmpresa : 0;
     if (cajaEmpresaRaw < monto) {
-      throw new Error("Saldo insuficiente en caja empresa");
+      throw new Error("Saldo insuficiente en base empresa");
     }
 
     const cajaAdmin =
@@ -335,7 +335,7 @@ export async function descontarCajaEmpresa(
   if (monto <= 0) throw new Error("El monto del gasto debe ser mayor a 0");
   const current = await getCapitalEmpresa(db, jefeUid);
   if (current.cajaEmpresa < monto) {
-    throw new Error("Saldo insuficiente en caja empresa para este gasto");
+    throw new Error("Saldo insuficiente en base empresa para este gasto");
   }
   const ref = cajaEmpresaRef(db, jefeUid);
   const nuevaCaja = current.cajaEmpresa - monto;

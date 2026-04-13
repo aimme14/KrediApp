@@ -248,7 +248,7 @@ export async function POST(request: NextRequest) {
             error:
               e instanceof Error
                 ? e.message
-                : "Saldo insuficiente en caja de la empresa",
+                : "Saldo insuficiente en base de la empresa",
           },
           { status: 400 }
         );
@@ -318,7 +318,7 @@ export async function POST(request: NextRequest) {
             error:
               e instanceof Error
                 ? e.message
-                : "Saldo insuficiente en caja del administrador",
+                : "Saldo insuficiente en base del administrador",
           },
           { status: 400 }
         );
@@ -367,7 +367,7 @@ export async function POST(request: NextRequest) {
             error:
               e instanceof Error
                 ? e.message
-                : "No se pudo registrar el gasto contra la caja del empleado",
+                : "No se pudo registrar el gasto contra la base del empleado",
           },
           { status: 400 }
         );
@@ -387,7 +387,7 @@ export async function POST(request: NextRequest) {
             error:
               e instanceof Error
                 ? e.message
-                : "Saldo insuficiente en la caja del empleado",
+                : "Saldo insuficiente en la base del empleado",
           },
           { status: 400 }
         );

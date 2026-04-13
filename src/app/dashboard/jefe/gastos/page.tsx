@@ -286,7 +286,7 @@ export default function GastosPage() {
     <div className="card">
       <h2 style={{ marginTop: 0 }}>Gastos operativos</h2>
       <p style={{ color: "var(--text-muted)", marginTop: "-0.25rem", marginBottom: "1rem" }}>
-        Los montos se descuentan de la caja de la empresa.
+        Los montos se descuentan de la base de la empresa.
       </p>
 
       {showForm && (

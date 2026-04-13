@@ -3,8 +3,17 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
+import { getCapital, type CapitalResponse } from "@/lib/capital";
 import { getEmpresa } from "@/lib/empresa";
 import type { EmpresaProfile } from "@/types/empresa";
+
+function formatMoneda(value: number): string {
+  const hasDecimals = Math.round(value * 100) % 100 !== 0;
+  return `$ ${value.toLocaleString("es-CO", {
+    minimumFractionDigits: hasDecimals ? 2 : 0,
+    maximumFractionDigits: 2,
+  })}`;
+}
 
 /** Separa el nombre para mostrar: primera palabra con gradiente, resto en blanco. */
 function splitNombreParaGradiente(nombre: string): { conGradiente: string; resto: string } {
@@ -47,22 +56,47 @@ function IconImagePlaceholder() {
 }
 
 export default function InicioJefePage() {
-  const { profile } = useAuth();
+  const { user, profile } = useAuth();
   const [loading, setLoading] = useState(true);
   const [empresa, setEmpresa] = useState<EmpresaProfile | null>(null);
+  const [capital, setCapital] = useState<CapitalResponse | null>(null);
+  const [finanzasError, setFinanzasError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!profile || profile.role !== "jefe") return;
+    if (!profile || profile.role !== "jefe" || !user) return;
     let cancelled = false;
-    getEmpresa(profile.uid)
-      .then((data) => {
-        if (!cancelled && data) setEmpresa(data);
-      })
-      .finally(() => {
+
+    (async () => {
+      setLoading(true);
+      setFinanzasError(null);
+      try {
+        const token = await user.getIdToken();
+        const [empresaResult, capitalResult] = await Promise.allSettled([
+          getEmpresa(profile.uid),
+          getCapital(token),
+        ]);
+        if (cancelled) return;
+        if (empresaResult.status === "fulfilled" && empresaResult.value) {
+          setEmpresa(empresaResult.value);
+        }
+        if (capitalResult.status === "fulfilled") {
+          setCapital(capitalResult.value);
+        } else {
+          const reason = capitalResult.reason;
+          setCapital(null);
+          setFinanzasError(
+            reason instanceof Error ? reason.message : "No se pudo cargar base y capital"
+          );
+        }
+      } finally {
         if (!cancelled) setLoading(false);
-      });
-    return () => { cancelled = true; };
-  }, [profile]);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [profile, user]);
 
   if (loading) {
     return (
@@ -72,6 +106,10 @@ export default function InicioJefePage() {
           <div className="jefe-inicio-skeleton-logo" />
           <div className="jefe-inicio-skeleton-title" />
           <div className="jefe-inicio-skeleton-chips" />
+        </div>
+        <div className="jefe-inicio-finanzas jefe-inicio-finanzas-loading" aria-hidden>
+          <div className="jefe-inicio-skeleton-monto" />
+          <div className="jefe-inicio-skeleton-monto" />
         </div>
       </div>
     );
@@ -138,6 +176,36 @@ export default function InicioJefePage() {
             <Link href="/dashboard/jefe/empresa">Perfil de la empresa</Link>.
           </p>
         )}
+      </section>
+
+      <section className="jefe-inicio-finanzas" aria-labelledby="jefe-inicio-finanzas-heading">
+        <h2 id="jefe-inicio-finanzas-heading" className="jefe-inicio-finanzas-title">
+          Base y capital de la empresa
+        </h2>
+        {finanzasError && (
+          <p className="jefe-inicio-finanzas-error" role="alert">
+            {finanzasError}
+          </p>
+        )}
+        {!finanzasError && capital && (
+          <div className="jefe-inicio-finanzas-grid">
+            <div className="jefe-inicio-monto-card">
+              <span className="jefe-inicio-monto-label">Base empresa</span>
+              <span className="jefe-inicio-monto-valor" aria-live="polite">
+                {formatMoneda(capital.cajaEmpresa)}
+              </span>
+            </div>
+            <div className="jefe-inicio-monto-card">
+              <span className="jefe-inicio-monto-label">Capital empresa</span>
+              <span className="jefe-inicio-monto-valor" aria-live="polite">
+                {formatMoneda(capital.capitalEmpresa)}
+              </span>
+            </div>
+          </div>
+        )}
+        <Link href="/dashboard/jefe/gestion-financiera" className="jefe-inicio-finanzas-link">
+          Ver gestión financiera
+        </Link>
       </section>
     </div>
   );

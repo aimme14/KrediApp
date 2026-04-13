@@ -326,7 +326,7 @@ export default function GastosPage() {
     <div className="card">
       <h2 style={{ marginTop: 0 }}>Gastos operativos</h2>
       <p style={{ color: "var(--text-muted)", marginTop: "-0.25rem", marginBottom: "1rem" }}>
-        Indica si el gasto es tuyo (administrador) o de una ruta específica. Se descuenta de tu caja.
+        Indica si el gasto es tuyo (administrador) o de una ruta específica. Se descuenta de tu base.
       </p>
 
       {showForm && (

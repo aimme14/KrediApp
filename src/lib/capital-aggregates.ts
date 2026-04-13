@@ -12,7 +12,7 @@ import {
   CAPITAL_CAJA_EMPLEADO_DOC,
 } from "@/lib/empresas-db";
 import { listarGastosParaCapitalAdmin } from "@/lib/gastos-totals";
-import { computeCapitalAdmin } from "@/lib/capital-formulas";
+import { computeCapitalAdmin, computeCapitalTotalRutaDesdeSaldos } from "@/lib/capital-formulas";
 import { syncAllCapitalRutaSnapshots } from "@/lib/capital-ruta-snapshot";
 
 export interface CapitalAdminDesglose {
@@ -73,12 +73,20 @@ async function sumaCapitalRutasPorAdmin(
   let perdidasAcumuladasRutas = 0;
   for (const d of rutasSnap.docs) {
     const data = d.data();
+    const cajaRuta = typeof data.cajaRuta === "number" ? data.cajaRuta : 0;
+    const cajasEmpleados =
+      typeof data.cajasEmpleados === "number" ? data.cajasEmpleados : 0;
+    const inversiones = typeof data.inversiones === "number" ? data.inversiones : 0;
+    const perdidas = typeof data.perdidas === "number" ? data.perdidas : 0;
     const capitalTotal =
       typeof data.capitalTotal === "number"
         ? data.capitalTotal
-        : (typeof data.cajaRuta === "number" ? data.cajaRuta : 0) +
-          (typeof data.cajasEmpleados === "number" ? data.cajasEmpleados : 0) +
-          (typeof data.inversiones === "number" ? data.inversiones : 0);
+        : computeCapitalTotalRutaDesdeSaldos({
+            cajaRuta,
+            cajasEmpleados,
+            inversiones,
+            perdidas,
+          });
     suma += capitalTotal;
     perdidasAcumuladasRutas += typeof data.perdidas === "number" ? data.perdidas : 0;
   }
@@ -122,8 +130,6 @@ export async function computeSumaCapitalAdminsDetalle(
     const capitalAdmin = computeCapitalAdmin({
       cajaAdmin,
       sumaCapitalRutas,
-      gastosAdmin,
-      gastosRuta,
     });
 
     desgloses.push({

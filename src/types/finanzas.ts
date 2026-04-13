@@ -6,7 +6,7 @@ import type { Timestamp } from "firebase/firestore";
  */
 
 // ── Capital empresa (Jefe) ───────────
-/** Documento empresas/{jefeUid}/capital/cajaEmpresa. capitalEmpresa = cajaEmpresa + Σ(capitalAdmin) − gastosEmpresa */
+/** Documento empresas/{jefeUid}/capital/cajaEmpresa. capitalEmpresa = cajaEmpresa + Σ(capitalAdmin); los gastos de empresa descuentan la caja al registrarse. */
 export interface CapitalEmpresa {
   capitalEmpresa: number;
   cajaEmpresa: number;
@@ -109,7 +109,8 @@ export type TipoMovimiento =
   | "entrega_inicial"
   | "cobro_cuota"
   | "gasto"
-  | "cierre";
+  | "cierre"
+  | "asignacion_admin";
 
 export type CategoriaGastoMovimiento = "transporte" | "alimentacion" | "otro";
 
@@ -150,6 +151,13 @@ export type MotivoNoPago =
   | "sin_fondos"
   | "no_estaba"
   | "promesa_pago"
+  | "otro";
+
+/** Clasificación al registrar pérdida (saldo que no se cobrará: de inversiones a pérdidas en la ruta). */
+export type MotivoPerdida =
+  | "imposible_cobrar"
+  | "cliente_perdido"
+  | "acuerdo_quita"
   | "otro";
 
 // ── Extensiones previstas para Cuota ──

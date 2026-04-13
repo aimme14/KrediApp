@@ -2,7 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAdminFirestore } from "@/lib/firebase-admin";
 import { getApiUser } from "@/lib/api-auth";
 import { EMPRESAS_COLLECTION, RUTAS_SUBCOLLECTION, USERS_COLLECTION } from "@/lib/empresas-db";
+import {
+  empleadoAsignadoEnDocumentoRuta,
+  rutaIdsConEmpleadoEnUsuarios,
+} from "@/lib/ruta-empleado-ocupada";
 import { descontarCajaAdmin } from "@/lib/admin-capital";
+import { computeCapitalTotalRutaDesdeSaldos } from "@/lib/capital-formulas";
 import { upsertCapitalRutaSnapshot } from "@/lib/capital-ruta-snapshot";
 
 const COUNTERS_COLLECTION = "counters";
@@ -27,14 +32,46 @@ export async function GET(request: NextRequest) {
   }
 
   const db = getAdminFirestore();
+  const sinEmpleado =
+    request.nextUrl.searchParams.get("sinEmpleado") === "true" ||
+    request.nextUrl.searchParams.get("sinEmpleado") === "1";
+
   const snap = await db
     .collection(EMPRESAS_COLLECTION)
     .doc(apiUser.empresaId)
     .collection(RUTAS_SUBCOLLECTION)
     .get();
 
-  const list = snap.docs.map((d) => {
+  let rutaIdsOcupadasUsuarios: Set<string> | null = null;
+  if (sinEmpleado) {
+    rutaIdsOcupadasUsuarios = await rutaIdsConEmpleadoEnUsuarios(db, apiUser.empresaId);
+  }
+
+  const docsFiltrados = sinEmpleado
+    ? snap.docs.filter((d) => {
+        const data = d.data() as Record<string, unknown>;
+        if (empleadoAsignadoEnDocumentoRuta(data)) return false;
+        if (rutaIdsOcupadasUsuarios!.has(d.id)) return false;
+        return true;
+      })
+    : snap.docs;
+
+  const list = docsFiltrados.map((d) => {
     const data = d.data();
+    const cajaRuta = typeof data.cajaRuta === "number" ? data.cajaRuta : 0;
+    const cajasEmpleados = typeof data.cajasEmpleados === "number" ? data.cajasEmpleados : 0;
+    const inversiones = typeof data.inversiones === "number" ? data.inversiones : 0;
+    const ganancias = typeof data.ganancias === "number" ? data.ganancias : 0;
+    const perdidas = typeof data.perdidas === "number" ? data.perdidas : 0;
+    const capitalTotalRaw =
+      typeof data.capitalTotal === "number"
+        ? data.capitalTotal
+        : computeCapitalTotalRutaDesdeSaldos({
+            cajaRuta,
+            cajasEmpleados,
+            inversiones,
+            perdidas,
+          });
     return {
       id: d.id,
       nombre: data.nombre ?? "",
@@ -45,6 +82,11 @@ export async function GET(request: NextRequest) {
       empleadoId: data.empleadoId ?? "",
       fechaCreacion: data.fechaCreacion?.toDate?.() ?? null,
       codigo: data.codigo ?? undefined,
+      cajaRuta,
+      cajasEmpleados,
+      inversiones,
+      ganancias,
+      capitalTotal: Math.round(capitalTotalRaw * 100) / 100,
     };
   });
 
@@ -54,7 +96,7 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({ rutas });
 }
 
-/** POST: crea una ruta. Opcional: capitalInicial (sale de caja del admin). */
+/** POST: crea una ruta. Opcional: capitalInicial (sale de la base del admin). */
 export async function POST(request: NextRequest) {
   const apiUser = await getApiUser(request);
   if (!apiUser) {
@@ -84,7 +126,7 @@ export async function POST(request: NextRequest) {
       await descontarCajaAdmin(db, apiUser.empresaId, apiUser.uid, capitalInicial, "Creación de ruta");
     } catch (e) {
       return NextResponse.json(
-        { error: e instanceof Error ? e.message : "Saldo insuficiente en caja del administrador" },
+        { error: e instanceof Error ? e.message : "Saldo insuficiente en base del administrador" },
         { status: 400 }
       );
     }

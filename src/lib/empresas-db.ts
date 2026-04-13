@@ -20,6 +20,9 @@ export const GASTOS_ADMIN_SUBCOLLECTION = "gastosAdministrador";
 /** Gastos del empleado/trabajador. empresas/{empresaId}/gastosEmpleado/{gastoId} */
 export const GASTOS_EMPLEADO_SUBCOLLECTION = "gastosEmpleado";
 
+/** Entregas de reporte del día (trabajador → base ruta). empresas/{empresaId}/reportesDia/{id} */
+export const REPORTES_DIA_SUBCOLLECTION = "reportesDia";
+
 /** Jornadas de cobro. empresas/{empresaId}/jornadas/{jornadaId} */
 export const JORNADAS_SUBCOLLECTION = "jornadas";
 

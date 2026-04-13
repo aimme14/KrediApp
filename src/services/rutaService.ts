@@ -18,6 +18,7 @@ import {
   USUARIOS_SUBCOLLECTION,
   USERS_COLLECTION,
 } from "@/lib/empresas-db";
+import { computeCapitalTotalRutaDesdeSaldos } from "@/lib/capital-formulas";
 import { syncCapitalRutaSnapshotClient } from "@/services/capitalRutaSnapshotClient";
 import type { RutaFinanciera } from "@/types/finanzas";
 
@@ -37,7 +38,15 @@ function mapRutaSnapshot(snap: DocumentSnapshot | null): RutaFinanciera | null {
   const cajaRuta = data.cajaRuta ?? 0;
   const cajasEmpleados = data.cajasEmpleados ?? 0;
   const inversiones = data.inversiones ?? 0;
-  const capitalTotal = data.capitalTotal ?? cajaRuta + cajasEmpleados + inversiones;
+  const perdidas = data.perdidas ?? 0;
+  const capitalTotal =
+    data.capitalTotal ??
+    computeCapitalTotalRutaDesdeSaldos({
+      cajaRuta,
+      cajasEmpleados,
+      inversiones,
+      perdidas,
+    });
 
   return {
     id: snap.id,
@@ -61,13 +70,35 @@ function assertCapitalRuta(
   cajaRuta: number,
   cajasEmpleados: number,
   inversiones: number,
+  perdidas: number,
   capitalTotal: number
 ) {
-  if (cajaRuta < 0) throw new Error("Saldo insuficiente en cajaRuta");
-  if (cajasEmpleados < 0) throw new Error("Saldo insuficiente en cajasEmpleados");
+  if (cajaRuta < 0) throw new Error("Saldo insuficiente en la base de la ruta");
+  if (cajasEmpleados < 0) throw new Error("Saldo insuficiente en bases de empleados");
+  if (inversiones < 0) throw new Error("Saldo de inversiones negativo");
+  const esperado = computeCapitalTotalRutaDesdeSaldos({
+    cajaRuta,
+    cajasEmpleados,
+    inversiones,
+    perdidas,
+  });
+  if (Math.abs(esperado - capitalTotal) > 0.02) {
+    throw new Error("Capital descuadrado — revisar operación");
+  }
+}
+
+/** Invariante legacy (préstamo cuotas): caja + bases + inversiones = capitalTotal sin despejar pérdidas en la ecuación. */
+function assertCapitalRutaLegadoCuotas(
+  cajaRuta: number,
+  cajasEmpleados: number,
+  inversiones: number,
+  capitalTotal: number
+) {
+  if (cajaRuta < 0) throw new Error("Saldo insuficiente en la base de la ruta");
+  if (cajasEmpleados < 0) throw new Error("Saldo insuficiente en bases de empleados");
   if (inversiones < 0) throw new Error("Saldo de inversiones negativo");
   const suma = cajaRuta + cajasEmpleados + inversiones;
-  if (suma !== capitalTotal) {
+  if (Math.abs(suma - capitalTotal) > 0.02) {
     throw new Error("Capital descuadrado — revisar operación");
   }
 }
@@ -102,9 +133,10 @@ export async function crearRuta(
   const cajaRuta = capitalInicial;
   const cajasEmpleados = 0;
   const inversiones = 0;
+  const perdidas = 0;
   const capitalTotal = capitalInicial;
 
-  assertCapitalRuta(cajaRuta, cajasEmpleados, inversiones, capitalTotal);
+  assertCapitalRuta(cajaRuta, cajasEmpleados, inversiones, perdidas, capitalTotal);
 
   const data: RutaDocData = {
     nombre: nombre.trim(),
@@ -128,6 +160,7 @@ export async function crearRuta(
       data.cajaRuta,
       data.cajasEmpleados,
       data.inversiones,
+      data.perdidas,
       data.capitalTotal
     );
   });
@@ -266,16 +299,17 @@ export async function registrarPrestamo(
     const snap = await tx.get(rutaRef);
     if (!snap.exists()) throw new Error("Ruta no encontrada");
     const data = snap.data() as RutaDocData;
-    let { cajaRuta, cajasEmpleados, inversiones, capitalTotal } = data;
+    let { cajaRuta, cajasEmpleados, inversiones, capitalTotal, perdidas } = data;
+    perdidas = perdidas ?? 0;
 
     if (cajaRuta < capitalPrestado) {
-      throw new Error("Saldo insuficiente en cajaRuta");
+      throw new Error("Saldo insuficiente en la base de la ruta");
     }
 
     cajaRuta -= capitalPrestado;
     inversiones += capitalPrestado;
 
-    assertCapitalRuta(cajaRuta, cajasEmpleados, inversiones, capitalTotal);
+    assertCapitalRuta(cajaRuta, cajasEmpleados, inversiones, perdidas, capitalTotal);
 
     tx.update(rutaRef, {
       cajaRuta,
@@ -338,7 +372,7 @@ export async function marcarIncobrable(
     perdidas += capitalCuota;
     capitalTotal -= capitalCuota;
 
-    assertCapitalRuta(cajaRuta, cajasEmpleados, inversiones, capitalTotal);
+    assertCapitalRutaLegadoCuotas(cajaRuta, cajasEmpleados, inversiones, capitalTotal);
 
     const cuotaSnap = await tx.get(cuotaRef);
     if (!cuotaSnap.exists()) {

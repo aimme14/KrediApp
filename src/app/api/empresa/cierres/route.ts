@@ -8,7 +8,10 @@ import {
   CAPITAL_SUBCOLLECTION,
   CAPITAL_CAJA_EMPRESA_DOC,
 } from "@/lib/empresas-db";
-import { computeCapitalEmpresa } from "@/lib/capital-formulas";
+import {
+  computeCapitalEmpresa,
+  computeCapitalTotalRutaDesdeSaldos,
+} from "@/lib/capital-formulas";
 import { computeSumaCapitalAdminsDetalle } from "@/lib/capital-aggregates";
 import {
   listarGastosConRutaParaEmpresa,
@@ -136,9 +139,15 @@ export async function POST(request: NextRequest) {
     const inversiones = typeof data.inversiones === "number" ? data.inversiones : 0;
     const ganancias = typeof data.ganancias === "number" ? data.ganancias : 0;
     const perdidas = typeof data.perdidas === "number" ? data.perdidas : 0;
-    const capitalTotal = typeof data.capitalTotal === "number"
-      ? data.capitalTotal
-      : cajaRuta + cajasEmpleados + inversiones;
+    const capitalTotal =
+      typeof data.capitalTotal === "number"
+        ? data.capitalTotal
+        : computeCapitalTotalRutaDesdeSaldos({
+            cajaRuta,
+            cajasEmpleados,
+            inversiones,
+            perdidas,
+          });
     const gastos = gastosByRuta[rutaId] ?? 0;
     const utilidad = ganancias - gastos - perdidas;
     utilidadGlobal += utilidad;

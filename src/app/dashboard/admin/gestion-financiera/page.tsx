@@ -131,7 +131,7 @@ export default function GestionFinancieraPage() {
       return;
     }
     if (num > cajaAdmin) {
-      setInvertirError("No tienes suficiente caja disponible.");
+      setInvertirError("No tienes suficiente base disponible.");
       return;
     }
     setInvertirSaving(true);
@@ -174,7 +174,7 @@ export default function GestionFinancieraPage() {
       <div className="card">
         <h2 style={{ marginTop: 0 }}>Gestión financiera</h2>
         <p style={{ color: "var(--text-muted)", fontSize: "0.875rem", marginBottom: "1.25rem" }}>
-          Caja del administrador, capital y total de gastos por ruta.
+          Base del administrador, capital y total de gastos por ruta.
         </p>
 
         {error && <p className="error-msg">{error}</p>}
@@ -192,7 +192,7 @@ export default function GestionFinancieraPage() {
               }}
             >
               <div className="card" style={{ padding: "1rem", margin: 0, flex: "1 1 220px" }}>
-                <div style={{ fontSize: "0.875rem", color: "var(--text-muted)" }}>Caja admin</div>
+                <div style={{ fontSize: "0.875rem", color: "var(--text-muted)" }}>Base admin</div>
                 <div style={{ fontSize: "1.5rem", fontWeight: 800, color: "var(--text)", marginTop: "0.25rem" }}>
                   {formatMoneda(cajaAdmin)}
                 </div>
@@ -222,7 +222,7 @@ export default function GestionFinancieraPage() {
                     <tr>
                       <th>Ruta</th>
                       <th className="col-num">Capital</th>
-                      <th className="col-num">Caja</th>
+                      <th className="col-num">Base</th>
                       <th className="col-num">Inversiones</th>
                       <th className="col-num">Gastos</th>
                       <th className="col-num">Pérdidas</th>
@@ -276,7 +276,7 @@ export default function GestionFinancieraPage() {
               <span className="gf-tab-icon" aria-hidden>
                 🏦
               </span>
-              Caja
+              Base
             </button>
             <button
               type="button"
@@ -312,7 +312,7 @@ export default function GestionFinancieraPage() {
                 <span className="gf-capital-badge-privado">🔒 Privado</span>
               </div>
               <p className="gf-capital-card-desc">
-                Solo tú ves estos montos. El capital total incluye tu caja, el capital asignado a rutas y
+                Solo tú ves estos montos. El capital total incluye tu base, el capital asignado a rutas y
                 descuenta los gastos registrados (generales y por ruta).
               </p>
 
@@ -322,7 +322,7 @@ export default function GestionFinancieraPage() {
                   ${formatMonto(capitalAdmin)}
                 </span>
                 <div className="gf-capital-desglose gf-capital-desglose-dos">
-                  <span>Caja admin: {formatMonto(cajaAdmin)}</span>
+                  <span>Base admin: {formatMonto(cajaAdmin)}</span>
                   <span>Σ capital rutas: {formatMonto(sumaCapitalRutas)}</span>
                 </div>
                 <div className="gf-capital-indicators">
@@ -374,17 +374,17 @@ export default function GestionFinancieraPage() {
                   <span className="gf-capital-icon" aria-hidden>
                     🏦
                   </span>
-                  <h2 className="gf-capital-card-title">Caja del administrador</h2>
+                  <h2 className="gf-capital-card-title">Base del administrador</h2>
                 </div>
                 <span className="gf-capital-badge-privado">🔒 Privado</span>
               </div>
               <p className="gf-capital-card-desc">
-                Liquidez disponible en tu caja antes de distribuir a rutas u operaciones. Los movimientos se
+                Liquidez disponible en tu base antes de distribuir a rutas u operaciones. Los movimientos se
                 registran al crear rutas, préstamos o gastos según las reglas del sistema.
               </p>
 
               <div className="gf-capital-display">
-                <span className="gf-capital-label">CAJA TOTAL</span>
+                <span className="gf-capital-label">BASE TOTAL</span>
                 <span className="gf-capital-monto" aria-live="polite">
                   ${formatMonto(cajaAdmin)}
                 </span>
@@ -407,7 +407,7 @@ export default function GestionFinancieraPage() {
                   </span>
                 </div>
                 <p className="gf-caja-chart-note">Referencia visual (sin serie histórica en administrador)</p>
-                <div className="gf-mini-chart" role="img" aria-label="Referencia de caja">
+                <div className="gf-mini-chart" role="img" aria-label="Referencia de base">
                   <MiniChart points={chartPointsCaja} />
                 </div>
               </div>
@@ -418,13 +418,13 @@ export default function GestionFinancieraPage() {
                 <span className="gf-salidas-icon" aria-hidden>
                   📥
                 </span>
-                <h2 className="gf-salidas-title">Invertir en caja de ruta</h2>
+                <h2 className="gf-salidas-title">Invertir en base de ruta</h2>
               </div>
               <p className="gf-salidas-desc">
-                Transfiere dinero desde tu caja de administrador hacia la <strong>caja de la ruta</strong>{" "}
+                Transfiere dinero desde tu base de administrador hacia la <strong>base de la ruta</strong>{" "}
                 (liquidez disponible en esa ruta). El capital total de la ruta aumenta en el mismo monto.
               </p>
-              <p style={{ marginBottom: "1rem", fontWeight: 600 }}>Tu caja disponible: {formatMonto(cajaAdmin)}</p>
+              <p style={{ marginBottom: "1rem", fontWeight: 600 }}>Tu base disponible: {formatMonto(cajaAdmin)}</p>
 
               {rutasPropias.length === 0 ? (
                 <p className="gf-salidas-empty">No tienes rutas asignadas aún. Crea una ruta primero.</p>
@@ -448,7 +448,7 @@ export default function GestionFinancieraPage() {
                     <option value="">— selecciona —</option>
                     {rutasPropias.map((r) => (
                       <option key={r.rutaId} value={r.rutaId}>
-                        {r.nombre} (caja ruta: {formatMonto(r.cajaRuta ?? 0)})
+                        {r.nombre} (base ruta: {formatMonto(r.cajaRuta ?? 0)})
                       </option>
                     ))}
                   </select>
@@ -496,7 +496,7 @@ export default function GestionFinancieraPage() {
                   <span className="gf-historial-icon" aria-hidden>
                     📒
                   </span>
-                  Historial de inversiones en caja de ruta
+                  Historial de inversiones en base de ruta
                 </h2>
               </div>
               {inversiones.length === 0 ? (

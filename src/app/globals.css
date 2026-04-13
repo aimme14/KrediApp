@@ -2131,6 +2131,91 @@ th {
   50% { opacity: 1; }
 }
 
+.jefe-inicio-finanzas {
+  margin-top: 1.25rem;
+  padding: 0 0.25rem 0.5rem;
+}
+
+.jefe-inicio-finanzas-title {
+  margin: 0 0 0.75rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.jefe-inicio-finanzas-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.jefe-inicio-monto-card {
+  border-radius: 12px;
+  padding: 1rem 1rem 1.1rem;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  text-align: left;
+}
+
+.jefe-inicio-monto-label {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-bottom: 0.35rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.jefe-inicio-monto-valor {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.2;
+}
+
+.jefe-inicio-finanzas-error {
+  margin: 0 0 0.75rem;
+  font-size: 0.875rem;
+  color: #dc2626;
+  text-align: center;
+}
+
+.jefe-inicio-finanzas-link {
+  display: block;
+  text-align: center;
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.jefe-inicio-finanzas-link:hover {
+  color: var(--text);
+}
+
+.jefe-inicio-finanzas-loading {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.75rem;
+  margin-top: 1.25rem;
+  padding: 0 0.25rem;
+}
+
+.jefe-inicio-skeleton-monto {
+  height: 4.25rem;
+  border-radius: 12px;
+  background: rgba(148, 163, 184, 0.22);
+  animation: jefe-inicio-pulse 1.2s ease-in-out infinite;
+}
+
+[data-theme="light"] .jefe-inicio-skeleton-monto {
+  background: #e2e8f0;
+}
+
 /* Administradores del jefe: tabla con header (título + botón), formulario y filtro */
 .admin-jefe-table-card {
   margin-bottom: 1rem;
@@ -4232,6 +4317,31 @@ th {
 /* ── Cobrar cliente ─────────────────────────────────────────────────────── */
 .cobrar-card { max-width: 420px; margin: 0 auto; }
 .cobrar-header { margin-bottom: 1.25rem; }
+.cobrar-header-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.5rem;
+}
+.cobrar-header-top .cobrar-back { margin-bottom: 0; }
+.cobrar-btn-perdida {
+  flex-shrink: 0;
+  padding: 0.4rem 0.75rem;
+  font-size: 0.8125rem;
+}
+.cobrar-perdida-hint {
+  margin: 0.35rem 0 0 0;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+.cobrar-perdida-nota-app {
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  margin-bottom: 1rem;
+}
+.cobrar-text { font-size: 0.9rem; line-height: 1.45; color: var(--text-muted); margin: 0 0 1rem 0; }
 .cobrar-back {
   display: inline-block;
   margin-bottom: 0.5rem;

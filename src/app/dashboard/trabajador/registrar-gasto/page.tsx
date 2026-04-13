@@ -58,7 +58,7 @@ export default function RegistrarGastoPage() {
       <div className="card registrar-gasto-card">
         <h2 className="registrar-gasto-title">Registrar gasto</h2>
         <p className="registrar-gasto-sin-jornada">
-          No tienes una jornada activa. Inicia la jornada desde la Ruta del día para poder registrar gastos de caja.
+          No tienes una jornada activa. Inicia la jornada desde la Ruta del día para poder registrar gastos desde tu base.
         </p>
         <Link href="/dashboard/trabajador/ruta" className="btn btn-primary">Ir a Ruta del día</Link>
       </div>
@@ -69,7 +69,7 @@ export default function RegistrarGastoPage() {
     return (
       <div className="card registrar-gasto-card registrar-gasto-confirmacion">
         <h2 className="registrar-gasto-title">Gasto registrado</h2>
-        <p>Se descontó {formatCurrency(ultimoMonto)} de tu caja. El saldo se actualizará al instante.</p>
+        <p>Se descontó {formatCurrency(ultimoMonto)} de tu base. El saldo se actualizará al instante.</p>
         <div className="registrar-gasto-actions">
           <button type="button" className="btn btn-secondary" onClick={() => setExito(false)}>
             Registrar otro
@@ -86,7 +86,7 @@ export default function RegistrarGastoPage() {
         <Link href="/dashboard/trabajador/ruta" className="registrar-gasto-back">← Ruta del día</Link>
         <h2 className="registrar-gasto-title">Registrar gasto</h2>
         <p className="registrar-gasto-saldo">
-          Saldo actual en caja: <strong>{formatCurrency(cajaActual)}</strong>
+          Saldo actual en base: <strong>{formatCurrency(cajaActual)}</strong>
         </p>
       </div>
 
@@ -102,7 +102,7 @@ export default function RegistrarGastoPage() {
             className="registrar-gasto-input"
           />
           {montoNum > cajaActual && (
-            <p className="error-msg">El monto no puede superar el saldo en caja ({formatCurrency(cajaActual)}).</p>
+            <p className="error-msg">El monto no puede superar el saldo en base ({formatCurrency(cajaActual)}).</p>
           )}
         </div>
 

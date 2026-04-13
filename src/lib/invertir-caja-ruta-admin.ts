@@ -58,7 +58,7 @@ export async function invertirAdminEnCajaRuta(
         ? userSnap.data()!.cajaAdmin
         : 0;
     if (cajaActual < monto) {
-      throw new Error("Saldo insuficiente en caja del administrador");
+      throw new Error("Saldo insuficiente en base del administrador");
     }
 
     const oldCajaRuta = typeof rd.cajaRuta === "number" ? rd.cajaRuta : 0;

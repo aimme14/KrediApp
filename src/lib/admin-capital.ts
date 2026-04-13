@@ -47,7 +47,7 @@ export async function descontarCajaAdmin(
     : 0;
 
   if (cajaActual < monto) {
-    throw new Error("Saldo insuficiente en caja del administrador");
+    throw new Error("Saldo insuficiente en base del administrador");
   }
 
   const nuevaCaja = cajaActual - monto;

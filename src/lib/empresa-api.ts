@@ -14,6 +14,16 @@ export type RutaItem = {
   fechaCreacion: string | null;
   /** Código legible (ej. RT-001-002). Id técnico sigue siendo id. */
   codigo?: string;
+  /** Efectivo operable en la ruta (base para prestar / mover). */
+  cajaRuta?: number;
+  /** Efectivo asignado a empleados en jornada. */
+  cajasEmpleados?: number;
+  /** Capital colocado en préstamos (inversión). */
+  inversiones?: number;
+  /** Intereses / ganancias acumuladas. */
+  ganancias?: number;
+  /** Patrimonio total de la ruta (caja ruta + bases empleados + inversiones − pérdidas). */
+  capitalTotal?: number;
 };
 
 export type ClienteItem = {
@@ -93,13 +103,14 @@ export type GastoItem = {
   alcance?: string;
 };
 
-/** Item de la subcolección pagos de un préstamo (historial de cobros / no pago). */
+/** Item de la subcolección pagos de un préstamo (historial de cobros / no pago / pérdida). */
 export type PagoItem = {
   id: string;
   monto: number;
   fecha: string | null;
-  tipo: "pago" | "no_pago";
+  tipo: "pago" | "no_pago" | "perdida";
   metodoPago: string | null;
+  motivoPerdida?: string | null;
   registradoPorUid: string | null;
   registradoPorNombre: string | null;
 };
@@ -119,11 +130,104 @@ async function fetchWithAuth(
   });
 }
 
-export async function listRutas(token: string): Promise<RutaItem[]> {
-  const res = await fetchWithAuth("/api/empresa/rutas", token);
+export async function listRutas(
+  token: string,
+  options?: { sinEmpleado?: boolean }
+): Promise<RutaItem[]> {
+  const params = new URLSearchParams();
+  if (options?.sinEmpleado) params.set("sinEmpleado", "true");
+  const qs = params.toString();
+  const url = qs ? `/api/empresa/rutas?${qs}` : "/api/empresa/rutas";
+  const res = await fetchWithAuth(url, token);
   const data = await res.json();
   if (!res.ok) throw new Error(data.error ?? "Error al cargar rutas");
   return data.rutas ?? [];
+}
+
+/** Rutas del administrador con bases para la vista «ruta del día». */
+export type RutaDelDiaEmpleadoItem = {
+  uid: string;
+  nombre: string;
+  baseTrabajador: number;
+  jornadaActivaEnRuta: boolean;
+};
+
+export type RutaDelDiaItem = {
+  id: string;
+  nombre: string;
+  codigo?: string;
+  ubicacion: string;
+  cajaRuta: number;
+  empleados: RutaDelDiaEmpleadoItem[];
+};
+
+export async function getRutaDelDia(token: string): Promise<RutaDelDiaItem[]> {
+  const res = await fetchWithAuth("/api/empresa/ruta-del-dia", token);
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error ?? "Error al cargar ruta del día");
+  return data.rutas ?? [];
+}
+
+/** Pasa efectivo de la base de la ruta a la base del trabajador (misma lógica que entrega en jornada). */
+export async function asignarBaseEmpleadoDesdeRuta(
+  token: string,
+  rutaId: string,
+  params: { empleadoUid: string; monto: number }
+): Promise<{ cajaRuta: number; cajasEmpleados: number; baseTrabajador: number }> {
+  const res = await fetchWithAuth(
+    `/api/empresa/rutas/${encodeURIComponent(rutaId)}/asignar-base-empleado`,
+    token,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        empleadoUid: params.empleadoUid,
+        monto: params.monto,
+      }),
+    }
+  );
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error ?? "Error al asignar base");
+  return data;
+}
+
+/** Trabajador: pasa todo el efectivo de su base/jornada a la base de la ruta. */
+export async function entregarReporteDia(
+  token: string
+): Promise<{ monto: number; rutaId: string }> {
+  const res = await fetchWithAuth("/api/empresa/empleado/entregar-reporte", token, {
+    method: "POST",
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error ?? "Error al entregar reporte");
+  return { monto: data.monto ?? 0, rutaId: data.rutaId ?? "" };
+}
+
+export type ReporteDiaItem = {
+  id: string;
+  fechaDia: string;
+  rutaId: string;
+  rutaNombre: string;
+  empleadoId: string;
+  empleadoNombre: string;
+  montoEntregado: number;
+  fecha: string | null;
+};
+
+export async function getReportesDia(
+  token: string,
+  fecha?: string
+): Promise<{ fechaDia: string; items: ReporteDiaItem[]; totalMonto: number }> {
+  const url = fecha
+    ? `/api/empresa/reportes-dia?fecha=${encodeURIComponent(fecha)}`
+    : "/api/empresa/reportes-dia";
+  const res = await fetchWithAuth(url, token);
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error ?? "Error al cargar reportes");
+  return {
+    fechaDia: data.fechaDia ?? "",
+    items: Array.isArray(data.items) ? data.items : [],
+    totalMonto: typeof data.totalMonto === "number" ? data.totalMonto : 0,
+  };
 }
 
 export async function createRuta(
@@ -260,6 +364,37 @@ export async function registrarNoPago(
   if (!res.ok) throw new Error(data.error ?? "Error al registrar no pago");
 }
 
+/** Registra pérdida reconocida (monto que no se cobrará): ajusta saldo del préstamo y ruta (inversiones → pérdidas). */
+export async function registrarPerdida(
+  token: string,
+  prestamoId: string,
+  params: {
+    monto: number;
+    motivoPerdida: string;
+    nota?: string;
+    registradoPorUid?: string;
+    registradoPorNombre?: string;
+  }
+): Promise<{ saldoPendiente: number; adelantoCuota?: number }> {
+  const res = await fetchWithAuth(`/api/empresa/prestamos/${encodeURIComponent(prestamoId)}/pagos`, token, {
+    method: "POST",
+    body: JSON.stringify({
+      tipo: "perdida",
+      monto: params.monto,
+      motivoPerdida: params.motivoPerdida,
+      nota: params.nota?.trim() || undefined,
+      registradoPorUid: params.registradoPorUid,
+      registradoPorNombre: params.registradoPorNombre,
+    }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error ?? "Error al registrar pérdida");
+  return {
+    saldoPendiente: data.saldoPendiente ?? 0,
+    adelantoCuota: data.adelantoCuota,
+  };
+}
+
 export async function createPrestamo(
   token: string,
   params: {
@@ -290,15 +425,15 @@ export async function listGastos(token: string): Promise<GastoItem[]> {
   return data.gastos ?? [];
 }
 
-/** Obtiene la caja del administrador (solo role admin). */
+/** Obtiene la base del administrador (solo role admin). */
 export async function getCajaAdmin(token: string): Promise<number> {
   const res = await fetchWithAuth("/api/empresa/admin-caja", token);
   const data = await res.json();
-  if (!res.ok) throw new Error(data.error ?? "Error al cargar la caja del administrador");
+  if (!res.ok) throw new Error(data.error ?? "Error al cargar la base del administrador");
   return typeof data.cajaAdmin === "number" ? data.cajaAdmin : 0;
 }
 
-/** Transfiere monto de la caja del admin a la caja de una ruta (solo rutas propias). */
+/** Transfiere monto de la base del admin a la base de una ruta (solo rutas propias). */
 export async function invertirEnCajaRuta(
   token: string,
   params: { rutaId: string; monto: number }

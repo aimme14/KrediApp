@@ -6,7 +6,10 @@ import {
   CLIENTES_SUBCOLLECTION,
   PRESTAMOS_SUBCOLLECTION,
 } from "@/lib/empresas-db";
-import { registrarPrestamoEnRuta } from "@/lib/ruta-financiera-admin";
+import {
+  registrarPrestamoDesdeCajaEmpleado,
+  registrarPrestamoEnRuta,
+} from "@/lib/ruta-financiera-admin";
 import {
   getNextWorkingDay,
   addWorkingDays,
@@ -176,10 +179,20 @@ export async function POST(request: NextRequest) {
 
   if (rutaIdPrestamo) {
     try {
-      await registrarPrestamoEnRuta(db, apiUser.empresaId, rutaIdPrestamo, monto);
+      if (apiUser.role === "empleado") {
+        await registrarPrestamoDesdeCajaEmpleado(
+          db,
+          apiUser.empresaId,
+          rutaIdPrestamo,
+          empleadoIdPrestamo,
+          monto
+        );
+      } else {
+        await registrarPrestamoEnRuta(db, apiUser.empresaId, rutaIdPrestamo, monto);
+      }
     } catch (e) {
       return NextResponse.json(
-        { error: e instanceof Error ? e.message : "Error al impactar caja de la ruta" },
+        { error: e instanceof Error ? e.message : "Error al impactar base de la ruta" },
         { status: 400 }
       );
     }

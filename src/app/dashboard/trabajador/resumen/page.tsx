@@ -2,13 +2,30 @@
 
 import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
-import { listPrestamos, listGastos, type PrestamoItem, type GastoItem } from "@/lib/empresa-api";
+import {
+  listPrestamos,
+  listGastos,
+  entregarReporteDia,
+  type PrestamoItem,
+  type GastoItem,
+} from "@/lib/empresa-api";
+
+function formatMonto(value: number): string {
+  const hasDecimals = Math.round(value * 100) % 100 !== 0;
+  return `$ ${value.toLocaleString("es-CO", {
+    minimumFractionDigits: hasDecimals ? 2 : 0,
+    maximumFractionDigits: 2,
+  })}`;
+}
 
 export default function ResumenDelDiaPage() {
   const { user, profile } = useAuth();
   const [prestamos, setPrestamos] = useState<PrestamoItem[]>([]);
   const [gastos, setGastos] = useState<GastoItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [entregando, setEntregando] = useState(false);
+  const [msgReporte, setMsgReporte] = useState<string | null>(null);
+  const [errReporte, setErrReporte] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -29,11 +46,47 @@ export default function ResumenDelDiaPage() {
     .reduce((sum, g) => sum + g.monto, 0);
   const gastosTotal = gastos.reduce((sum, g) => sum + g.monto, 0);
 
+  const handleEntregarReporte = async () => {
+    if (!user) return;
+    setErrReporte(null);
+    setMsgReporte(null);
+    setEntregando(true);
+    try {
+      const token = await user.getIdToken();
+      const r = await entregarReporteDia(token);
+      setMsgReporte(`Entregaste ${formatMonto(r.monto)} a la base de la ruta.`);
+    } catch (e) {
+      setErrReporte(e instanceof Error ? e.message : "No se pudo entregar");
+    } finally {
+      setEntregando(false);
+    }
+  };
+
   if (!profile || profile.role !== "trabajador") return null;
 
   return (
     <div className="card">
       <h2 style={{ marginTop: 0 }}>Resumen del día</h2>
+      <p style={{ color: "var(--text-muted)", fontSize: "0.875rem", marginBottom: "1rem" }}>
+        Los cobros de capital quedan en tu base; los intereses se registran en ganancias de la ruta. Cuando entregues el efectivo al administrador,
+        usá &quot;Entregar reporte&quot; para pasar tu base a la base de la ruta.
+      </p>
+
+      <div style={{ marginBottom: "1.25rem" }}>
+        <button
+          type="button"
+          className="btn btn-primary"
+          disabled={entregando}
+          onClick={handleEntregarReporte}
+        >
+          {entregando ? "Entregando…" : "Entregar reporte"}
+        </button>
+        {msgReporte && (
+          <p style={{ marginTop: "0.5rem", color: "var(--success, #6bbf6b)", fontSize: "0.875rem" }}>{msgReporte}</p>
+        )}
+        {errReporte && <p className="error-msg" style={{ marginTop: "0.5rem" }}>{errReporte}</p>}
+      </div>
+
       <p style={{ color: "var(--text-muted)", fontSize: "0.875rem", marginBottom: "1.25rem" }}>
         Lo recogido, lo que falta por recoger y los gastos generados.
       </p>

@@ -48,7 +48,7 @@ export async function descontarCajaEmpleado(
       : 0;
 
   if (cajaActual < monto) {
-    throw new Error("Saldo insuficiente en la caja del empleado");
+    throw new Error("Saldo insuficiente en la base del empleado");
   }
 
   const nuevaCaja = cajaActual - monto;

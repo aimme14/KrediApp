@@ -44,13 +44,13 @@ export default function EmpleadoPage() {
   useEffect(() => {
     if (!user) return;
     user.getIdToken().then((token) => {
-      listRutas(token).then(setRutas).catch(() => {});
+      listRutas(token, { sinEmpleado: true }).then(setRutas).catch(() => {});
     });
   }, [user]);
 
   const handleCreateTrabajador = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!profile) return;
+    if (!profile || !user) return;
     setError(null);
     if (!rutaId.trim()) {
       setError("Debes seleccionar una ruta para el empleado");
@@ -85,8 +85,13 @@ export default function EmpleadoPage() {
       setPassword("");
       setPasswordConfirm("");
       setShowForm(false);
-      const list = await listUsersByCreator(profile.uid, "trabajador");
+      const [list, token] = await Promise.all([
+        listUsersByCreator(profile.uid, "trabajador"),
+        user.getIdToken(),
+      ]);
       setTrabajadores(list);
+      const rutasLibres = await listRutas(token, { sinEmpleado: true });
+      setRutas(rutasLibres);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al crear empleado");
     } finally {
@@ -101,6 +106,7 @@ export default function EmpleadoPage() {
       <h2 style={{ marginTop: 0 }}>Empleado</h2>
       <p style={{ color: "var(--text-muted)", fontSize: "0.875rem", marginBottom: "1.25rem" }}>
         Crea empleados con nombre, ubicación, dirección, teléfono, cédula, ruta, correo y contraseña (credenciales de ingreso).
+        Solo puede haber <strong>un trabajador por ruta</strong>; en el listado solo aparecen rutas que aún no tienen empleado asignado.
       </p>
 
       <div style={{ marginBottom: "1.25rem" }}>
@@ -181,6 +187,11 @@ export default function EmpleadoPage() {
                   </option>
                 ))}
               </select>
+              {rutas.length === 0 && (
+                <p style={{ fontSize: "0.8125rem", color: "var(--text-muted)", marginTop: "0.35rem", marginBottom: 0 }}>
+                  No hay rutas libres. Crea una ruta nueva o espera a liberar una (un trabajador por ruta).
+                </p>
+              )}
             </div>
             <div className="form-group">
               <label>Correo (credencial de ingreso)</label>

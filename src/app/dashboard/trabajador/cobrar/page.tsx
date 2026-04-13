@@ -10,13 +10,14 @@ import {
   listPagos,
   registrarPago,
   registrarNoPago,
+  registrarPerdida,
   actualizarComprobantePago,
   type ClienteItem,
   type PrestamoItem,
   type PagoItem,
 } from "@/lib/empresa-api";
 import { uploadImage, getImageAccept } from "@/lib/storage";
-import type { MotivoNoPago } from "@/types/finanzas";
+import type { MotivoNoPago, MotivoPerdida } from "@/types/finanzas";
 
 /** Carga html2canvas solo en el cliente (evita fallos de bundle/SSR y reduce el JS inicial). */
 async function captureElementToCanvas(el: HTMLElement) {
@@ -103,6 +104,13 @@ const MOTIVOS_NO_PAGO: { value: MotivoNoPago; label: string }[] = [
   { value: "otro", label: "Otro motivo" },
 ];
 
+const MOTIVOS_PERDIDA: { value: MotivoPerdida; label: string }[] = [
+  { value: "imposible_cobrar", label: "Imposible cobrar / incobrable" },
+  { value: "cliente_perdido", label: "Cliente perdido o mudanza" },
+  { value: "acuerdo_quita", label: "Acuerdo o quita de saldo" },
+  { value: "otro", label: "Otro motivo" },
+];
+
 function CobrarClientePageContent() {
   const { user, profile } = useAuth();
   const searchParams = useSearchParams();
@@ -147,6 +155,14 @@ function CobrarClientePageContent() {
   const [notaNoPago, setNotaNoPago] = useState("");
   const [submittingNoPago, setSubmittingNoPago] = useState(false);
   const [noPagoRegistrado, setNoPagoRegistrado] = useState(false);
+
+  const [showPerdida, setShowPerdida] = useState(false);
+  const [motivoPerdida, setMotivoPerdida] = useState<MotivoPerdida | "">("");
+  const [montoPerdidaInput, setMontoPerdidaInput] = useState("");
+  const [notaPerdida, setNotaPerdida] = useState("");
+  const [submittingPerdida, setSubmittingPerdida] = useState(false);
+  const [perdidaRegistrada, setPerdidaRegistrada] = useState(false);
+  const [montoPerdidaConfirmado, setMontoPerdidaConfirmado] = useState(0);
 
   useEffect(() => {
     if (!user || !clienteId || !prestamoId) {
@@ -396,6 +412,57 @@ function CobrarClientePageContent() {
     }
   };
 
+  const montoPerdidaNum = useMemo(() => {
+    const n = parseFloat(montoPerdidaInput.replace(",", "."));
+    return Number.isFinite(n) && n >= 0 ? n : 0;
+  }, [montoPerdidaInput]);
+
+  const handleRegistrarPerdida = async () => {
+    if (!motivoPerdida || !user || !prestamoId || !profile || !prestamo) return;
+    const montoAplicar = Math.min(montoPerdidaNum, prestamo.saldoPendiente ?? 0);
+    if (montoAplicar <= 0) return;
+    setSubmittingPerdida(true);
+    setError(null);
+    try {
+      const token = await user.getIdToken();
+      const nombreRegistro = profile.displayName ?? profile.email ?? "";
+      const res = await registrarPerdida(token, prestamoId, {
+        monto: montoAplicar,
+        motivoPerdida,
+        nota: notaPerdida.trim() || undefined,
+        registradoPorUid: user.uid,
+        registradoPorNombre: nombreRegistro || undefined,
+      });
+      setMontoPerdidaConfirmado(montoAplicar);
+      setPrestamo((p) =>
+        p
+          ? {
+              ...p,
+              saldoPendiente: res.saldoPendiente,
+              adelantoCuota: res.adelantoCuota ?? p.adelantoCuota,
+              estado: res.saldoPendiente <= 0 ? "pagado" : p.estado,
+            }
+          : null
+      );
+      const nuevoPago: PagoItem = {
+        id: "",
+        monto: montoAplicar,
+        fecha: new Date().toISOString(),
+        tipo: "perdida",
+        metodoPago: null,
+        motivoPerdida,
+        registradoPorUid: user.uid,
+        registradoPorNombre: nombreRegistro || null,
+      };
+      setUltimosPagos((prev) => [nuevoPago, ...prev]);
+      setPerdidaRegistrada(true);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Error al registrar pérdida");
+    } finally {
+      setSubmittingPerdida(false);
+    }
+  };
+
   if (!profile || (profile.role !== "trabajador" && profile.role !== "admin")) return null;
   const backHref = fromAdmin ? "/dashboard/admin/prestamo" : "/dashboard/trabajador/ruta";
   const backLabel = fromAdmin ? "Volver a Préstamos" : "Ruta del día";
@@ -596,6 +663,99 @@ function CobrarClientePageContent() {
     );
   }
 
+  if (perdidaRegistrada) {
+    return (
+      <div className="card cobrar-card cobrar-confirmacion">
+        <h2 className="cobrar-title">Pérdida registrada</h2>
+        <p>
+          Se reconoció una pérdida de {formatCurrency(montoPerdidaConfirmado)} para {cliente.nombre} (
+          {MOTIVOS_PERDIDA.find((m) => m.value === motivoPerdida)?.label ?? motivoPerdida}
+          ). El saldo pendiente del préstamo quedó en {formatCurrency(prestamo.saldoPendiente)}.
+        </p>
+        <p className="cobrar-perdida-nota-app">
+          En la ruta, el capital correspondiente se descuenta de inversiones y se registra en pérdidas.
+        </p>
+        <Link href={backHref} className="btn btn-primary">{backLabel}</Link>
+      </div>
+    );
+  }
+
+  if (showPerdida) {
+    const cobrarQuery = `clienteId=${clienteId}&prestamoId=${prestamoId}${fromAdmin ? "&from=admin" : ""}`;
+    const maxPerdida = prestamo.saldoPendiente ?? 0;
+    const montoPerdidaAplicar = Math.min(montoPerdidaNum, maxPerdida);
+    const puedePerdida =
+      !!motivoPerdida && montoPerdidaAplicar > 0 && montoPerdidaNum > 0;
+    return (
+      <div className="card cobrar-card">
+        <div className="cobrar-header">
+          <Link href={fromAdmin ? `/dashboard/admin/cobrar?${cobrarQuery}` : `/dashboard/trabajador/cobrar?${cobrarQuery}`} className="cobrar-back">← Volver</Link>
+          <h2 className="cobrar-title">Registrar pérdida</h2>
+          <p className="cobrar-subtitle">{cliente.nombre}</p>
+        </div>
+        <p className="cobrar-text">
+          Monto que no se cobrará (total o parte del saldo). Se clasifica el motivo; en la ruta se mueve de inversiones a pérdidas según el capital asociado a ese saldo.
+        </p>
+        <div className="form-group">
+          <label>Monto de la pérdida</label>
+          <input
+            type="text"
+            inputMode="decimal"
+            value={montoPerdidaInput}
+            onChange={(e) => setMontoPerdidaInput(e.target.value)}
+            placeholder={maxPerdida > 0 ? formatCurrency(maxPerdida) : "0"}
+            className="cobrar-input"
+          />
+          <p className="cobrar-perdida-hint">Máximo según saldo pendiente: {formatCurrency(maxPerdida)}</p>
+        </div>
+        <div className="form-group">
+          <label>Motivo</label>
+          <select
+            value={motivoPerdida}
+            onChange={(e) => setMotivoPerdida(e.target.value as MotivoPerdida)}
+            className="cobrar-select"
+          >
+            <option value="">Seleccionar...</option>
+            {MOTIVOS_PERDIDA.map((m) => (
+              <option key={m.value} value={m.value}>{m.label}</option>
+            ))}
+          </select>
+        </div>
+        <div className="form-group">
+          <label>Nota (opcional)</label>
+          <input
+            type="text"
+            value={notaPerdida}
+            onChange={(e) => setNotaPerdida(e.target.value)}
+            placeholder="Detalle adicional"
+            className="cobrar-input"
+          />
+        </div>
+        {error && <p className="error-msg">{error}</p>}
+        <div className="cobrar-actions">
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={() => {
+              setShowPerdida(false);
+              setError(null);
+            }}
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            className="btn btn-primary"
+            disabled={!puedePerdida || submittingPerdida}
+            onClick={handleRegistrarPerdida}
+          >
+            {submittingPerdida ? "Registrando..." : "Confirmar pérdida"}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   if (showNoPago) {
     const cobrarQuery = `clienteId=${clienteId}&prestamoId=${prestamoId}${fromAdmin ? "&from=admin" : ""}`;
     return (
@@ -651,14 +811,31 @@ function CobrarClientePageContent() {
     );
   }
 
-  const pagosSoloPago = ultimosPagos.filter((p) => p.tipo === "pago");
+  const pagosHistorial = ultimosPagos.filter((p) => p.tipo === "pago" || p.tipo === "perdida");
   const formatFechaPago = (f: string | null) =>
     f ? new Date(f).toLocaleString("es-CO", { dateStyle: "short", timeStyle: "short" }) : "—";
 
   return (
     <div className="card cobrar-card">
       <div className="cobrar-header">
-        <Link href={backHref} className="cobrar-back">← {backLabel}</Link>
+        <div className="cobrar-header-top">
+          <Link href={backHref} className="cobrar-back">← {backLabel}</Link>
+          <button
+            type="button"
+            className="btn btn-secondary cobrar-btn-perdida"
+            onClick={() => {
+              setShowPerdida(true);
+              setMontoPerdidaInput(
+                prestamo.saldoPendiente > 0 ? String(Math.round(prestamo.saldoPendiente)) : ""
+              );
+              setMotivoPerdida("");
+              setNotaPerdida("");
+              setError(null);
+            }}
+          >
+            Pérdida
+          </button>
+        </div>
         <h2 className="cobrar-title">{cliente.nombre}</h2>
         <p className="cobrar-subtitle">
           Saldo pendiente · {prestamo.modalidad} · Estado: {prestamo.estado}
@@ -676,7 +853,7 @@ function CobrarClientePageContent() {
         >
           <span className="cobrar-historial-toggle-label">Últimos pagos</span>
           <span className="cobrar-historial-toggle-badge" aria-hidden>
-            {pagosSoloPago.length} registro{pagosSoloPago.length !== 1 ? "s" : ""}
+            {pagosHistorial.length} registro{pagosHistorial.length !== 1 ? "s" : ""}
           </span>
           <span className="cobrar-historial-toggle-icon" aria-hidden>{historialExpandido ? "▲" : "▼"}</span>
         </button>
@@ -687,15 +864,21 @@ function CobrarClientePageContent() {
           className="cobrar-historial-list"
           style={{ display: historialExpandido ? "block" : "none" }}
         >
-          {pagosSoloPago.length === 0 ? (
+          {pagosHistorial.length === 0 ? (
             <p className="cobrar-historial-empty">Aún no hay pagos registrados en este préstamo.</p>
           ) : (
             <ul className="cobrar-historial-ul">
-              {pagosSoloPago.map((p) => (
-                <li key={p.id} className="cobrar-historial-li">
+              {pagosHistorial.map((p, idx) => (
+                <li key={p.id || `p-${idx}`} className="cobrar-historial-li">
                   <span className="cobrar-historial-fecha">{formatFechaPago(p.fecha)}</span>
                   <span className="cobrar-historial-monto">{formatCurrency(p.monto)}</span>
-                  <span className="cobrar-historial-metodo">{p.metodoPago === "transferencia" ? "Transferencia" : "Efectivo"}</span>
+                  <span className="cobrar-historial-metodo">
+                    {p.tipo === "perdida"
+                      ? "Pérdida"
+                      : p.metodoPago === "transferencia"
+                        ? "Transferencia"
+                        : "Efectivo"}
+                  </span>
                   <span className="cobrar-historial-registrado" title="Registrado por">
                     {p.registradoPorNombre || p.registradoPorUid || "—"}
                   </span>

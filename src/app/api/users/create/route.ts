@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { FieldValue } from "firebase-admin/firestore";
 import { getAdminAuth, getAdminFirestore } from "@/lib/firebase-admin";
 import { canCreateRole } from "@/types/roles";
 import type { Role } from "@/types/roles";
@@ -13,6 +14,7 @@ import { asignarCapitalAAdmin } from "@/lib/jefe-capital";
 import { persistAggregatedCapitalDocs } from "@/lib/capital-aggregates";
 import { parseMontoBase } from "@/lib/parse-monto-base";
 import { upsertCapitalRutaSnapshot } from "@/lib/capital-ruta-snapshot";
+import { rutaTieneEmpleadoAsignado } from "@/lib/ruta-empleado-ocupada";
 
 /** Colección de contadores para códigos secuenciales (JF-001, AD-001 por jefe) */
 const COUNTERS_COLLECTION = "counters";
@@ -157,6 +159,34 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    if (role === "trabajador" && rutaId && String(rutaId).trim()) {
+      const rid = String(rutaId).trim();
+      const rutaRef = adminDb
+        .collection(EMPRESAS_COLLECTION)
+        .doc(empresaId)
+        .collection(RUTAS_SUBCOLLECTION)
+        .doc(rid);
+      const rutaSnap = await rutaRef.get();
+      if (!rutaSnap.exists) {
+        return NextResponse.json({ error: "La ruta no existe" }, { status: 400 });
+      }
+      const ocupada = await rutaTieneEmpleadoAsignado(
+        adminDb,
+        empresaId,
+        rid,
+        rutaSnap.data() as Record<string, unknown>
+      );
+      if (ocupada) {
+        return NextResponse.json(
+          {
+            error:
+              "Esa ruta ya tiene un trabajador asignado. Solo puede haber uno por ruta; elige otra ruta o reasigna desde la gestión de empleados.",
+          },
+          { status: 400 }
+        );
+      }
+    }
+
     // Escribir en empresas/{empresaId}/usuarios/{uid}
     const usuarioEmpresaData: Record<string, unknown> = {
       nombre: displayName ?? "",
@@ -223,6 +253,19 @@ export async function POST(request: NextRequest) {
       .doc(uid)
       .set(usuarioEmpresaData);
 
+    if (rolFirestore === "empleado" && rutaId && String(rutaId).trim()) {
+      const rid = String(rutaId).trim();
+      await adminDb
+        .collection(EMPRESAS_COLLECTION)
+        .doc(empresaId)
+        .collection(RUTAS_SUBCOLLECTION)
+        .doc(rid)
+        .set(
+          { empleadosIds: FieldValue.arrayUnion(uid), ultimaActualizacion: now },
+          { merge: true }
+        );
+    }
+
     if (
       rolFirestore === "empleado" &&
       rutaId &&
@@ -239,7 +282,6 @@ export async function POST(request: NextRequest) {
         const rd = rutaSnap.data() as Record<string, unknown>;
         const cajaRuta = typeof rd.cajaRuta === "number" ? rd.cajaRuta : 0;
         const inversiones = typeof rd.inversiones === "number" ? rd.inversiones : 0;
-        const ganancias = typeof rd.ganancias === "number" ? rd.ganancias : 0;
         const perdidas = typeof rd.perdidas === "number" ? rd.perdidas : 0;
         const oldCajas =
           typeof rd.cajasEmpleados === "number" ? rd.cajasEmpleados : 0;
@@ -247,7 +289,7 @@ export async function POST(request: NextRequest) {
         const prevCapital =
           typeof rd.capitalTotal === "number"
             ? rd.capitalTotal
-            : cajaRuta + oldCajas + inversiones + ganancias - perdidas;
+            : cajaRuta + oldCajas + inversiones - perdidas;
         const capitalTotal = prevCapital + montoDesdeBase;
         const merged = { ...rd, cajasEmpleados, capitalTotal, ultimaActualizacion: now };
         await rutaRef.set(

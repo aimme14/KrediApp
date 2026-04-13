@@ -7,8 +7,7 @@ import {
   PRESTAMOS_SUBCOLLECTION,
   USUARIOS_SUBCOLLECTION,
 } from "@/lib/empresas-db";
-import { listarGastosParaCapitalAdmin, listarGastosRutaPorAdmin } from "@/lib/gastos-totals";
-import { sumarGastosAdminDesdeLista } from "@/lib/capital-aggregates";
+import { listarGastosRutaPorAdmin } from "@/lib/gastos-totals";
 import { computeCapitalAdmin, computeCapitalRutaFromRutaFields } from "@/lib/capital-formulas";
 
 export type ResumenRutaItem = {
@@ -46,12 +45,11 @@ export async function GET(request: NextRequest) {
     .collection(PRESTAMOS_SUBCOLLECTION)
     .where("adminId", "==", apiUser.uid)
     .get();
-  const [gastosLista, gastosCapitalLista] = await Promise.all([
-    listarGastosRutaPorAdmin(db, apiUser.empresaId, apiUser.uid),
-    apiUser.role === "admin"
-      ? listarGastosParaCapitalAdmin(db, apiUser.empresaId, apiUser.uid)
-      : Promise.resolve([] as Array<{ monto?: number; rutaId?: string }>),
-  ]);
+  const gastosLista = await listarGastosRutaPorAdmin(
+    db,
+    apiUser.empresaId,
+    apiUser.uid
+  );
 
   const prestamos = prestamosSnap.docs.map((d) => {
     const data = d.data();
@@ -137,12 +135,9 @@ export async function GET(request: NextRequest) {
       sumaCapitalRutas += capitalTotal;
     }
 
-    const { gastosAdmin, gastosRuta } = sumarGastosAdminDesdeLista(gastosCapitalLista);
     capitalAdmin = computeCapitalAdmin({
       cajaAdmin,
       sumaCapitalRutas,
-      gastosAdmin,
-      gastosRuta,
     });
     capitalAdmin = Math.round(capitalAdmin * 100) / 100;
   }

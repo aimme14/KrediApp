@@ -4,6 +4,14 @@ import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { listRutas, createRuta, listClientes, listPrestamos, formatClienteCodigoCorto, type RutaItem, type ClienteItem, type PrestamoItem } from "@/lib/empresa-api";
 
+function formatMonto(value: number): string {
+  const hasDecimals = Math.round(value * 100) % 100 !== 0;
+  return `$ ${value.toLocaleString("es-CO", {
+    minimumFractionDigits: hasDecimals ? 2 : 0,
+    maximumFractionDigits: 2,
+  })}`;
+}
+
 export default function RutasPage() {
   const { user, profile } = useAuth();
   const [rutas, setRutas] = useState<RutaItem[]>([]);
@@ -81,8 +89,13 @@ export default function RutasPage() {
   return (
     <div className="card">
       <h2 style={{ marginTop: 0 }}>Rutas</h2>
-      <p style={{ color: "var(--text-muted)", fontSize: "0.875rem", marginBottom: "1.25rem" }}>
+      <p style={{ color: "var(--text-muted)", fontSize: "0.875rem", marginBottom: "0.5rem" }}>
         Crea rutas con nombre y ubicación. Al desplegar una ruta verás los clientes con su información y estado financiero.
+      </p>
+      <p style={{ color: "var(--text-muted)", fontSize: "0.8125rem", marginBottom: "1.25rem", lineHeight: 1.45 }}>
+        <strong>Patrimonio total</strong> es todo el capital de la ruta. <strong>Base de la ruta</strong> es el efectivo disponible para operar.
+        Los préstamos salen de la base y suman en <strong>Inversiones</strong>; al cobrar, el dinero vuelve a la base y el interés acumula en{" "}
+        <strong>Ganancias</strong>.
       </p>
 
       <div style={{ marginBottom: "1.25rem" }}>
@@ -125,10 +138,10 @@ export default function RutasPage() {
                 inputMode="decimal"
                 value={capitalInicial}
                 onChange={(e) => setCapitalInicial(e.target.value)}
-                placeholder="Ej: 2000000 (sale de tu caja)"
+                placeholder="Ej: 2000000 (sale de tu base del administrador)"
               />
               <p style={{ fontSize: "0.875rem", color: "var(--text-muted)", marginTop: "0.25rem" }}>
-                Si ingresas un monto, se descontará de tu caja y quedará en caja de la ruta.
+                Si ingresas un monto, se descontará de tu base del administrador y quedará en la base de la ruta.
               </p>
             </div>
             {error && <p className="error-msg">{error}</p>}
@@ -182,6 +195,54 @@ export default function RutasPage() {
                 </span>
                 <span aria-hidden>{expandedRutaId === ruta.id ? "▼" : "▶"}</span>
               </button>
+
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fill, minmax(128px, 1fr))",
+                  gap: "0.65rem",
+                  marginTop: "0.75rem",
+                }}
+                aria-label="Resumen financiero de la ruta"
+              >
+                {(
+                  [
+                    { label: "Patrimonio total", value: ruta.capitalTotal ?? 0, title: "Patrimonio total (base ruta + bases empleados + inversiones − pérdidas)" },
+                    { label: "Base", value: ruta.cajaRuta ?? 0, title: "Efectivo en la ruta disponible para prestar o mover" },
+                    { label: "Inversiones", value: ruta.inversiones ?? 0, title: "Capital colocado en préstamos activos" },
+                    { label: "Ganancias", value: ruta.ganancias ?? 0, title: "Intereses acumulados por cobros" },
+                  ] as const
+                ).map((item) => (
+                  <div
+                    key={item.label}
+                    className="card"
+                    title={item.title}
+                    style={{
+                      padding: "0.65rem 0.85rem",
+                      margin: 0,
+                      background: "var(--card-bg)",
+                      border: "1px solid var(--card-border)",
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontSize: "0.7rem",
+                        color: "var(--text-muted)",
+                        textTransform: "uppercase",
+                        letterSpacing: "0.03em",
+                        display: "block",
+                        marginBottom: "0.25rem",
+                        lineHeight: 1.2,
+                      }}
+                    >
+                      {item.label}
+                    </span>
+                    <span style={{ fontSize: "1.05rem", fontWeight: 700, color: "var(--text)" }}>
+                      {formatMonto(typeof item.value === "number" ? item.value : 0)}
+                    </span>
+                  </div>
+                ))}
+              </div>
 
               {expandedRutaId === ruta.id && (
                 <div style={{ marginTop: "1rem", paddingTop: "1rem", borderTop: "1px solid var(--border)" }}>

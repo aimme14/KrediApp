@@ -57,7 +57,7 @@ function getChartPoints(historial: CapitalHistorialEntry[], montoActual: number)
   return points;
 }
 
-/** Aproximación de evolución de caja a partir del historial de capital (Σ admins actual). */
+/** Aproximación de evolución de base a partir del historial de capital (Σ admins actual). */
 function getChartPointsCaja(
   historial: CapitalHistorialEntry[],
   cajaActual: number,
@@ -238,9 +238,9 @@ export default function GestionFinancieraPage() {
       setBtnState("success");
       const anteriorCaja = capital?.cajaEmpresa ?? 0;
       if (data.cajaEmpresa > anteriorCaja) {
-        setToast({ tipo: "aumento", mensaje: "Caja de la empresa actualizada correctamente." });
+        setToast({ tipo: "aumento", mensaje: "Base de la empresa actualizada correctamente." });
       } else {
-        setToast({ tipo: "reduccion", mensaje: "Caja de la empresa actualizada." });
+        setToast({ tipo: "reduccion", mensaje: "Base de la empresa actualizada." });
       }
       setTimeout(() => setToast(null), TOAST_DURATION);
       setTimeout(() => setBtnState("default"), BUTTON_SUCCESS_DURATION);
@@ -285,7 +285,7 @@ export default function GestionFinancieraPage() {
     }
     const cajaDisp = capital?.cajaEmpresa ?? 0;
     if (invertirDestino !== "empresa" && num > cajaDisp) {
-      setInvertirError("El monto supera la caja empresa disponible.");
+      setInvertirError("El monto supera la base empresa disponible.");
       return;
     }
     setInvertirError(null);
@@ -303,8 +303,8 @@ export default function GestionFinancieraPage() {
         tipo: invertirDestino === "empresa" ? "aumento" : "reduccion",
         mensaje:
           invertirDestino === "empresa"
-            ? "Inversión en caja empresa registrada."
-            : "Transferencia a la caja del administrador registrada.",
+            ? "Inversión en base empresa registrada."
+            : "Transferencia a la base del administrador registrada.",
       });
       setTimeout(() => setToast(null), TOAST_DURATION);
     } catch (err) {
@@ -323,7 +323,7 @@ export default function GestionFinancieraPage() {
       return;
     }
     if (delta < 0 && -delta > cajaEmpresa) {
-      setAjusteError("No puedes restar más de lo disponible en caja empresa.");
+      setAjusteError("No puedes restar más de lo disponible en base empresa.");
       return;
     }
     setAjusteError(null);
@@ -335,11 +335,11 @@ export default function GestionFinancieraPage() {
       setAjusteInput("");
       setToast({
         tipo: delta > 0 ? "aumento" : "reduccion",
-        mensaje: delta > 0 ? "Caja aumentada correctamente." : "Caja reducida correctamente.",
+        mensaje: delta > 0 ? "Base aumentada correctamente." : "Base reducida correctamente.",
       });
       setTimeout(() => setToast(null), TOAST_DURATION);
     } catch (e) {
-      setAjusteError(e instanceof Error ? e.message : "Error al ajustar caja");
+      setAjusteError(e instanceof Error ? e.message : "Error al ajustar base");
     } finally {
       setAjusteSaving(false);
     }
@@ -365,7 +365,7 @@ export default function GestionFinancieraPage() {
   const desgloseDosLineas = (
     <div className="gf-capital-desglose gf-capital-desglose-dos">
       <span>Capital: {formatMonto(monto)}</span>
-      <span>Caja: {formatMonto(cajaEmpresa)}</span>
+      <span>Base: {formatMonto(cajaEmpresa)}</span>
     </div>
   );
 
@@ -394,8 +394,8 @@ export default function GestionFinancieraPage() {
         <div className="gf-kpi-card gf-kpi-caja">
           <span className="gf-kpi-emoji" aria-hidden>🏦</span>
           <span className="gf-kpi-value">{formatMonto(cajaEmpresa)}</span>
-          <span className="gf-kpi-label">CAJA DE LA EMPRESA</span>
-          <span className="gf-kpi-sub">Liquidez en caja</span>
+          <span className="gf-kpi-label">BASE DE LA EMPRESA</span>
+          <span className="gf-kpi-sub">Liquidez en base</span>
         </div>
       </div>
 
@@ -422,7 +422,7 @@ export default function GestionFinancieraPage() {
           onClick={() => setSeccionActiva("caja")}
         >
           <span className="gf-tab-icon" aria-hidden>🏦</span>
-          Caja
+          Base
         </button>
       </nav>
 
@@ -442,7 +442,7 @@ export default function GestionFinancieraPage() {
             </div>
             <span className="gf-capital-badge-privado">🔒 Privado</span>
           </div>
-          <p className="gf-capital-card-desc">Solo visible por el jefe. Para ingresar o ajustar montos usa la pestaña Caja.</p>
+          <p className="gf-capital-card-desc">Solo visible por el jefe. Para ingresar o ajustar montos usa la pestaña Base.</p>
 
           {loading ? (
             <p className="gf-loading">Cargando…</p>
@@ -521,7 +521,7 @@ export default function GestionFinancieraPage() {
         </div>
       </div>
 
-      {/* Panel Caja (misma estructura que antes el bloque de capital, orientado a caja empresa) */}
+      {/* Panel Base (misma estructura que antes el bloque de capital, orientado a base empresa) */}
       <div
         id="gf-panel-caja"
         role="tabpanel"
@@ -533,18 +533,18 @@ export default function GestionFinancieraPage() {
           <div className="gf-capital-card-header">
             <div className="gf-capital-card-title-wrap">
               <span className="gf-capital-icon" aria-hidden>🏦</span>
-              <h2 className="gf-capital-card-title">Caja de la empresa</h2>
+              <h2 className="gf-capital-card-title">Base de la empresa</h2>
             </div>
             <span className="gf-capital-badge-privado">🔒 Privado</span>
           </div>
-          <p className="gf-capital-card-desc">Solo visible y editable por el jefe. El capital total se calcula como caja + Σ capital administradores.</p>
+          <p className="gf-capital-card-desc">Solo visible y editable por el jefe. El capital total se calcula como base + Σ capital administradores.</p>
 
           {loading ? (
             <p className="gf-loading">Cargando…</p>
           ) : (
             <>
               <div className="gf-capital-display">
-                <span className="gf-capital-label">CAJA TOTAL</span>
+                <span className="gf-capital-label">BASE TOTAL</span>
                 <span className="gf-capital-monto" aria-live="polite">
                   ${formatMonto(cajaEmpresa)}
                 </span>
@@ -559,8 +559,8 @@ export default function GestionFinancieraPage() {
                     Tendencia: {tendencia === "subiendo" ? "Subiendo" : tendencia === "bajando" ? "Bajando" : "Estable"}
                   </span>
                 </div>
-                <p className="gf-caja-chart-note">Evolución aproximada de caja (referencia histórica)</p>
-                <div className="gf-mini-chart" role="img" aria-label="Evolución de la caja">
+                <p className="gf-caja-chart-note">Evolución aproximada de base (referencia histórica)</p>
+                <div className="gf-mini-chart" role="img" aria-label="Evolución de la base">
                   <MiniChart points={chartPointsCaja} />
                 </div>
               </div>
@@ -571,11 +571,11 @@ export default function GestionFinancieraPage() {
                 style={{ marginTop: "1.25rem", paddingTop: "1.25rem", borderTop: "1px solid var(--border)" }}
               >
                 <h3 className="gf-capital-form-label" style={{ marginBottom: "0.35rem", fontSize: "0.95rem" }}>
-                  Invertir en caja
+                  Invertir en base
                 </h3>
                 <p className="gf-capital-form-hint" style={{ marginBottom: "0.75rem" }}>
-                  <strong>Empresa:</strong> suma liquidez a la caja empresa.{" "}
-                  <strong>Administrador:</strong> transfiere desde la caja empresa hacia la caja de ese administrador (no cambia el capital total de la empresa).
+                  <strong>Empresa:</strong> suma liquidez a la base empresa.{" "}
+                  <strong>Administrador:</strong> transfiere desde la base empresa hacia la base de ese administrador (no cambia el capital total de la empresa).
                 </p>
                 <label htmlFor="gf-invertir-destino" className="gf-capital-form-label">
                   DESTINO
@@ -593,7 +593,7 @@ export default function GestionFinancieraPage() {
                     aria-invalid={!!invertirError}
                   >
                     <option value="">Seleccionar…</option>
-                    <option value="empresa">Empresa (caja empresa)</option>
+                    <option value="empresa">Empresa (base empresa)</option>
                     {adminsOrdenados.map((a, i) => (
                       <option key={a.uid} value={a.uid}>
                         Administrador {i + 1}
@@ -639,8 +639,8 @@ export default function GestionFinancieraPage() {
                   onClick={() => setFormCajaAbierto((v) => !v)}
                   aria-expanded={formCajaAbierto}
                   aria-controls="gf-caja-form-section"
-                  title={formCajaAbierto ? "Cerrar sección" : "Actualizar caja"}
-                  aria-label={formCajaAbierto ? "Cerrar sección de actualización de caja" : "Abrir sección para actualizar caja de la empresa"}
+                  title={formCajaAbierto ? "Cerrar sección" : "Actualizar base"}
+                  aria-label={formCajaAbierto ? "Cerrar sección de actualización de base" : "Abrir sección para actualizar base de la empresa"}
                 >
                   <svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
                     <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
@@ -657,7 +657,7 @@ export default function GestionFinancieraPage() {
               >
                 <form onSubmit={handleSubmitCaja} className="gf-capital-form">
                   <label htmlFor="gf-monto" className="gf-capital-form-label">
-                    ACTUALIZAR CAJA DE LA EMPRESA
+                    ACTUALIZAR BASE DE LA EMPRESA
                   </label>
                   <div className="gf-capital-input-wrap">
                     <span className="gf-capital-input-prefix">COP $</span>
@@ -710,7 +710,7 @@ export default function GestionFinancieraPage() {
                     </p>
                   )}
                   <p className="gf-capital-form-hint">
-                    Ingresa el nuevo monto de <strong>caja</strong> disponible en la empresa (se reparte el capital total: caja + Σ administradores).
+                    Ingresa el nuevo monto de <strong>base</strong> disponible en la empresa (se reparte el capital total: base + Σ administradores).
                   </p>
                   <button
                     type="submit"
@@ -739,10 +739,10 @@ export default function GestionFinancieraPage() {
 
                 <div style={{ marginTop: "1.5rem", paddingTop: "1.5rem", borderTop: "1px solid var(--border)" }}>
                   <label htmlFor="gf-ajuste-monto" className="gf-capital-form-label">
-                    AJUSTAR CAJA (SUMAR O RESTAR)
+                    AJUSTAR BASE (SUMAR O RESTAR)
                   </label>
                   <p className="gf-capital-form-hint" style={{ marginBottom: "0.5rem" }}>
-                    Número positivo para sumar a la caja; negativo para restar (solo hasta lo disponible).
+                    Número positivo para sumar a la base; negativo para restar (solo hasta lo disponible).
                   </p>
                   <div className="gf-capital-input-wrap" style={{ maxWidth: "14rem" }}>
                     <span className="gf-capital-input-prefix">COP $</span>
@@ -831,10 +831,10 @@ export default function GestionFinancieraPage() {
             aria-describedby="gf-modal-desc"
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 id="gf-modal-title" className="gf-modal-title">Confirmar caja de la empresa</h2>
+            <h2 id="gf-modal-title" className="gf-modal-title">Confirmar base de la empresa</h2>
             <p id="gf-modal-desc" className="gf-modal-desc">
-              Vas a establecer la <strong>caja</strong> en <strong className="gf-modal-monto">${formatMonto(cajaObjetivoPendiente)}</strong>. El capital total pasará a{" "}
-              <strong>${formatMonto(cajaObjetivoPendiente + sumaCapitalAdmins)}</strong> (caja + Σ administradores). Ingresa tu contraseña para confirmar.
+              Vas a establecer la <strong>base</strong> en <strong className="gf-modal-monto">${formatMonto(cajaObjetivoPendiente)}</strong>. El capital total pasará a{" "}
+              <strong>${formatMonto(cajaObjetivoPendiente + sumaCapitalAdmins)}</strong> (base + Σ administradores). Ingresa tu contraseña para confirmar.
             </p>
             <label htmlFor="gf-modal-password" className="gf-modal-label">Contraseña</label>
             <input

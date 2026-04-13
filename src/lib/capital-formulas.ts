@@ -3,6 +3,25 @@
  * Los valores persistidos son insumos; los capitales resultantes se calculan aquí.
  */
 
+function roundMoney(n: number): number {
+  return Math.round(n * 100) / 100;
+}
+
+/**
+ * Patrimonio de ruta: base ruta + bases empleados + capital colocado en préstamos − pérdidas reconocidas.
+ * La ganancia por intereses queda en la caja del trabajador (cajasEmpleados / caja jornada), no se suma aparte.
+ */
+export function computeCapitalTotalRutaDesdeSaldos(r: {
+  cajaRuta: number;
+  cajasEmpleados: number;
+  inversiones: number;
+  perdidas: number;
+}): number {
+  return roundMoney(
+    r.cajaRuta + r.cajasEmpleados + r.inversiones - r.perdidas
+  );
+}
+
 /**
  * capitalEmpresa = cajaEmpresa + suma(capitalAdmin de cada admin).
  * Los gastos de empresa descuentan la caja al registrarse; el total acumulado es informativo (subcolección gastosEmpresa).
@@ -15,22 +34,22 @@ export function computeCapitalEmpresa(
 }
 
 /**
- * capitalAdmin = cajaAdmin + suma(capitalRuta) − gastosAdmin − gastosRuta
+ * capitalAdmin = cajaAdmin + suma(capitalRuta).
+ * Los gastos operativos del admin se pagan desde caja al registrarse (`descontarCajaAdmin`);
+ * no se restan los montos de gastos otra vez aquí (evita doble descuento).
  * La suma de capitalRuta usa `capitalTotal` de cada ruta (ya neto de pérdidas registradas en la ruta).
  */
 export function computeCapitalAdmin(params: {
   cajaAdmin: number;
   sumaCapitalRutas: number;
-  gastosAdmin: number;
-  gastosRuta: number;
 }): number {
-  const { cajaAdmin, sumaCapitalRutas, gastosAdmin, gastosRuta } = params;
-  return cajaAdmin + sumaCapitalRutas - gastosAdmin - gastosRuta;
+  const { cajaAdmin, sumaCapitalRutas } = params;
+  return cajaAdmin + sumaCapitalRutas;
 }
 
 /**
- * capitalRuta alineado al modelo de negocio: base en ruta + cajas empleados + inversiones + ganancias − pérdidas.
- * En datos persistidos, `capitalTotal` de la ruta es la fuente de verdad operativa.
+ * Patrimonio de ruta: cajaRuta + cajasEmpleados + inversiones − perdidas.
+ * `ganancias` y `capitalTotal` opcional no alteran el resultado (compatibilidad de llamadas).
  */
 export function computeCapitalRutaFromRutaFields(r: {
   cajaRuta: number;
@@ -40,14 +59,10 @@ export function computeCapitalRutaFromRutaFields(r: {
   perdidas: number;
   capitalTotal?: number;
 }): number {
-  if (typeof r.capitalTotal === "number") {
-    return r.capitalTotal;
-  }
-  return (
-    r.cajaRuta +
-    r.cajasEmpleados +
-    r.inversiones +
-    r.ganancias -
-    r.perdidas
-  );
+  return computeCapitalTotalRutaDesdeSaldos({
+    cajaRuta: r.cajaRuta,
+    cajasEmpleados: r.cajasEmpleados,
+    inversiones: r.inversiones,
+    perdidas: r.perdidas,
+  });
 }
