@@ -15,6 +15,7 @@ import { persistAggregatedCapitalDocs } from "@/lib/capital-aggregates";
 import { parseMontoBase } from "@/lib/parse-monto-base";
 import { upsertCapitalRutaSnapshot } from "@/lib/capital-ruta-snapshot";
 import { rutaTieneEmpleadoAsignado } from "@/lib/ruta-empleado-ocupada";
+import { syncCustomClaimsForUid } from "@/lib/sync-custom-claims";
 
 /** Colección de contadores para códigos secuenciales (JF-001, AD-001 por jefe) */
 const COUNTERS_COLLECTION = "counters";
@@ -338,6 +339,8 @@ export async function POST(request: NextRequest) {
     if (adminNum !== null) userAuthData.adminNum = adminNum;
 
     await adminDb.collection(USERS_COLLECTION).doc(uid).set(userAuthData);
+
+    await syncCustomClaimsForUid(uid);
 
     return NextResponse.json({ uid });
   } catch (e) {

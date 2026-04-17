@@ -23,7 +23,7 @@ import type { MotivoNoPago, MotivoPerdida } from "@/types/finanzas";
 async function captureElementToCanvas(el: HTMLElement) {
   const { default: html2canvas } = await import("html2canvas");
   return html2canvas(el, {
-    scale: 2,
+    scale: 1,
     backgroundColor: "#ffffff",
     logging: false,
   });
@@ -52,6 +52,21 @@ function CloseIcon() {
   return (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
       <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+    </svg>
+  );
+}
+
+/** Indicador de captura del comprobante (html2canvas). */
+function ComprobanteLoadingIcon() {
+  return (
+    <svg className="comprobante-spinner-icon" width="44" height="44" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" opacity="0.2" />
+      <path
+        d="M12 2a10 10 0 0 1 10 10"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
     </svg>
   );
 }
@@ -143,8 +158,12 @@ function CobrarClientePageContent() {
   const [pagoIdConfirmado, setPagoIdConfirmado] = useState<string | null>(null);
   const comprobanteRef = useRef<HTMLDivElement>(null);
   const comprobanteBlobRef = useRef<Blob | null>(null);
-  const [comprobanteImageUrl, setComprobanteImageUrl] = useState<string | null>(null);
+  const comprobanteObjectUrlRef = useRef<string | null>(null);
+  /** Vista previa local (blob:) o URL remota tras guardar en Storage. */
+  const [comprobanteDisplayUrl, setComprobanteDisplayUrl] = useState<string | null>(null);
   const [comprobanteGenerando, setComprobanteGenerando] = useState(false);
+  const [comprobanteSubiendo, setComprobanteSubiendo] = useState(false);
+  const [comprobanteRemotoOk, setComprobanteRemotoOk] = useState(false);
   const [comprobanteError, setComprobanteError] = useState<string | null>(null);
   const [showShareMenu, setShowShareMenu] = useState(false);
   const shareMenuRef = useRef<HTMLDivElement>(null);
@@ -236,8 +255,7 @@ function CobrarClientePageContent() {
 
   const fotosRequeridas = metodoPago === "transferencia" ? 2 : 1;
   const fotosActuales = evidenciaFiles.slice(0, fotosRequeridas).filter(Boolean).length;
-  const evidenciaCompleta = fotosActuales === fotosRequeridas;
-  const puedeConfirmar = montoNum > 0 && metodoPago && evidenciaCompleta;
+  const puedeConfirmar = montoNum > 0 && metodoPago;
 
   const setEvidenciaAt = (index: 0 | 1, file: File | null) => {
     setEvidenciaFiles((prev) => {
@@ -275,10 +293,20 @@ function CobrarClientePageContent() {
     return () => document.removeEventListener("click", handleClickOutside);
   }, [showShareMenu]);
 
-  const generarYSubirComprobante = useCallback(async () => {
+  useEffect(() => {
+    return () => {
+      if (comprobanteObjectUrlRef.current) {
+        URL.revokeObjectURL(comprobanteObjectUrlRef.current);
+        comprobanteObjectUrlRef.current = null;
+      }
+    };
+  }, []);
+
+  const generarComprobanteLocal = useCallback(async () => {
     const el = comprobanteRef.current;
-    if (!el || !prestamo || !pagoIdConfirmado || !user) return;
+    if (!el) throw new Error("No se encontró el comprobante en pantalla");
     setComprobanteError(null);
+    setComprobanteRemotoOk(false);
     setComprobanteGenerando(true);
     try {
       const canvas = await captureElementToCanvas(el);
@@ -287,6 +315,28 @@ function CobrarClientePageContent() {
       );
       if (!blob) throw new Error("No se pudo generar la imagen");
       comprobanteBlobRef.current = blob;
+      if (comprobanteObjectUrlRef.current) {
+        URL.revokeObjectURL(comprobanteObjectUrlRef.current);
+        comprobanteObjectUrlRef.current = null;
+      }
+      const objUrl = URL.createObjectURL(blob);
+      comprobanteObjectUrlRef.current = objUrl;
+      setComprobanteDisplayUrl(objUrl);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Error al generar comprobante";
+      setComprobanteError(msg);
+      throw e;
+    } finally {
+      setComprobanteGenerando(false);
+    }
+  }, []);
+
+  const subirComprobanteAlServidor = useCallback(async () => {
+    const blob = comprobanteBlobRef.current;
+    if (!blob || !prestamo || !pagoIdConfirmado || !user) return;
+    setComprobanteError(null);
+    setComprobanteSubiendo(true);
+    try {
       const file = new File([blob], "comprobante-pago.png", { type: "image/png" });
       const token = await user.getIdToken();
       const url = await uploadImage(file, {
@@ -295,34 +345,65 @@ function CobrarClientePageContent() {
         filename: pagoIdConfirmado,
       });
       await actualizarComprobantePago(token, prestamo.id, pagoIdConfirmado, url);
-      setComprobanteImageUrl(url);
+      if (comprobanteObjectUrlRef.current) {
+        URL.revokeObjectURL(comprobanteObjectUrlRef.current);
+        comprobanteObjectUrlRef.current = null;
+      }
+      setComprobanteDisplayUrl(url);
+      setComprobanteRemotoOk(true);
     } catch (e) {
-      setComprobanteError(e instanceof Error ? e.message : "Error al generar comprobante");
+      setComprobanteError(e instanceof Error ? e.message : "Error al guardar comprobante en el préstamo");
     } finally {
-      setComprobanteGenerando(false);
+      setComprobanteSubiendo(false);
     }
   }, [prestamo, pagoIdConfirmado, user]);
 
+  const reintentarComprobante = useCallback(async () => {
+    if (comprobanteBlobRef.current && comprobanteDisplayUrl && comprobanteError) {
+      await subirComprobanteAlServidor();
+      return;
+    }
+    try {
+      await generarComprobanteLocal();
+      await subirComprobanteAlServidor();
+    } catch {
+      /* generarComprobanteLocal ya registró el error */
+    }
+  }, [comprobanteDisplayUrl, comprobanteError, generarComprobanteLocal, subirComprobanteAlServidor]);
+
   useEffect(() => {
-    if (!confirmado || !pagoIdConfirmado || !prestamo || !user || comprobanteImageUrl) return;
+    if (!confirmado || !pagoIdConfirmado || !prestamo || !user || comprobanteDisplayUrl) return;
     const el = comprobanteRef.current;
     if (!el) return;
     let cancelled = false;
-    setComprobanteGenerando(true);
-    setComprobanteError(null);
     const t = setTimeout(() => {
-      generarYSubirComprobante().finally(() => {
-        if (!cancelled) setComprobanteGenerando(false);
-      });
+      void (async () => {
+        try {
+          await generarComprobanteLocal();
+          if (cancelled) return;
+          void subirComprobanteAlServidor();
+        } catch {
+          /* error de generación */
+        }
+      })();
     }, 300);
     return () => {
       cancelled = true;
       clearTimeout(t);
-      setComprobanteGenerando(false);
     };
-  }, [confirmado, pagoIdConfirmado, prestamo?.id, user, comprobanteImageUrl, generarYSubirComprobante]);
+  }, [confirmado, pagoIdConfirmado, prestamo?.id, user, comprobanteDisplayUrl, generarComprobanteLocal, subirComprobanteAlServidor]);
 
   const descargarComprobanteDesdeDOM = useCallback(async () => {
+    const blobCached = comprobanteBlobRef.current;
+    if (blobCached) {
+      const url = URL.createObjectURL(blobCached);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "comprobante-pago.png";
+      a.click();
+      URL.revokeObjectURL(url);
+      return;
+    }
     const el = comprobanteRef.current;
     if (!el) return;
     try {
@@ -495,10 +576,26 @@ function CobrarClientePageContent() {
     totalAPagar > 0 && numeroCuotas > 0
       ? Math.min(numeroCuotas, Math.ceil((saldoTrasCobro / totalAPagar) * numeroCuotas))
       : 0;
-  const cuotasPagadasTrasCobro = numeroCuotas - cuotasRestantesTrasCobro;
 
   if (confirmado) {
     const prestamoSaldado = saldoTrasCobro === 0;
+    let comprobanteEstadoMsg: string | null = null;
+    if (comprobanteGenerando) {
+      comprobanteEstadoMsg = null;
+    } else if (comprobanteDisplayUrl && comprobanteSubiendo) {
+      comprobanteEstadoMsg = "Guardando copia del comprobante en el préstamo…";
+    } else if (comprobanteDisplayUrl && comprobanteRemotoOk) {
+      comprobanteEstadoMsg = "Copia del comprobante guardada en el préstamo.";
+    } else if (comprobanteDisplayUrl && !comprobanteRemotoOk && !comprobanteSubiendo && !comprobanteError) {
+      comprobanteEstadoMsg = "Listo para compartir.";
+    }
+    const textoComprobanteWa =
+      `Comprobante KrediApp — ${cliente.nombre}\n` +
+      `Monto pagado: ${formatCurrency(montoAplicar)}\n` +
+      `Saldo restante: ${formatCurrency(saldoTrasCobro)}\n` +
+      `${new Date().toLocaleString("es-CO")}`;
+    const mostrarPlaceholderCarga =
+      !comprobanteDisplayUrl && (!comprobanteError || comprobanteGenerando);
     return (
       <div className="card cobrar-card cobrar-confirmacion">
         <h2 className="cobrar-title">Cobro registrado</h2>
@@ -512,7 +609,10 @@ function CobrarClientePageContent() {
           <p><strong>Nuevo saldo pendiente:</strong> {formatCurrency(saldoTrasCobro)}</p>
           <p><strong>Cuotas restantes:</strong> {cuotasRestantesTrasCobro} de {numeroCuotas}</p>
         </div>
-        {comprobanteError && (
+        {comprobanteEstadoMsg && (
+          <p className="comprobante-estado-msg">{comprobanteEstadoMsg}</p>
+        )}
+        {comprobanteError && !comprobanteDisplayUrl && (
           <div className="cobrar-comprobante-error" role="alert">
             <p className="cobrar-comprobante-error-msg">Cobro registrado correctamente. No se pudo generar la imagen del comprobante para compartir.</p>
             <p className="cobrar-comprobante-error-detail">{comprobanteError}</p>
@@ -520,8 +620,8 @@ function CobrarClientePageContent() {
               <button
                 type="button"
                 className="btn btn-secondary"
-                onClick={() => generarYSubirComprobante()}
-                disabled={comprobanteGenerando}
+                onClick={() => void reintentarComprobante()}
+                disabled={comprobanteGenerando || comprobanteSubiendo}
               >
                 {comprobanteGenerando ? "Generando…" : "Reintentar comprobante"}
               </button>
@@ -535,55 +635,81 @@ function CobrarClientePageContent() {
             </div>
           </div>
         )}
-        {comprobanteImageUrl ? (
+        {comprobanteError && comprobanteDisplayUrl && (
+          <div className="cobrar-comprobante-error cobrar-comprobante-error-soft" role="alert">
+            <p className="cobrar-comprobante-error-msg">
+              Ya puedes compartir la imagen del comprobante. No se pudo guardar la copia en el préstamo.
+            </p>
+            <p className="cobrar-comprobante-error-detail">{comprobanteError}</p>
+            <div className="cobrar-comprobante-error-actions">
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => void subirComprobanteAlServidor()}
+                disabled={comprobanteSubiendo}
+              >
+                {comprobanteSubiendo ? "Guardando…" : "Reintentar guardar en el préstamo"}
+              </button>
+            </div>
+          </div>
+        )}
+        {comprobanteDisplayUrl ? (
           <div className="comprobante-cobro comprobante-imagen-wrap">
-            <img src={comprobanteImageUrl} alt="Comprobante de pago" className="comprobante-imagen" />
+            <img src={comprobanteDisplayUrl} alt="Comprobante de pago" className="comprobante-imagen" />
           </div>
         ) : (
           <>
-            {comprobanteGenerando && (
-              <p className="comprobante-generando-msg">Generando comprobante en imagen…</p>
+            {mostrarPlaceholderCarga && (
+              <div className="comprobante-placeholder" role="status" aria-live="polite" aria-busy={mostrarPlaceholderCarga}>
+                <ComprobanteLoadingIcon />
+                <span className="comprobante-placeholder-texto">Generando comprobante…</span>
+                <span className="comprobante-placeholder-hint">Preparando imagen para compartir</span>
+              </div>
             )}
-            <div ref={comprobanteRef} className="comprobante-cobro comprobante-voucher" aria-label="Comprobante para el cliente">
-              <div className="voucher-header">
-                <div className="voucher-icon" aria-hidden>✓</div>
-                <h3 className="voucher-title">Pago exitoso</h3>
-                <p className="voucher-subtitle">Comprobante de pago</p>
-              </div>
-              <div className="voucher-monto">
-                <span className="voucher-monto-label">Monto pagado</span>
-                <span className="voucher-monto-value">{formatCurrency(montoAplicar)}</span>
-              </div>
-              <div className="voucher-rows">
-                <div className="voucher-row">
-                  <span className="voucher-row-label">Cliente</span>
-                  <span className="voucher-row-value">{cliente.nombre}</span>
-                </div>
-                {cliente.cedula && (
-                  <div className="voucher-row">
-                    <span className="voucher-row-label">Cédula</span>
-                    <span className="voucher-row-value">{cliente.cedula}</span>
+            <div className="comprobante-capture-offscreen" aria-hidden="true">
+              <div ref={comprobanteRef} className="comprobante-cobro comprobante-voucher" aria-label="Comprobante para el cliente">
+                  <div className="voucher-header">
+                    <div className="voucher-icon" aria-hidden>✓</div>
+                    <h3 className="voucher-title">Pago exitoso</h3>
+                    <p className="voucher-subtitle">Comprobante de pago</p>
                   </div>
-                )}
-                {cliente.telefono && (
-                  <div className="voucher-row">
-                    <span className="voucher-row-label">Teléfono</span>
-                    <span className="voucher-row-value">{cliente.telefono}</span>
+                  <div className="voucher-monto">
+                    <span className="voucher-monto-label">Monto pagado</span>
+                    <span className="voucher-monto-value">{formatCurrency(montoAplicar)}</span>
                   </div>
-                )}
-                <div className="voucher-row">
-                  <span className="voucher-row-label">Cuota</span>
-                  <span className="voucher-row-value">Cuota {cuotasPagadasTrasCobro} de {numeroCuotas}</span>
+                  <div className="voucher-rows">
+                    <div className="voucher-row">
+                      <span className="voucher-row-label">Cliente</span>
+                      <span className="voucher-row-value">{cliente.nombre}</span>
+                    </div>
+                    {cliente.cedula && (
+                      <div className="voucher-row">
+                        <span className="voucher-row-label">Cédula</span>
+                        <span className="voucher-row-value">{cliente.cedula}</span>
+                      </div>
+                    )}
+                    {cliente.telefono && (
+                      <div className="voucher-row">
+                        <span className="voucher-row-label">Teléfono</span>
+                        <span className="voucher-row-value">{cliente.telefono}</span>
+                      </div>
+                    )}
+                    <div className="voucher-row">
+                      <span className="voucher-row-label">Cuotas restantes</span>
+                      <span className="voucher-row-value">
+                        {cuotasRestantesTrasCobro} de {numeroCuotas}
+                      </span>
+                    </div>
+                    <div className="voucher-row">
+                      <span className="voucher-row-label">Saldo restante</span>
+                      <span className="voucher-row-value">{formatCurrency(saldoTrasCobro)}</span>
+                    </div>
+                  </div>
+                  <div className="voucher-footer">
+                    <p className="voucher-fecha">{new Date().toLocaleString("es-CO", { dateStyle: "long", timeStyle: "short" })}</p>
+                    <p className="voucher-brand">KrediApp · Comprobante válido</p>
+                  </div>
                 </div>
-                <div className="voucher-row">
-                  <span className="voucher-row-label">Saldo restante</span>
-                  <span className="voucher-row-value">{formatCurrency(saldoTrasCobro)}</span>
-                </div>
-              </div>
-              <div className="voucher-footer">
-                <p className="voucher-fecha">{new Date().toLocaleString("es-CO", { dateStyle: "long", timeStyle: "short" })}</p>
-                <p className="voucher-brand">KrediApp · Comprobante válido</p>
-              </div>
             </div>
           </>
         )}
@@ -596,7 +722,7 @@ function CobrarClientePageContent() {
               onClick={(e) => { e.stopPropagation(); setShowShareMenu((v) => !v); setError(null); }}
               aria-expanded={showShareMenu}
               aria-haspopup="true"
-              disabled={!comprobanteImageUrl}
+              disabled={!comprobanteDisplayUrl}
             >
               Compartir
             </button>
@@ -615,26 +741,26 @@ function CobrarClientePageContent() {
                   type="button"
                   className="compartir-opcion compartir-opcion-icono"
                   role="menuitem"
-                  disabled={!comprobanteImageUrl}
+                  disabled={!comprobanteDisplayUrl}
                   onClick={async () => {
-                    if (!comprobanteImageUrl) return;
+                    if (!comprobanteDisplayUrl) return;
                     setShowShareMenu(false);
                     setError(null);
                     try {
-                      const blob = comprobanteBlobRef.current ?? await getImageBlob(comprobanteImageUrl);
+                      const blob = comprobanteBlobRef.current ?? await getImageBlob(comprobanteDisplayUrl);
                       const file = new File([blob], "comprobante-pago.png", { type: blob.type || "image/png" });
                       const hasShareApi = typeof navigator !== "undefined" && "share" in navigator;
                       const canShare = hasShareApi && (typeof navigator.canShare === "function" ? navigator.canShare({ files: [file] }) : true);
                       if (canShare) {
                         await navigator.share({ files: [file], title: "Comprobante de pago" });
                       } else {
-                        const url = URL.createObjectURL(blob);
+                        const dl = URL.createObjectURL(blob);
                         const a = document.createElement("a");
-                        a.href = url;
+                        a.href = dl;
                         a.download = "comprobante-pago.png";
                         a.click();
-                        URL.revokeObjectURL(url);
-                        window.open("https://wa.me/?text=" + encodeURIComponent(comprobanteImageUrl), "_blank", "noopener");
+                        URL.revokeObjectURL(dl);
+                        window.open("https://wa.me/?text=" + encodeURIComponent(textoComprobanteWa), "_blank", "noopener");
                       }
                     } catch (e) {
                       setError(e instanceof Error ? e.message : "Error al compartir la imagen");
@@ -948,13 +1074,11 @@ function CobrarClientePageContent() {
         </div>
 
         <div className="form-group">
-          <label>
-            Evidencia del pago <span className="form-required" aria-hidden>*</span>
-          </label>
+          <label>Evidencia del pago (opcional)</label>
           <p className="cobrar-evidencia-hint">
             {metodoPago === "efectivo"
-              ? "Efectivo: 1 foto obligatoria (subir o tomar con cámara)."
-              : "Transferencia: 2 fotos obligatorias (subir o tomar con cámara)."}
+              ? "Efectivo: puedes adjuntar hasta 1 foto (subir o tomar con cámara)."
+              : "Transferencia: puedes adjuntar hasta 2 fotos (subir o tomar con cámara)."}
           </p>
           <p className="cobrar-evidencia-progress">
             {fotosActuales} de {fotosRequeridas} foto{fotosRequeridas === 2 ? "s" : ""}
@@ -1081,7 +1205,6 @@ function CobrarClientePageContent() {
             type="submit"
             className="btn btn-primary"
             disabled={!puedeConfirmar || submitting}
-            title={!evidenciaCompleta ? `Falta evidencia: ${fotosRequeridas - fotosActuales} foto(s) requerida(s)` : undefined}
           >
             {submitting ? "Registrando..." : "Confirmar cobro"}
           </button>

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminFirestore } from "@/lib/firebase-admin";
+import { syncCustomClaimsForUid } from "@/lib/sync-custom-claims";
 import { getApiUser } from "@/lib/api-auth";
 import { EMPRESAS_COLLECTION, USUARIOS_SUBCOLLECTION, USERS_COLLECTION } from "@/lib/empresas-db";
 
@@ -56,6 +57,8 @@ export async function PATCH(
       await usuarioRef.update({ activo: enabled });
     }
   }
+
+  await syncCustomClaimsForUid(empleadoUid);
 
   return NextResponse.json({ ok: true });
 }

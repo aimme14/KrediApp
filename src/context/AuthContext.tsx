@@ -166,6 +166,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         const profile = await fetchUserProfile(user.uid, user.email ?? undefined);
         setState((s) => ({ ...s, user, profile, loading: false, error: null }));
+        try {
+          const idToken = await user.getIdToken();
+          await fetch("/api/users/me/sync-claims", {
+            method: "POST",
+            headers: { Authorization: `Bearer ${idToken}` },
+          });
+          await user.getIdToken(true);
+        } catch {
+          /* claims opcionales si la API falla */
+        }
       } catch {
         setState((s) => ({ ...s, user, profile: null, loading: false, error: null }));
       }

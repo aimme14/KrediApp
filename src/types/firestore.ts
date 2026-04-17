@@ -58,6 +58,8 @@ export interface RutaDoc {
   fechaCreacion: Date;
   /** Código legible RT-{adminNum}-{routeNum} (id técnico es el doc id) */
   codigo?: string;
+  /** Si false, los trabajadores no pueden usar cobros hasta que el admin abra (manual). Omisión = abierta. */
+  rutaOperativa?: boolean;
 }
 
 /** Cliente */

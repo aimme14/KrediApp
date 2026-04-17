@@ -3979,6 +3979,30 @@ th {
   background: var(--perfil-empresa-primary-hover);
 }
 
+/* Trabajador: ruta cerrada por admin */
+.ruta-operativa-cerrada-card {
+  padding: 1.25rem 1.35rem;
+  border: 1px solid var(--card-border);
+  border-radius: 12px;
+}
+.ruta-operativa-cerrada-title {
+  margin: 0 0 0.75rem 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+.ruta-operativa-cerrada-text {
+  margin: 0 0 0.65rem 0;
+  font-size: 0.9375rem;
+  line-height: 1.5;
+  color: var(--text);
+}
+.ruta-operativa-cerrada-hint {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+
 /* ── Ruta del día ───────────────────────────────────────────────────────── */
 .ruta-dia-card {
   max-width: 480px;
@@ -4019,6 +4043,60 @@ th {
   font-size: 1.125rem;
   color: #16a34a;
 }
+
+.ruta-dia-caja-card {
+  margin-bottom: 1.25rem;
+  padding: 1rem 1.1rem;
+  border-radius: 12px;
+  border: 1px solid var(--card-border);
+  background: var(--input-bg);
+}
+.ruta-dia-caja-inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.ruta-dia-caja-text { flex: 1; min-width: 0; }
+.ruta-dia-caja-title {
+  margin: 0 0 0.25rem 0;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+.ruta-dia-caja-desc {
+  margin: 0;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  color: var(--text-muted);
+}
+.ruta-dia-caja-monto-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.35rem;
+  flex-shrink: 0;
+}
+.ruta-dia-caja-monto {
+  font-size: 1.5rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.ruta-dia-caja-link {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--link);
+  text-decoration: none;
+}
+.ruta-dia-caja-link:hover {
+  text-decoration: underline;
+}
+
 .ruta-dia-toolbar {
   display: flex;
   flex-wrap: wrap;
@@ -4408,6 +4486,68 @@ th {
 .cobrar-comprobante-error-detail { margin: 0 0 0.75rem 0; font-size: 0.875rem; color: var(--text-muted); }
 .cobrar-comprobante-error-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
 
+.cobrar-comprobante-error-soft {
+  border-color: var(--warning-border, #facc15);
+  background: var(--warning-bg, #fefce8);
+}
+
+.comprobante-estado-msg {
+  margin: 0 0 0.75rem 0;
+  font-size: 0.875rem;
+  color: var(--text-muted);
+}
+
+/* Placeholder + fuente off-screen para captura html2canvas */
+.comprobante-placeholder {
+  max-width: 380px;
+  margin: 0 auto 1.25rem;
+  min-height: 280px;
+  border-radius: 20px;
+  border: 1px dashed var(--card-border);
+  background: var(--input-bg);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  padding: 2rem 1.5rem;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.comprobante-placeholder-texto {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--text);
+  margin-top: 0.5rem;
+}
+
+.comprobante-placeholder-hint {
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+}
+
+.comprobante-spinner-icon {
+  color: var(--link);
+  animation: comprobante-spin 0.75s linear infinite;
+}
+
+@keyframes comprobante-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Voucher oculto a la vista pero en el DOM para html2canvas y “Descargar desde pantalla” */
+.comprobante-capture-offscreen {
+  position: fixed;
+  left: -9999px;
+  top: 0;
+  width: 380px;
+  pointer-events: none;
+  z-index: -1;
+}
+
 .cobrar-evidencia-hint { margin: 0.25rem 0 0 0; font-size: 0.875rem; color: var(--text-muted); }
 .cobrar-evidencia-progress { margin: 0.25rem 0 0.5rem 0; font-size: 0.8125rem; font-weight: 600; }
 .cobrar-evidencia-slots { display: flex; flex-direction: column; gap: 1rem; }
@@ -4501,112 +4641,188 @@ th {
   max-width: 360px;
 }
 
-/* Voucher tipo Nequi / documento (fondo claro para captura e impresión) */
-.comprobante-voucher {
-  max-width: 380px;
-  padding: 0;
-  border-radius: 16px;
-  overflow: hidden;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.08);
-  border: 1px solid #e5e7eb;
-  background: #ffffff !important;
-  color: #111827 !important;
+/* Voucher comprobante de cobro (fondo claro fijo para captura html2canvas e impresión) */
+.comprobante-cobro.comprobante-voucher {
+  margin-left: auto;
+  margin-right: auto;
 }
+
+.comprobante-voucher {
+  --voucher-fg: #0f172a;
+  --voucher-muted: #64748b;
+  --voucher-border: #e2e8f0;
+  --voucher-accent: #7c3aed;
+  --voucher-success: #059669;
+  --voucher-surface: #ffffff;
+  --voucher-soft: #f8fafc;
+
+  max-width: 380px;
+  width: 100%;
+  padding: 0;
+  border-radius: 20px;
+  overflow: hidden;
+  box-sizing: border-box;
+  color-scheme: light;
+  isolation: isolate;
+  /* Sombra suave: html2canvas a veces artefacta sombras fuertes */
+  box-shadow:
+    0 1px 2px rgba(15, 23, 42, 0.06),
+    0 8px 24px rgba(15, 23, 42, 0.06);
+  border: 1px solid var(--voucher-border);
+  background: var(--voucher-surface) !important;
+  color: var(--voucher-fg) !important;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
 .voucher-header {
   text-align: center;
-  padding: 1.5rem 1.25rem 1rem;
-  border-bottom: 1px solid #e5e7eb;
+  padding: 1.75rem 1.5rem 1.35rem;
+  background: linear-gradient(180deg, #f8fafc 0%, #ffffff 55%);
+  border-bottom: 1px solid var(--voucher-border);
 }
+
 .voucher-icon {
-  width: 48px;
-  height: 48px;
-  margin: 0 auto 0.75rem;
+  width: 52px;
+  height: 52px;
+  margin: 0 auto 1rem;
   border-radius: 50%;
-  background: #059669;
+  background: linear-gradient(145deg, #10b981 0%, var(--voucher-success) 100%);
   color: #fff;
-  font-size: 1.5rem;
+  font-size: 1.6rem;
   font-weight: 700;
   display: flex;
   align-items: center;
   justify-content: center;
   line-height: 1;
+  box-shadow:
+    0 2px 6px rgba(5, 150, 105, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.25);
 }
+
 .voucher-title {
-  margin: 0 0 0.25rem 0;
-  font-size: 1.25rem;
-  font-weight: 700;
-  color: #111827;
+  margin: 0 0 0.35rem 0;
+  font-size: 1.35rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--voucher-fg);
 }
+
 .voucher-subtitle {
   margin: 0;
-  font-size: 0.8125rem;
-  color: #6b7280;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--voucher-muted);
 }
+
 .voucher-monto {
-  padding: 1.25rem 1.25rem 1rem;
+  position: relative;
+  padding: 1.35rem 1.5rem 1.25rem;
   text-align: center;
-  background: #f9fafb;
-  border-bottom: 1px solid #e5e7eb;
+  background: var(--voucher-soft);
+  border-bottom: 1px solid var(--voucher-border);
 }
+
+/* Acento lateral (sin cambiar textos) */
+.voucher-monto::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.85rem;
+  bottom: 0.85rem;
+  width: 4px;
+  border-radius: 0 4px 4px 0;
+  background: linear-gradient(180deg, var(--voucher-accent) 0%, #a78bfa 100%);
+}
+
 .voucher-monto-label {
   display: block;
-  font-size: 0.75rem;
-  color: #6b7280;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: var(--voucher-muted);
   text-transform: uppercase;
-  letter-spacing: 0.04em;
-  margin-bottom: 0.35rem;
+  letter-spacing: 0.08em;
+  margin-bottom: 0.45rem;
 }
+
 .voucher-monto-value {
-  font-size: 1.75rem;
+  font-size: 1.85rem;
   font-weight: 800;
-  color: #111827;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+  color: var(--voucher-fg);
 }
+
 .voucher-rows {
-  padding: 0.5rem 1.25rem 1rem;
+  padding: 0.35rem 1.5rem 1.15rem;
+  background: var(--voucher-surface);
 }
+
 .voucher-row {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
-  padding: 0.5rem 0;
-  border-bottom: 1px solid #f3f4f6;
-  gap: 0.75rem;
+  padding: 0.65rem 0;
+  gap: 1rem;
+  border-bottom: 1px solid #f1f5f9;
 }
-.voucher-row:last-child { border-bottom: none; }
+
+.voucher-row:last-child {
+  border-bottom: none;
+  padding-bottom: 0.35rem;
+}
+
 .voucher-row-label {
   font-size: 0.8125rem;
-  color: #6b7280;
+  font-weight: 600;
+  color: #475569;
   flex-shrink: 0;
+  min-width: 5rem;
 }
+
 .voucher-row-value {
   font-size: 0.9375rem;
   font-weight: 600;
-  color: #111827;
+  color: var(--voucher-fg);
   text-align: right;
+  word-break: break-word;
+  font-variant-numeric: tabular-nums;
 }
+
 .voucher-footer {
-  padding: 1rem 1.25rem;
-  background: #f9fafb;
-  border-top: 1px solid #e5e7eb;
+  padding: 1.15rem 1.5rem 1.35rem;
+  text-align: center;
+  background: linear-gradient(180deg, #fafafa 0%, var(--voucher-soft) 100%);
+  border-top: 1px solid var(--voucher-border);
 }
+
 .voucher-fecha {
-  margin: 0 0 0.35rem 0;
+  margin: 0 0 0.4rem 0;
   font-size: 0.8125rem;
-  color: #6b7280;
+  color: var(--voucher-muted);
+  line-height: 1.45;
 }
+
 .voucher-brand {
   margin: 0;
   font-size: 0.75rem;
-  color: #9ca3af;
+  font-weight: 600;
+  color: #94a3b8;
+  letter-spacing: 0.02em;
 }
 
 .comprobante-imagen-wrap {
   max-width: 380px;
   margin-bottom: 1.25rem;
-  border-radius: 16px;
+  margin-left: auto;
+  margin-right: auto;
+  border-radius: 20px;
   overflow: hidden;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.08);
-  border: 1px solid var(--card-border);
+  box-shadow:
+    0 1px 2px rgba(15, 23, 42, 0.06),
+    0 8px 24px rgba(15, 23, 42, 0.06);
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
 }
 .comprobante-imagen {
   display: block;
@@ -4689,8 +4905,9 @@ th {
   .cobrar-resumen-post { display: none !important; }
   .comprobante-voucher {
     box-shadow: none;
-    border: 1px solid #d1d5db;
+    border: 1px solid #cbd5e1;
     max-width: 100%;
+    border-radius: 12px;
   }
 }
 

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
+import { TrabajadorRutaProvider, useTrabajadorRuta } from "@/context/TrabajadorRutaContext";
 
 const NAV_ITEMS = [
   { href: "/dashboard/trabajador", label: "Inicio", icon: "home" },
@@ -91,6 +92,30 @@ function NavIcon({ name }: { name: string }) {
   }
 }
 
+/** Bloquea la operación si el admin cerró la ruta (`rutaOperativa === false`). Una sola suscripción en el provider. */
+function RutaOperativaGate({ children }: { children: React.ReactNode }) {
+  const { puedeOperar, loading, ruta } = useTrabajadorRuta();
+
+  if (loading || puedeOperar) {
+    return <>{children}</>;
+  }
+
+  return (
+    <div className="container" style={{ paddingTop: "2rem", maxWidth: "420px" }}>
+      <div className="card ruta-operativa-cerrada-card">
+        <h2 className="ruta-operativa-cerrada-title">Ruta no disponible</h2>
+        <p className="ruta-operativa-cerrada-text">
+          Tu ruta <strong>{ruta?.nombre ? `«${ruta.nombre}»` : ""}</strong> está cerrada por el administrador.
+          No puedes registrar cobros ni operaciones de ruta hasta que la abran de nuevo.
+        </p>
+        <p className="ruta-operativa-cerrada-hint">
+          Si necesitas trabajar ya, contacta al administrador para que habilite la operación del día.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 export default function TrabajadorLayout({ children }: { children: React.ReactNode }) {
   const { user, profile, loading, isEnabled } = useAuth();
   const router = useRouter();
@@ -123,6 +148,7 @@ export default function TrabajadorLayout({ children }: { children: React.ReactNo
   }
 
   return (
+    <TrabajadorRutaProvider>
     <div className="jefe-wrapper">
       <aside className={`jefe-drawer ${menuOpen ? "jefe-drawer-open" : ""}`} aria-hidden={!menuOpen}>
         <div className="jefe-drawer-inner">
@@ -137,7 +163,9 @@ export default function TrabajadorLayout({ children }: { children: React.ReactNo
         </div>
       </aside>
       {menuOpen && <button type="button" className="jefe-drawer-backdrop" onClick={() => setMenuOpen(false)} aria-label="Cerrar menú" />}
-      <main className="jefe-main">{children}</main>
+      <main className="jefe-main">
+        <RutaOperativaGate>{children}</RutaOperativaGate>
+      </main>
       <nav className="trabajador-bottom-nav" aria-label="Navegación principal">
         {BOTTOM_NAV_ITEMS.map((item) =>
           item.type === "menu" ? (
@@ -165,5 +193,6 @@ export default function TrabajadorLayout({ children }: { children: React.ReactNo
         )}
       </nav>
     </div>
+    </TrabajadorRutaProvider>
   );
 }

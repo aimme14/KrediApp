@@ -1,8 +1,13 @@
 "use client";
 
-import { useMemo, useCallback, useState } from "react";
+import { useMemo, useCallback, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { doc, onSnapshot } from "firebase/firestore";
 import { useAuth } from "@/context/AuthContext";
+import { db } from "@/lib/firebase";
+import { EMPRESAS_COLLECTION, USUARIOS_SUBCOLLECTION } from "@/lib/empresas-db";
+import { useJornada } from "@/hooks/useJornada";
 import { useRuta } from "@/hooks/useRuta";
 import { useRutaDia } from "@/hooks/useRutaDia";
 import type { ClienteRutaGrupo, PrioridadClienteRuta } from "@/types/finanzas";
@@ -65,8 +70,27 @@ function getBadgeLabel(
 }
 
 export default function RutaDelDiaPage() {
-  const { profile } = useAuth();
+  const { user, profile } = useAuth();
   const router = useRouter();
+  const { jornadaActiva, loading: loadingJornada } = useJornada();
+  const [cajaEmpleadoFirestore, setCajaEmpleadoFirestore] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!user || !profile?.empresaId || profile.role !== "trabajador") {
+      setCajaEmpleadoFirestore(null);
+      return;
+    }
+    if (!db) {
+      setCajaEmpleadoFirestore(0);
+      return;
+    }
+    const ref = doc(db, EMPRESAS_COLLECTION, profile.empresaId, USUARIOS_SUBCOLLECTION, user.uid);
+    const unsub = onSnapshot(ref, (snap) => {
+      const v = snap.data()?.cajaEmpleado;
+      setCajaEmpleadoFirestore(typeof v === "number" ? v : 0);
+    });
+    return () => unsub();
+  }, [user, profile?.empresaId, profile?.role]);
   const {
     ruta,
     loading: loadingRuta,
@@ -142,6 +166,24 @@ export default function RutaDelDiaPage() {
     month: "short",
   });
 
+  const enJornadaEstaRuta = Boolean(
+    jornadaActiva &&
+      profile?.rutaId &&
+      jornadaActiva.rutaId === profile.rutaId
+  );
+
+  const saldoBaseTrabajador = enJornadaEstaRuta
+    ? jornadaActiva!.cajaActual
+    : (cajaEmpleadoFirestore ?? 0);
+
+  const cargandoSaldoBase =
+    loadingJornada ||
+    (!enJornadaEstaRuta && cajaEmpleadoFirestore === null && !!db);
+
+  const etiquetaSaldoBase = enJornadaEstaRuta
+    ? "Base del día"
+    : "Tu base";
+
   const [filtroExpandido, setFiltroExpandido] = useState(false);
   const filtroActualLabel =
     FILTROS_OPCIONES.find((f) => f.id === filtro)?.label ?? (filtro === "hoy" ? "Todos" : "Todos");
@@ -174,6 +216,31 @@ export default function RutaDelDiaPage() {
       {loadingRuta && !ruta && (
         <p className="ruta-dia-loading">Cargando ruta...</p>
       )}
+
+      <section className="ruta-dia-caja-card" aria-labelledby="ruta-dia-caja-heading">
+        <div className="ruta-dia-caja-inner">
+          <div className="ruta-dia-caja-text">
+            <h3 id="ruta-dia-caja-heading" className="ruta-dia-caja-title">
+              {etiquetaSaldoBase}
+            </h3>
+            <p className="ruta-dia-caja-desc">
+              {enJornadaEstaRuta
+                ? "Efectivo acumulado en tu jornada activa (entrega + cobros − gastos)."
+                : "Saldo en tu cuenta de trabajador cuando no hay jornada del día abierta."}
+            </p>
+          </div>
+          <div className="ruta-dia-caja-monto-wrap">
+            <span className="ruta-dia-caja-monto" aria-live="polite">
+              {cargandoSaldoBase ? "…" : formatCurrency(saldoBaseTrabajador)}
+            </span>
+            {enJornadaEstaRuta && (
+              <Link href="/dashboard/trabajador/registrar-gasto" className="ruta-dia-caja-link">
+                Registrar gasto
+              </Link>
+            )}
+          </div>
+        </div>
+      </section>
 
       {error && (
         <div className="ruta-dia-error-wrap" role="alert">

@@ -72,6 +72,8 @@ export async function GET(request: NextRequest) {
             inversiones,
             perdidas,
           });
+    const rutaOperativa =
+      typeof data.rutaOperativa === "boolean" ? data.rutaOperativa : true;
     return {
       id: d.id,
       nombre: data.nombre ?? "",
@@ -87,6 +89,8 @@ export async function GET(request: NextRequest) {
       inversiones,
       ganancias,
       capitalTotal: Math.round(capitalTotalRaw * 100) / 100,
+      /** false = trabajadores no pueden operar hasta que el admin abra la ruta */
+      rutaOperativa,
     };
   });
 
@@ -171,6 +175,8 @@ export async function POST(request: NextRequest) {
     gastos: 0,
     perdidas: 0,
     ultimaActualizacion: now,
+    /** Por defecto abierta; el admin puede cerrar manualmente */
+    rutaOperativa: true,
   });
 
   await upsertCapitalRutaSnapshot(db, apiUser.empresaId, ref.id, {

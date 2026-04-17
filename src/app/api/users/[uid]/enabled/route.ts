@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminFirestore } from "@/lib/firebase-admin";
+import { syncCustomClaimsForUid } from "@/lib/sync-custom-claims";
 import { EMPRESAS_COLLECTION, USUARIOS_SUBCOLLECTION, USERS_COLLECTION } from "@/lib/empresas-db";
 
 /**
@@ -58,6 +59,8 @@ export async function PATCH(
     if (usuarioSnap.exists) {
       await usuarioRef.update({ activo: enabled });
     }
+
+    await syncCustomClaimsForUid(adminUid);
 
     return NextResponse.json({ ok: true });
   } catch (e) {

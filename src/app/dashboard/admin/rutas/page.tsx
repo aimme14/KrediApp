@@ -2,7 +2,17 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/context/AuthContext";
-import { listRutas, createRuta, listClientes, listPrestamos, formatClienteCodigoCorto, type RutaItem, type ClienteItem, type PrestamoItem } from "@/lib/empresa-api";
+import {
+  listRutas,
+  createRuta,
+  listClientes,
+  listPrestamos,
+  patchRutaOperativa,
+  formatClienteCodigoCorto,
+  type RutaItem,
+  type ClienteItem,
+  type PrestamoItem,
+} from "@/lib/empresa-api";
 
 function formatMonto(value: number): string {
   const hasDecimals = Math.round(value * 100) % 100 !== 0;
@@ -25,6 +35,7 @@ export default function RutasPage() {
   const [capitalInicial, setCapitalInicial] = useState("");
   const [creating, setCreating] = useState(false);
   const [expandedRutaId, setExpandedRutaId] = useState<string | null>(null);
+  const [operativaSavingId, setOperativaSavingId] = useState<string | null>(null);
 
   const loadRutas = useCallback(async () => {
     if (!user) return;
@@ -83,6 +94,21 @@ export default function RutasPage() {
 
   const getPrestamoForCliente = (rutaId: string, clienteId: string): PrestamoItem | undefined =>
     (prestamosByRuta[rutaId] ?? []).find((p) => p.clienteId === clienteId);
+
+  const handleRutaOperativa = async (rutaId: string, siguiente: boolean) => {
+    if (!user) return;
+    setError(null);
+    setOperativaSavingId(rutaId);
+    try {
+      const token = await user.getIdToken();
+      await patchRutaOperativa(token, rutaId, siguiente);
+      await loadRutas();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Error al actualizar la ruta");
+    } finally {
+      setOperativaSavingId(null);
+    }
+  };
 
   if (!profile || profile.role !== "admin") return null;
 
@@ -242,6 +268,58 @@ export default function RutasPage() {
                     </span>
                   </div>
                 ))}
+              </div>
+
+              <div
+                style={{
+                  marginTop: "0.85rem",
+                  paddingTop: "0.85rem",
+                  borderTop: "1px solid var(--card-border)",
+                  display: "flex",
+                  flexWrap: "wrap",
+                  alignItems: "center",
+                  gap: "0.65rem",
+                }}
+              >
+                <span style={{ fontSize: "0.8125rem", fontWeight: 600, color: "var(--text-muted)" }}>
+                  Operación del día (trabajadores):
+                </span>
+                <span
+                  style={{
+                    fontSize: "0.8125rem",
+                    fontWeight: 700,
+                    padding: "0.2rem 0.55rem",
+                    borderRadius: "6px",
+                    background: ruta.rutaOperativa !== false ? "var(--success-bg, #f0fdf4)" : "rgba(248, 113, 113, 0.15)",
+                    color: ruta.rutaOperativa !== false ? "var(--success-fg, #166534)" : "#b91c1c",
+                  }}
+                >
+                  {ruta.rutaOperativa !== false ? "Abierta" : "Cerrada"}
+                </span>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  style={{ padding: "0.35rem 0.75rem", fontSize: "0.875rem" }}
+                  disabled={operativaSavingId === ruta.id || ruta.rutaOperativa !== false}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    void handleRutaOperativa(ruta.id, true);
+                  }}
+                >
+                  {operativaSavingId === ruta.id ? "…" : "Abrir ruta"}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  style={{ padding: "0.35rem 0.75rem", fontSize: "0.875rem" }}
+                  disabled={operativaSavingId === ruta.id || ruta.rutaOperativa === false}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    void handleRutaOperativa(ruta.id, false);
+                  }}
+                >
+                  {operativaSavingId === ruta.id ? "…" : "Cerrar ruta"}
+                </button>
               </div>
 
               {expandedRutaId === ruta.id && (

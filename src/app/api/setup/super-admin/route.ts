@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminAuth, getAdminFirestore } from "@/lib/firebase-admin";
 import { SUPER_ADMIN_COLLECTION } from "@/types/superAdmin";
+import { syncCustomClaimsForUid } from "@/lib/sync-custom-claims";
 
 /**
  * GET: Indica si aún se puede crear el primer Super Admin (no existe ninguno).
@@ -77,6 +78,8 @@ export async function POST(request: NextRequest) {
       updatedAt: now,
       emailVerified: true,
     });
+
+    await syncCustomClaimsForUid(uid);
 
     return NextResponse.json({
       success: true,
