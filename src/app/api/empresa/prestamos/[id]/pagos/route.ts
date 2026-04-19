@@ -508,10 +508,13 @@ export async function POST(
             (jd.rutaId as string) === rutaIdPrestamo
           ) {
             const cajaA = typeof jd.cajaActual === "number" ? jd.cajaActual : 0;
-            const entrega = typeof jd.entregaInicial === "number" ? jd.entregaInicial : 0;
+            const cobrosDelDia = typeof jd.cobrosDelDia === "number" ? jd.cobrosDelDia : 0;
+            const clientesCobrados = typeof jd.clientesCobrados === "number" ? jd.clientesCobrados : 0;
+            const m = Math.round(montoAcreditarCajaEmpleado * 100) / 100;
             tx.update(jRef, {
-              cajaActual: Math.round((cajaA + montoAcreditarCajaEmpleado) * 100) / 100,
-              entregaInicial: Math.round((entrega + montoAcreditarCajaEmpleado) * 100) / 100,
+              cajaActual: Math.round((cajaA + m) * 100) / 100,
+              cobrosDelDia: Math.round((cobrosDelDia + m) * 100) / 100,
+              clientesCobrados: clientesCobrados + 1,
             });
           } else if (uSnap?.exists) {
             const ud = uSnap.data() as Record<string, unknown>;
