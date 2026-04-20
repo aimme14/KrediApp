@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
+import { useTrabajadorLista } from "@/context/TrabajadorListaContext";
 import {
-  listPrestamos,
   listGastos,
   entregarReporteDia,
   type PrestamoItem,
@@ -20,23 +20,32 @@ function formatMonto(value: number): string {
 
 export default function ResumenDelDiaPage() {
   const { user, profile } = useAuth();
-  const [prestamos, setPrestamos] = useState<PrestamoItem[]>([]);
+  const { prestamos, loading: loadingLista } = useTrabajadorLista();
   const [gastos, setGastos] = useState<GastoItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loadingGastos, setLoadingGastos] = useState(true);
   const [entregando, setEntregando] = useState(false);
   const [msgReporte, setMsgReporte] = useState<string | null>(null);
   const [errReporte, setErrReporte] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) return;
-    const token = user.getIdToken().then((t) => t);
-    Promise.all([token.then((t) => listPrestamos(t)), token.then((t) => listGastos(t))])
-      .then(([p, g]) => {
-        setPrestamos(p);
-        setGastos(g);
+    let cancelled = false;
+    setLoadingGastos(true);
+    user
+      .getIdToken()
+      .then((t) => listGastos(t))
+      .then((g) => {
+        if (!cancelled) setGastos(g);
       })
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (!cancelled) setLoadingGastos(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [user]);
+
+  const loading = loadingLista || loadingGastos;
 
   const hoy = new Date().toDateString();
   const recogidoHoy = prestamos.reduce((sum, p) => sum + (p.totalAPagar - p.saldoPendiente), 0);

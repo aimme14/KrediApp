@@ -1,6 +1,6 @@
 /**
  * Registrar gasto operativo del empleado con jornada activa (Admin SDK).
- * Misma lógica que services/jornadaService.registrarGasto.
+ * Lógica numérica compartida: `jornada-gasto-compute` + `jornadaService.registrarGasto`.
  */
 
 import type { Firestore } from "firebase-admin/firestore";
@@ -11,29 +11,8 @@ import {
   MOVIMIENTOS_SUBCOLLECTION,
   RUTAS_SUBCOLLECTION,
 } from "@/lib/empresas-db";
-import { computeCapitalTotalRutaDesdeSaldos } from "@/lib/capital-formulas";
+import { computeCamposTrasGastoOperativoEmpleado } from "@/lib/jornada-gasto-compute";
 import { upsertCapitalRutaSnapshot } from "@/lib/capital-ruta-snapshot";
-
-function assertCapitalRuta(
-  cajaRuta: number,
-  cajasEmpleados: number,
-  inversiones: number,
-  perdidas: number,
-  capitalTotal: number
-) {
-  if (cajaRuta < 0) throw new Error("Saldo insuficiente en la base de la ruta");
-  if (cajasEmpleados < 0) throw new Error("Saldo insuficiente en base del empleado");
-  if (inversiones < 0) throw new Error("Saldo de inversiones negativo");
-  const esperado = computeCapitalTotalRutaDesdeSaldos({
-    cajaRuta,
-    cajasEmpleados,
-    inversiones,
-    perdidas,
-  });
-  if (Math.abs(esperado - capitalTotal) > 0.02) {
-    throw new Error("Capital descuadrado — revisar operación");
-  }
-}
 
 export async function getJornadaActivaEmpleado(
   db: Firestore,
@@ -102,40 +81,25 @@ export async function registrarGastoJornadaDesdeApi(
       throw new Error("La ruta no coincide con la jornada");
     }
 
-    let cajaActual = (jornada.cajaActual as number) ?? 0;
-    let gastosDelDia = (jornada.gastosDelDia as number) ?? 0;
-
-    if (cajaActual < monto) {
-      throw new Error("Saldo insuficiente en base del empleado");
-    }
-
-    cajaActual -= monto;
-    gastosDelDia += monto;
-
     const rutaSnap = await tx.get(rutaRef);
     if (!rutaSnap.exists) throw new Error("Ruta no encontrada");
     const ruta = rutaSnap.data() as Record<string, unknown>;
 
-    const cajaRuta = (ruta.cajaRuta as number) ?? 0;
-    let cajasEmpleados = (ruta.cajasEmpleados as number) ?? 0;
-    const inversiones = (ruta.inversiones as number) ?? 0;
-    const perdidas = (ruta.perdidas as number) ?? 0;
-
-    cajasEmpleados -= monto;
-    const capitalTotal = computeCapitalTotalRutaDesdeSaldos({
-      cajaRuta,
-      cajasEmpleados,
-      inversiones,
-      perdidas,
+    const gasto = computeCamposTrasGastoOperativoEmpleado({
+      monto,
+      cajaActual: (jornada.cajaActual as number) ?? 0,
+      gastosDelDia: (jornada.gastosDelDia as number) ?? 0,
+      cajaRuta: (ruta.cajaRuta as number) ?? 0,
+      cajasEmpleados: (ruta.cajasEmpleados as number) ?? 0,
+      inversiones: (ruta.inversiones as number) ?? 0,
+      perdidas: (ruta.perdidas as number) ?? 0,
     });
-
-    assertCapitalRuta(cajaRuta, cajasEmpleados, inversiones, perdidas, capitalTotal);
 
     const now = Timestamp.now();
 
     tx.update(jornadaRef, {
-      cajaActual,
-      gastosDelDia,
+      cajaActual: gasto.cajaActual,
+      gastosDelDia: gasto.gastosDelDia,
     });
 
     tx.set(movimientoRef, {
@@ -147,9 +111,9 @@ export async function registrarGastoJornadaDesdeApi(
     });
 
     tx.update(rutaRef, {
-      cajasEmpleados,
+      cajasEmpleados: gasto.cajasEmpleados,
       gastos: ((ruta.gastos as number) ?? 0) + monto,
-      capitalTotal,
+      capitalTotal: gasto.capitalTotal,
       ultimaActualizacion: now,
     });
   });

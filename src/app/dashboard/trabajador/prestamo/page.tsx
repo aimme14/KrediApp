@@ -2,9 +2,8 @@
 
 import { useState, useEffect, useCallback, useMemo, Fragment } from "react";
 import { useAuth } from "@/context/AuthContext";
+import { useTrabajadorLista } from "@/context/TrabajadorListaContext";
 import {
-  listClientes,
-  listPrestamos,
   createPrestamo,
   clienteNumFromCodigo,
   type ClienteItem,
@@ -67,9 +66,13 @@ function hoyDDMMAAAA(): string {
 
 export default function PrestamoTrabajadorPage() {
   const { user, profile } = useAuth();
-  const [clientes, setClientes] = useState<ClienteItem[]>([]);
-  const [prestamos, setPrestamos] = useState<PrestamoItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const {
+    clientes,
+    prestamos,
+    loading,
+    error: listaError,
+    refresh,
+  } = useTrabajadorLista();
   const [error, setError] = useState<string | null>(null);
   const [clienteId, setClienteId] = useState("");
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -86,22 +89,6 @@ export default function PrestamoTrabajadorPage() {
   useEffect(() => {
     setHistorialEconomicoColapsado(true);
   }, [clienteId]);
-
-  const loadData = useCallback(async () => {
-    if (!user) return;
-    const token = await user.getIdToken();
-    Promise.all([listClientes(token), listPrestamos(token)])
-      .then(([c, p]) => {
-        setClientes(c);
-        setPrestamos(p);
-      })
-      .catch((e) => setError(e instanceof Error ? e.message : "Error al cargar"))
-      .finally(() => setLoading(false));
-  }, [user]);
-
-  useEffect(() => {
-    loadData();
-  }, [loadData]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -153,7 +140,7 @@ export default function PrestamoTrabajadorPage() {
       setModalidad("mensual");
       setConfirmarMontoAlto(false);
       setShowCreateForm(false);
-      await loadData();
+      await refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al crear préstamo");
     } finally {
@@ -503,7 +490,9 @@ export default function PrestamoTrabajadorPage() {
           </div>
         )}
 
-        {error && <p className="error-msg">{error}</p>}
+        {(error || listaError) && (
+          <p className="error-msg">{error ?? listaError}</p>
+        )}
         <button type="submit" className="btn btn-primary" disabled={creating}>
           {creating ? "Creando..." : "Crear préstamo"}
         </button>

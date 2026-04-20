@@ -148,21 +148,88 @@ export async function POST(
         ? (motivoNoPago as (typeof MOTIVOS_NO_PAGO)[number])
         : "otro";
 
-    await prestamoRef.collection(PAGOS_SUBCOLLECTION).add({
-      monto: 0,
-      fecha: now,
-      empleadoId: apiUser.uid,
-      tipo: "no_pago",
-      motivoNoPago: motivo,
-      nota: (nota ?? "").trim() || null,
-      registradoPorUid: uidRegistro,
-      registradoPorNombre: nombreRegistro,
-    });
+    const empUidNoPago =
+      typeof data.empleadoId === "string" && data.empleadoId.trim()
+        ? data.empleadoId.trim()
+        : apiUser.uid;
+    const rutaIdPrestamoNoPago =
+      typeof data.rutaId === "string" ? data.rutaId.trim() : "";
+    const preJornadaNoPago =
+      rutaIdPrestamoNoPago && empUidNoPago
+        ? await getJornadaActivaEmpleado(db, apiUser.empresaId, empUidNoPago)
+        : null;
 
-    await prestamoRef.update({
-      estado: "mora",
-      updatedAt: now,
-    });
+    try {
+      await db.runTransaction(async (tx) => {
+        const prSnap = await tx.get(prestamoRef);
+        if (!prSnap.exists) {
+          throw new Error("PRESTAMO_NOT_FOUND");
+        }
+        const pr = prSnap.data()!;
+        const rutaIdPr =
+          typeof pr.rutaId === "string" ? pr.rutaId.trim() : "";
+
+        const jRef =
+          preJornadaNoPago &&
+          preJornadaNoPago.rutaId === rutaIdPr &&
+          rutaIdPr
+            ? db
+                .collection(EMPRESAS_COLLECTION)
+                .doc(apiUser.empresaId)
+                .collection(JORNADAS_SUBCOLLECTION)
+                .doc(preJornadaNoPago.jornadaId)
+            : null;
+
+        let jSnap: FirebaseFirestore.DocumentSnapshot | null = null;
+        if (jRef) {
+          jSnap = await tx.get(jRef);
+        }
+
+        const pagoRef = prestamoRef.collection(PAGOS_SUBCOLLECTION).doc();
+        tx.set(pagoRef, {
+          monto: 0,
+          fecha: now,
+          empleadoId: apiUser.uid,
+          tipo: "no_pago",
+          motivoNoPago: motivo,
+          nota: (nota ?? "").trim() || null,
+          registradoPorUid: uidRegistro,
+          registradoPorNombre: nombreRegistro,
+        });
+
+        tx.update(prestamoRef, {
+          estado: "mora",
+          updatedAt: now,
+        });
+
+        const jd = jSnap?.data() as Record<string, unknown> | undefined;
+        if (
+          jRef &&
+          jSnap?.exists &&
+          jd &&
+          jd.estado === "activa" &&
+          (jd.rutaId as string) === rutaIdPr
+        ) {
+          const noPag =
+            typeof jd.clientesNoPagaron === "number" ? jd.clientesNoPagaron : 0;
+          const visit =
+            typeof jd.clientesVisitados === "number" ? jd.clientesVisitados : 0;
+          tx.update(jRef, {
+            clientesNoPagaron: noPag + 1,
+            clientesVisitados: visit + 1,
+          });
+        }
+      });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "";
+      if (msg === "PRESTAMO_NOT_FOUND") {
+        return NextResponse.json({ error: "Préstamo no encontrado" }, { status: 404 });
+      }
+      return NextResponse.json(
+        { error: msg || "No se pudo registrar el no pago" },
+        { status: 400 }
+      );
+    }
 
     return NextResponse.json({ ok: true, tipo: "no_pago" });
   }

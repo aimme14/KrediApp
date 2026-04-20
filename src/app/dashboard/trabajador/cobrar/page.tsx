@@ -4,9 +4,8 @@ import { useState, useEffect, useMemo, useRef, useCallback, Suspense } from "rea
 import { useSearchParams, usePathname } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
+import { useTrabajadorLista } from "@/context/TrabajadorListaContext";
 import {
-  listClientes,
-  listPrestamos,
   listPagos,
   registrarPago,
   registrarNoPago,
@@ -128,6 +127,13 @@ const MOTIVOS_PERDIDA: { value: MotivoPerdida; label: string }[] = [
 
 function CobrarClientePageContent() {
   const { user, profile } = useAuth();
+  const {
+    clientes: clientesLista,
+    prestamos: prestamosLista,
+    loading: listaLoading,
+    error: listaError,
+    refresh: refreshLista,
+  } = useTrabajadorLista();
   const searchParams = useSearchParams();
   const pathname = usePathname();
   const clienteId = searchParams.get("clienteId");
@@ -154,6 +160,8 @@ function CobrarClientePageContent() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  /** Texto auxiliar durante envío (subidas en paralelo + API). */
+  const [submitStatus, setSubmitStatus] = useState<string | null>(null);
   const [confirmado, setConfirmado] = useState(false);
   const [pagoIdConfirmado, setPagoIdConfirmado] = useState<string | null>(null);
   const comprobanteRef = useRef<HTMLDivElement>(null);
@@ -188,21 +196,36 @@ function CobrarClientePageContent() {
       setLoading(false);
       return;
     }
-    let cancelled = false;
-    user.getIdToken().then((token) => {
-      Promise.all([listClientes(token), listPrestamos(token)])
-        .then(([clientes, prestamos]) => {
-          if (cancelled) return;
-          const c = clientes.find((x) => x.id === clienteId) ?? null;
-          const p = prestamos.find((x) => x.id === prestamoId && x.clienteId === clienteId) ?? null;
-          setCliente(c);
-          setPrestamo(p);
-        })
-        .catch((e) => !cancelled && setError(e instanceof Error ? e.message : "Error al cargar"))
-        .finally(() => !cancelled && setLoading(false));
-    });
-    return () => { cancelled = true; };
-  }, [user, clienteId, prestamoId]);
+    const esperandoPrimeraCarga =
+      listaLoading &&
+      clientesLista.length === 0 &&
+      prestamosLista.length === 0;
+    if (esperandoPrimeraCarga) {
+      setLoading(true);
+      return;
+    }
+
+    const c = clientesLista.find((x) => x.id === clienteId) ?? null;
+    const p =
+      prestamosLista.find((x) => x.id === prestamoId && x.clienteId === clienteId) ??
+      null;
+    setCliente(c);
+    setPrestamo(p);
+
+    if (listaError) setError(listaError);
+    else if (!c || !p)
+      setError("Cliente o préstamo no encontrado");
+    else setError(null);
+    setLoading(false);
+  }, [
+    user,
+    clienteId,
+    prestamoId,
+    clientesLista,
+    prestamosLista,
+    listaLoading,
+    listaError,
+  ]);
 
   useEffect(() => {
     if (!user || !prestamoId) return;
@@ -428,19 +451,33 @@ function CobrarClientePageContent() {
     if (!user || !prestamo || !puedeConfirmar || !profile) return;
     setError(null);
     setSubmitting(true);
+    setSubmitStatus(null);
     const idempotencyKey = idempotencyKeyRef.current ?? crypto.randomUUID();
     idempotencyKeyRef.current = idempotencyKey;
     try {
       const filesToUpload = evidenciaFiles.slice(0, fotosRequeridas).filter((f): f is File => f != null);
-      const urls: string[] = [];
-      for (let i = 0; i < filesToUpload.length; i++) {
-        const url = await uploadImage(filesToUpload[i], {
-          folder: "pagos",
-          ownerId: user.uid,
-          filename: `evidencia-${i + 1}`,
-        });
-        urls.push(url);
-      }
+      let doneUploads = 0;
+      const urls =
+        filesToUpload.length === 0
+          ? []
+          : await Promise.all(
+              filesToUpload.map((file, i) =>
+                uploadImage(file, {
+                  folder: "pagos",
+                  ownerId: user.uid,
+                  filename: `evidencia-${i + 1}`,
+                }).then((url) => {
+                  doneUploads++;
+                  if (filesToUpload.length > 1) {
+                    setSubmitStatus(
+                      `Subiendo evidencias (${doneUploads}/${filesToUpload.length})…`
+                    );
+                  }
+                  return url;
+                })
+              )
+            );
+      setSubmitStatus("Registrando pago…");
       const evidenciaUrl = urls.join(",");
       const token = await user.getIdToken();
       const nombreRegistro = profile.displayName ?? profile.email ?? "";
@@ -465,10 +502,12 @@ function CobrarClientePageContent() {
         registradoPorNombre: nombreRegistro || null,
       };
       setUltimosPagos((prev) => [nuevoPago, ...prev]);
+      await refreshLista();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al registrar cobro");
     } finally {
       setSubmitting(false);
+      setSubmitStatus(null);
     }
   };
 
@@ -486,6 +525,7 @@ function CobrarClientePageContent() {
         registradoPorNombre: nombreRegistro || undefined,
       });
       setNoPagoRegistrado(true);
+      await refreshLista();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al registrar no pago");
     } finally {
@@ -515,6 +555,7 @@ function CobrarClientePageContent() {
         registradoPorNombre: nombreRegistro || undefined,
       });
       setMontoPerdidaConfirmado(montoAplicar);
+      await refreshLista();
       setPrestamo((p) =>
         p
           ? {
@@ -1206,7 +1247,7 @@ function CobrarClientePageContent() {
             className="btn btn-primary"
             disabled={!puedeConfirmar || submitting}
           >
-            {submitting ? "Registrando..." : "Confirmar cobro"}
+            {submitting ? submitStatus ?? "Registrando…" : "Confirmar cobro"}
           </button>
         </div>
       </form>

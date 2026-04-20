@@ -1,13 +1,18 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState } from "react";
 import { useAuth } from "@/context/AuthContext";
-import { listClientes, createCliente, formatClienteCodigoCorto, type ClienteItem } from "@/lib/empresa-api";
+import { useTrabajadorLista } from "@/context/TrabajadorListaContext";
+import { createCliente, formatClienteCodigoCorto } from "@/lib/empresa-api";
 
 export default function ClienteTrabajadorPage() {
   const { user, profile } = useAuth();
-  const [clientes, setClientes] = useState<ClienteItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const {
+    clientes,
+    loading,
+    error: listaError,
+    refresh,
+  } = useTrabajadorLista();
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [nombre, setNombre] = useState("");
@@ -16,19 +21,6 @@ export default function ClienteTrabajadorPage() {
   const [telefono, setTelefono] = useState("");
   const [cedula, setCedula] = useState("");
   const [creating, setCreating] = useState(false);
-
-  const load = useCallback(async () => {
-    if (!user) return;
-    const token = await user.getIdToken();
-    listClientes(token)
-      .then(setClientes)
-      .catch((e) => setError(e instanceof Error ? e.message : "Error al cargar"))
-      .finally(() => setLoading(false));
-  }, [user]);
-
-  useEffect(() => {
-    load();
-  }, [load]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -51,7 +43,7 @@ export default function ClienteTrabajadorPage() {
       setTelefono("");
       setCedula("");
       setShowForm(false);
-      await load();
+      await refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al crear cliente");
     } finally {
@@ -96,9 +88,8 @@ export default function ClienteTrabajadorPage() {
             </div>
             <div className="form-group">
               <label>Cédula</label>
-              <input type="text" value={cedula} onChange={(e) => setCedula(e.target.value)} placeholder="Número de cédula" />
+              <input type="text" value={cedula} onChange={(e) => setCedula(e.target.value)} placeholder="Sin puntos ni espacios" />
             </div>
-            {error && <p className="error-msg">{error}</p>}
             <button type="submit" className="btn btn-primary" disabled={creating}>
               {creating ? "Creando..." : "Crear cliente"}
             </button>
@@ -108,6 +99,9 @@ export default function ClienteTrabajadorPage() {
 
       <div className="card">
         <h3 style={{ marginTop: 0 }}>Clientes de tu ruta</h3>
+        {(error || listaError) && (
+          <p className="error-msg">{error ?? listaError}</p>
+        )}
         {loading ? (
           <p>Cargando...</p>
         ) : clientes.length === 0 ? (

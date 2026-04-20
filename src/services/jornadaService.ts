@@ -16,9 +16,15 @@ import {
 import { db } from "@/lib/firebase";
 import {
   EMPRESAS_COLLECTION,
+  PRESTAMOS_SUBCOLLECTION,
   RUTAS_SUBCOLLECTION,
 } from "@/lib/empresas-db";
 import { computeCapitalTotalRutaDesdeSaldos } from "@/lib/capital-formulas";
+import { computeCamposTrasGastoOperativoEmpleado } from "@/lib/jornada-gasto-compute";
+import {
+  computeRutaCamposTrasCobroPrestamoCobroEnEmpleado,
+  splitMontoPagoEnCapitalYGanancia,
+} from "@/lib/ruta-financiera-compute";
 import { syncCapitalRutaSnapshotClient } from "@/services/capitalRutaSnapshotClient";
 import type { Jornada, Movimiento, TipoMovimiento } from "@/types/finanzas";
 
@@ -234,40 +240,32 @@ export async function registrarGasto(
       throw new Error("Jornada no encontrada");
     }
     const jornada = jornadaSnap.data() as any;
-    let cajaActual = jornada.cajaActual ?? 0;
-    let gastosDelDia = jornada.gastosDelDia ?? 0;
-
-    if (cajaActual < monto) {
-      throw new Error("Saldo insuficiente en base del empleado");
+    if (jornada.estado !== "activa") {
+      throw new Error("La jornada no está activa");
     }
-
-    cajaActual -= monto;
-    gastosDelDia += monto;
+    if (jornada.rutaId !== rutaId) {
+      throw new Error("La ruta no coincide con la jornada");
+    }
 
     const rutaSnap = await tx.get(rutaRef);
     if (!rutaSnap.exists()) throw new Error("Ruta no encontrada");
     const ruta = rutaSnap.data() as any;
 
-    const cajaRuta = ruta.cajaRuta ?? 0;
-    let cajasEmpleados = ruta.cajasEmpleados ?? 0;
-    const inversiones = ruta.inversiones ?? 0;
-    const perdidas = ruta.perdidas ?? 0;
-
-    cajasEmpleados -= monto;
-    const capitalTotal = computeCapitalTotalRutaDesdeSaldos({
-      cajaRuta,
-      cajasEmpleados,
-      inversiones,
-      perdidas,
+    const gasto = computeCamposTrasGastoOperativoEmpleado({
+      monto,
+      cajaActual: jornada.cajaActual ?? 0,
+      gastosDelDia: jornada.gastosDelDia ?? 0,
+      cajaRuta: ruta.cajaRuta ?? 0,
+      cajasEmpleados: ruta.cajasEmpleados ?? 0,
+      inversiones: ruta.inversiones ?? 0,
+      perdidas: ruta.perdidas ?? 0,
     });
-
-    assertCapitalRuta(cajaRuta, cajasEmpleados, inversiones, perdidas, capitalTotal);
 
     const now = Timestamp.now();
 
     tx.update(jornadaRef, {
-      cajaActual,
-      gastosDelDia,
+      cajaActual: gasto.cajaActual,
+      gastosDelDia: gasto.gastosDelDia,
     });
 
     tx.set(movimientoRef, {
@@ -279,9 +277,9 @@ export async function registrarGasto(
     });
 
     tx.update(rutaRef, {
-      cajasEmpleados,
+      cajasEmpleados: gasto.cajasEmpleados,
       gastos: (ruta.gastos ?? 0) + monto,
-      capitalTotal,
+      capitalTotal: gasto.capitalTotal,
       ultimaActualizacion: now,
     });
   });
@@ -291,13 +289,15 @@ export async function registrarGasto(
 
 // ── Registrar cobro en jornada ──────────────────────────────────────────────
 
+/**
+ * Impacto de cobro en jornada + ruta usando la misma lógica que la API de pagos (`ruta-financiera-compute`).
+ * No usar para el mismo cobro que ya registró `POST /api/empresa/prestamos/:id/pagos` (doble impacto en ruta).
+ */
 export async function registrarCobroEnJornada(
   empresaId: string,
   jornadaId: string,
   rutaId: string,
   cuotaTotal: number,
-  cuotaCapital: number,
-  cuotaGanancia: number,
   prestamoId: string,
   cuotaId: string,
   clienteId: string,
@@ -318,6 +318,13 @@ export async function registrarCobroEnJornada(
     JORNADAS_SUBCOLLECTION,
     jornadaId
   );
+  const prestamoRef = doc(
+    firestore,
+    EMPRESAS_COLLECTION,
+    empresaId,
+    PRESTAMOS_SUBCOLLECTION,
+    prestamoId
+  );
   const rutaRef = doc(
     firestore,
     EMPRESAS_COLLECTION,
@@ -336,6 +343,33 @@ export async function registrarCobroEnJornada(
     if (!jornadaSnap.exists()) throw new Error("Jornada no encontrada");
     const jornada = jornadaSnap.data() as any;
 
+    const prestamoSnap = await tx.get(prestamoRef);
+    if (!prestamoSnap.exists()) throw new Error("Préstamo no encontrado");
+    const prestamo = prestamoSnap.data() as any;
+    const montoPrestamo = typeof prestamo.monto === "number" ? prestamo.monto : 0;
+    const totalAPagar =
+      typeof prestamo.totalAPagar === "number" ? prestamo.totalAPagar : 0;
+
+    const rutaSnap = await tx.get(rutaRef);
+    if (!rutaSnap.exists()) throw new Error("Ruta no encontrada");
+    const rutaData = rutaSnap.data() as Record<string, unknown>;
+    const perdidas = typeof rutaData.perdidas === "number" ? rutaData.perdidas : 0;
+
+    const rutaUpd = computeRutaCamposTrasCobroPrestamoCobroEnEmpleado(
+      rutaData,
+      cuotaTotal,
+      montoPrestamo,
+      totalAPagar
+    );
+
+    assertCapitalRuta(
+      rutaUpd.cajaRuta,
+      rutaUpd.cajasEmpleados,
+      rutaUpd.inversiones,
+      perdidas,
+      rutaUpd.capitalTotal
+    );
+
     let cajaActual = jornada.cajaActual ?? 0;
     let cobrosDelDia = jornada.cobrosDelDia ?? 0;
     let clientesCobrados = jornada.clientesCobrados ?? 0;
@@ -344,27 +378,12 @@ export async function registrarCobroEnJornada(
     cobrosDelDia += cuotaTotal;
     clientesCobrados += 1;
 
-    const rutaSnap = await tx.get(rutaRef);
-    if (!rutaSnap.exists()) throw new Error("Ruta no encontrada");
-    const ruta = rutaSnap.data() as any;
-
-    const cajaRuta = ruta.cajaRuta ?? 0;
-    let cajasEmpleados = ruta.cajasEmpleados ?? 0;
-    let inversiones = ruta.inversiones ?? 0;
-    let ganancias = ruta.ganancias ?? 0;
-    const perdidas = ruta.perdidas ?? 0;
-
-    cajasEmpleados += cuotaTotal;
-    inversiones -= cuotaCapital;
-    ganancias += cuotaGanancia;
-    const capitalTotal = computeCapitalTotalRutaDesdeSaldos({
-      cajaRuta,
-      cajasEmpleados,
-      inversiones,
-      perdidas,
-    });
-
-    assertCapitalRuta(cajaRuta, cajasEmpleados, inversiones, perdidas, capitalTotal);
+    const { capital: cuotaCapital, ganancia: cuotaGanancia } =
+      splitMontoPagoEnCapitalYGanancia(
+        cuotaTotal,
+        montoPrestamo,
+        totalAPagar
+      );
 
     const now = Timestamp.now();
 
@@ -388,10 +407,11 @@ export async function registrarCobroEnJornada(
     });
 
     tx.update(rutaRef, {
-      cajasEmpleados,
-      inversiones,
-      ganancias,
-      capitalTotal,
+      cajaRuta: rutaUpd.cajaRuta,
+      cajasEmpleados: rutaUpd.cajasEmpleados,
+      inversiones: rutaUpd.inversiones,
+      ganancias: rutaUpd.ganancias,
+      capitalTotal: rutaUpd.capitalTotal,
       ultimaActualizacion: now,
     });
   });
@@ -401,6 +421,7 @@ export async function registrarCobroEnJornada(
 
 // ── Otros helpers de jornada ────────────────────────────────────────────────
 
+/** Preferir `POST .../prestamos/:id/pagos` con `tipo: no_pago` (actualiza jornada si hay sesión activa). Reservado para flujos legacy sin API. */
 export async function registrarNoPagoEnJornada(
   empresaId: string,
   jornadaId: string
@@ -425,6 +446,7 @@ export async function registrarNoPagoEnJornada(
   });
 }
 
+/** Solo visita sin cobro — la UI principal no lo usa aún; no duplicar si ya registraste cobro o no_pago vía API. */
 export async function marcarClienteVisitado(
   empresaId: string,
   jornadaId: string

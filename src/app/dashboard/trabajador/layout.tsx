@@ -5,6 +5,7 @@ import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { TrabajadorRutaProvider, useTrabajadorRuta } from "@/context/TrabajadorRutaContext";
+import { TrabajadorListaProvider } from "@/context/TrabajadorListaContext";
 
 const NAV_ITEMS = [
   { href: "/dashboard/trabajador", label: "Inicio", icon: "home" },
@@ -116,11 +117,26 @@ function RutaOperativaGate({ children }: { children: React.ReactNode }) {
   );
 }
 
+/** Rutas que conviene precargar para que el cambio de pestaña sea más rápido. */
+const PREFETCH_TRABAJADOR_HREFS = [
+  "/dashboard/trabajador",
+  "/dashboard/trabajador/ruta",
+  "/dashboard/trabajador/resumen",
+  "/dashboard/trabajador/cliente",
+  "/dashboard/trabajador/prestamo",
+] as const;
+
 export default function TrabajadorLayout({ children }: { children: React.ReactNode }) {
   const { user, profile, loading, isEnabled } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
+
+  useEffect(() => {
+    for (const href of PREFETCH_TRABAJADOR_HREFS) {
+      router.prefetch(href);
+    }
+  }, [router]);
 
   useEffect(() => {
     if (loading) return;
@@ -149,6 +165,7 @@ export default function TrabajadorLayout({ children }: { children: React.ReactNo
 
   return (
     <TrabajadorRutaProvider>
+    <TrabajadorListaProvider>
     <div className="jefe-wrapper">
       <aside className={`jefe-drawer ${menuOpen ? "jefe-drawer-open" : ""}`} aria-hidden={!menuOpen}>
         <div className="jefe-drawer-inner">
@@ -193,6 +210,7 @@ export default function TrabajadorLayout({ children }: { children: React.ReactNo
         )}
       </nav>
     </div>
+    </TrabajadorListaProvider>
     </TrabajadorRutaProvider>
   );
 }

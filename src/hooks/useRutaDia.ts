@@ -2,11 +2,8 @@
 
 import { useMemo, useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/context/AuthContext";
-import {
-  listClientes,
-  listPrestamos,
-  type PrestamoItem,
-} from "@/lib/empresa-api";
+import { useTrabajadorLista } from "@/context/TrabajadorListaContext";
+import { type ClienteItem, type PrestamoItem } from "@/lib/empresa-api";
 import type {
   ClienteRuta,
   ClienteRutaGrupo,
@@ -21,6 +18,9 @@ export type FiltroRutaDia =
   | "cobrados";
 
 const VISITADOS_STORAGE_PREFIX = "krediapp-ruta-visitados-";
+
+/** No refetch al volver a la pestaña si la última carga fue hace menos de esto. */
+const VISIBILITY_MIN_INTERVAL_MS = 45_000;
 
 function getVisitadosKey(): string {
   return `${VISITADOS_STORAGE_PREFIX}${new Date().toISOString().slice(0, 10)}`;
@@ -115,107 +115,98 @@ function toDate(value: string | null | undefined): Date | null {
   return Number.isNaN(d.getTime()) ? null : d;
 }
 
+function buildClientesRuta(
+  clientes: ClienteItem[],
+  prestamos: PrestamoItem[]
+): ClienteRuta[] {
+  const prestamosPendientes = prestamos.filter(
+    (p) => p.estado !== "pagado" && (p.saldoPendiente ?? 0) > 0
+  );
+  const mapClientesById = new Map(clientes.map((c) => [c.id, c]));
+  const visitados = getVisitadosHoy();
+
+  const map: ClienteRuta[] = [];
+  for (const p of prestamosPendientes) {
+    const c = mapClientesById.get(p.clienteId);
+    const fechaV = toDate(p.fechaVencimiento ?? null);
+    const estado = p.estado ?? "activo";
+    const diasMora = calcularDiasMora(fechaV, estado);
+    const prioridad = calcularPrioridad(fechaV, estado, diasMora);
+    const intentosFallidos =
+      (p as PrestamoItem & { intentosFallidos?: number }).intentosFallidos ??
+      0;
+
+    const cuotaPagadaHoy = isMismoDia(p.ultimoPagoFecha ?? null);
+
+    map.push({
+      cuotaId: p.id,
+      prestamoId: p.id,
+      clienteId: p.clienteId,
+      clienteNombre: c?.nombre ?? `Cliente ${p.clienteId.slice(0, 8)}`,
+      clienteDireccion: c?.direccion ?? "",
+      zona: c?.ubicacion ?? "",
+      monto: p.saldoPendiente ?? 0,
+      fechaVencimiento: fechaV,
+      estado,
+      frecuencia: p.modalidad ?? "",
+      numeroCuota: 1,
+      totalCuotas: p.numeroCuotas ?? 0,
+      diasMora,
+      intentosFallidos,
+      prioridad,
+      visitado: visitados.has(p.clienteId),
+      cuotaPagadaHoy,
+    });
+  }
+
+  return map;
+}
+
 export function useRutaDia(): UseRutaDiaState {
   const { user, profile } = useAuth();
-  const [clientesRuta, setClientesRuta] = useState<ClienteRuta[]>([]);
+  const {
+    clientes,
+    prestamos,
+    loading: loadingLista,
+    error: errorLista,
+    lastFetchedAt,
+    refresh,
+  } = useTrabajadorLista();
+
   const [filtro, setFiltro] = useState<FiltroRutaDia>("todos");
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [refreshTrigger, setRefreshTrigger] = useState(0);
+  /** Invalida memo de visitados tras markVisitado */
+  const [visitadosBump, setVisitadosBump] = useState(0);
 
-  const load = useCallback(async () => {
-    if (!user || !profile || profile.role !== "trabajador") {
-      setClientesRuta([]);
-      setLoading(false);
-      setError(null);
-      return;
-    }
+  const clientesRuta = useMemo(() => {
+    if (!user || !profile || profile.role !== "trabajador") return [];
+    return buildClientesRuta(clientes, prestamos);
+  }, [user, profile, clientes, prestamos, visitadosBump]);
 
-    setLoading(true);
-    setError(null);
-    try {
-      const token = await user.getIdToken();
-      const [clientes, prestamos] = await Promise.all([
-        listClientes(token),
-        listPrestamos(token),
-      ]);
+  const loading =
+    Boolean(user && profile?.role === "trabajador") && loadingLista;
 
-      const prestamosPendientes = prestamos.filter(
-        (p) => p.estado !== "pagado" && (p.saldoPendiente ?? 0) > 0
-      );
-      const mapClientesById = new Map(clientes.map((c) => [c.id, c]));
-      const visitados = getVisitadosHoy();
-
-      const map: ClienteRuta[] = [];
-      for (const p of prestamosPendientes) {
-        const c = mapClientesById.get(p.clienteId);
-        const fechaV = toDate(p.fechaVencimiento ?? null);
-        const estado = p.estado ?? "activo";
-        const diasMora = calcularDiasMora(fechaV, estado);
-        const prioridad = calcularPrioridad(fechaV, estado, diasMora);
-        const intentosFallidos =
-          (p as PrestamoItem & { intentosFallidos?: number }).intentosFallidos ??
-          0;
-
-        const cuotaPagadaHoy = isMismoDia(p.ultimoPagoFecha ?? null);
-
-        map.push({
-          cuotaId: p.id,
-          prestamoId: p.id,
-          clienteId: p.clienteId,
-          clienteNombre: c?.nombre ?? `Cliente ${p.clienteId.slice(0, 8)}`,
-          clienteDireccion: c?.direccion ?? "",
-          zona: c?.ubicacion ?? "",
-          monto: p.saldoPendiente ?? 0,
-          fechaVencimiento: fechaV,
-          estado,
-          frecuencia: p.modalidad ?? "",
-          numeroCuota: 1,
-          totalCuotas: p.numeroCuotas ?? 0,
-          diasMora,
-          intentosFallidos,
-          prioridad,
-          visitado: visitados.has(p.clienteId),
-          cuotaPagadaHoy,
-        });
-      }
-
-      setClientesRuta(map);
-    } catch (e) {
-      const msg =
-        e instanceof Error ? e.message : "Error al cargar la ruta del día";
-      setError(msg);
-      setClientesRuta([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [user, profile]);
-
-  useEffect(() => {
-    load();
-  }, [load, refreshTrigger]);
+  const error =
+    profile?.role === "trabajador" ? errorLista : null;
 
   useEffect(() => {
     const onVisibility = () => {
-      if (document.visibilityState === "visible") {
-        setRefreshTrigger((t) => t + 1);
-      }
+      if (document.visibilityState !== "visible") return;
+      if (lastFetchedAt === 0) return;
+      const age = Date.now() - lastFetchedAt;
+      if (age < VISIBILITY_MIN_INTERVAL_MS) return;
+      void refresh();
     };
     document.addEventListener("visibilitychange", onVisibility);
     return () => document.removeEventListener("visibilitychange", onVisibility);
-  }, []);
+  }, [refresh, lastFetchedAt]);
 
   const refetch = useCallback(() => {
-    setRefreshTrigger((t) => t + 1);
-  }, []);
+    void refresh();
+  }, [refresh]);
 
   const markVisitado = useCallback((clienteId: string) => {
     addVisitadoHoy(clienteId);
-    setClientesRuta((prev) =>
-      prev.map((c) =>
-        c.clienteId === clienteId ? { ...c, visitado: true } : c
-      )
-    );
+    setVisitadosBump((b) => b + 1);
   }, []);
 
   const clientesFiltrados = useMemo(() => {
