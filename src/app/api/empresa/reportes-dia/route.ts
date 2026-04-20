@@ -48,6 +48,12 @@ export async function GET(request: NextRequest) {
       const x = doc.data();
       const rutaId = typeof x.rutaId === "string" ? x.rutaId : "";
       if (!misRutaIds.has(rutaId)) return null;
+      const comentarioRaw = x.comentario;
+      const comentario =
+        typeof comentarioRaw === "string" && comentarioRaw.trim()
+          ? comentarioRaw.trim()
+          : null;
+
       return {
         id: doc.id,
         fechaDia: typeof x.fechaDia === "string" ? x.fechaDia : fechaDia,
@@ -57,6 +63,7 @@ export async function GET(request: NextRequest) {
         empleadoNombre: typeof x.empleadoNombre === "string" ? x.empleadoNombre : "",
         montoEntregado: typeof x.montoEntregado === "number" ? x.montoEntregado : 0,
         fecha: x.fecha?.toDate?.()?.toISOString?.() ?? null,
+        comentario,
       };
     })
     .filter(Boolean) as Array<{
@@ -68,6 +75,7 @@ export async function GET(request: NextRequest) {
     empleadoNombre: string;
     montoEntregado: number;
     fecha: string | null;
+    comentario: string | null;
   }>;
 
   items.sort((a, b) => (b.fecha ?? "").localeCompare(a.fecha ?? ""));

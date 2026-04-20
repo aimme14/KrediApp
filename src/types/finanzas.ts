@@ -204,7 +204,7 @@ export interface IntentoCobroExtension {
 }
 
 // ── ClienteRuta (pantalla ruta del día) ─
-export type PrioridadClienteRuta = 1 | 2 | 3 | 4;
+export type PrioridadClienteRuta = 1 | 2 | 3 | 4 | 5;
 
 export interface ClienteRuta {
   cuotaId: string;

@@ -85,6 +85,8 @@ export type PrestamoItem = {
   adelantoCuota?: number;
   /** Fecha del último pago (ISO). Para semáforo "cuota del día pagada" en ruta del día. */
   ultimoPagoFecha?: string | null;
+  /** No pagos consecutivos registrados (sin pago). A las 3 pasará el préstamo a mora. */
+  intentosFallidos?: number;
 };
 
 export type GastoItem = {
@@ -208,10 +210,16 @@ export async function patchRutaOperativa(
 
 /** Trabajador: pasa todo el efectivo de su base/jornada a la base de la ruta. */
 export async function entregarReporteDia(
-  token: string
+  token: string,
+  options?: { comentario?: string }
 ): Promise<{ monto: number; rutaId: string }> {
+  const body: Record<string, string> = {};
+  if (options?.comentario !== undefined) {
+    body.comentario = options.comentario;
+  }
   const res = await fetchWithAuth("/api/empresa/empleado/entregar-reporte", token, {
     method: "POST",
+    body: JSON.stringify(body),
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error ?? "Error al entregar reporte");
@@ -227,6 +235,8 @@ export type ReporteDiaItem = {
   empleadoNombre: string;
   montoEntregado: number;
   fecha: string | null;
+  /** Nota opcional del trabajador al entregar el reporte */
+  comentario?: string | null;
 };
 
 export async function getReportesDia(

@@ -4226,8 +4226,9 @@ th {
 }
 .ruta-dia-section-1 { color: #dc2626; }
 .ruta-dia-section-2 { color: #ea580c; }
-.ruta-dia-section-3 { color: #2563eb; }
-.ruta-dia-section-4 { color: var(--text-muted); }
+.ruta-dia-section-3 { color: #f97316; }
+.ruta-dia-section-4 { color: #2563eb; }
+.ruta-dia-section-5 { color: var(--text-muted); }
 .ruta-dia-section-list {
   list-style: none;
   margin: 0;
@@ -4249,6 +4250,17 @@ th {
   background: var(--input-bg);
 }
 /* Semáforo: círculo + barra vertical izquierda */
+.ruta-dia-semaforo-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  flex-shrink: 0;
+}
+.ruta-dia-semaforo-warn-icon {
+  font-size: 12px;
+  line-height: 1;
+  color: #ea580c;
+}
 .ruta-dia-semaforo {
   flex-shrink: 0;
   width: 10px;
@@ -4259,6 +4271,9 @@ th {
 }
 .ruta-dia-semaforo-rojo {
   background: #dc2626;
+}
+.ruta-dia-semaforo-naranja {
+  background: #ea580c;
 }
 .ruta-dia-semaforo-amarillo {
   background: #eab308;
@@ -4272,6 +4287,9 @@ th {
 }
 .ruta-dia-item-semaforo-amarillo {
   border-left: 4px solid #eab308;
+}
+.ruta-dia-item-semaforo-naranja {
+  border-left: 4px solid #ea580c;
 }
 .ruta-dia-item-semaforo-verde {
   border-left: 4px solid #16a34a;
@@ -4301,8 +4319,9 @@ th {
 }
 .ruta-dia-avatar.prioridad-1 { background: #fef2f2; color: #dc2626; }
 .ruta-dia-avatar.prioridad-2 { background: #fff7ed; color: #ea580c; }
-.ruta-dia-avatar.prioridad-3 { background: #eff6ff; color: #2563eb; }
-.ruta-dia-avatar.prioridad-4 { background: var(--input-bg); color: var(--text-muted); }
+.ruta-dia-avatar.prioridad-3 { background: #fff7ed; color: #ea580c; }
+.ruta-dia-avatar.prioridad-4 { background: #eff6ff; color: #2563eb; }
+.ruta-dia-avatar.prioridad-5 { background: var(--input-bg); color: var(--text-muted); }
 [data-theme="dark"] .ruta-dia-avatar.prioridad-1 {
   background: rgba(220, 38, 38, 0.18);
   color: #f87171;
@@ -4312,8 +4331,19 @@ th {
   color: #f59e0b;
 }
 [data-theme="dark"] .ruta-dia-avatar.prioridad-3 {
+  background: rgba(217, 119, 6, 0.22);
+  color: #fb923c;
+}
+[data-theme="dark"] .ruta-dia-avatar.prioridad-4 {
   background: rgba(37, 99, 235, 0.20);
   color: #60a5fa;
+}
+[data-theme="dark"] .ruta-dia-avatar.prioridad-5 {
+  background: var(--input-bg);
+  color: var(--text-muted);
+}
+[data-theme="dark"] .ruta-dia-semaforo-warn-icon {
+  color: #fb923c;
 }
 .ruta-dia-avatar-check {
   position: absolute;
@@ -4350,6 +4380,7 @@ th {
 .ruta-dia-badge.estado-mora { background: #fef2f2; color: #dc2626; }
 .ruta-dia-badge.estado-pagada { background: #f0fdf4; color: #16a34a; }
 .ruta-dia-badge.estado-activo { background: #fffbeb; color: #d97706; }
+.ruta-dia-badge.estado-alerta { background: #fff7ed; color: #ea580c; }
 
 [data-theme="dark"] .ruta-dia-badge.estado-mora {
   background: rgba(220, 38, 38, 0.16);
@@ -4362,6 +4393,10 @@ th {
 [data-theme="dark"] .ruta-dia-badge.estado-activo {
   background: rgba(217, 119, 6, 0.18);
   color: #fbbf24;
+}
+[data-theme="dark"] .ruta-dia-badge.estado-alerta {
+  background: rgba(234, 88, 12, 0.18);
+  color: #fb923c;
 }
 .ruta-dia-footer {
   position: fixed;

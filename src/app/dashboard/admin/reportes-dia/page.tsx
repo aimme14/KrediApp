@@ -85,6 +85,7 @@ export default function ReportesDiaPage() {
                   <th>Hora</th>
                   <th>Ruta</th>
                   <th>Trabajador</th>
+                  <th>Comentario</th>
                   <th className="col-num">Monto entregado</th>
                 </tr>
               </thead>
@@ -108,6 +109,17 @@ export default function ReportesDiaPage() {
                       ) : null}
                     </td>
                     <td>{row.empleadoNombre}</td>
+                    <td
+                      style={{
+                        maxWidth: "280px",
+                        fontSize: "0.875rem",
+                        color: row.comentario ? "var(--text)" : "var(--text-muted)",
+                        whiteSpace: "pre-wrap",
+                        wordBreak: "break-word",
+                      }}
+                    >
+                      {row.comentario ?? "—"}
+                    </td>
                     <td className="col-num">{formatMonto(row.montoEntregado)}</td>
                   </tr>
                 ))}

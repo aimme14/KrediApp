@@ -22,6 +22,9 @@ const VISITADOS_STORAGE_PREFIX = "krediapp-ruta-visitados-";
 /** No refetch al volver a la pestaña si la última carga fue hace menos de esto. */
 const VISIBILITY_MIN_INTERVAL_MS = 45_000;
 
+/** Debe coincidir con la API: mora tras 3 no pagos consecutivos; UI alerta en 1–2. */
+const NO_PAGOS_PARA_MORA_UI = 3;
+
 function getVisitadosKey(): string {
   return `${VISITADOS_STORAGE_PREFIX}${new Date().toISOString().slice(0, 10)}`;
 }
@@ -78,17 +81,24 @@ function calcularDiasMora(
 function calcularPrioridad(
   fechaVencimiento: Date | null,
   estado: string,
-  diasMora: number
+  diasMora: number,
+  intentosFallidos: number
 ): PrioridadClienteRuta {
   const hoy = new Date();
-  if (estado === "mora" && diasMora > 0) return 1;
-  if (!fechaVencimiento) return 4;
+  if (estado === "mora") return 1;
+  if (
+    estado === "activo" &&
+    intentosFallidos >= 1 &&
+    intentosFallidos < NO_PAGOS_PARA_MORA_UI
+  ) {
+    return 2;
+  }
+  if (!fechaVencimiento) return 5;
   const diffMs = fechaVencimiento.getTime() - hoy.getTime();
   const dias = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-  if (dias <= 0) return 2; // vence hoy o vencido
-  if (dias === 1) return 3; // mañana
-  if (dias <= 7) return 4; // esta semana
-  return 4;
+  if (dias <= 0) return 3;
+  if (dias === 1) return 4;
+  return 5;
 }
 
 function isHoy(fecha: Date | null): boolean {
@@ -131,10 +141,8 @@ function buildClientesRuta(
     const fechaV = toDate(p.fechaVencimiento ?? null);
     const estado = p.estado ?? "activo";
     const diasMora = calcularDiasMora(fechaV, estado);
-    const prioridad = calcularPrioridad(fechaV, estado, diasMora);
-    const intentosFallidos =
-      (p as PrestamoItem & { intentosFallidos?: number }).intentosFallidos ??
-      0;
+    const intentosFallidos = p.intentosFallidos ?? 0;
+    const prioridad = calcularPrioridad(fechaV, estado, diasMora, intentosFallidos);
 
     const cuotaPagadaHoy = isMismoDia(p.ultimoPagoFecha ?? null);
 

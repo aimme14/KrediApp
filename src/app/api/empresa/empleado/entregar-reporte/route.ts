@@ -10,14 +10,32 @@ import {
 } from "@/lib/empresas-db";
 import { entregarReporteTrabajadorARuta } from "@/lib/entregar-reporte-empleado-admin";
 
-/** POST: trabajador entrega a la base de la ruta el efectivo acumulado en su base / jornada. */
-export async function POST(_request: NextRequest) {
-  const apiUser = await getApiUser(_request);
+const MAX_COMENTARIO_REPORTE = 2000;
+
+/** POST: trabajador entrega a la base de la ruta el efectivo acumulado en su base / jornada. Body opcional: { comentario?: string } */
+export async function POST(request: NextRequest) {
+  const apiUser = await getApiUser(request);
   if (!apiUser) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
   if (apiUser.role !== "empleado") {
     return NextResponse.json({ error: "Solo trabajadores" }, { status: 403 });
+  }
+
+  let comentarioTrimmed: string | null = null;
+  const body = (await request.json().catch(() => ({}))) as { comentario?: unknown };
+  if (body?.comentario !== undefined && body.comentario !== null) {
+    if (typeof body.comentario !== "string") {
+      return NextResponse.json({ error: "El comentario debe ser texto" }, { status: 400 });
+    }
+    const t = body.comentario.trim();
+    if (t.length > MAX_COMENTARIO_REPORTE) {
+      return NextResponse.json(
+        { error: `El comentario no puede superar ${MAX_COMENTARIO_REPORTE} caracteres` },
+        { status: 400 }
+      );
+    }
+    comentarioTrimmed = t.length > 0 ? t : null;
   }
 
   const db = getAdminFirestore();
@@ -57,6 +75,7 @@ export async function POST(_request: NextRequest) {
         empleadoNombre,
         montoEntregado: result.monto,
         adminId,
+        comentario: comentarioTrimmed,
       });
 
     return NextResponse.json({

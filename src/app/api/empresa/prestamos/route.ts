@@ -53,6 +53,7 @@ export async function GET(request: NextRequest) {
       adelantoCuota: data.adelantoCuota ?? 0,
       /** Fecha del último pago (para semáforo "cuota del día pagada" en ruta del día). */
       ultimoPagoFecha: data.ultimoPagoFecha?.toDate?.()?.toISOString?.() ?? null,
+      intentosFallidos: typeof data.intentosFallidos === "number" ? data.intentosFallidos : 0,
     };
   });
 

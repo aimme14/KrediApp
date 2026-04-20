@@ -6,9 +6,10 @@ import { useTrabajadorLista } from "@/context/TrabajadorListaContext";
 import {
   listGastos,
   entregarReporteDia,
-  type PrestamoItem,
   type GastoItem,
 } from "@/lib/empresa-api";
+
+const MAX_COMENTARIO_REPORTE = 2000;
 
 function formatMonto(value: number): string {
   const hasDecimals = Math.round(value * 100) % 100 !== 0;
@@ -24,6 +25,8 @@ export default function ResumenDelDiaPage() {
   const [gastos, setGastos] = useState<GastoItem[]>([]);
   const [loadingGastos, setLoadingGastos] = useState(true);
   const [entregando, setEntregando] = useState(false);
+  const [modalEntregaAbierto, setModalEntregaAbierto] = useState(false);
+  const [comentarioEntrega, setComentarioEntrega] = useState("");
   const [msgReporte, setMsgReporte] = useState<string | null>(null);
   const [errReporte, setErrReporte] = useState<string | null>(null);
 
@@ -45,6 +48,18 @@ export default function ResumenDelDiaPage() {
     };
   }, [user]);
 
+  useEffect(() => {
+    if (!modalEntregaAbierto) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setModalEntregaAbierto(false);
+        setComentarioEntrega("");
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [modalEntregaAbierto]);
+
   const loading = loadingLista || loadingGastos;
 
   const hoy = new Date().toDateString();
@@ -55,15 +70,28 @@ export default function ResumenDelDiaPage() {
     .reduce((sum, g) => sum + g.monto, 0);
   const gastosTotal = gastos.reduce((sum, g) => sum + g.monto, 0);
 
-  const handleEntregarReporte = async () => {
+  const cerrarModalEntrega = () => {
+    setModalEntregaAbierto(false);
+    setComentarioEntrega("");
+    setErrReporte(null);
+  };
+
+  const handleConfirmarEntrega = async () => {
     if (!user) return;
+    if (comentarioEntrega.length > MAX_COMENTARIO_REPORTE) {
+      setErrReporte(`El comentario no puede superar ${MAX_COMENTARIO_REPORTE} caracteres`);
+      return;
+    }
     setErrReporte(null);
     setMsgReporte(null);
     setEntregando(true);
     try {
       const token = await user.getIdToken();
-      const r = await entregarReporteDia(token);
+      const r = await entregarReporteDia(token, {
+        comentario: comentarioEntrega.trim(),
+      });
       setMsgReporte(`Entregaste ${formatMonto(r.monto)} a la base de la ruta.`);
+      cerrarModalEntrega();
     } catch (e) {
       setErrReporte(e instanceof Error ? e.message : "No se pudo entregar");
     } finally {
@@ -86,14 +114,19 @@ export default function ResumenDelDiaPage() {
           type="button"
           className="btn btn-primary"
           disabled={entregando}
-          onClick={handleEntregarReporte}
+          onClick={() => {
+            setModalEntregaAbierto(true);
+            setErrReporte(null);
+          }}
         >
-          {entregando ? "Entregando…" : "Entregar reporte"}
+          Entregar reporte
         </button>
         {msgReporte && (
           <p style={{ marginTop: "0.5rem", color: "var(--success, #6bbf6b)", fontSize: "0.875rem" }}>{msgReporte}</p>
         )}
-        {errReporte && <p className="error-msg" style={{ marginTop: "0.5rem" }}>{errReporte}</p>}
+        {!modalEntregaAbierto && errReporte && (
+          <p className="error-msg" style={{ marginTop: "0.5rem" }}>{errReporte}</p>
+        )}
       </div>
 
       <p style={{ color: "var(--text-muted)", fontSize: "0.875rem", marginBottom: "1.25rem" }}>
@@ -130,6 +163,66 @@ export default function ResumenDelDiaPage() {
               </tr>
             </tbody>
           </table>
+        </div>
+      )}
+
+      {modalEntregaAbierto && (
+        <div className="gf-modal-backdrop" onClick={cerrarModalEntrega} aria-hidden>
+          <div
+            className="gf-modal"
+            style={{ maxWidth: "440px" }}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="resumen-entrega-title"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 id="resumen-entrega-title" className="gf-modal-title">
+              Confirmar entrega del reporte
+            </h2>
+            <p className="gf-modal-desc">
+              Vas a pasar todo el efectivo de tu base (o jornada abierta) a la base de la ruta. ¿Confirmás la entrega?
+            </p>
+            <label htmlFor="resumen-entrega-comentario" className="gf-modal-label">
+              Comentario <span style={{ fontWeight: 400, color: "var(--text-muted)" }}>(opcional)</span>
+            </label>
+            <textarea
+              id="resumen-entrega-comentario"
+              className="gf-modal-input"
+              style={{ minHeight: "88px", resize: "vertical" }}
+              value={comentarioEntrega}
+              onChange={(e) => setComentarioEntrega(e.target.value.slice(0, MAX_COMENTARIO_REPORTE))}
+              placeholder="Ej. billetes revisados, novedades del día…"
+              disabled={entregando}
+              maxLength={MAX_COMENTARIO_REPORTE}
+              rows={4}
+            />
+            <p style={{ margin: 0, fontSize: "0.75rem", color: "var(--text-muted)" }}>
+              {comentarioEntrega.length}/{MAX_COMENTARIO_REPORTE}
+            </p>
+            {errReporte && (
+              <p className="error-msg" style={{ marginTop: "0.5rem", marginBottom: 0 }} role="alert">
+                {errReporte}
+              </p>
+            )}
+            <div className="gf-modal-actions">
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={cerrarModalEntrega}
+                disabled={entregando}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() => void handleConfirmarEntrega()}
+                disabled={entregando}
+              >
+                {entregando ? "Entregando…" : "Confirmar entrega"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

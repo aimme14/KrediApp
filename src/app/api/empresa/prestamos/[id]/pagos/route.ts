@@ -27,6 +27,8 @@ const MOTIVOS_PERDIDA = [
   "otro",
 ] as const;
 const MAX_PAGOS_LIST = 50;
+/** Tras este número de «no pago» consecutivos el préstamo pasa a estado mora. */
+const NO_PAGOS_CONSECUTIVOS_PARA_MORA = 3;
 
 /** GET: listar últimos pagos del préstamo (para historial). Empleado o admin de la ruta/empresa. */
 export async function GET(
@@ -197,8 +199,16 @@ export async function POST(
           registradoPorNombre: nombreRegistro,
         });
 
+        const prevFallos =
+          typeof pr.intentosFallidos === "number" ? pr.intentosFallidos : 0;
+        const intentosFallidos = prevFallos + 1;
+        const yaEnMora = pr.estado === "mora";
+        const pasarAMora =
+          yaEnMora || intentosFallidos >= NO_PAGOS_CONSECUTIVOS_PARA_MORA;
+
         tx.update(prestamoRef, {
-          estado: "mora",
+          intentosFallidos,
+          estado: pasarAMora ? "mora" : "activo",
           updatedAt: now,
         });
 
@@ -547,10 +557,11 @@ export async function POST(
 
       tx.update(prestamoRef, {
         saldoPendiente: nuevoSaldo,
-        estado: nuevoSaldo <= 0 ? "pagado" : d.estado,
+        estado: nuevoSaldo <= 0 ? "pagado" : "activo",
         updatedAt: nowTx,
         adelantoCuota: adelantoParaGuardar,
         ultimoPagoFecha: FieldValue.serverTimestamp(),
+        intentosFallidos: 0,
       });
 
       if (rutaRef && rutaSnap?.exists) {
