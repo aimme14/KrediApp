@@ -1,6 +1,6 @@
 /**
  * Servicio de capital de empresa (nivel jefe).
- * capitalEmpresa = cajaEmpresa + suma(capitalAdmin) − gastosEmpresa
+ * capitalEmpresa (en API) = cajaEmpresa + suma(capitalAdmin); no se persiste en el doc Firestore.
  * Persistencia: empresas/{jefeUid}/capital/cajaEmpresa (sin documento "actual").
  */
 
@@ -28,7 +28,11 @@ export type CapitalEmpresaFlujoTipo =
   | "ajuste_caja"
   | "inversion_admin"
   | "gasto_empresa"
-  | "asignacion_nuevo_admin";
+  | "asignacion_nuevo_admin"
+  /** Base empresa → cajaAdmin de un administrador existente (capital total sin cambio neto). */
+  | "inversion_caja_admin"
+  /** @deprecated Renombrado a `inversion_caja_admin`; conservar lectura de histórico. */
+  | "traspaso_base_admin";
 
 export interface CapitalEmpresaHistorialEntry {
   id?: string;
@@ -36,6 +40,34 @@ export interface CapitalEmpresaHistorialEntry {
   montoNuevo: number;
   at: Date;
   tipo?: CapitalEmpresaFlujoTipo;
+  /** Presente en flujos de asignación / inversión a admin (desde base empresa). */
+  montoTransferencia?: number;
+  deltaCaja?: number;
+  cajaAnterior?: number;
+  cajaNueva?: number;
+  adminUid?: string;
+  adminNombre?: string;
+}
+
+/** Serializa una entrada de historial para respuestas JSON (API jefe). */
+export function historialCapitalEmpresaToJson(h: CapitalEmpresaHistorialEntry) {
+  const atIso = h.at instanceof Date ? h.at.toISOString() : null;
+  const row: Record<string, unknown> = {
+    id: h.id,
+    tipo: h.tipo,
+    montoAnterior: h.montoAnterior,
+    montoNuevo: h.montoNuevo,
+    at: atIso,
+  };
+  if (typeof h.montoTransferencia === "number") {
+    row.montoTransferencia = h.montoTransferencia;
+  }
+  if (typeof h.deltaCaja === "number") row.deltaCaja = h.deltaCaja;
+  if (typeof h.cajaAnterior === "number") row.cajaAnterior = h.cajaAnterior;
+  if (typeof h.cajaNueva === "number") row.cajaNueva = h.cajaNueva;
+  if (typeof h.adminUid === "string") row.adminUid = h.adminUid;
+  if (typeof h.adminNombre === "string") row.adminNombre = h.adminNombre;
+  return row;
 }
 
 export interface CapitalEmpresaDoc {
@@ -81,7 +113,7 @@ async function loadHistorialDesdeFlujo(
       const x = d.data() as Record<string, unknown>;
       const atRaw = x.at as { toDate?: () => Date } | undefined;
       const tipoRaw = x.tipo;
-      return {
+      const entry: CapitalEmpresaHistorialEntry = {
         id: d.id,
         montoAnterior: typeof x.montoAnterior === "number" ? x.montoAnterior : 0,
         montoNuevo: typeof x.montoNuevo === "number" ? x.montoNuevo : 0,
@@ -91,6 +123,15 @@ async function loadHistorialDesdeFlujo(
             ? (tipoRaw as CapitalEmpresaFlujoTipo)
             : undefined,
       };
+      if (typeof x.montoTransferencia === "number") {
+        entry.montoTransferencia = x.montoTransferencia;
+      }
+      if (typeof x.deltaCaja === "number") entry.deltaCaja = x.deltaCaja;
+      if (typeof x.cajaAnterior === "number") entry.cajaAnterior = x.cajaAnterior;
+      if (typeof x.cajaNueva === "number") entry.cajaNueva = x.cajaNueva;
+      if (typeof x.adminUid === "string") entry.adminUid = x.adminUid;
+      if (typeof x.adminNombre === "string") entry.adminNombre = x.adminNombre;
+      return entry;
     });
   } catch (e) {
     if (typeof console !== "undefined" && console.warn) {
@@ -101,30 +142,6 @@ async function loadHistorialDesdeFlujo(
     }
     return [];
   }
-}
-
-/**
- * Elimina todos los documentos de flujo bajo cajaEmpresa y quita el campo legado `historial` del documento principal.
- */
-export async function clearCapitalEmpresaFlujo(
-  db: Firestore,
-  jefeUid: string
-): Promise<void> {
-  const col = capitalEmpresaFlujoCol(db, jefeUid);
-  // Borrar en tandas (límite de operaciones por batch).
-  let snap = await col.limit(450).get();
-  while (!snap.empty) {
-    const batch = db.batch();
-    for (const d of snap.docs) {
-      batch.delete(d.ref);
-    }
-    await batch.commit();
-    snap = await col.limit(450).get();
-  }
-  await cajaEmpresaRef(db, jefeUid).set(
-    { historial: FieldValue.delete() },
-    { merge: true }
-  );
 }
 
 async function buildCapitalEmpresaDoc(
@@ -245,7 +262,7 @@ export async function setCapitalInicial(
     ref,
     {
       cajaEmpresa,
-      capitalEmpresa,
+      capitalEmpresa: FieldValue.delete(),
       jefeUid,
       updatedAt: now,
       historial: FieldValue.delete(),
@@ -272,7 +289,7 @@ export async function ajustarCapital(
   const newCaja = current.cajaEmpresa + delta;
   if (newCaja < 0) {
     throw new Error(
-      "Saldo insuficiente en base empresa. No se puede restar más de lo disponible."
+      "Saldo insuficiente en la caja de la empresa. No se puede restar más de lo disponible."
     );
   }
 
@@ -299,7 +316,7 @@ export async function ajustarCapital(
     ref,
     {
       cajaEmpresa,
-      capitalEmpresa,
+      capitalEmpresa: FieldValue.delete(),
       jefeUid,
       updatedAt: now,
       historial: FieldValue.delete(),
@@ -321,7 +338,7 @@ export async function registrarSalida(
   const current = await getCapitalEmpresa(db, jefeUid);
   if (current.cajaEmpresa < monto) {
     throw new Error(
-      "Saldo insuficiente en base empresa para esta salida"
+      "Saldo insuficiente en la caja de la empresa para esta salida"
     );
   }
 
@@ -341,7 +358,7 @@ export async function asignarCapitalAAdmin(
   if (monto <= 0) throw new Error("El monto a asignar debe ser mayor a 0");
   const antes = await getCapitalEmpresa(db, jefeUid);
   if (antes.cajaEmpresa < monto) {
-    throw new Error("Saldo insuficiente en base empresa para asignar al administrador");
+    throw new Error("Saldo insuficiente en la caja de la empresa para asignar al administrador");
   }
 
   const ref = cajaEmpresaRef(db, jefeUid);
@@ -365,6 +382,7 @@ export async function asignarCapitalAAdmin(
     ref,
     {
       cajaEmpresa,
+      capitalEmpresa: FieldValue.delete(),
       updatedAt: now,
       historial: FieldValue.delete(),
     },
@@ -374,84 +392,89 @@ export async function asignarCapitalAAdmin(
 }
 
 /**
- * Transfiere liquidez de caja empresa a la caja del administrador (incrementa cajaAdmin).
- * El capital total de empresa no cambia (solo se redistribuye entre caja empresa y Σ admins).
+ * Inversión a caja de administrador: efectivo de la base empresa → cajaAdmin.
+ * Valida que el usuario exista en `empresas/{jefeUid}/usuarios/{adminUid}` con rol `admin`.
  */
-export async function invertirCajaEmpresaEnAdministrador(
+export async function transferirBaseEmpresaAAdmin(
   db: Firestore,
   jefeUid: string,
   adminUid: string,
   monto: number
 ): Promise<CapitalEmpresaDoc> {
-  if (!adminUid.trim()) throw new Error("Administrador no válido");
-  if (monto <= 0) throw new Error("El monto debe ser mayor a 0");
+  if (!adminUid || typeof adminUid !== "string" || !adminUid.trim()) {
+    throw new Error("Debes indicar un administrador");
+  }
+  const adminId = adminUid.trim();
+  if (adminId === jefeUid) {
+    throw new Error("No puedes invertir en caja del propio jefe como administrador");
+  }
+  if (monto <= 0) throw new Error("El monto de la inversión debe ser mayor a 0");
 
-  const antes = await getCapitalEmpresa(db, jefeUid);
-
-  const empresaRef = cajaEmpresaRef(db, jefeUid);
   const adminRef = db
     .collection(EMPRESAS_COLLECTION)
     .doc(jefeUid)
     .collection(USUARIOS_SUBCOLLECTION)
-    .doc(adminUid);
+    .doc(adminId);
 
+  const adminSnap = await adminRef.get();
+  if (!adminSnap.exists) {
+    throw new Error("El administrador no pertenece a esta empresa o no existe");
+  }
+  const adminData = adminSnap.data() as Record<string, unknown>;
+  if ((adminData.rol as string | undefined) !== "admin") {
+    throw new Error("El usuario indicado no es un administrador de la empresa");
+  }
+
+  const antes = await getCapitalEmpresa(db, jefeUid);
+  if (antes.cajaEmpresa < monto) {
+    throw new Error("Saldo insuficiente en la caja de la empresa para invertir en la caja del administrador");
+  }
+
+  const cajaEmpresa = antes.cajaEmpresa - monto;
+  const sumaDespues = antes.sumaCapitalAdmins + monto;
+  const capitalAntes = antes.capitalEmpresa;
+  const capitalDespues = computeCapitalEmpresa(cajaEmpresa, sumaDespues);
+
+  const ref = cajaEmpresaRef(db, jefeUid);
   const now = new Date();
+  const nombreAdmin =
+    typeof adminData.nombre === "string" && adminData.nombre.trim()
+      ? adminData.nombre.trim()
+      : typeof adminData.email === "string"
+        ? adminData.email
+        : adminId;
 
-  await db.runTransaction(async (tx) => {
-    const [empSnap, adminSnap] = await Promise.all([
-      tx.get(empresaRef),
-      tx.get(adminRef),
-    ]);
-
-    if (!adminSnap.exists) {
-      throw new Error("Administrador no encontrado en la empresa");
-    }
-    const adm = adminSnap.data()!;
-    if (adm.rol !== "admin") {
-      throw new Error("El usuario seleccionado no es un administrador");
-    }
-
-    const empData = empSnap.exists ? empSnap.data() : undefined;
-    const cajaEmpresaRaw =
-      typeof empData?.cajaEmpresa === "number" ? empData.cajaEmpresa : 0;
-    if (cajaEmpresaRaw < monto) {
-      throw new Error("Saldo insuficiente en base empresa");
-    }
-
-    const cajaAdmin =
-      typeof adm.cajaAdmin === "number" ? adm.cajaAdmin : 0;
-    const newCajaEmpresa = Math.round((cajaEmpresaRaw - monto) * 100) / 100;
-    const newCajaAdmin = Math.round((cajaAdmin + monto) * 100) / 100;
-
-    tx.set(
-      empresaRef,
-      {
-        cajaEmpresa: newCajaEmpresa,
-        updatedAt: now,
-        jefeUid,
-        historial: FieldValue.delete(),
-      },
-      { merge: true }
-    );
-    tx.update(adminRef, {
-      cajaAdmin: newCajaAdmin,
-      ultimaActualizacionCapital: now,
-    });
-  });
-
-  await persistAggregatedCapitalDocs(db, jefeUid);
-  const despues = await getCapitalEmpresa(db, jefeUid);
-  await capitalEmpresaFlujoCol(db, jefeUid).add({
-    tipo: "inversion_admin",
-    montoAnterior: antes.capitalEmpresa,
-    montoNuevo: despues.capitalEmpresa,
+  const batch = db.batch();
+  const flujoRef = capitalEmpresaFlujoCol(db, jefeUid).doc();
+  batch.set(flujoRef, {
+    tipo: "inversion_caja_admin",
+    montoAnterior: capitalAntes,
+    montoNuevo: capitalDespues,
     at: Timestamp.fromDate(now),
     jefeUid,
-    adminUid: adminUid.trim(),
+    adminUid: adminId,
+    adminNombre: nombreAdmin,
     montoTransferencia: monto,
     cajaAnterior: antes.cajaEmpresa,
-    cajaNueva: despues.cajaEmpresa,
+    cajaNueva: cajaEmpresa,
   });
+  batch.set(
+    ref,
+    {
+      cajaEmpresa,
+      capitalEmpresa: FieldValue.delete(),
+      updatedAt: now,
+      historial: FieldValue.delete(),
+    },
+    { merge: true }
+  );
+  batch.update(adminRef, {
+    cajaAdmin: FieldValue.increment(monto),
+    ultimaActualizacionCapital: now,
+  });
+  await batch.commit();
+
+  await persistAggregatedCapitalDocs(db, jefeUid);
   return getCapitalEmpresa(db, jefeUid);
 }
 
@@ -467,7 +490,7 @@ export async function descontarCajaEmpresa(
   if (monto <= 0) throw new Error("El monto del gasto debe ser mayor a 0");
   const current = await getCapitalEmpresa(db, jefeUid);
   if (current.cajaEmpresa < monto) {
-    throw new Error("Saldo insuficiente en base empresa para este gasto");
+    throw new Error("Saldo insuficiente en la caja de la empresa para este gasto");
   }
   const ref = cajaEmpresaRef(db, jefeUid);
   const nuevaCaja = current.cajaEmpresa - monto;
@@ -490,6 +513,7 @@ export async function descontarCajaEmpresa(
     ref,
     {
       cajaEmpresa: nuevaCaja,
+      capitalEmpresa: FieldValue.delete(),
       updatedAt: now,
       historial: FieldValue.delete(),
     },

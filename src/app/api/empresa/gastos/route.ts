@@ -248,7 +248,7 @@ export async function POST(request: NextRequest) {
             error:
               e instanceof Error
                 ? e.message
-                : "Saldo insuficiente en base de la empresa",
+                : "Saldo insuficiente en la caja de la empresa",
           },
           { status: 400 }
         );

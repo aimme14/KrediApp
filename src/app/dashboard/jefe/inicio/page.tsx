@@ -85,7 +85,7 @@ export default function InicioJefePage() {
           const reason = capitalResult.reason;
           setCapital(null);
           setFinanzasError(
-            reason instanceof Error ? reason.message : "No se pudo cargar base y capital"
+            reason instanceof Error ? reason.message : "No se pudo cargar caja y capital"
           );
         }
       } finally {
@@ -180,7 +180,7 @@ export default function InicioJefePage() {
 
       <section className="jefe-inicio-finanzas" aria-labelledby="jefe-inicio-finanzas-heading">
         <h2 id="jefe-inicio-finanzas-heading" className="jefe-inicio-finanzas-title">
-          Base y capital de la empresa
+          Caja y capital de la empresa
         </h2>
         {finanzasError && (
           <p className="jefe-inicio-finanzas-error" role="alert">
@@ -190,7 +190,7 @@ export default function InicioJefePage() {
         {!finanzasError && capital && (
           <div className="jefe-inicio-finanzas-grid">
             <div className="jefe-inicio-monto-card">
-              <span className="jefe-inicio-monto-label">Base empresa</span>
+              <span className="jefe-inicio-monto-label">Caja de la empresa</span>
               <span className="jefe-inicio-monto-valor" aria-live="polite">
                 {formatMoneda(capital.cajaEmpresa)}
               </span>

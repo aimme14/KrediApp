@@ -6,7 +6,7 @@ import {
   setCapitalInicial,
   ajustarCapital,
   registrarSalida,
-  clearCapitalEmpresaFlujo,
+  historialCapitalEmpresaToJson,
 } from "@/lib/jefe-capital";
 
 /** GET: capital de empresa (fórmula nueva + desglose). */
@@ -26,13 +26,9 @@ export async function GET(request: NextRequest) {
     const db = getAdminFirestore();
     const doc = await getCapitalEmpresa(db, apiUser.uid);
 
-    const historial = (doc.historial ?? []).map((h) => ({
-      id: h.id,
-      tipo: h.tipo,
-      montoAnterior: h.montoAnterior,
-      montoNuevo: h.montoNuevo,
-      at: h.at instanceof Date ? h.at.toISOString() : null,
-    }));
+    const historial = (doc.historial ?? []).map((h) =>
+      historialCapitalEmpresaToJson(h)
+    );
 
     return NextResponse.json({
       capitalEmpresa: doc.capitalEmpresa,
@@ -76,13 +72,9 @@ export async function PUT(request: NextRequest) {
   const db = getAdminFirestore();
 
   const jsonDoc = async (doc: Awaited<ReturnType<typeof getCapitalEmpresa>>) => {
-    const historial = (doc.historial ?? []).map((h) => ({
-      id: h.id,
-      tipo: h.tipo,
-      montoAnterior: h.montoAnterior,
-      montoNuevo: h.montoNuevo,
-      at: h.at instanceof Date ? h.at.toISOString() : null,
-    }));
+    const historial = (doc.historial ?? []).map((h) =>
+      historialCapitalEmpresaToJson(h)
+    );
     return {
       ok: true,
       capitalEmpresa: doc.capitalEmpresa,
@@ -141,28 +133,4 @@ export async function PUT(request: NextRequest) {
       { status: 400 }
     );
   }
-}
-
-/** PATCH: elimina el flujo de movimientos bajo cajaEmpresa. Body: { clearHistorial: true } */
-export async function PATCH(request: NextRequest) {
-  const apiUser = await getApiUser(request);
-  if (!apiUser) {
-    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-  }
-  if (apiUser.role !== "jefe") {
-    return NextResponse.json(
-      { error: "Solo el jefe puede gestionar el capital" },
-      { status: 403 }
-    );
-  }
-
-  const body = await request.json().catch(() => ({}));
-  if (body.clearHistorial !== true) {
-    return NextResponse.json({ error: "Acción no válida" }, { status: 400 });
-  }
-
-  const db = getAdminFirestore();
-  await clearCapitalEmpresaFlujo(db, apiUser.uid);
-
-  return NextResponse.json({ ok: true, historial: [] });
 }

@@ -31,7 +31,7 @@ export const MOVIMIENTOS_SUBCOLLECTION = "movimientos";
 /** Colección empresas/{jefeUid}/capital — documentos por capa (cajaEmpresa, cajaAdmin, cajaEmpleado) y rama para rutas. */
 export const CAPITAL_SUBCOLLECTION = "capital";
 
-/** Documento con caja y gastos de empresa; el capital se calcula: cajaEmpresa + suma(capitalAdmin) − gastosEmpresa. */
+/** Documento caja empresa (liquidez en caja); el capital total se calcula al leer: cajaEmpresa + suma(capitalAdmin). */
 export const CAPITAL_CAJA_EMPRESA_DOC = "cajaEmpresa";
 
 /** Movimientos de capital/base empresa (un documento por evento). empresas/{jefeUid}/capital/cajaEmpresa/flujo/{id} */

@@ -1,20 +1,19 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { reauthenticateWithCredential, EmailAuthProvider } from "firebase/auth";
 import { useAuth } from "@/context/AuthContext";
 import { auth } from "@/lib/firebase";
 import {
   getCapital,
   setCapital,
-  clearCapitalHistorial,
   invertirCajaJefe,
+  transferirBaseEmpresaAAdmin,
   type CapitalHistorialEntry,
   type CapitalResponse,
 } from "@/lib/capital";
 import { listUsersByCreator } from "@/lib/users";
 import type { UserProfile } from "@/types/roles";
-
 /** Cuántas filas mostrar en cada panel de historial (el API puede devolver hasta 100). */
 const FLUJO_UI_LIMIT = 50;
 
@@ -26,11 +25,14 @@ function etiquetaTipoFlujo(tipo: string | undefined): string {
     case "ajuste_caja":
       return "Ajuste de base";
     case "inversion_admin":
-      return "Transferencia a administrador";
+      return "Transferencia a administrador (histórico)";
     case "gasto_empresa":
       return "Gasto de empresa";
     case "asignacion_nuevo_admin":
       return "Asignación a nuevo administrador";
+    case "inversion_caja_admin":
+    case "traspaso_base_admin":
+      return "Inversión a caja de administrador";
     default:
       return "Cambio de capital";
   }
@@ -95,10 +97,98 @@ function parseMontoInput(value: string): { num: number; valid: boolean } {
   return { num, valid: true };
 }
 
-function sortAdminsPorCodigo(a: UserProfile, b: UserProfile): number {
-  const ca = (a.codigo ?? "").toString();
-  const cb = (b.codigo ?? "").toString();
-  return ca.localeCompare(cb, undefined, { numeric: true });
+function montoInversionHistorial(entry: CapitalHistorialEntry): number | null {
+  if (typeof entry.montoTransferencia === "number" && entry.montoTransferencia > 0) {
+    return entry.montoTransferencia;
+  }
+  if (
+    typeof entry.cajaAnterior === "number" &&
+    typeof entry.cajaNueva === "number" &&
+    entry.cajaAnterior > entry.cajaNueva
+  ) {
+    return Math.round((entry.cajaAnterior - entry.cajaNueva) * 100) / 100;
+  }
+  return null;
+}
+
+/** Inversión a caja de admin o movimientos equivalentes con monto explícito y sin variación de capital total. */
+function esHistorialInversionAzul(entry: CapitalHistorialEntry): boolean {
+  const m = montoInversionHistorial(entry);
+  if (m == null) return false;
+  const t = entry.tipo;
+  if (t === "inversion_caja_admin" || t === "traspaso_base_admin") return true;
+  if (t === "asignacion_nuevo_admin" || t === "inversion_admin") {
+    return entry.montoNuevo === entry.montoAnterior;
+  }
+  return false;
+}
+
+function HistorialCambiosList({
+  historial,
+  keyPrefix,
+}: {
+  historial: CapitalHistorialEntry[];
+  keyPrefix: string;
+}) {
+  if (historial.length === 0) {
+    return <p className="gf-historial-empty">Sin cambios registrados aún.</p>;
+  }
+  return (
+    <ul className="gf-historial-list">
+      {historial.slice(0, FLUJO_UI_LIMIT).map((entry, i) => {
+        const diff = entry.montoNuevo - entry.montoAnterior;
+        const azul = esHistorialInversionAzul(entry);
+        const mInv = montoInversionHistorial(entry);
+        return (
+          <li
+            key={entry.id ? `${keyPrefix}-${entry.id}` : `${keyPrefix}-${entry.at}-${i}`}
+            className="gf-historial-item"
+            style={{ animationDelay: `${i * 0.06}s` }}
+          >
+            <span className="gf-historial-emoji" aria-hidden>
+              {azul ? "📘" : entry.montoNuevo >= entry.montoAnterior ? "📈" : "📉"}
+            </span>
+            <div className="gf-historial-body">
+              <span className="gf-historial-text">
+                {etiquetaTipoFlujo(entry.tipo)}
+              </span>
+              <span className="gf-historial-detalle">
+                {azul && mInv != null ? (
+                  <>
+                    <span className="gf-historial-capital-neutro">
+                      {diff === 0
+                        ? `Capital total sin cambio neto (${formatMonto(entry.montoAnterior)})`
+                        : `Capital ${formatMonto(entry.montoAnterior)} → ${formatMonto(entry.montoNuevo)}`}
+                    </span>
+                    <span className="gf-historial-inversion-wrap">
+                      <span className="gf-historial-inversion-label"> · Inversión </span>
+                      <span className="gf-diff-inversion">{formatMonto(mInv)}</span>
+                      {entry.adminNombre ? (
+                        <span className="gf-historial-admin-sufijo"> · {entry.adminNombre}</span>
+                      ) : null}
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    {formatMonto(entry.montoAnterior)} → {formatMonto(entry.montoNuevo)}
+                    <span
+                      className={
+                        entry.montoNuevo >= entry.montoAnterior ? "gf-diff-up" : "gf-diff-down"
+                      }
+                    >
+                      {entry.montoNuevo >= entry.montoAnterior ? "+" : ""}
+                      {formatMonto(entry.montoNuevo - entry.montoAnterior)}
+                    </span>
+                  </>
+                )}
+              </span>
+            </div>
+            <span className="gf-historial-hora">{formatSoloHora(entry.at)}</span>
+          </li>
+        );
+      })}
+    </ul>
+  );
 }
 
 export default function GestionFinancieraPage() {
@@ -112,7 +202,6 @@ export default function GestionFinancieraPage() {
   const [inputErrorConfirm, setInputErrorConfirm] = useState<string | null>(null);
   const [btnState, setBtnState] = useState<"default" | "saving" | "success">("default");
   const [toast, setToast] = useState<{ tipo: "aumento" | "reduccion"; mensaje: string } | null>(null);
-  const [clearingHistorial, setClearingHistorial] = useState(false);
   const [modalAbierto, setModalAbierto] = useState(false);
   const [cajaObjetivoPendiente, setCajaObjetivoPendiente] = useState<number | null>(null);
   const [passwordValue, setPasswordValue] = useState("");
@@ -121,13 +210,16 @@ export default function GestionFinancieraPage() {
   const [isConfirming, setIsConfirming] = useState(false);
   const [formCajaAbierto, setFormCajaAbierto] = useState(false);
   const [seccionActiva, setSeccionActiva] = useState<"capital" | "caja">("capital");
-  const [admins, setAdmins] = useState<UserProfile[]>([]);
-  const [invertirDestino, setInvertirDestino] = useState<"" | "empresa" | string>("");
+  const [tipoLiquidezBase, setTipoLiquidezBase] = useState<"entrada" | "inversion_caja_admin">("entrada");
   const [invertirMonto, setInvertirMonto] = useState("");
   const [invertirSaving, setInvertirSaving] = useState(false);
   const [invertirError, setInvertirError] = useState<string | null>(null);
-
-  const adminsOrdenados = useMemo(() => [...admins].sort(sortAdminsPorCodigo), [admins]);
+  const [adminsEmpresa, setAdminsEmpresa] = useState<UserProfile[]>([]);
+  const [adminsEmpresaLoading, setAdminsEmpresaLoading] = useState(false);
+  const [transferAdminUid, setTransferAdminUid] = useState("");
+  const [transferMonto, setTransferMonto] = useState("");
+  const [transferSaving, setTransferSaving] = useState(false);
+  const [transferError, setTransferError] = useState<string | null>(null);
 
   const loadCapital = useCallback(async () => {
     if (!user || !profile || profile.role !== "jefe") return;
@@ -148,19 +240,23 @@ export default function GestionFinancieraPage() {
   }, [loadCapital]);
 
   useEffect(() => {
-    if (!profile || profile.role !== "jefe") return;
+    if (!profile || profile.role !== "jefe" || seccionActiva !== "caja") return;
     let cancelled = false;
+    setAdminsEmpresaLoading(true);
     listUsersByCreator(profile.uid, "admin")
       .then((list) => {
-        if (!cancelled) setAdmins(list);
+        if (!cancelled) setAdminsEmpresa(list);
       })
       .catch(() => {
-        if (!cancelled) setAdmins([]);
+        if (!cancelled) setAdminsEmpresa([]);
+      })
+      .finally(() => {
+        if (!cancelled) setAdminsEmpresaLoading(false);
       });
     return () => {
       cancelled = true;
     };
-  }, [profile]);
+  }, [profile, seccionActiva]);
 
   useEffect(() => {
     if (!modalAbierto) return;
@@ -256,9 +352,9 @@ export default function GestionFinancieraPage() {
       setBtnState("success");
       const anteriorCaja = capital?.cajaEmpresa ?? 0;
       if (data.cajaEmpresa > anteriorCaja) {
-        setToast({ tipo: "aumento", mensaje: "Base de la empresa actualizada correctamente." });
+        setToast({ tipo: "aumento", mensaje: "Caja de la empresa actualizada correctamente." });
       } else {
-        setToast({ tipo: "reduccion", mensaje: "Base de la empresa actualizada." });
+        setToast({ tipo: "reduccion", mensaje: "Caja de la empresa actualizada." });
       }
       setTimeout(() => setToast(null), TOAST_DURATION);
       setTimeout(() => setBtnState("default"), BUTTON_SUCCESS_DURATION);
@@ -274,66 +370,71 @@ export default function GestionFinancieraPage() {
     }
   };
 
-  const handleClearHistorial = async () => {
-    if (!user || !profile || profile.role !== "jefe") return;
-    if (
-      !window.confirm(
-        "¿Eliminar todos los movimientos del flujo de capital de empresa? Esta acción no se puede deshacer."
-      )
-    )
-      return;
-    setClearingHistorial(true);
-    try {
-      const token = await user.getIdToken();
-      await clearCapitalHistorial(token);
-      setCapitalState((prev) => (prev ? { ...prev, historial: [] } : null));
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Error al limpiar historial");
-    } finally {
-      setClearingHistorial(false);
-    }
-  };
-
   const handleInvertirCaja = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user || !profile || profile.role !== "jefe") return;
-    if (!invertirDestino) {
-      setInvertirError("Selecciona dónde invertir.");
-      return;
-    }
     const { num, valid } = parseMontoInput(invertirMonto);
     if (!valid) {
       setInvertirError("Ingresa un monto válido mayor a 0.");
-      return;
-    }
-    const cajaDisp = capital?.cajaEmpresa ?? 0;
-    if (invertirDestino !== "empresa" && num > cajaDisp) {
-      setInvertirError("El monto supera la base empresa disponible.");
       return;
     }
     setInvertirError(null);
     setInvertirSaving(true);
     try {
       const token = await user.getIdToken();
-      const data = await invertirCajaJefe(token, {
-        destino: invertirDestino === "empresa" ? "empresa" : "admin",
-        monto: num,
-        adminUid: invertirDestino === "empresa" ? undefined : invertirDestino,
-      });
+      const data = await invertirCajaJefe(token, { monto: num });
       setCapitalState((prev) => (prev ? { ...prev, ...data } : null));
       setInvertirMonto("");
       setToast({
-        tipo: invertirDestino === "empresa" ? "aumento" : "reduccion",
-        mensaje:
-          invertirDestino === "empresa"
-            ? "Inversión en base empresa registrada."
-            : "Transferencia a la base del administrador registrada.",
+        tipo: "aumento",
+        mensaje: "Inversión en empresa registrada.",
       });
       setTimeout(() => setToast(null), TOAST_DURATION);
     } catch (err) {
       setInvertirError(err instanceof Error ? err.message : "Error al invertir");
     } finally {
       setInvertirSaving(false);
+    }
+  };
+
+  const handleTransferirBaseAdmin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user || !profile || profile.role !== "jefe") return;
+    if (!transferAdminUid.trim()) {
+      setTransferError("Selecciona un administrador.");
+      return;
+    }
+    const { num, valid } = parseMontoInput(transferMonto);
+    if (!valid) {
+      setTransferError("Ingresa un monto válido mayor a 0.");
+      return;
+    }
+    const cajaDisponible = capital?.cajaEmpresa ?? 0;
+    if (num > cajaDisponible) {
+      setTransferError("El monto supera la caja disponible de la empresa.");
+      return;
+    }
+    setTransferError(null);
+    setTransferSaving(true);
+    try {
+      const token = await user.getIdToken();
+      const data = await transferirBaseEmpresaAAdmin(token, {
+        adminUid: transferAdminUid.trim(),
+        monto: num,
+      });
+      setCapitalState((prev) => (prev ? { ...prev, ...data } : null));
+      setTransferMonto("");
+      setToast({
+        tipo: "aumento",
+        mensaje: "Inversión a caja de administrador registrada.",
+      });
+      setTimeout(() => setToast(null), TOAST_DURATION);
+    } catch (err) {
+      setTransferError(
+        err instanceof Error ? err.message : "Error al registrar la inversión"
+      );
+    } finally {
+      setTransferSaving(false);
     }
   };
 
@@ -357,7 +458,7 @@ export default function GestionFinancieraPage() {
   const desgloseDosLineas = (
     <div className="gf-capital-desglose gf-capital-desglose-dos">
       <span>Capital: {formatMonto(monto)}</span>
-      <span>Base: {formatMonto(cajaEmpresa)}</span>
+      <span>Caja: {formatMonto(cajaEmpresa)}</span>
     </div>
   );
 
@@ -386,12 +487,12 @@ export default function GestionFinancieraPage() {
         <div className="gf-kpi-card gf-kpi-caja">
           <span className="gf-kpi-emoji" aria-hidden>🏦</span>
           <span className="gf-kpi-value">{formatMonto(cajaEmpresa)}</span>
-          <span className="gf-kpi-label">BASE DE LA EMPRESA</span>
-          <span className="gf-kpi-sub">Liquidez en base</span>
+          <span className="gf-kpi-label">CAJA DE LA EMPRESA</span>
+          <span className="gf-kpi-sub">Liquidez en caja</span>
         </div>
       </div>
 
-      <nav className="gf-tabs" role="tablist" aria-label="Secciones de gestión financiera">
+      <nav className="gf-tabs" role="tablist" aria-label="Secciones de gestión financiera: capital y caja de la empresa">
         <button
           type="button"
           role="tab"
@@ -414,7 +515,7 @@ export default function GestionFinancieraPage() {
           onClick={() => setSeccionActiva("caja")}
         >
           <span className="gf-tab-icon" aria-hidden>🏦</span>
-          Base
+          Caja
         </button>
       </nav>
 
@@ -434,7 +535,7 @@ export default function GestionFinancieraPage() {
             </div>
             <span className="gf-capital-badge-privado">🔒 Privado</span>
           </div>
-          <p className="gf-capital-card-desc">Solo visible por el jefe. Para ingresar o ajustar montos usa la pestaña Base.</p>
+          <p className="gf-capital-card-desc">Solo visible por el jefe. Para ingresar o ajustar montos usa la pestaña Caja.</p>
 
           {loading ? (
             <p className="gf-loading">Cargando…</p>
@@ -476,48 +577,12 @@ export default function GestionFinancieraPage() {
               <span className="gf-historial-icon" aria-hidden>🕐</span>
               HISTORIAL DE CAMBIOS
             </h2>
-            <button
-              type="button"
-              className="gf-historial-clear"
-              onClick={handleClearHistorial}
-              disabled={clearingHistorial || historial.length === 0}
-            >
-              Limpiar flujo
-            </button>
           </div>
-          {historial.length === 0 ? (
-            <p className="gf-historial-empty">Sin cambios registrados aún.</p>
-          ) : (
-            <ul className="gf-historial-list">
-              {historial.slice(0, FLUJO_UI_LIMIT).map((entry, i) => (
-                <li
-                  key={entry.id ?? `${entry.at}-${i}`}
-                  className="gf-historial-item"
-                  style={{ animationDelay: `${i * 0.06}s` }}
-                >
-                  <span className="gf-historial-emoji" aria-hidden>
-                    {entry.montoNuevo >= entry.montoAnterior ? "📈" : "📉"}
-                  </span>
-                  <div className="gf-historial-body">
-                    <span className="gf-historial-text">
-                      {etiquetaTipoFlujo(entry.tipo)}
-                    </span>
-                    <span className="gf-historial-detalle">
-                      {formatMonto(entry.montoAnterior)} → {formatMonto(entry.montoNuevo)}
-                      <span className={entry.montoNuevo >= entry.montoAnterior ? "gf-diff-up" : "gf-diff-down"}>
-                        {entry.montoNuevo >= entry.montoAnterior ? "+" : ""}{formatMonto(entry.montoNuevo - entry.montoAnterior)}
-                      </span>
-                    </span>
-                  </div>
-                  <span className="gf-historial-hora">{formatSoloHora(entry.at)}</span>
-                </li>
-              ))}
-            </ul>
-          )}
+          <HistorialCambiosList historial={historial} keyPrefix="cap" />
         </div>
       </div>
 
-      {/* Panel Base (misma estructura que antes el bloque de capital, orientado a base empresa) */}
+      {/* Panel caja empresa (liquidez del jefe) */}
       <div
         id="gf-panel-caja"
         role="tabpanel"
@@ -529,18 +594,18 @@ export default function GestionFinancieraPage() {
           <div className="gf-capital-card-header">
             <div className="gf-capital-card-title-wrap">
               <span className="gf-capital-icon" aria-hidden>🏦</span>
-              <h2 className="gf-capital-card-title">Base de la empresa</h2>
+              <h2 className="gf-capital-card-title">Caja de la empresa</h2>
             </div>
             <span className="gf-capital-badge-privado">🔒 Privado</span>
           </div>
-          <p className="gf-capital-card-desc">Solo visible y editable por el jefe. El capital total se calcula como base + Σ capital administradores.</p>
+          <p className="gf-capital-card-desc">Solo visible y editable por el jefe. El capital total se calcula como caja de la empresa + Σ capital administradores.</p>
 
           {loading ? (
             <p className="gf-loading">Cargando…</p>
           ) : (
             <>
               <div className="gf-capital-display">
-                <span className="gf-capital-label">BASE TOTAL</span>
+                <span className="gf-capital-label">CAJA TOTAL</span>
                 <span className="gf-capital-monto" aria-live="polite">
                   ${formatMonto(cajaEmpresa)}
                 </span>
@@ -555,78 +620,151 @@ export default function GestionFinancieraPage() {
                     Tendencia: {tendencia === "subiendo" ? "Subiendo" : tendencia === "bajando" ? "Bajando" : "Estable"}
                   </span>
                 </div>
-                <p className="gf-caja-chart-note">Evolución aproximada de base (referencia histórica)</p>
-                <div className="gf-mini-chart" role="img" aria-label="Evolución de la base">
+                <p className="gf-caja-chart-note">Evolución aproximada de la caja (referencia histórica)</p>
+                <div className="gf-mini-chart" role="img" aria-label="Evolución de la caja de la empresa">
                   <MiniChart points={chartPointsCaja} />
                 </div>
               </div>
 
-              <form
-                onSubmit={handleInvertirCaja}
-                className="gf-invertir-caja gf-capital-form"
+              <div
+                className="gf-capital-form"
                 style={{ marginTop: "1.25rem", paddingTop: "1.25rem", borderTop: "1px solid var(--border)" }}
               >
-                <h3 className="gf-capital-form-label" style={{ marginBottom: "0.35rem", fontSize: "0.95rem" }}>
-                  Invertir en base
-                </h3>
-                <p className="gf-capital-form-hint" style={{ marginBottom: "0.75rem" }}>
-                  <strong>Empresa:</strong> suma liquidez a la base empresa.{" "}
-                  <strong>Administrador:</strong> transfiere desde la base empresa hacia la base de ese administrador (no cambia el capital total de la empresa).
-                </p>
-                <label htmlFor="gf-invertir-destino" className="gf-capital-form-label">
-                  DESTINO
-                </label>
-                <div className="gf-capital-input-wrap" style={{ maxWidth: "min(100%, 22rem)" }}>
-                  <select
-                    id="gf-invertir-destino"
-                    value={invertirDestino}
-                    onChange={(e) => {
-                      setInvertirDestino(e.target.value as "" | "empresa" | string);
-                      setInvertirError(null);
-                    }}
-                    className="gf-capital-input gf-capital-select"
-                    disabled={invertirSaving}
-                    aria-invalid={!!invertirError}
-                  >
-                    <option value="">Seleccionar…</option>
-                    <option value="empresa">Empresa (base empresa)</option>
-                    {adminsOrdenados.map((a, i) => (
-                      <option key={a.uid} value={a.uid}>
-                        Administrador {i + 1}
-                        {a.codigo ? ` (${a.codigo})` : ""}
-                        {a.displayName ? ` — ${a.displayName}` : ""}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <label htmlFor="gf-invertir-monto" className="gf-capital-form-label gf-capital-form-label-second">
-                  MONTO
-                </label>
-                <div className="gf-capital-input-wrap" style={{ maxWidth: "14rem" }}>
-                  <span className="gf-capital-input-prefix">COP $</span>
-                  <input
-                    id="gf-invertir-monto"
-                    type="text"
-                    inputMode="decimal"
-                    value={invertirMonto}
-                    onChange={(e) => {
-                      setInvertirMonto(e.target.value);
-                      setInvertirError(null);
-                    }}
-                    placeholder="Ej. 500000"
-                    className={`gf-capital-input ${invertirError ? "gf-capital-input-error" : ""}`}
-                    disabled={invertirSaving}
-                  />
-                </div>
-                {invertirError && (
-                  <p className="gf-capital-input-msg-error" role="alert">
-                    {invertirError}
+                <h3 className="gf-liquidez-section-title">Liquidez y administradores</h3>
+                <div className="gf-liquidez-switch" role="radiogroup" aria-label="Tipo de movimiento de liquidez">
+                  <p id="gf-liquidez-switch-desc" className="gf-liquidez-switch-label">
+                    Elige una opción
                   </p>
+                  <div className="gf-liquidez-segmented" aria-describedby="gf-liquidez-switch-desc">
+                    <button
+                      type="button"
+                      role="radio"
+                      aria-checked={tipoLiquidezBase === "entrada"}
+                      className={`gf-liquidez-segment gf-liquidez-segment--entrada ${tipoLiquidezBase === "entrada" ? "gf-liquidez-segment--active" : ""}`}
+                      onClick={() => {
+                        setTipoLiquidezBase("entrada");
+                        setInvertirError(null);
+                        setTransferError(null);
+                      }}
+                    >
+                      <span className="gf-liquidez-segment__icon" aria-hidden>🏦</span>
+                      <span className="gf-liquidez-segment__title">Inversión en empresa</span>
+                      <span className="gf-liquidez-segment__hint">Aporta efectivo al negocio; sube la caja de la empresa y el capital total.</span>
+                    </button>
+                    <button
+                      type="button"
+                      role="radio"
+                      aria-checked={tipoLiquidezBase === "inversion_caja_admin"}
+                      className={`gf-liquidez-segment gf-liquidez-segment--inversion ${tipoLiquidezBase === "inversion_caja_admin" ? "gf-liquidez-segment--active" : ""}`}
+                      onClick={() => {
+                        setTipoLiquidezBase("inversion_caja_admin");
+                        setInvertirError(null);
+                        setTransferError(null);
+                      }}
+                    >
+                      <span className="gf-liquidez-segment__icon" aria-hidden>📘</span>
+                      <span className="gf-liquidez-segment__title">Inversión a caja de administrador</span>
+                      <span className="gf-liquidez-segment__hint">Desde la caja de la empresa hacia un admin; el capital total no cambia.</span>
+                    </button>
+                  </div>
+                </div>
+
+                {tipoLiquidezBase === "entrada" ? (
+                  <form onSubmit={handleInvertirCaja} className="gf-invertir-caja">
+                    <p className="gf-capital-form-hint" style={{ marginBottom: "0.75rem" }}>
+                      Registra una inversión en la empresa: entra dinero nuevo, sube la caja de la empresa y el capital total.
+                    </p>
+                    <label htmlFor="gf-invertir-monto" className="gf-capital-form-label">
+                      MONTO
+                    </label>
+                    <div className="gf-capital-input-wrap" style={{ maxWidth: "14rem" }}>
+                      <span className="gf-capital-input-prefix">COP $</span>
+                      <input
+                        id="gf-invertir-monto"
+                        type="text"
+                        inputMode="decimal"
+                        value={invertirMonto}
+                        onChange={(e) => {
+                          setInvertirMonto(e.target.value);
+                          setInvertirError(null);
+                        }}
+                        placeholder="Ej. 500000"
+                        className={`gf-capital-input ${invertirError ? "gf-capital-input-error" : ""}`}
+                        disabled={invertirSaving}
+                      />
+                    </div>
+                    {invertirError && (
+                      <p className="gf-capital-input-msg-error" role="alert">
+                        {invertirError}
+                      </p>
+                    )}
+                    <button type="submit" className="gf-btn-actualizar" disabled={invertirSaving} style={{ marginTop: "0.75rem" }}>
+                      {invertirSaving ? "Aplicando…" : "Registrar inversión en empresa"}
+                    </button>
+                  </form>
+                ) : (
+                  <form onSubmit={handleTransferirBaseAdmin} className="gf-inversion-caja-admin-form">
+                    <p className="gf-capital-form-hint" style={{ marginBottom: "0.75rem" }}>
+                      Invierte desde la caja de la empresa hacia la caja de un administrador. El capital total no cambia: baja el saldo en caja del jefe y sube la caja del administrador.
+                    </p>
+                    <label htmlFor="gf-transfer-admin" className="gf-capital-form-label">
+                      ADMINISTRADOR
+                    </label>
+                    <select
+                      id="gf-transfer-admin"
+                      className="gf-capital-input"
+                      style={{ maxWidth: "100%", width: "100%", marginBottom: "0.75rem", padding: "0.5rem 0.65rem" }}
+                      value={transferAdminUid}
+                      onChange={(e) => {
+                        setTransferAdminUid(e.target.value);
+                        setTransferError(null);
+                      }}
+                      disabled={transferSaving || adminsEmpresaLoading}
+                    >
+                      <option value="">
+                        {adminsEmpresaLoading ? "Cargando…" : adminsEmpresa.length === 0 ? "Sin administradores" : "Selecciona…"}
+                      </option>
+                      {adminsEmpresa.map((a) => (
+                        <option key={a.uid} value={a.uid}>
+                          {a.displayName?.trim() || a.email || a.uid}
+                        </option>
+                      ))}
+                    </select>
+                    <label htmlFor="gf-transfer-monto" className="gf-capital-form-label">
+                      MONTO
+                    </label>
+                    <div className="gf-capital-input-wrap" style={{ maxWidth: "14rem" }}>
+                      <span className="gf-capital-input-prefix">COP $</span>
+                      <input
+                        id="gf-transfer-monto"
+                        type="text"
+                        inputMode="decimal"
+                        value={transferMonto}
+                        onChange={(e) => {
+                          setTransferMonto(e.target.value);
+                          setTransferError(null);
+                        }}
+                        placeholder="Ej. 200000"
+                        className={`gf-capital-input ${transferError ? "gf-capital-input-error" : ""}`}
+                        disabled={transferSaving}
+                      />
+                    </div>
+                    {transferError && (
+                      <p className="gf-capital-input-msg-error" role="alert">
+                        {transferError}
+                      </p>
+                    )}
+                    <button
+                      type="submit"
+                      className="gf-btn-actualizar"
+                      disabled={transferSaving || !transferAdminUid || adminsEmpresa.length === 0}
+                      style={{ marginTop: "0.75rem" }}
+                    >
+                      {transferSaving ? "Aplicando…" : "Registrar inversión"}
+                    </button>
+                  </form>
                 )}
-                <button type="submit" className="gf-btn-actualizar" disabled={invertirSaving || !invertirDestino}>
-                  {invertirSaving ? "Aplicando…" : "Invertir"}
-                </button>
-              </form>
+              </div>
 
               <div className="gf-actualizar-toggle-wrap">
                 <button
@@ -636,7 +774,7 @@ export default function GestionFinancieraPage() {
                   aria-expanded={formCajaAbierto}
                   aria-controls="gf-caja-form-section"
                   title={formCajaAbierto ? "Cerrar sección" : "Cuadrar caja"}
-                  aria-label={formCajaAbierto ? "Cerrar sección de cuadrar caja" : "Abrir sección para cuadrar caja (base empresa)"}
+                  aria-label={formCajaAbierto ? "Cerrar sección de cuadrar caja" : "Abrir sección para cuadrar caja (caja de la empresa)"}
                 >
                   <svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
                     <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
@@ -653,7 +791,7 @@ export default function GestionFinancieraPage() {
               >
                 <form onSubmit={handleSubmitCaja} className="gf-capital-form">
                   <label htmlFor="gf-monto" className="gf-capital-form-label">
-                    CUADRAR CAJA — BASE EMPRESA
+                    CUADRAR CAJA — CAJA DE LA EMPRESA
                   </label>
                   <div className="gf-capital-input-wrap">
                     <span className="gf-capital-input-prefix">COP $</span>
@@ -680,7 +818,7 @@ export default function GestionFinancieraPage() {
                     </p>
                   )}
                   <label htmlFor="gf-monto-confirm" className="gf-capital-form-label gf-capital-form-label-second">
-                    REPITE EL MONTO DE LA BASE
+                    REPITE EL MONTO DE LA CAJA DE LA EMPRESA
                   </label>
                   <div className="gf-capital-input-wrap">
                     <span className="gf-capital-input-prefix">COP $</span>
@@ -706,7 +844,7 @@ export default function GestionFinancieraPage() {
                     </p>
                   )}
                   <p className="gf-capital-form-hint">
-                    Indica el monto con el que queda <strong>cuadrada la caja</strong> (base empresa). El capital total será base + Σ administradores.
+                    Indica el monto con el que queda <strong>cuadrada la caja de la empresa</strong>. El capital total será caja de la empresa + Σ administradores.
                   </p>
                   <button
                     type="submit"
@@ -749,44 +887,8 @@ export default function GestionFinancieraPage() {
               <span className="gf-historial-icon" aria-hidden>🕐</span>
               HISTORIAL DE CAMBIOS
             </h2>
-            <button
-              type="button"
-              className="gf-historial-clear"
-              onClick={handleClearHistorial}
-              disabled={clearingHistorial || historial.length === 0}
-            >
-              Limpiar flujo
-            </button>
           </div>
-          {historial.length === 0 ? (
-            <p className="gf-historial-empty">Sin cambios registrados aún.</p>
-          ) : (
-            <ul className="gf-historial-list">
-              {historial.slice(0, FLUJO_UI_LIMIT).map((entry, i) => (
-                <li
-                  key={entry.id ? `caja-${entry.id}` : `caja-${entry.at}-${i}`}
-                  className="gf-historial-item"
-                  style={{ animationDelay: `${i * 0.06}s` }}
-                >
-                  <span className="gf-historial-emoji" aria-hidden>
-                    {entry.montoNuevo >= entry.montoAnterior ? "📈" : "📉"}
-                  </span>
-                  <div className="gf-historial-body">
-                    <span className="gf-historial-text">
-                      {etiquetaTipoFlujo(entry.tipo)}
-                    </span>
-                    <span className="gf-historial-detalle">
-                      {formatMonto(entry.montoAnterior)} → {formatMonto(entry.montoNuevo)}
-                      <span className={entry.montoNuevo >= entry.montoAnterior ? "gf-diff-up" : "gf-diff-down"}>
-                        {entry.montoNuevo >= entry.montoAnterior ? "+" : ""}{formatMonto(entry.montoNuevo - entry.montoAnterior)}
-                      </span>
-                    </span>
-                  </div>
-                  <span className="gf-historial-hora">{formatSoloHora(entry.at)}</span>
-                </li>
-              ))}
-            </ul>
-          )}
+          <HistorialCambiosList historial={historial} keyPrefix="caja" />
         </div>
       </div>
 
@@ -802,8 +904,8 @@ export default function GestionFinancieraPage() {
           >
             <h2 id="gf-modal-title" className="gf-modal-title">Cuadrar caja</h2>
             <p id="gf-modal-desc" className="gf-modal-desc">
-              Vas a <strong>cuadrar la caja</strong> con base <strong className="gf-modal-monto">${formatMonto(cajaObjetivoPendiente)}</strong>. El capital total pasará a{" "}
-              <strong>${formatMonto(cajaObjetivoPendiente + sumaCapitalAdmins)}</strong> (base + Σ administradores). La caja empresa quedará exactamente en ese monto. Escribe tu contraseña dos veces para confirmar.
+              Vas a <strong>cuadrar la caja de la empresa</strong> con saldo <strong className="gf-modal-monto">${formatMonto(cajaObjetivoPendiente)}</strong>. El capital total pasará a{" "}
+              <strong>${formatMonto(cajaObjetivoPendiente + sumaCapitalAdmins)}</strong> (caja de la empresa + Σ administradores). La caja de la empresa quedará exactamente en ese monto. Escribe tu contraseña dos veces para confirmar.
             </p>
             <label htmlFor="gf-modal-password" className="gf-modal-label">Contraseña</label>
             <input

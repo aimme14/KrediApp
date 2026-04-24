@@ -10,6 +10,12 @@ export interface CapitalHistorialEntry {
   montoAnterior: number;
   montoNuevo: number;
   at: string | null;
+  montoTransferencia?: number;
+  deltaCaja?: number;
+  cajaAnterior?: number;
+  cajaNueva?: number;
+  adminUid?: string;
+  adminNombre?: string;
 }
 
 export interface CapitalResponse {
@@ -52,14 +58,26 @@ function toCapitalResponse(json: Record<string, unknown>): CapitalResponse {
           : 0,
     updatedAt: (json.updatedAt as string) ?? null,
     historial: Array.isArray(json.historial)
-      ? (json.historial as Record<string, unknown>[]).map((row) => ({
-          id: typeof row.id === "string" ? row.id : undefined,
-          tipo: typeof row.tipo === "string" ? row.tipo : undefined,
-          montoAnterior:
-            typeof row.montoAnterior === "number" ? row.montoAnterior : 0,
-          montoNuevo: typeof row.montoNuevo === "number" ? row.montoNuevo : 0,
-          at: typeof row.at === "string" ? row.at : null,
-        }))
+      ? (json.historial as Record<string, unknown>[]).map((row) => {
+          const base = {
+            id: typeof row.id === "string" ? row.id : undefined,
+            tipo: typeof row.tipo === "string" ? row.tipo : undefined,
+            montoAnterior:
+              typeof row.montoAnterior === "number" ? row.montoAnterior : 0,
+            montoNuevo: typeof row.montoNuevo === "number" ? row.montoNuevo : 0,
+            at: typeof row.at === "string" ? row.at : null,
+          };
+          const out: CapitalHistorialEntry = { ...base };
+          if (typeof row.montoTransferencia === "number") {
+            out.montoTransferencia = row.montoTransferencia;
+          }
+          if (typeof row.deltaCaja === "number") out.deltaCaja = row.deltaCaja;
+          if (typeof row.cajaAnterior === "number") out.cajaAnterior = row.cajaAnterior;
+          if (typeof row.cajaNueva === "number") out.cajaNueva = row.cajaNueva;
+          if (typeof row.adminUid === "string") out.adminUid = row.adminUid;
+          if (typeof row.adminNombre === "string") out.adminNombre = row.adminNombre;
+          return out;
+        })
       : [],
   };
 }
@@ -161,20 +179,19 @@ export async function registrarSalidaCapital(
   return { ...toCapitalResponse(json), ok: (json as { ok?: unknown }).ok === true };
 }
 
-export type InvertirDestinoBody = {
-  destino: "empresa" | "admin";
+/** Entrada de liquidez a la base empresa (no transfiere a administradores). */
+export type InvertirEmpresaBody = {
   monto: number;
-  adminUid?: string;
 };
 
 export async function invertirCajaJefe(
   token: string,
-  body: InvertirDestinoBody
+  body: InvertirEmpresaBody
 ): Promise<CapitalResponse & { ok: boolean }> {
   const res = await fetch("/api/jefe/invertir", {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-    body: JSON.stringify(body),
+    body: JSON.stringify({ monto: body.monto }),
   });
   const json = await parseJsonResponse<Record<string, unknown>>(res);
   if (!res.ok) {
@@ -185,18 +202,27 @@ export async function invertirCajaJefe(
   return { ...toCapitalResponse(json), ok: (json as { ok?: unknown }).ok === true };
 }
 
-export async function clearCapitalHistorial(token: string): Promise<void> {
-  const res = await fetch("/api/jefe/capital", {
-    method: "PATCH",
+/** Inversión a caja de administrador: base empresa → cajaAdmin (capital total sin cambio neto). */
+export type TransferirBaseAdminBody = {
+  adminUid: string;
+  monto: number;
+};
+
+export async function transferirBaseEmpresaAAdmin(
+  token: string,
+  body: TransferirBaseAdminBody
+): Promise<CapitalResponse & { ok: boolean }> {
+  const res = await fetch("/api/jefe/transferir-base-admin", {
+    method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ clearHistorial: true }),
+    body: JSON.stringify({ adminUid: body.adminUid, monto: body.monto }),
   });
-  // Se consume la respuesta para que el cliente no se quede esperando,
-  // y falla con un error legible si el servidor no responde JSON.
   const json = await parseJsonResponse<Record<string, unknown>>(res);
   if (!res.ok) {
     throw new Error(
-      extractApiErrorMessage(json, "Error al limpiar historial")
+      extractApiErrorMessage(json, "Error al invertir en caja de administrador")
     );
   }
+  return { ...toCapitalResponse(json), ok: (json as { ok?: unknown }).ok === true };
 }
+

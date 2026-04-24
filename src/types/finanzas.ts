@@ -7,12 +7,13 @@ import type { Timestamp } from "firebase/firestore";
 
 // ── Capital empresa (Jefe) ───────────
 /**
- * Documento empresas/{jefeUid}/capital/cajaEmpresa.
- * capitalEmpresa = cajaEmpresa + Σ(capitalAdmin); los gastos de empresa descuentan la caja al registrarse.
+ * Documento empresas/{jefeUid}/capital/cajaEmpresa (Firestore: caja, jefeUid, updatedAt; sin capitalEmpresa persistido).
+ * En API, capitalEmpresa = cajaEmpresa + Σ(capitalAdmin); los gastos descuentan la caja al registrarse.
  * El flujo de cambios vive en la subcolección `flujo` bajo este documento (no en el array `historial`).
  */
 export interface CapitalEmpresa {
-  capitalEmpresa: number;
+  /** Calculado en servidor; puede omitirse en el documento Firestore. */
+  capitalEmpresa?: number;
   cajaEmpresa: number;
   gastosEmpresa: number;
   jefeUid: string;

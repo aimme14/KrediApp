@@ -138,14 +138,6 @@ export default function GastosPage() {
     return timeB - timeA;
   });
 
-  const hoy = new Date();
-  const isHoy = (fecha: string | number | null | undefined) => {
-    if (!fecha) return false;
-    const d = new Date(fecha);
-    return d.getFullYear() === hoy.getFullYear() && d.getMonth() === hoy.getMonth() && d.getDate() === hoy.getDate();
-  };
-  const totalDelDia = gastosOrdenados.filter((g) => isHoy(g.fecha)).reduce((sum, g) => sum + (g.monto ?? 0), 0);
-
   const loadGastos = useCallback(async () => {
     if (!user) return;
     const token = await user.getIdToken();
@@ -286,7 +278,7 @@ export default function GastosPage() {
     <div className="card">
       <h2 style={{ marginTop: 0 }}>Gastos operativos</h2>
       <p style={{ color: "var(--text-muted)", marginTop: "-0.25rem", marginBottom: "1rem" }}>
-        Los montos se descuentan de la base de la empresa.
+        Los montos se descuentan de la caja de la empresa.
       </p>
 
       {showForm && (
@@ -460,12 +452,6 @@ export default function GastosPage() {
             )}
           </div>
           <div className="gastos-header-actions">
-            {!loading && gastos.length > 0 && (
-              <div className="gastos-total-box" aria-live="polite">
-                <span className="gastos-total-label">Total del día</span>
-                <span className="gastos-total-value">{formatMoneda(totalDelDia)}</span>
-              </div>
-            )}
             <button
               type="button"
               className="btn btn-primary"

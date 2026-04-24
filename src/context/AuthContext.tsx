@@ -23,6 +23,21 @@ import { SUPER_ADMIN_COLLECTION } from "@/types/superAdmin";
 
 const USERS_COLLECTION = "users";
 
+/** Evita pantalla infinita si Firestore no responde al leer el perfil. */
+const PROFILE_FETCH_TIMEOUT_MS = 15_000;
+const PROFILE_TIMEOUT_MESSAGE =
+  "La conexión tardó demasiado al cargar tu perfil. Comprueba tu internet, desactiva VPN o bloqueadores y recarga la página.";
+
+function profileFetchTimeoutError(): Error {
+  const e = new Error("AUTH_PROFILE_TIMEOUT");
+  e.name = "AuthProfileTimeout";
+  return e;
+}
+
+function isProfileTimeout(e: unknown): boolean {
+  return e instanceof Error && e.message === "AUTH_PROFILE_TIMEOUT";
+}
+
 /** Convierte errores de Firebase Auth a mensajes en español genéricos (sin revelar si el email existe). */
 function getAuthErrorMessage(e: unknown): string {
   const err = e as { code?: string; message?: string } | null;
@@ -170,7 +185,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
       try {
-        const profile = await fetchUserProfile(user.uid, user.email ?? undefined);
+        const profile = await new Promise<UserProfile | null>((resolve, reject) => {
+          let settled = false;
+          const t = window.setTimeout(() => {
+            if (settled) return;
+            settled = true;
+            reject(profileFetchTimeoutError());
+          }, PROFILE_FETCH_TIMEOUT_MS);
+          fetchUserProfile(user.uid, user.email ?? undefined)
+            .then((p) => {
+              if (settled) return;
+              settled = true;
+              window.clearTimeout(t);
+              resolve(p);
+            })
+            .catch((err) => {
+              if (settled) return;
+              settled = true;
+              window.clearTimeout(t);
+              reject(err instanceof Error ? err : new Error(String(err)));
+            });
+        });
         setState((s) => ({ ...s, user, profile, loading: false, error: null }));
         try {
           const idToken = await user.getIdToken();
@@ -182,8 +217,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         } catch {
           /* claims opcionales si la API falla */
         }
-      } catch {
-        setState((s) => ({ ...s, user, profile: null, loading: false, error: null }));
+      } catch (e: unknown) {
+        const message = isProfileTimeout(e)
+          ? PROFILE_TIMEOUT_MESSAGE
+          : e instanceof Error && e.message
+            ? e.message
+            : "No se pudo cargar tu perfil. Inténtalo de nuevo.";
+        setState((s) => ({
+          ...s,
+          user,
+          profile: null,
+          loading: false,
+          error: message,
+        }));
       }
     });
     return () => unsub();

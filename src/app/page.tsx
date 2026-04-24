@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import LoginForm from "@/components/LoginForm";
 import ThemeToggle from "@/components/ThemeToggle";
@@ -16,7 +16,20 @@ function LoginFormSignOut() {
 }
 
 export default function HomePage() {
-  const { user, profile, loading, isEnabled } = useAuth();
+  const { user, profile, loading, isEnabled, error } = useAuth();
+  const [showSlowHint, setShowSlowHint] = useState(false);
+
+  useEffect(() => {
+    if (!loading) {
+      setShowSlowHint(false);
+      return;
+    }
+    const id = window.setTimeout(() => setShowSlowHint(true), 8000);
+    return () => {
+      window.clearTimeout(id);
+      setShowSlowHint(false);
+    };
+  }, [loading]);
 
   useEffect(() => {
     if (loading) return;
@@ -37,6 +50,11 @@ export default function HomePage() {
           <ThemeToggle />
         </div>
         <p>Cargando...</p>
+        {showSlowHint ? (
+          <p style={{ color: "var(--text-muted)", maxWidth: 420, margin: "1rem auto 0", fontSize: "0.9rem" }}>
+            Si esto tarda mucho, comprueba tu conexión, desactiva bloqueadores o recarga la página.
+          </p>
+        ) : null}
       </div>
     );
   }
@@ -64,7 +82,9 @@ export default function HomePage() {
           <Logo variant="page" priority />
         </div>
         <p className="error-msg" style={{ marginBottom: "1rem" }}>
-            Tu cuenta no tiene un perfil asignado en la aplicación. Contacta al Super Administrador o al responsable para que te den de alta.
+            {error?.trim()
+              ? error
+              : "Tu cuenta no tiene un perfil asignado en la aplicación. Contacta al Super Administrador o al responsable para que te den de alta."}
           </p>
           <LoginFormSignOut />
         </div>
@@ -81,6 +101,11 @@ export default function HomePage() {
         <div className="page-title" style={{ display: "flex", justifyContent: "center", marginBottom: "1rem" }}>
           <Logo variant="page" priority />
         </div>
+        {error?.trim() ? (
+          <p className="error-msg" style={{ marginBottom: "1rem" }}>
+            {error}
+          </p>
+        ) : null}
         <p style={{ color: "var(--text-muted)", marginBottom: "1.5rem" }}>
           Inicia sesión con tu cuenta
         </p>
