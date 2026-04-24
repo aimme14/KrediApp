@@ -6,13 +6,18 @@ import type { Timestamp } from "firebase/firestore";
  */
 
 // ── Capital empresa (Jefe) ───────────
-/** Documento empresas/{jefeUid}/capital/cajaEmpresa. capitalEmpresa = cajaEmpresa + Σ(capitalAdmin); los gastos de empresa descuentan la caja al registrarse. */
+/**
+ * Documento empresas/{jefeUid}/capital/cajaEmpresa.
+ * capitalEmpresa = cajaEmpresa + Σ(capitalAdmin); los gastos de empresa descuentan la caja al registrarse.
+ * El flujo de cambios vive en la subcolección `flujo` bajo este documento (no en el array `historial`).
+ */
 export interface CapitalEmpresa {
   capitalEmpresa: number;
   cajaEmpresa: number;
   gastosEmpresa: number;
   jefeUid: string;
   updatedAt: Timestamp;
+  /** @deprecated En servidor ya no se escribe; usar subcolección `flujo`. */
   historial?: CapitalHistorialEntry[];
 }
 
@@ -237,7 +242,7 @@ export interface ClienteRutaGrupo {
   zona?: string;
   /** Suma de saldos pendientes de todos los préstamos del cliente */
   totalMonto: number;
-  /** Número de préstamos/cuotas pendientes */
+  /** Cuántos préstamos activos con saldo agrupan esta fila */
   cantidadPrestamos: number;
   /** Prioridad más urgente del grupo (1 = más urgente) */
   prioridadMax: PrioridadClienteRuta;
@@ -245,7 +250,7 @@ export interface ClienteRutaGrupo {
   diasMoraMax: number;
   /** Si el cobrador ya visitó a este cliente hoy (localStorage) */
   visitado: boolean;
-  /** Ítems del grupo; el primero es el "principal" para abrir cobro */
+  /** Ítems ordenados por urgencia (misma regla que la lista); el primero abre en Cobrar */
   items: ClienteRuta[];
 }
 

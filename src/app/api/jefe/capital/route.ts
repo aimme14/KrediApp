@@ -2,15 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAdminFirestore } from "@/lib/firebase-admin";
 import { getApiUser } from "@/lib/api-auth";
 import {
-  EMPRESAS_COLLECTION,
-  CAPITAL_SUBCOLLECTION,
-  CAPITAL_CAJA_EMPRESA_DOC,
-} from "@/lib/empresas-db";
-import {
   getCapitalEmpresa,
   setCapitalInicial,
   ajustarCapital,
   registrarSalida,
+  clearCapitalEmpresaFlujo,
 } from "@/lib/jefe-capital";
 
 /** GET: capital de empresa (fórmula nueva + desglose). */
@@ -30,7 +26,9 @@ export async function GET(request: NextRequest) {
     const db = getAdminFirestore();
     const doc = await getCapitalEmpresa(db, apiUser.uid);
 
-    const historial = (doc.historial ?? []).slice(0, 6).map((h) => ({
+    const historial = (doc.historial ?? []).map((h) => ({
+      id: h.id,
+      tipo: h.tipo,
       montoAnterior: h.montoAnterior,
       montoNuevo: h.montoNuevo,
       at: h.at instanceof Date ? h.at.toISOString() : null,
@@ -78,7 +76,9 @@ export async function PUT(request: NextRequest) {
   const db = getAdminFirestore();
 
   const jsonDoc = async (doc: Awaited<ReturnType<typeof getCapitalEmpresa>>) => {
-    const historial = (doc.historial ?? []).slice(0, 6).map((h) => ({
+    const historial = (doc.historial ?? []).map((h) => ({
+      id: h.id,
+      tipo: h.tipo,
       montoAnterior: h.montoAnterior,
       montoNuevo: h.montoNuevo,
       at: h.at instanceof Date ? h.at.toISOString() : null,
@@ -143,7 +143,7 @@ export async function PUT(request: NextRequest) {
   }
 }
 
-/** PATCH: limpia el historial. Body: { clearHistorial: true } */
+/** PATCH: elimina el flujo de movimientos bajo cajaEmpresa. Body: { clearHistorial: true } */
 export async function PATCH(request: NextRequest) {
   const apiUser = await getApiUser(request);
   if (!apiUser) {
@@ -162,13 +162,7 @@ export async function PATCH(request: NextRequest) {
   }
 
   const db = getAdminFirestore();
-  const capitalRef = db
-    .collection(EMPRESAS_COLLECTION)
-    .doc(apiUser.uid)
-    .collection(CAPITAL_SUBCOLLECTION)
-    .doc(CAPITAL_CAJA_EMPRESA_DOC);
-
-  await capitalRef.set({ historial: [] }, { merge: true });
+  await clearCapitalEmpresaFlujo(db, apiUser.uid);
 
   return NextResponse.json({ ok: true, historial: [] });
 }

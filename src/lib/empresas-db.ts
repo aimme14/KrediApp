@@ -34,6 +34,9 @@ export const CAPITAL_SUBCOLLECTION = "capital";
 /** Documento con caja y gastos de empresa; el capital se calcula: cajaEmpresa + suma(capitalAdmin) − gastosEmpresa. */
 export const CAPITAL_CAJA_EMPRESA_DOC = "cajaEmpresa";
 
+/** Movimientos de capital/base empresa (un documento por evento). empresas/{jefeUid}/capital/cajaEmpresa/flujo/{id} */
+export const CAPITAL_CAJA_EMPRESA_FLUJO_SUBCOLLECTION = "flujo";
+
 /** Snapshot agregado de capital de administradores (suma de capitalAdmin por admin). */
 export const CAPITAL_CAJA_ADMIN_DOC = "cajaAdmin";
 

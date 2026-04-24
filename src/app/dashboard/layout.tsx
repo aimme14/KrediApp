@@ -51,10 +51,26 @@ export default function DashboardLayout({
     return () => { cancelled = true; };
   }, [empresaDocId]);
 
-  if (loading || !profile) {
+  if (loading) {
     return (
       <div className="container" style={{ paddingTop: "4rem", textAlign: "center" }}>
         <p>Cargando...</p>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="container" style={{ paddingTop: "4rem", textAlign: "center" }}>
+        <p>Redirigiendo…</p>
+      </div>
+    );
+  }
+
+  if (!profile) {
+    return (
+      <div className="container" style={{ paddingTop: "4rem", textAlign: "center" }}>
+        <p>Comprobando tu cuenta…</p>
       </div>
     );
   }

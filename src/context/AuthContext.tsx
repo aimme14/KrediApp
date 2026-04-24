@@ -1,6 +1,12 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+} from "react";
 import {
   User,
   onAuthStateChanged,
@@ -212,7 +218,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const clearError = () => setState((s) => ({ ...s, error: null }));
 
   const hasRole = (role: Role) => state.profile?.role === role;
-  const isEnabled = () => state.profile?.enabled !== false;
+  const isEnabled = useCallback(
+    () => state.profile?.enabled !== false,
+    [state.profile]
+  );
 
   const value: AuthContextValue = {
     ...state,

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useAuth } from "@/context/AuthContext";
+import { parseInteresPct } from "@/lib/interes-pct";
 
 const MODALIDADES = [
   { value: "diario", label: "Diario" },
@@ -34,7 +35,7 @@ export default function SimulacroPrestamoPage() {
 
   const montoNum = parseFloat(monto.replace(",", ".")) || 0;
   const nCuotas = Math.max(1, parseInt(numeroCuotas, 10) || 1);
-  const iVal = parseFloat(interes.replace(",", ".")) || 0;
+  const iVal = parseInteresPct(interes);
   const { totalAPagar, cuota } = montoNum > 0
     ? calcularTotal(montoNum, iVal, nCuotas, modalidad)
     : { totalAPagar: 0, cuota: 0 };
@@ -92,15 +93,12 @@ export default function SimulacroPrestamoPage() {
           <div className="form-group">
             <label>Interés (%)</label>
             <input
-              type="number"
+              type="text"
               inputMode="decimal"
-              min={0}
-              step={0.1}
-              max={999.99}
               value={interes}
               onChange={(e) => {
                 const v = e.target.value.replace(",", ".");
-                if (v === "" || /^\d*\.?\d*$/.test(v)) setInteres(e.target.value);
+                if (v === "" || /^\d*\.?\d*$/.test(v)) setInteres(v);
               }}
               onKeyDown={(e) => {
                 const k = e.key;

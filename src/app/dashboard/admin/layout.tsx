@@ -176,10 +176,18 @@ export default function AdminLayout({
     return () => setHeaderLeftSlot(null);
   }, [setHeaderLeftSlot, menuOpen]);
 
-  if (loading || !profile || profile.role !== "admin") {
+  if (loading || !profile) {
     return (
       <div className="container" style={{ paddingTop: "4rem", textAlign: "center" }}>
         <p>Cargando...</p>
+      </div>
+    );
+  }
+
+  if (profile.role !== "admin") {
+    return (
+      <div className="container" style={{ paddingTop: "4rem", textAlign: "center" }}>
+        <p>Redirigiendo al panel…</p>
       </div>
     );
   }

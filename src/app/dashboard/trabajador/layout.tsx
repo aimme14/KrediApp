@@ -155,10 +155,18 @@ export default function TrabajadorLayout({ children }: { children: React.ReactNo
     setMenuOpen(false);
   }, [pathname]);
 
-  if (loading || !profile || profile.role !== "trabajador") {
+  if (loading || !profile) {
     return (
       <div className="container" style={{ paddingTop: "4rem", textAlign: "center" }}>
         <p>Cargando...</p>
+      </div>
+    );
+  }
+
+  if (profile.role !== "trabajador") {
+    return (
+      <div className="container" style={{ paddingTop: "4rem", textAlign: "center" }}>
+        <p>Redirigiendo al panel…</p>
       </div>
     );
   }

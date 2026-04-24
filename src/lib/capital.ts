@@ -4,6 +4,9 @@
  */
 
 export interface CapitalHistorialEntry {
+  id?: string;
+  /** Origen del movimiento (subcolección `flujo` en Firestore). */
+  tipo?: string;
   montoAnterior: number;
   montoNuevo: number;
   at: string | null;
@@ -48,7 +51,16 @@ function toCapitalResponse(json: Record<string, unknown>): CapitalResponse {
           ? json.sumaCapitalAdmins
           : 0,
     updatedAt: (json.updatedAt as string) ?? null,
-    historial: Array.isArray(json.historial) ? (json.historial as CapitalHistorialEntry[]) : [],
+    historial: Array.isArray(json.historial)
+      ? (json.historial as Record<string, unknown>[]).map((row) => ({
+          id: typeof row.id === "string" ? row.id : undefined,
+          tipo: typeof row.tipo === "string" ? row.tipo : undefined,
+          montoAnterior:
+            typeof row.montoAnterior === "number" ? row.montoAnterior : 0,
+          montoNuevo: typeof row.montoNuevo === "number" ? row.montoNuevo : 0,
+          at: typeof row.at === "string" ? row.at : null,
+        }))
+      : [],
   };
 }
 

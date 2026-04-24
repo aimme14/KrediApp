@@ -8,7 +8,9 @@ import {
 } from "@/lib/jefe-capital";
 
 function jsonDoc(doc: Awaited<ReturnType<typeof getCapitalEmpresa>>) {
-  const historial = (doc.historial ?? []).slice(0, 6).map((h) => ({
+  const historial = (doc.historial ?? []).map((h) => ({
+    id: h.id,
+    tipo: h.tipo,
     montoAnterior: h.montoAnterior,
     montoNuevo: h.montoNuevo,
     at: h.at instanceof Date ? h.at.toISOString() : null,

@@ -127,10 +127,18 @@ export default function JefeLayout({
     return () => setHeaderLeftSlot(null);
   }, [setHeaderLeftSlot, menuOpen]);
 
-  if (loading || !profile || profile.role !== "jefe") {
+  if (loading || !profile) {
     return (
       <div className="container" style={{ paddingTop: "4rem", textAlign: "center" }}>
         <p>Cargando...</p>
+      </div>
+    );
+  }
+
+  if (profile.role !== "jefe") {
+    return (
+      <div className="container" style={{ paddingTop: "4rem", textAlign: "center" }}>
+        <p>Redirigiendo al panel…</p>
       </div>
     );
   }

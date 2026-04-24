@@ -9,13 +9,11 @@ import { db } from "@/lib/firebase";
 import { EMPRESAS_COLLECTION, USUARIOS_SUBCOLLECTION } from "@/lib/empresas-db";
 import { useJornada } from "@/hooks/useJornada";
 import { useRuta } from "@/hooks/useRuta";
-import { useRutaDia } from "@/hooks/useRutaDia";
+import { NO_PAGOS_PARA_MORA, useRutaDia } from "@/hooks/useRutaDia";
 import type { ClienteRutaGrupo, PrioridadClienteRuta } from "@/types/finanzas";
 
 /** Semáforo: rojo = mora, naranja = 1–2 no pagos, amarillo = pendiente, verde = cuota del día pagada */
 export type SemaforoRuta = "rojo" | "naranja" | "amarillo" | "verde";
-
-const NO_PAGOS_PARA_MORA = 3;
 
 function tieneAlertaNoPago(grupo: ClienteRutaGrupo): boolean {
   return grupo.items.some(
@@ -123,12 +121,8 @@ export default function RutaDelDiaPage() {
     markVisitado,
   } = useRutaDia();
 
-  /** Número de préstamos/cuotas en la ruta del día */
-  const totalPrestamos = clientes.length;
   /** Cuotas/préstamos con pago registrado hoy (semáforo verde) */
   const totalCobrados = clientes.filter((c) => c.cuotaPagadaHoy).length;
-  /** Total cobrado hoy: no disponible sin API; se deja en 0 */
-  const totalCobrado = 0;
 
   const gruposPorPrioridad = useMemo(() => {
     const grupos: Record<number, ClienteRutaGrupo[]> = {
@@ -152,7 +146,7 @@ export default function RutaDelDiaPage() {
     },
     { prioridad: 3 as PrioridadClienteRuta, titulo: "VENCEN HOY" },
     { prioridad: 4 as PrioridadClienteRuta, titulo: "MAÑANA" },
-    { prioridad: 5 as PrioridadClienteRuta, titulo: "ESTA SEMANA" },
+    { prioridad: 5 as PrioridadClienteRuta, titulo: "PRESTAMOS" },
   ];
 
   const handleClickCliente = useCallback(
@@ -206,9 +200,10 @@ export default function RutaDelDiaPage() {
 
   const [filtroExpandido, setFiltroExpandido] = useState(false);
   const filtroActualLabel =
-    FILTROS_OPCIONES.find((f) => f.id === filtro)?.label ?? (filtro === "hoy" ? "Todos" : "Todos");
+    FILTROS_OPCIONES.find((f) => f.id === filtro)?.label ?? "Todos";
   const filtroLabel =
-    FILTROS_OPCIONES.find((f) => f.id === filtro)?.label?.toLowerCase() ?? (filtro === "hoy" ? "vencen hoy" : "este filtro");
+    FILTROS_OPCIONES.find((f) => f.id === filtro)?.label?.toLowerCase() ??
+    "este filtro";
   const emptySinClientes = clientes.length === 0;
   const emptyFiltro =
     !emptySinClientes && clientesFiltrados.length === 0;
@@ -221,10 +216,6 @@ export default function RutaDelDiaPage() {
           <p className="ruta-dia-subtitle">
             {fechaLabel} · {ruta?.nombre ?? "Sin ruta"}
           </p>
-        </div>
-        <div className="ruta-dia-summary">
-          <span className="ruta-dia-summary-clientes">{totalPrestamos} préstamos</span>
-          <span className="ruta-dia-summary-monto">{formatCurrency(totalCobrado)}</span>
         </div>
       </header>
 
@@ -347,7 +338,7 @@ export default function RutaDelDiaPage() {
                     const subtituloParts: string[] = [];
                     if (grupo.cantidadPrestamos > 1) {
                       subtituloParts.push(
-                        `${grupo.cantidadPrestamos} cuotas`
+                        `${grupo.cantidadPrestamos} préstamos`
                       );
                     }
                     if (grupo.diasMoraMax > 0) {
@@ -374,7 +365,7 @@ export default function RutaDelDiaPage() {
                         tabIndex={0}
                         onClick={() => handleClickCliente(grupo)}
                         onKeyDown={(e) => handleKeyDown(e, grupo)}
-                        aria-label={`${grupo.clienteNombre}, ${getSemaforoLabel(semaforo)}. ${formatCurrency(grupo.totalMonto)}${grupo.cantidadPrestamos > 1 ? `, ${grupo.cantidadPrestamos} cuotas` : ""}. ${grupo.visitado ? "Visitado" : ""}`}
+                        aria-label={`${grupo.clienteNombre}, ${getSemaforoLabel(semaforo)}. Saldo a cobrar ahora ${formatCurrency(grupo.items[0]?.monto ?? 0)}${grupo.cantidadPrestamos > 1 ? `; total ${grupo.cantidadPrestamos} préstamos ${formatCurrency(grupo.totalMonto)}` : ""}. ${grupo.visitado ? "Visitado" : ""}`}
                       >
                         <span
                           className="ruta-dia-semaforo-wrap"
@@ -405,11 +396,11 @@ export default function RutaDelDiaPage() {
                               {grupo.clienteNombre}
                             </span>
                             <span className="ruta-dia-item-monto">
-                              {formatCurrency(grupo.totalMonto)}
+                              {formatCurrency(grupo.items[0]?.monto ?? 0)}
                               {grupo.cantidadPrestamos > 1 && (
                                 <span className="ruta-dia-item-cuotas">
                                   {" "}
-                                  · {grupo.cantidadPrestamos} cuotas
+                                  · total {formatCurrency(grupo.totalMonto)}
                                 </span>
                               )}
                             </span>
@@ -444,12 +435,6 @@ export default function RutaDelDiaPage() {
           <span className="ruta-dia-footer-label">Pendientes</span>
           <span className="ruta-dia-footer-value">
             {clientes.length - totalCobrados}
-          </span>
-        </div>
-        <div className="ruta-dia-footer-item">
-          <span className="ruta-dia-footer-label">Total cobrado</span>
-          <span className="ruta-dia-footer-value ruta-dia-footer-value-green">
-            {formatCurrency(totalCobrado)}
           </span>
         </div>
       </footer>

@@ -16,7 +16,25 @@ import {
 import { listUsersByCreator } from "@/lib/users";
 import type { UserProfile } from "@/types/roles";
 
-const MAX_HISTORIAL = 6;
+/** Cuántas filas mostrar en cada panel de historial (el API puede devolver hasta 100). */
+const FLUJO_UI_LIMIT = 50;
+
+function etiquetaTipoFlujo(tipo: string | undefined): string {
+  switch (tipo) {
+    case "definicion_capital":
+      return "Definición de capital";
+    case "ajuste_caja":
+      return "Ajuste de base";
+    case "inversion_admin":
+      return "Transferencia a administrador";
+    case "gasto_empresa":
+      return "Gasto de empresa";
+    case "asignacion_nuevo_admin":
+      return "Asignación a nuevo administrador";
+    default:
+      return "Cambio de capital";
+  }
+}
 const TOAST_DURATION = 3000;
 const BUTTON_SUCCESS_DURATION = 2000;
 
@@ -258,7 +276,12 @@ export default function GestionFinancieraPage() {
 
   const handleClearHistorial = async () => {
     if (!user || !profile || profile.role !== "jefe") return;
-    if (!window.confirm("¿Estás seguro de que quieres limpiar todo el historial de cambios?")) return;
+    if (
+      !window.confirm(
+        "¿Eliminar todos los movimientos del flujo de capital de empresa? Esta acción no se puede deshacer."
+      )
+    )
+      return;
     setClearingHistorial(true);
     try {
       const token = await user.getIdToken();
@@ -490,21 +513,25 @@ export default function GestionFinancieraPage() {
               onClick={handleClearHistorial}
               disabled={clearingHistorial || historial.length === 0}
             >
-              Limpiar historial
+              Limpiar flujo
             </button>
           </div>
           {historial.length === 0 ? (
             <p className="gf-historial-empty">Sin cambios registrados aún.</p>
           ) : (
             <ul className="gf-historial-list">
-              {historial.slice(0, MAX_HISTORIAL).map((entry, i) => (
-                <li key={`${entry.at}-${i}`} className="gf-historial-item" style={{ animationDelay: `${i * 0.06}s` }}>
+              {historial.slice(0, FLUJO_UI_LIMIT).map((entry, i) => (
+                <li
+                  key={entry.id ?? `${entry.at}-${i}`}
+                  className="gf-historial-item"
+                  style={{ animationDelay: `${i * 0.06}s` }}
+                >
                   <span className="gf-historial-emoji" aria-hidden>
                     {entry.montoNuevo >= entry.montoAnterior ? "📈" : "📉"}
                   </span>
                   <div className="gf-historial-body">
                     <span className="gf-historial-text">
-                      Capital {entry.montoNuevo >= entry.montoAnterior ? "aumentado" : "reducido"}
+                      {etiquetaTipoFlujo(entry.tipo)}
                     </span>
                     <span className="gf-historial-detalle">
                       {formatMonto(entry.montoAnterior)} → {formatMonto(entry.montoNuevo)}
@@ -790,21 +817,25 @@ export default function GestionFinancieraPage() {
               onClick={handleClearHistorial}
               disabled={clearingHistorial || historial.length === 0}
             >
-              Limpiar historial
+              Limpiar flujo
             </button>
           </div>
           {historial.length === 0 ? (
             <p className="gf-historial-empty">Sin cambios registrados aún.</p>
           ) : (
             <ul className="gf-historial-list">
-              {historial.slice(0, MAX_HISTORIAL).map((entry, i) => (
-                <li key={`caja-${entry.at}-${i}`} className="gf-historial-item" style={{ animationDelay: `${i * 0.06}s` }}>
+              {historial.slice(0, FLUJO_UI_LIMIT).map((entry, i) => (
+                <li
+                  key={entry.id ? `caja-${entry.id}` : `caja-${entry.at}-${i}`}
+                  className="gf-historial-item"
+                  style={{ animationDelay: `${i * 0.06}s` }}
+                >
                   <span className="gf-historial-emoji" aria-hidden>
                     {entry.montoNuevo >= entry.montoAnterior ? "📈" : "📉"}
                   </span>
                   <div className="gf-historial-body">
                     <span className="gf-historial-text">
-                      Capital {entry.montoNuevo >= entry.montoAnterior ? "aumentado" : "reducido"}
+                      {etiquetaTipoFlujo(entry.tipo)}
                     </span>
                     <span className="gf-historial-detalle">
                       {formatMonto(entry.montoAnterior)} → {formatMonto(entry.montoNuevo)}

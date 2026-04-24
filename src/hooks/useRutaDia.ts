@@ -10,12 +10,7 @@ import type {
   PrioridadClienteRuta,
 } from "@/types/finanzas";
 
-export type FiltroRutaDia =
-  | "todos"
-  | "mora"
-  | "hoy"
-  | "pendientes"
-  | "cobrados";
+export type FiltroRutaDia = "todos" | "mora" | "pendientes" | "cobrados";
 
 const VISITADOS_STORAGE_PREFIX = "krediapp-ruta-visitados-";
 
@@ -23,7 +18,7 @@ const VISITADOS_STORAGE_PREFIX = "krediapp-ruta-visitados-";
 const VISIBILITY_MIN_INTERVAL_MS = 45_000;
 
 /** Debe coincidir con la API: mora tras 3 no pagos consecutivos; UI alerta en 1–2. */
-const NO_PAGOS_PARA_MORA_UI = 3;
+export const NO_PAGOS_PARA_MORA = 3;
 
 function getVisitadosKey(): string {
   return `${VISITADOS_STORAGE_PREFIX}${new Date().toISOString().slice(0, 10)}`;
@@ -89,7 +84,7 @@ function calcularPrioridad(
   if (
     estado === "activo" &&
     intentosFallidos >= 1 &&
-    intentosFallidos < NO_PAGOS_PARA_MORA_UI
+    intentosFallidos < NO_PAGOS_PARA_MORA
   ) {
     return 2;
   }
@@ -99,6 +94,20 @@ function calcularPrioridad(
   if (dias <= 0) return 3;
   if (dias === 1) return 4;
   return 5;
+}
+
+/** Misma prioridad que `clientesFiltrados` para que el 1.er ítem del grupo = préstamo que abre Cobrar */
+function compareClienteRutaPrioridad(a: ClienteRuta, b: ClienteRuta): number {
+  if (a.prioridad !== b.prioridad) return a.prioridad - b.prioridad;
+  const zonaA = (a.zona ?? "").toLowerCase();
+  const zonaB = (b.zona ?? "").toLowerCase();
+  if (zonaA && zonaB && zonaA !== zonaB) {
+    return zonaA.localeCompare(zonaB);
+  }
+  if (b.diasMora !== a.diasMora) return b.diasMora - a.diasMora;
+  if (b.intentosFallidos !== a.intentosFallidos)
+    return b.intentosFallidos - a.intentosFallidos;
+  return b.monto - a.monto;
 }
 
 function isHoy(fecha: Date | null): boolean {
@@ -223,9 +232,6 @@ export function useRutaDia(): UseRutaDiaState {
       case "mora":
         lista = lista.filter((c) => c.estado === "mora");
         break;
-      case "hoy":
-        lista = lista.filter((c) => isHoy(c.fechaVencimiento));
-        break;
       case "pendientes":
         lista = lista.filter((c) => !c.cuotaPagadaHoy);
         break;
@@ -237,18 +243,7 @@ export function useRutaDia(): UseRutaDiaState {
         break;
     }
 
-    lista.sort((a, b) => {
-      if (a.prioridad !== b.prioridad) return a.prioridad - b.prioridad;
-      const zonaA = (a.zona ?? "").toLowerCase();
-      const zonaB = (b.zona ?? "").toLowerCase();
-      if (zonaA && zonaB && zonaA !== zonaB) {
-        return zonaA.localeCompare(zonaB);
-      }
-      if (b.diasMora !== a.diasMora) return b.diasMora - a.diasMora;
-      if (b.intentosFallidos !== a.intentosFallidos)
-        return b.intentosFallidos - a.intentosFallidos;
-      return b.monto - a.monto;
-    });
+    lista.sort(compareClienteRutaPrioridad);
 
     return lista;
   }, [clientesRuta, filtro]);
@@ -263,13 +258,14 @@ export function useRutaDia(): UseRutaDiaState {
 
     const groups: ClienteRutaGrupo[] = [];
     byClient.forEach((items, clienteId) => {
-      const first = items[0]!;
-      const totalMonto = items.reduce((s, i) => s + i.monto, 0);
+      const sorted = [...items].sort(compareClienteRutaPrioridad);
+      const first = sorted[0]!;
+      const totalMonto = sorted.reduce((s, i) => s + i.monto, 0);
       const prioridadMax = Math.min(
-        ...items.map((i) => i.prioridad)
+        ...sorted.map((i) => i.prioridad)
       ) as PrioridadClienteRuta;
-      const diasMoraMax = Math.max(...items.map((i) => i.diasMora));
-      const visitado = items.some((i) => i.visitado);
+      const diasMoraMax = Math.max(...sorted.map((i) => i.diasMora));
+      const visitado = sorted.some((i) => i.visitado);
 
       groups.push({
         clienteId,
@@ -277,11 +273,11 @@ export function useRutaDia(): UseRutaDiaState {
         clienteDireccion: first.clienteDireccion,
         zona: first.zona,
         totalMonto,
-        cantidadPrestamos: items.length,
+        cantidadPrestamos: sorted.length,
         prioridadMax,
         diasMoraMax,
         visitado,
-        items,
+        items: sorted,
       });
     });
 

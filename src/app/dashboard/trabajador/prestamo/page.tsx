@@ -9,6 +9,7 @@ import {
   type ClienteItem,
   type PrestamoItem,
 } from "@/lib/empresa-api";
+import { formatInteresResumenPct, parseInteresPct } from "@/lib/interes-pct";
 
 const MODALIDADES = [
   { value: "diario", label: "Diario" },
@@ -95,7 +96,7 @@ export default function PrestamoTrabajadorPage() {
     if (!user) return;
     const montoNum = parseFloat(monto.replace(",", "."));
     const nCuotas = Math.max(1, parseInt(numeroCuotas, 10) || 1);
-    const iVal = parseFloat(interes.replace(",", ".")) || 0;
+    const iVal = parseInteresPct(interes);
 
     if (isNaN(montoNum) || montoNum < MONTO_MIN) {
       setError(`El monto debe ser al menos ${formatMoneda(MONTO_MIN)}`);
@@ -157,7 +158,7 @@ export default function PrestamoTrabajadorPage() {
   const clienteSeleccionado = clienteId ? clientePorId[clienteId] : null;
   const montoNum = parseFloat(monto.replace(",", "."));
   const nCuotasVal = parseInt(numeroCuotas, 10) || 0;
-  const iVal = parseFloat(interes.replace(",", ".")) || 0;
+  const iVal = parseInteresPct(interes);
   const totalAPagar = !isNaN(montoNum) && montoNum > 0 && nCuotasVal >= 1
     ? montoNum * (1 + iVal / 100)
     : 0;
@@ -388,15 +389,12 @@ export default function PrestamoTrabajadorPage() {
         <div className="form-group">
           <label>Interés (%)</label>
           <input
-            type="number"
+            type="text"
             inputMode="decimal"
-            min={0}
-            step={0.1}
-            max={INTERES_MAX}
             value={interes}
             onChange={(e) => {
               const v = e.target.value.replace(",", ".");
-              if (v === "" || /^\d*\.?\d*$/.test(v)) setInteres(e.target.value);
+              if (v === "" || /^\d*\.?\d*$/.test(v)) setInteres(v);
             }}
             onKeyDown={(e) => {
               const k = e.key;
@@ -436,7 +434,7 @@ export default function PrestamoTrabajadorPage() {
               (() => {
                 const montoNum = parseFloat(monto.replace(",", "."));
                 const nCuotas = parseInt(numeroCuotas, 10);
-                const iVal = parseFloat(interes.replace(",", ".")) || 0;
+                const iVal = parseInteresPct(interes);
                 if (isNaN(montoNum) || montoNum <= 0 || !nCuotas || nCuotas < 1) return "—";
                 const total = montoNum * (1 + iVal / 100);
                 return formatMoneda(total / nCuotas);
@@ -463,7 +461,7 @@ export default function PrestamoTrabajadorPage() {
             <h4 style={{ marginTop: 0, marginBottom: "0.75rem", fontSize: "0.95rem" }}>Resumen del préstamo</h4>
             <ul style={{ margin: 0, paddingLeft: "1.25rem", fontSize: "0.875rem", lineHeight: 1.6 }}>
               <li>Monto a prestar: <strong>{formatMoneda(montoNum)}</strong></li>
-              <li>Interés: <strong>{iVal}%</strong></li>
+              <li>Interés: <strong>{formatInteresResumenPct(iVal)}%</strong></li>
               <li>Total a pagar: <strong>{formatMoneda(totalAPagar)}</strong></li>
               <li>Número de cuotas: <strong>{nCuotasVal}</strong> ({modalidad})</li>
               <li>Cuota por pago: <strong>{formatMoneda(cuotaPorPago)}</strong></li>
