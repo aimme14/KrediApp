@@ -7,7 +7,6 @@ import { auth } from "@/lib/firebase";
 import {
   getCapital,
   setCapital,
-  ajustarCapital,
   clearCapitalHistorial,
   invertirCajaJefe,
   type CapitalHistorialEntry,
@@ -21,8 +20,9 @@ const FLUJO_UI_LIMIT = 50;
 
 function etiquetaTipoFlujo(tipo: string | undefined): string {
   switch (tipo) {
+    case "cuadrar_caja":
     case "definicion_capital":
-      return "Definición de capital";
+      return "Cuadrar caja";
     case "ajuste_caja":
       return "Ajuste de base";
     case "inversion_admin":
@@ -95,14 +95,6 @@ function parseMontoInput(value: string): { num: number; valid: boolean } {
   return { num, valid: true };
 }
 
-function parseAjusteInput(value: string): { delta: number; valid: boolean } {
-  const raw = value.replace(/\s/g, "").replace(/\./g, "").replace(",", ".");
-  if (raw === "" || raw === "-") return { delta: 0, valid: false };
-  const num = Number(raw);
-  if (Number.isNaN(num)) return { delta: 0, valid: false };
-  return { delta: num, valid: true };
-}
-
 function sortAdminsPorCodigo(a: UserProfile, b: UserProfile): number {
   const ca = (a.codigo ?? "").toString();
   const cb = (b.codigo ?? "").toString();
@@ -124,13 +116,11 @@ export default function GestionFinancieraPage() {
   const [modalAbierto, setModalAbierto] = useState(false);
   const [cajaObjetivoPendiente, setCajaObjetivoPendiente] = useState<number | null>(null);
   const [passwordValue, setPasswordValue] = useState("");
+  const [passwordConfirmValue, setPasswordConfirmValue] = useState("");
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [isConfirming, setIsConfirming] = useState(false);
   const [formCajaAbierto, setFormCajaAbierto] = useState(false);
   const [seccionActiva, setSeccionActiva] = useState<"capital" | "caja">("capital");
-  const [ajusteInput, setAjusteInput] = useState("");
-  const [ajusteSaving, setAjusteSaving] = useState(false);
-  const [ajusteError, setAjusteError] = useState<string | null>(null);
   const [admins, setAdmins] = useState<UserProfile[]>([]);
   const [invertirDestino, setInvertirDestino] = useState<"" | "empresa" | string>("");
   const [invertirMonto, setInvertirMonto] = useState("");
@@ -205,6 +195,7 @@ export default function GestionFinancieraPage() {
     setInputErrorConfirm(null);
     setCajaObjetivoPendiente(num1);
     setPasswordValue("");
+    setPasswordConfirmValue("");
     setPasswordError(null);
     setModalAbierto(true);
   };
@@ -213,6 +204,7 @@ export default function GestionFinancieraPage() {
     setModalAbierto(false);
     setCajaObjetivoPendiente(null);
     setPasswordValue("");
+    setPasswordConfirmValue("");
     setPasswordError(null);
   };
 
@@ -220,6 +212,14 @@ export default function GestionFinancieraPage() {
     if (!user || !profile || profile.role !== "jefe" || cajaObjetivoPendiente == null || !auth) return;
     if (!passwordValue.trim()) {
       setPasswordError("Ingresa tu contraseña para confirmar.");
+      return;
+    }
+    if (!passwordConfirmValue.trim()) {
+      setPasswordError("Repite la contraseña en el segundo campo.");
+      return;
+    }
+    if (passwordValue !== passwordConfirmValue) {
+      setPasswordError("Las contraseñas no coinciden.");
       return;
     }
     setPasswordError(null);
@@ -334,37 +334,6 @@ export default function GestionFinancieraPage() {
       setInvertirError(err instanceof Error ? err.message : "Error al invertir");
     } finally {
       setInvertirSaving(false);
-    }
-  };
-
-  const handleAjustarCaja = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!user || !profile || profile.role !== "jefe") return;
-    const { delta, valid } = parseAjusteInput(ajusteInput);
-    if (!valid || delta === 0) {
-      setAjusteError("Ingresa un monto a sumar (ej. 500000) o restar (ej. -300000).");
-      return;
-    }
-    if (delta < 0 && -delta > cajaEmpresa) {
-      setAjusteError("No puedes restar más de lo disponible en base empresa.");
-      return;
-    }
-    setAjusteError(null);
-    setAjusteSaving(true);
-    try {
-      const token = await user.getIdToken();
-      const data = await ajustarCapital(token, delta);
-      setCapitalState((prev) => (prev ? { ...prev, ...data } : null));
-      setAjusteInput("");
-      setToast({
-        tipo: delta > 0 ? "aumento" : "reduccion",
-        mensaje: delta > 0 ? "Base aumentada correctamente." : "Base reducida correctamente.",
-      });
-      setTimeout(() => setToast(null), TOAST_DURATION);
-    } catch (e) {
-      setAjusteError(e instanceof Error ? e.message : "Error al ajustar base");
-    } finally {
-      setAjusteSaving(false);
     }
   };
 
@@ -666,8 +635,8 @@ export default function GestionFinancieraPage() {
                   onClick={() => setFormCajaAbierto((v) => !v)}
                   aria-expanded={formCajaAbierto}
                   aria-controls="gf-caja-form-section"
-                  title={formCajaAbierto ? "Cerrar sección" : "Actualizar base"}
-                  aria-label={formCajaAbierto ? "Cerrar sección de actualización de base" : "Abrir sección para actualizar base de la empresa"}
+                  title={formCajaAbierto ? "Cerrar sección" : "Cuadrar caja"}
+                  aria-label={formCajaAbierto ? "Cerrar sección de cuadrar caja" : "Abrir sección para cuadrar caja (base empresa)"}
                 >
                   <svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
                     <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
@@ -684,7 +653,7 @@ export default function GestionFinancieraPage() {
               >
                 <form onSubmit={handleSubmitCaja} className="gf-capital-form">
                   <label htmlFor="gf-monto" className="gf-capital-form-label">
-                    ACTUALIZAR BASE DE LA EMPRESA
+                    CUADRAR CAJA — BASE EMPRESA
                   </label>
                   <div className="gf-capital-input-wrap">
                     <span className="gf-capital-input-prefix">COP $</span>
@@ -711,7 +680,7 @@ export default function GestionFinancieraPage() {
                     </p>
                   )}
                   <label htmlFor="gf-monto-confirm" className="gf-capital-form-label gf-capital-form-label-second">
-                    REPITE EL MONTO PARA CONFIRMAR
+                    REPITE EL MONTO DE LA BASE
                   </label>
                   <div className="gf-capital-input-wrap">
                     <span className="gf-capital-input-prefix">COP $</span>
@@ -737,7 +706,7 @@ export default function GestionFinancieraPage() {
                     </p>
                   )}
                   <p className="gf-capital-form-hint">
-                    Ingresa el nuevo monto de <strong>base</strong> disponible en la empresa (se reparte el capital total: base + Σ administradores).
+                    Indica el monto con el que queda <strong>cuadrada la caja</strong> (base empresa). El capital total será base + Σ administradores.
                   </p>
                   <button
                     type="submit"
@@ -763,37 +732,6 @@ export default function GestionFinancieraPage() {
                     {btnState === "success" && "¡Guardado!"}
                   </button>
                 </form>
-
-                <div style={{ marginTop: "1.5rem", paddingTop: "1.5rem", borderTop: "1px solid var(--border)" }}>
-                  <label htmlFor="gf-ajuste-monto" className="gf-capital-form-label">
-                    AJUSTAR BASE (SUMAR O RESTAR)
-                  </label>
-                  <p className="gf-capital-form-hint" style={{ marginBottom: "0.5rem" }}>
-                    Número positivo para sumar a la base; negativo para restar (solo hasta lo disponible).
-                  </p>
-                  <div className="gf-capital-input-wrap" style={{ maxWidth: "14rem" }}>
-                    <span className="gf-capital-input-prefix">COP $</span>
-                    <input
-                      id="gf-ajuste-monto"
-                      type="text"
-                      inputMode="decimal"
-                      value={ajusteInput}
-                      onChange={(e) => { setAjusteInput(e.target.value); setAjusteError(null); }}
-                      placeholder="Ej. 500000 o -300000"
-                      className={`gf-capital-input ${ajusteError ? "gf-capital-input-error" : ""}`}
-                      disabled={ajusteSaving}
-                    />
-                  </div>
-                  {ajusteError && <p className="gf-capital-input-msg-error" role="alert">{ajusteError}</p>}
-                  <button
-                    type="button"
-                    className="gf-btn-actualizar"
-                    onClick={handleAjustarCaja}
-                    disabled={ajusteSaving || !parseAjusteInput(ajusteInput).valid || parseAjusteInput(ajusteInput).delta === 0}
-                  >
-                    {ajusteSaving ? "Aplicando…" : "Aplicar ajuste"}
-                  </button>
-                </div>
               </div>
             </>
           )}
@@ -862,10 +800,10 @@ export default function GestionFinancieraPage() {
             aria-describedby="gf-modal-desc"
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 id="gf-modal-title" className="gf-modal-title">Confirmar base de la empresa</h2>
+            <h2 id="gf-modal-title" className="gf-modal-title">Cuadrar caja</h2>
             <p id="gf-modal-desc" className="gf-modal-desc">
-              Vas a establecer la <strong>base</strong> en <strong className="gf-modal-monto">${formatMonto(cajaObjetivoPendiente)}</strong>. El capital total pasará a{" "}
-              <strong>${formatMonto(cajaObjetivoPendiente + sumaCapitalAdmins)}</strong> (base + Σ administradores). Ingresa tu contraseña para confirmar.
+              Vas a <strong>cuadrar la caja</strong> con base <strong className="gf-modal-monto">${formatMonto(cajaObjetivoPendiente)}</strong>. El capital total pasará a{" "}
+              <strong>${formatMonto(cajaObjetivoPendiente + sumaCapitalAdmins)}</strong> (base + Σ administradores). La caja empresa quedará exactamente en ese monto. Escribe tu contraseña dos veces para confirmar.
             </p>
             <label htmlFor="gf-modal-password" className="gf-modal-label">Contraseña</label>
             <input
@@ -877,6 +815,24 @@ export default function GestionFinancieraPage() {
                 setPasswordError(null);
               }}
               placeholder="Tu contraseña"
+              className={`gf-modal-input ${passwordError ? "gf-capital-input-error" : ""}`}
+              disabled={isConfirming}
+              autoComplete="current-password"
+              aria-invalid={!!passwordError}
+              aria-describedby={passwordError ? "gf-modal-password-error" : undefined}
+            />
+            <label htmlFor="gf-modal-password-confirm" className="gf-modal-label" style={{ marginTop: "0.75rem" }}>
+              Repite la contraseña
+            </label>
+            <input
+              id="gf-modal-password-confirm"
+              type="password"
+              value={passwordConfirmValue}
+              onChange={(e) => {
+                setPasswordConfirmValue(e.target.value);
+                setPasswordError(null);
+              }}
+              placeholder="Repite la misma contraseña"
               className={`gf-modal-input ${passwordError ? "gf-capital-input-error" : ""}`}
               disabled={isConfirming}
               autoComplete="current-password"

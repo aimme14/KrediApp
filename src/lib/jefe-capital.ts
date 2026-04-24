@@ -22,6 +22,8 @@ import { sumGastosEmpresaCollection } from "@/lib/gastos-totals";
 
 /** Tipo de movimiento persistido en empresas/.../capital/cajaEmpresa/flujo/{id} */
 export type CapitalEmpresaFlujoTipo =
+  | "cuadrar_caja"
+  /** @deprecated Legado en Firestore; nuevos movimientos usan `cuadrar_caja`. */
   | "definicion_capital"
   | "ajuste_caja"
   | "inversion_admin"
@@ -201,7 +203,7 @@ export async function getCapitalEmpresa(
 }
 
 /**
- * Establece el capital de empresa objetivo (monto = capitalEmpresa deseado).
+ * Cuadrar caja / capital de empresa: monto = capitalEmpresa deseado.
  * Ajusta cajaEmpresa = monto − sumaCapitalAdmins (los gastos de empresa ya afectan la caja al registrarse).
  */
 export async function setCapitalInicial(
@@ -231,7 +233,7 @@ export async function setCapitalInicial(
   const batch = db.batch();
   const flujoRef = capitalEmpresaFlujoCol(db, jefeUid).doc();
   batch.set(flujoRef, {
-    tipo: "definicion_capital",
+    tipo: "cuadrar_caja",
     montoAnterior: antes.capitalEmpresa,
     montoNuevo: capitalEmpresa,
     at: Timestamp.fromDate(now),
