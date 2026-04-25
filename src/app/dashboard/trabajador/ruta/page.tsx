@@ -180,10 +180,10 @@ export default function RutaDelDiaPage() {
     month: "short",
   });
 
+  /** Misma ruta que `TrabajadorRutaContext` (puede venir de `profile.rutaId` o de empleado en la ruta). */
+  const rutaIdEfectivo = (ruta?.id ?? profile?.rutaId)?.trim() ?? "";
   const enJornadaEstaRuta = Boolean(
-    jornadaActiva &&
-      profile?.rutaId &&
-      jornadaActiva.rutaId === profile.rutaId
+    jornadaActiva && rutaIdEfectivo && jornadaActiva.rutaId === rutaIdEfectivo
   );
 
   const saldoBaseTrabajador = enJornadaEstaRuta
@@ -192,6 +192,7 @@ export default function RutaDelDiaPage() {
 
   const cargandoSaldoBase =
     loadingJornada ||
+    (Boolean(jornadaActiva) && !rutaIdEfectivo && loadingRuta) ||
     (!enJornadaEstaRuta && cajaEmpleadoFirestore === null && !!db);
 
   const etiquetaSaldoBase = enJornadaEstaRuta

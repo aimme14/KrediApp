@@ -18,6 +18,11 @@ import {
 } from "@/lib/ruta-financiera-admin";
 import { getJornadaActivaEmpleado } from "@/lib/jornada-gasto-admin";
 import { upsertCapitalRutaSnapshot } from "@/lib/capital-ruta-snapshot";
+import { recordCreditMovement } from "@/lib/financial-ledger";
+import {
+  startIdempotentOperation,
+  finishIdempotentOperation,
+} from "@/lib/financial-idempotency";
 
 const MOTIVOS_NO_PAGO = ["sin_fondos", "no_estaba", "promesa_pago", "otro"] as const;
 const MOTIVOS_PERDIDA = [
@@ -143,6 +148,26 @@ export async function POST(
   }
 
   const now = new Date();
+  const idem = await startIdempotentOperation({
+    db,
+    empresaId: apiUser.empresaId,
+    key: idempotencyKey,
+    endpoint: `prestamos:${prestamoId}:pagos`,
+    uid: apiUser.uid,
+  });
+  if (idem.replay) {
+    return NextResponse.json(idem.payload, { status: idem.status });
+  }
+
+  const finalize = async (status: number, payload: Record<string, unknown>) => {
+    await finishIdempotentOperation({
+      db,
+      empresaId: apiUser.empresaId,
+      key: idempotencyKey,
+      result: { ok: status < 400, status, payload },
+    });
+    return NextResponse.json(payload, { status });
+  };
 
   if (tipo === "no_pago") {
     const motivo =
@@ -233,22 +258,19 @@ export async function POST(
     } catch (e) {
       const msg = e instanceof Error ? e.message : "";
       if (msg === "PRESTAMO_NOT_FOUND") {
-        return NextResponse.json({ error: "Préstamo no encontrado" }, { status: 404 });
+        return finalize(404, { error: "Préstamo no encontrado" });
       }
-      return NextResponse.json(
-        { error: msg || "No se pudo registrar el no pago" },
-        { status: 400 }
-      );
+      return finalize(400, { error: msg || "No se pudo registrar el no pago" });
     }
 
-    return NextResponse.json({ ok: true, tipo: "no_pago" });
+    return finalize(200, { ok: true, tipo: "no_pago" });
   }
 
   if (tipo === "perdida") {
     const rawMonto =
       typeof monto === "number" ? monto : Number(String(monto ?? "").replace(/,/g, ""));
     if (Number.isNaN(rawMonto) || rawMonto <= 0) {
-      return NextResponse.json({ error: "Monto debe ser un número positivo" }, { status: 400 });
+      return finalize(400, { error: "Monto debe ser un número positivo" });
     }
 
     const motivoP =
@@ -378,7 +400,7 @@ export async function POST(
         }
       }
 
-      return NextResponse.json({
+      return finalize(200, {
         ok: true,
         tipo: "perdida",
         saldoPendiente: result.saldoPendiente,
@@ -387,26 +409,23 @@ export async function POST(
     } catch (e) {
       const msg = e instanceof Error ? e.message : "";
       if (msg === "PRESTAMO_NOT_FOUND") {
-        return NextResponse.json({ error: "Préstamo no encontrado" }, { status: 404 });
+        return finalize(404, { error: "Préstamo no encontrado" });
       }
       if (msg === "SIN_SALDO_APLICABLE") {
-        return NextResponse.json({ error: "No hay saldo pendiente para registrar la pérdida" }, { status: 400 });
+        return finalize(400, { error: "No hay saldo pendiente para registrar la pérdida" });
       }
       if (msg === "RUTA_NOT_FOUND") {
-        return NextResponse.json({ error: "Ruta del préstamo no encontrada" }, { status: 400 });
+        return finalize(400, { error: "Ruta del préstamo no encontrada" });
       }
       if (msg.includes("Capital de ruta descuadrado")) {
-        return NextResponse.json({ error: msg }, { status: 400 });
+        return finalize(400, { error: msg });
       }
-      return NextResponse.json(
-        { error: msg || "No se pudo registrar la pérdida" },
-        { status: 400 }
-      );
+      return finalize(400, { error: msg || "No se pudo registrar la pérdida" });
     }
   }
 
   if (typeof monto !== "number" || monto <= 0) {
-    return NextResponse.json({ error: "Monto debe ser un número positivo" }, { status: 400 });
+    return finalize(400, { error: "Monto debe ser un número positivo" });
   }
   const metodo = metodoPago === "transferencia" ? "transferencia" : "efectivo";
 
@@ -428,25 +447,7 @@ export async function POST(
     rutaIdPreRead && typeof monto === "number" && monto > 0
       ? await getJornadaActivaEmpleado(db, apiUser.empresaId, empleadoTitularCobro)
       : null;
-
   const keyTrimmed = typeof idempotencyKey === "string" ? idempotencyKey.trim() : "";
-  if (keyTrimmed) {
-    const existentes = await prestamoRef
-      .collection(PAGOS_SUBCOLLECTION)
-      .where("idempotencyKey", "==", keyTrimmed)
-      .limit(1)
-      .get();
-    if (!existentes.empty) {
-      const existingDoc = existentes.docs[0]!;
-      const prestamoData = (await prestamoRef.get()).data()!;
-      return NextResponse.json({
-        ok: true,
-        saldoPendiente: (prestamoData.saldoPendiente as number) ?? 0,
-        adelantoCuota: (prestamoData.adelantoCuota as number) ?? 0,
-        pagoId: existingDoc.id,
-      });
-    }
-  }
 
   try {
     const result = await db.runTransaction(async (tx) => {
@@ -529,6 +530,7 @@ export async function POST(
       let rutaSnap: FirebaseFirestore.DocumentSnapshot | null = null;
       let jSnap: FirebaseFirestore.DocumentSnapshot | null = null;
       let uSnap: FirebaseFirestore.DocumentSnapshot | null = null;
+        let walletBalanceAfter: number | undefined;
 
       if (rutaRef) {
         rutaSnap = await tx.get(rutaRef);
@@ -589,24 +591,27 @@ export async function POST(
             const cobrosDelDia = typeof jd.cobrosDelDia === "number" ? jd.cobrosDelDia : 0;
             const clientesCobrados = typeof jd.clientesCobrados === "number" ? jd.clientesCobrados : 0;
             const m = Math.round(montoAcreditarCajaEmpleado * 100) / 100;
+            walletBalanceAfter = Math.round((cajaA + m) * 100) / 100;
             tx.update(jRef, {
-              cajaActual: Math.round((cajaA + m) * 100) / 100,
+              cajaActual: walletBalanceAfter,
               cobrosDelDia: Math.round((cobrosDelDia + m) * 100) / 100,
               clientesCobrados: clientesCobrados + 1,
             });
           } else if (uSnap?.exists) {
             const ud = uSnap.data() as Record<string, unknown>;
             const cEmp = typeof ud.cajaEmpleado === "number" ? ud.cajaEmpleado : 0;
+            walletBalanceAfter = Math.round((cEmp + montoAcreditarCajaEmpleado) * 100) / 100;
             tx.update(usuarioEmpRef, {
-              cajaEmpleado: Math.round((cEmp + montoAcreditarCajaEmpleado) * 100) / 100,
+              cajaEmpleado: walletBalanceAfter,
               ultimaActualizacionCapital: nowTx,
             });
           }
         } else if (uSnap?.exists) {
           const ud = uSnap.data() as Record<string, unknown>;
           const cEmp = typeof ud.cajaEmpleado === "number" ? ud.cajaEmpleado : 0;
+          walletBalanceAfter = Math.round((cEmp + montoAcreditarCajaEmpleado) * 100) / 100;
           tx.update(usuarioEmpRef, {
-            cajaEmpleado: Math.round((cEmp + montoAcreditarCajaEmpleado) * 100) / 100,
+            cajaEmpleado: walletBalanceAfter,
             ultimaActualizacionCapital: nowTx,
           });
         }
@@ -629,6 +634,10 @@ export async function POST(
         saldoPendiente: nuevoSaldo,
         adelantoCuota: adelantoParaGuardar,
         rutaId: rutaIdPrestamo || null,
+          empleadoId: empUid,
+          cuotaCapital: parteCapital,
+          cuotaGanancia: parteGanancia,
+          walletBalanceAfter,
       };
     });
 
@@ -649,7 +658,53 @@ export async function POST(
       }
     }
 
-    return NextResponse.json({
+    try {
+      if (result.cuotaCapital > 0) {
+        await recordCreditMovement({
+          db,
+          empresaId: apiUser.empresaId,
+          walletType: "empleado_caja",
+          walletId: result.empleadoId,
+          amount: result.cuotaCapital,
+          eventType: "pago_prestamo_capital",
+          scope: "empleado",
+          createdBy: apiUser.uid,
+          relatedEntityType: "pago",
+          relatedEntityId: result.pagoId,
+          metadata: {
+            prestamoId,
+            rutaId: result.rutaId,
+            metodoPago: metodo,
+          },
+          operationId: `pago_capital:${result.pagoId}`,
+        });
+      }
+      if (result.cuotaGanancia > 0) {
+        await recordCreditMovement({
+          db,
+          empresaId: apiUser.empresaId,
+          walletType: "empleado_caja",
+          walletId: result.empleadoId,
+          amount: result.cuotaGanancia,
+          balanceAfter: result.walletBalanceAfter,
+          eventType: "pago_prestamo_interes",
+          scope: "empleado",
+          createdBy: apiUser.uid,
+          relatedEntityType: "pago",
+          relatedEntityId: result.pagoId,
+          metadata: {
+            prestamoId,
+            rutaId: result.rutaId,
+            metodoPago: metodo,
+          },
+          operationId: `pago_interes:${result.pagoId}`,
+        });
+      }
+    } catch (e) {
+      console.warn("[ledger] No se pudo registrar movimiento de pago", e);
+    }
+
+    return finalize(200, {
       ok: true,
       saldoPendiente: result.saldoPendiente,
       adelantoCuota: result.adelantoCuota,
@@ -658,23 +713,20 @@ export async function POST(
   } catch (e) {
     const msg = e instanceof Error ? e.message : "";
     if (msg === "PRESTAMO_NOT_FOUND") {
-      return NextResponse.json({ error: "Préstamo no encontrado" }, { status: 404 });
+      return finalize(404, { error: "Préstamo no encontrado" });
     }
     if (msg === "SIN_SALDO_APLICABLE") {
-      return NextResponse.json({ error: "No hay saldo pendiente para aplicar este pago" }, { status: 400 });
+      return finalize(400, { error: "No hay saldo pendiente para aplicar este pago" });
     }
     if (msg === "RUTA_NOT_FOUND") {
-      return NextResponse.json({ error: "Ruta del préstamo no encontrada" }, { status: 400 });
+      return finalize(400, { error: "Ruta del préstamo no encontrada" });
     }
     if (msg === "EMPLEADO_USUARIO_NOT_FOUND") {
-      return NextResponse.json({ error: "Trabajador no encontrado en la empresa" }, { status: 400 });
+      return finalize(400, { error: "Trabajador no encontrado en la empresa" });
     }
     if (msg.includes("Capital de ruta descuadrado")) {
-      return NextResponse.json({ error: msg }, { status: 400 });
+      return finalize(400, { error: msg });
     }
-    return NextResponse.json(
-      { error: msg || "No se pudo registrar el pago" },
-      { status: 400 }
-    );
+    return finalize(400, { error: msg || "No se pudo registrar el pago" });
   }
 }

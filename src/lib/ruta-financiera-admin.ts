@@ -89,6 +89,72 @@ export async function registrarPrestamoEnRuta(
 }
 
 /**
+ * Descuenta un gasto operativo desde la caja de una ruta.
+ * Solo permite operar al admin propietario de la ruta y valida saldo disponible.
+ */
+export async function descontarCajaRutaAdmin(
+  db: Firestore,
+  empresaId: string,
+  adminUid: string,
+  rutaId: string,
+  monto: number
+): Promise<{ cajaRuta: number; capitalTotal: number }> {
+  if (!empresaId || !rutaId || !adminUid) throw new Error("Datos incompletos");
+  if (!Number.isFinite(monto) || monto <= 0) {
+    throw new Error("El monto debe ser mayor a 0");
+  }
+
+  const rutaRef = db
+    .collection(EMPRESAS_COLLECTION)
+    .doc(empresaId)
+    .collection(RUTAS_SUBCOLLECTION)
+    .doc(rutaId);
+
+  const result = await db.runTransaction(async (tx) => {
+    const rutaSnap = await tx.get(rutaRef);
+    if (!rutaSnap.exists) throw new Error("Ruta no encontrada");
+
+    const rd = rutaSnap.data() as Record<string, unknown>;
+    if ((rd.adminId as string) !== adminUid) {
+      throw new Error("Esta ruta no pertenece a tu administración");
+    }
+
+    const cajaRuta = typeof rd.cajaRuta === "number" ? rd.cajaRuta : 0;
+    const cajasEmpleados =
+      typeof rd.cajasEmpleados === "number" ? rd.cajasEmpleados : 0;
+    const inversiones = typeof rd.inversiones === "number" ? rd.inversiones : 0;
+    const perdidas = typeof rd.perdidas === "number" ? rd.perdidas : 0;
+
+    if (cajaRuta < monto) {
+      throw new Error("Saldo insuficiente en caja de la ruta");
+    }
+
+    const nuevaCajaRuta = round2(cajaRuta - monto);
+    const nuevoCapitalTotal = computeCapitalTotalRutaDesdeSaldos({
+      cajaRuta: nuevaCajaRuta,
+      cajasEmpleados,
+      inversiones,
+      perdidas,
+    });
+
+    tx.update(rutaRef, {
+      cajaRuta: nuevaCajaRuta,
+      capitalTotal: nuevoCapitalTotal,
+      ultimaActualizacion: new Date(),
+    });
+
+    return { cajaRuta: nuevaCajaRuta, capitalTotal: nuevoCapitalTotal };
+  });
+
+  const after = await rutaRef.get();
+  if (after.exists) {
+    await upsertCapitalRutaSnapshot(db, empresaId, rutaId, after.data()!);
+  }
+
+  return result;
+}
+
+/**
  * Préstamo desde la caja del trabajador: descuenta cajaEmpleado (o jornada) y mueve a inversiones.
  * cajaRuta no cambia; capitalTotal no cambia.
  */

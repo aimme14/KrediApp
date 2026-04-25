@@ -5,16 +5,23 @@ import {
   EMPRESAS_COLLECTION,
   CLIENTES_SUBCOLLECTION,
   PRESTAMOS_SUBCOLLECTION,
+  RUTAS_SUBCOLLECTION,
+  USUARIOS_SUBCOLLECTION,
 } from "@/lib/empresas-db";
 import {
   registrarPrestamoDesdeCajaEmpleado,
   registrarPrestamoEnRuta,
 } from "@/lib/ruta-financiera-admin";
+import { recordDebitMovement } from "@/lib/financial-ledger";
 import {
   getNextWorkingDay,
   addWorkingDays,
   FESTIVOS,
 } from "@/lib/fechas-laborables";
+import {
+  startIdempotentOperation,
+  finishIdempotentOperation,
+} from "@/lib/financial-idempotency";
 import type { ModalidadPago } from "@/types/firestore";
 
 /** GET: lista préstamos. Empleado: los de su ruta. Admin/Jefe: los suyos */
@@ -90,6 +97,7 @@ export async function POST(request: NextRequest) {
     numeroCuotas,
     fechaInicio,
     multaMora,
+    idempotencyKey,
   } = body as {
     clienteId?: string;
     rutaId?: string;
@@ -100,6 +108,7 @@ export async function POST(request: NextRequest) {
     numeroCuotas?: number;
     fechaInicio?: string;
     multaMora?: number;
+    idempotencyKey?: string;
   };
 
   if (!clienteId?.trim()) {
@@ -107,6 +116,25 @@ export async function POST(request: NextRequest) {
   }
 
   const db = getAdminFirestore();
+  const idem = await startIdempotentOperation({
+    db,
+    empresaId: apiUser.empresaId,
+    key: idempotencyKey,
+    endpoint: "prestamos:create",
+    uid: apiUser.uid,
+  });
+  if (idem.replay) {
+    return NextResponse.json(idem.payload, { status: idem.status });
+  }
+  const finalize = async (status: number, payload: Record<string, unknown>) => {
+    await finishIdempotentOperation({
+      db,
+      empresaId: apiUser.empresaId,
+      key: idempotencyKey,
+      result: { ok: status < 400, status, payload },
+    });
+    return NextResponse.json(payload, { status });
+  };
   const clienteRef = db
     .collection(EMPRESAS_COLLECTION)
     .doc(apiUser.empresaId)
@@ -114,17 +142,16 @@ export async function POST(request: NextRequest) {
     .doc(clienteId.trim());
   const clienteSnap = await clienteRef.get();
   if (clienteSnap.exists && clienteSnap.data()?.moroso === true) {
-    return NextResponse.json(
-      { error: "No se puede otorgar préstamo a un cliente moroso (excluido)" },
-      { status: 400 }
-    );
+    return finalize(400, {
+      error: "No se puede otorgar préstamo a un cliente moroso (excluido)",
+    });
   }
 
   if (typeof monto !== "number" || monto <= 0) {
-    return NextResponse.json({ error: "Monto debe ser un número positivo" }, { status: 400 });
+    return finalize(400, { error: "Monto debe ser un número positivo" });
   }
   if (typeof numeroCuotas !== "number" || numeroCuotas < 1) {
-    return NextResponse.json({ error: "Número de cuotas debe ser al menos 1" }, { status: 400 });
+    return finalize(400, { error: "Número de cuotas debe ser al menos 1" });
   }
 
   const mod: ModalidadPago = modalidad === "diario" || modalidad === "semanal" ? modalidad : "mensual";
@@ -160,6 +187,57 @@ export async function POST(request: NextRequest) {
     rutaIdPrestamo = (clienteSnap.data()?.rutaId as string) ?? "";
   }
 
+  let ledgerWalletType: "ruta_caja" | "empleado_caja" | null = null;
+  let ledgerWalletId = "";
+  let ledgerBalanceAfter: number | undefined;
+  let ledgerEventType = "";
+
+  if (rutaIdPrestamo) {
+    try {
+      if (apiUser.role === "empleado") {
+        await registrarPrestamoDesdeCajaEmpleado(
+          db,
+          apiUser.empresaId,
+          rutaIdPrestamo,
+          empleadoIdPrestamo,
+          monto
+        );
+        ledgerWalletType = "empleado_caja";
+        ledgerWalletId = empleadoIdPrestamo;
+        ledgerEventType = "prestamo_desembolso_empleado";
+        const empSnap = await db
+          .collection(EMPRESAS_COLLECTION)
+          .doc(apiUser.empresaId)
+          .collection(USUARIOS_SUBCOLLECTION)
+          .doc(empleadoIdPrestamo)
+          .get();
+        const cajaEmp = empSnap.data()?.cajaEmpleado;
+        if (typeof cajaEmp === "number") {
+          ledgerBalanceAfter = cajaEmp;
+        }
+      } else {
+        await registrarPrestamoEnRuta(db, apiUser.empresaId, rutaIdPrestamo, monto);
+        ledgerWalletType = "ruta_caja";
+        ledgerWalletId = rutaIdPrestamo;
+        ledgerEventType = "prestamo_desembolso_ruta";
+        const rutaSnap = await db
+          .collection(EMPRESAS_COLLECTION)
+          .doc(apiUser.empresaId)
+          .collection(RUTAS_SUBCOLLECTION)
+          .doc(rutaIdPrestamo)
+          .get();
+        const cajaRuta = rutaSnap.data()?.cajaRuta;
+        if (typeof cajaRuta === "number") {
+          ledgerBalanceAfter = cajaRuta;
+        }
+      }
+    } catch (e) {
+      return finalize(400, {
+        error: e instanceof Error ? e.message : "Error al impactar base de la ruta",
+      });
+    }
+  }
+
   await ref.set({
     clienteId: clienteId.trim(),
     rutaId: rutaIdPrestamo,
@@ -178,30 +256,39 @@ export async function POST(request: NextRequest) {
     adelantoCuota: 0,
   });
 
-  if (rutaIdPrestamo) {
-    try {
-      if (apiUser.role === "empleado") {
-        await registrarPrestamoDesdeCajaEmpleado(
-          db,
-          apiUser.empresaId,
-          rutaIdPrestamo,
-          empleadoIdPrestamo,
-          monto
-        );
-      } else {
-        await registrarPrestamoEnRuta(db, apiUser.empresaId, rutaIdPrestamo, monto);
-      }
-    } catch (e) {
-      return NextResponse.json(
-        { error: e instanceof Error ? e.message : "Error al impactar base de la ruta" },
-        { status: 400 }
-      );
-    }
-  }
-
   if (clienteSnap.exists) {
     await clienteRef.update({ prestamo_activo: true });
   }
 
-  return NextResponse.json({ id: ref.id });
+  if (rutaIdPrestamo && ledgerWalletType && ledgerWalletId) {
+    try {
+      await recordDebitMovement({
+        db,
+        empresaId: apiUser.empresaId,
+        walletType: ledgerWalletType,
+        walletId: ledgerWalletId,
+        amount: monto,
+        balanceAfter: ledgerBalanceAfter,
+        eventType: ledgerEventType,
+        scope: ledgerWalletType === "ruta_caja" ? "ruta" : "empleado",
+        createdBy: apiUser.uid,
+        relatedEntityType: "prestamo",
+        relatedEntityId: ref.id,
+        metadata: {
+          prestamoId: ref.id,
+          clienteId: clienteId.trim(),
+          rutaId: rutaIdPrestamo,
+          empleadoId: empleadoIdPrestamo,
+          totalAPagar,
+          interesPct,
+        },
+        operationId: `prestamo:${ref.id}`,
+      });
+    } catch (e) {
+      console.warn("[ledger] No se pudo registrar movimiento de desembolso", e);
+    }
+  }
+
+  const payload = { id: ref.id };
+  return finalize(200, payload);
 }

@@ -17,6 +17,12 @@ import {
   getJornadaActivaEmpleado,
   registrarGastoJornadaDesdeApi,
 } from "@/lib/jornada-gasto-admin";
+import { descontarCajaRutaAdmin } from "@/lib/ruta-financiera-admin";
+import { recordDebitMovement, type WalletType } from "@/lib/financial-ledger";
+import {
+  startIdempotentOperation,
+  finishIdempotentOperation,
+} from "@/lib/financial-idempotency";
 import type { TipoGasto } from "@/types/firestore";
 
 export type AlcanceGastoAdmin = "ruta" | "admin";
@@ -195,6 +201,7 @@ export async function POST(request: NextRequest) {
     evidencia,
     alcance: alcanceBody,
     rutaId: rutaIdBody,
+    idempotencyKey,
   } = body as {
     descripcion?: string;
     monto?: number;
@@ -203,6 +210,7 @@ export async function POST(request: NextRequest) {
     evidencia?: string;
     alcance?: AlcanceGastoAdmin | string;
     rutaId?: string;
+    idempotencyKey?: string;
   };
 
   if (!descripcion || typeof descripcion !== "string" || !descripcion.trim()) {
@@ -224,6 +232,25 @@ export async function POST(request: NextRequest) {
 
   const db = getAdminFirestore();
   const empresaRef = db.collection(EMPRESAS_COLLECTION).doc(apiUser.empresaId);
+  const idem = await startIdempotentOperation({
+    db,
+    empresaId: apiUser.empresaId,
+    key: idempotencyKey,
+    endpoint: "gastos:create",
+    uid: apiUser.uid,
+  });
+  if (idem.replay) {
+    return NextResponse.json(idem.payload, { status: idem.status });
+  }
+  const finalize = async (status: number, payload: Record<string, unknown>) => {
+    await finishIdempotentOperation({
+      db,
+      empresaId: apiUser.empresaId,
+      key: idempotencyKey,
+      result: { ok: status < 400, status, payload },
+    });
+    return NextResponse.json(payload, { status });
+  };
 
   const userSnap = await db.collection(USERS_COLLECTION).doc(apiUser.uid).get();
   const userData = userSnap.data();
@@ -234,24 +261,22 @@ export async function POST(request: NextRequest) {
 
   /** ── Jefe: caja empresa + gastosEmpresa ── */
   if (apiUser.role === "jefe") {
+    let cajaEmpresaDespues: number | null = null;
     if (monto > 0) {
       try {
-        await descontarCajaEmpresa(
+        cajaEmpresaDespues = await descontarCajaEmpresa(
           db,
           apiUser.uid,
           monto,
           descripcion.trim()
         );
       } catch (e) {
-        return NextResponse.json(
-          {
-            error:
-              e instanceof Error
-                ? e.message
-                : "Saldo insuficiente en la caja de la empresa",
-          },
-          { status: 400 }
-        );
+        return finalize(400, {
+          error:
+            e instanceof Error
+              ? e.message
+              : "Saldo insuficiente en la caja de la empresa",
+        });
       }
     }
 
@@ -268,7 +293,35 @@ export async function POST(request: NextRequest) {
       evidencia: (evidencia ?? "").trim() || null,
     });
 
-    return NextResponse.json({ id: ref.id });
+    if (monto > 0 && typeof cajaEmpresaDespues === "number") {
+      try {
+        await recordDebitMovement({
+          db,
+          empresaId: apiUser.empresaId,
+          walletType: "empresa_caja",
+          walletId: apiUser.empresaId,
+          amount: monto,
+          balanceAfter: cajaEmpresaDespues,
+          eventType: "gasto_empresa",
+          scope: "empresa",
+          createdBy: apiUser.uid,
+          relatedEntityType: "gasto",
+          relatedEntityId: ref.id,
+          metadata: {
+            gastoId: ref.id,
+            rol: "jefe",
+            tipo: tipoValido,
+            descripcion: descripcion.trim(),
+          },
+          operationId: `gasto_empresa:${ref.id}`,
+        });
+      } catch (e) {
+        console.warn("[ledger] No se pudo registrar movimiento de gasto empresa", e);
+      }
+    }
+
+    const payload = { id: ref.id };
+    return finalize(200, payload);
   }
 
   /** ── Admin: caja admin + gastosAdministrador ── */
@@ -276,52 +329,70 @@ export async function POST(request: NextRequest) {
     const alcance: AlcanceGastoAdmin =
       alcanceBody === "ruta" ? "ruta" : "admin";
     let rutaIdValue = "";
+    let ledgerWalletType: WalletType | null = null;
+    let ledgerWalletId = "";
+    let ledgerBalanceAfter: number | null = null;
+    let ledgerEventType = "";
+    let ledgerScope: "admin" | "ruta" = "admin";
 
     if (alcance === "ruta") {
       const rid =
         typeof rutaIdBody === "string" ? rutaIdBody.trim() : "";
       if (!rid) {
-        return NextResponse.json(
-          { error: "Debes elegir una ruta para un gasto de ruta" },
-          { status: 400 }
-        );
+        return finalize(400, { error: "Debes elegir una ruta para un gasto de ruta" });
       }
       const rutaSnap = await empresaRef
         .collection(RUTAS_SUBCOLLECTION)
         .doc(rid)
         .get();
       if (!rutaSnap.exists) {
-        return NextResponse.json({ error: "Ruta no encontrada" }, { status: 400 });
+        return finalize(400, { error: "Ruta no encontrada" });
       }
       const adminRuta = rutaSnap.data()?.adminId;
       if (adminRuta !== apiUser.uid) {
-        return NextResponse.json(
-          { error: "Esta ruta no pertenece a tu administración" },
-          { status: 403 }
-        );
+        return finalize(403, { error: "Esta ruta no pertenece a tu administración" });
       }
       rutaIdValue = rid;
     }
 
     if (monto > 0) {
       try {
-        await descontarCajaAdmin(
-          db,
-          apiUser.empresaId,
-          apiUser.uid,
-          monto,
-          descripcion.trim()
-        );
+        if (alcance === "ruta") {
+          const result = await descontarCajaRutaAdmin(
+            db,
+            apiUser.empresaId,
+            apiUser.uid,
+            rutaIdValue,
+            monto
+          );
+          ledgerWalletType = "ruta_caja";
+          ledgerWalletId = rutaIdValue;
+          ledgerBalanceAfter = result.cajaRuta;
+          ledgerEventType = "gasto_ruta";
+          ledgerScope = "ruta";
+        } else {
+          const nuevaCajaAdmin = await descontarCajaAdmin(
+            db,
+            apiUser.empresaId,
+            apiUser.uid,
+            monto,
+            descripcion.trim()
+          );
+          ledgerWalletType = "admin_caja";
+          ledgerWalletId = apiUser.uid;
+          ledgerBalanceAfter = nuevaCajaAdmin;
+          ledgerEventType = "gasto_admin";
+          ledgerScope = "admin";
+        }
       } catch (e) {
-        return NextResponse.json(
-          {
-            error:
-              e instanceof Error
-                ? e.message
+        return finalize(400, {
+          error:
+            e instanceof Error
+              ? e.message
+              : alcance === "ruta"
+                ? "Saldo insuficiente en caja de la ruta"
                 : "Saldo insuficiente en base del administrador",
-          },
-          { status: 400 }
-        );
+        });
       }
     }
 
@@ -340,7 +411,42 @@ export async function POST(request: NextRequest) {
       evidencia: (evidencia ?? "").trim() || null,
     });
 
-    return NextResponse.json({ id: ref.id });
+    if (
+      monto > 0 &&
+      ledgerWalletType &&
+      ledgerWalletId &&
+      typeof ledgerBalanceAfter === "number"
+    ) {
+      try {
+        await recordDebitMovement({
+          db,
+          empresaId: apiUser.empresaId,
+          walletType: ledgerWalletType,
+          walletId: ledgerWalletId,
+          amount: monto,
+          balanceAfter: ledgerBalanceAfter,
+          eventType: ledgerEventType,
+          scope: ledgerScope,
+          createdBy: apiUser.uid,
+          relatedEntityType: "gasto",
+          relatedEntityId: ref.id,
+          metadata: {
+            gastoId: ref.id,
+            rol: "admin",
+            alcance,
+            rutaId: rutaIdValue || null,
+            tipo: tipoValido,
+            descripcion: descripcion.trim(),
+          },
+          operationId: `gasto_admin:${ref.id}`,
+        });
+      } catch (e) {
+        console.warn("[ledger] No se pudo registrar movimiento de gasto admin", e);
+      }
+    }
+
+    const payload = { id: ref.id };
+    return finalize(200, payload);
   }
 
   /** ── Empleado: descuenta caja del empleado (jornada activa → cajaActual + ruta; si no, cajaEmpleado en usuarios) ── */
@@ -362,15 +468,12 @@ export async function POST(request: NextRequest) {
           tipoValido
         );
       } catch (e) {
-        return NextResponse.json(
-          {
-            error:
-              e instanceof Error
-                ? e.message
-                : "No se pudo registrar el gasto contra la base del empleado",
-          },
-          { status: 400 }
-        );
+        return finalize(400, {
+          error:
+            e instanceof Error
+              ? e.message
+              : "No se pudo registrar el gasto contra la base del empleado",
+        });
       }
     } else {
       try {
@@ -382,15 +485,12 @@ export async function POST(request: NextRequest) {
           descripcion.trim()
         );
       } catch (e) {
-        return NextResponse.json(
-          {
-            error:
-              e instanceof Error
-                ? e.message
-                : "Saldo insuficiente en la base del empleado",
-          },
-          { status: 400 }
-        );
+        return finalize(400, {
+          error:
+            e instanceof Error
+              ? e.message
+              : "Saldo insuficiente en la base del empleado",
+        });
       }
     }
   }
@@ -409,5 +509,6 @@ export async function POST(request: NextRequest) {
     evidencia: (evidencia ?? "").trim() || null,
   });
 
-  return NextResponse.json({ id: ref.id });
+  const payload = { id: ref.id };
+  return finalize(200, payload);
 }

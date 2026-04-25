@@ -132,7 +132,7 @@ export default function AdminLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { user, profile, loading, isEnabled } = useAuth();
+  const { user, profile, loading, error, isEnabled } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -176,10 +176,18 @@ export default function AdminLayout({
     return () => setHeaderLeftSlot(null);
   }, [setHeaderLeftSlot, menuOpen]);
 
-  if (loading || !profile) {
+  if (loading) {
     return (
       <div className="container" style={{ paddingTop: "4rem", textAlign: "center" }}>
         <p>Cargando...</p>
+      </div>
+    );
+  }
+
+  if (!profile) {
+    return (
+      <div className="container" style={{ paddingTop: "4rem", textAlign: "center" }}>
+        <p>{error || "No se pudo cargar tu perfil. Recarga la página."}</p>
       </div>
     );
   }

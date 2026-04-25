@@ -62,3 +62,12 @@ export const CIERRES_MENSUALES_SUBCOLLECTION = "cierresMensuales";
 export const INVERSIONES_CAJA_RUTA_SUBCOLLECTION = "inversionesCajaRuta";
 
 export const USERS_COLLECTION = "users"; // Índice de auth
+
+/** Ledger financiero append-only por empresa. */
+export const FINANCIAL_MOVEMENTS_SUBCOLLECTION = "financialMovements";
+
+/** Saldos proyectados por wallet dentro de la empresa. */
+export const WALLET_BALANCES_SUBCOLLECTION = "walletBalances";
+
+/** Registro de operaciones idempotentes por empresa. */
+export const FINANCIAL_OPERATIONS_SUBCOLLECTION = "financialOperations";
