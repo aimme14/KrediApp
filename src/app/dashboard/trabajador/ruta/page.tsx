@@ -7,7 +7,8 @@ import { doc, onSnapshot } from "firebase/firestore";
 import { useAuth } from "@/context/AuthContext";
 import { db } from "@/lib/firebase";
 import { EMPRESAS_COLLECTION, USUARIOS_SUBCOLLECTION } from "@/lib/empresas-db";
-import { useJornada } from "@/hooks/useJornada";
+import { fechaDiaColombiaHoy } from "@/lib/colombia-day-bounds";
+import { getCobrosDelDiaEmpleado } from "@/lib/empresa-api";
 import { useRuta } from "@/hooks/useRuta";
 import { NO_PAGOS_PARA_MORA, useRutaDia } from "@/hooks/useRutaDia";
 import type { ClienteRutaGrupo, PrioridadClienteRuta } from "@/types/finanzas";
@@ -85,8 +86,10 @@ function getBadgeLabel(
 export default function RutaDelDiaPage() {
   const { user, profile } = useAuth();
   const router = useRouter();
-  const { jornadaActiva, loading: loadingJornada } = useJornada();
   const [cajaEmpleadoFirestore, setCajaEmpleadoFirestore] = useState<number | null>(null);
+  const [cajaTotalDelDia, setCajaTotalDelDia] = useState<number | null>(null);
+  const [loadingCajaTotal, setLoadingCajaTotal] = useState(true);
+  const [filtroExpandido, setFiltroExpandido] = useState(false);
 
   useEffect(() => {
     if (!user || !profile?.empresaId || profile.role !== "trabajador") {
@@ -104,6 +107,35 @@ export default function RutaDelDiaPage() {
     });
     return () => unsub();
   }, [user, profile?.empresaId, profile?.role]);
+
+  useEffect(() => {
+    if (!user || profile?.role !== "trabajador") {
+      setCajaTotalDelDia(null);
+      setLoadingCajaTotal(false);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      setLoadingCajaTotal(true);
+      try {
+        const token = await user.getIdToken();
+        const data = await getCobrosDelDiaEmpleado(token, fechaDiaColombiaHoy());
+        if (!cancelled) {
+          setCajaTotalDelDia(
+            typeof data.cajaTotalDelDia === "number" ? data.cajaTotalDelDia : null
+          );
+        }
+      } catch {
+        if (!cancelled) setCajaTotalDelDia(null);
+      } finally {
+        if (!cancelled) setLoadingCajaTotal(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user, profile?.role, profile?.empresaId, cajaEmpleadoFirestore]);
+
   const {
     ruta,
     loading: loadingRuta,
@@ -180,26 +212,13 @@ export default function RutaDelDiaPage() {
     month: "short",
   });
 
-  /** Misma ruta que `TrabajadorRutaContext` (puede venir de `profile.rutaId` o de empleado en la ruta). */
-  const rutaIdEfectivo = (ruta?.id ?? profile?.rutaId)?.trim() ?? "";
-  const enJornadaEstaRuta = Boolean(
-    jornadaActiva && rutaIdEfectivo && jornadaActiva.rutaId === rutaIdEfectivo
-  );
+  const saldoBaseTrabajador = cajaEmpleadoFirestore ?? 0;
+  const montoCajaTarjeta =
+    cajaTotalDelDia !== null ? cajaTotalDelDia : saldoBaseTrabajador;
 
-  const saldoBaseTrabajador = enJornadaEstaRuta
-    ? jornadaActiva!.cajaActual
-    : (cajaEmpleadoFirestore ?? 0);
+  /** Coherente con «Caja del día»: saldo en documento + cobros del día − gastos (Colombia). */
+  const etiquetaSaldoBase = "Caja total";
 
-  const cargandoSaldoBase =
-    loadingJornada ||
-    (Boolean(jornadaActiva) && !rutaIdEfectivo && loadingRuta) ||
-    (!enJornadaEstaRuta && cajaEmpleadoFirestore === null && !!db);
-
-  const etiquetaSaldoBase = enJornadaEstaRuta
-    ? "Base del día"
-    : "Tu base";
-
-  const [filtroExpandido, setFiltroExpandido] = useState(false);
   const filtroActualLabel =
     FILTROS_OPCIONES.find((f) => f.id === filtro)?.label ?? "Todos";
   const filtroLabel =
@@ -235,21 +254,16 @@ export default function RutaDelDiaPage() {
             <h3 id="ruta-dia-caja-heading" className="ruta-dia-caja-title">
               {etiquetaSaldoBase}
             </h3>
-            <p className="ruta-dia-caja-desc">
-              {enJornadaEstaRuta
-                ? "Efectivo acumulado en tu jornada activa (entrega + cobros − gastos)."
-                : "Saldo en tu cuenta de trabajador cuando no hay jornada del día abierta."}
-            </p>
           </div>
           <div className="ruta-dia-caja-monto-wrap">
             <span className="ruta-dia-caja-monto" aria-live="polite">
-              {cargandoSaldoBase ? "…" : formatCurrency(saldoBaseTrabajador)}
+              {loadingCajaTotal && cajaTotalDelDia === null
+                ? "…"
+                : formatCurrency(montoCajaTarjeta)}
             </span>
-            {enJornadaEstaRuta && (
-              <Link href="/dashboard/trabajador/registrar-gasto" className="ruta-dia-caja-link">
-                Registrar gasto
-              </Link>
-            )}
+            <Link href="/dashboard/trabajador/caja-del-dia" className="ruta-dia-caja-link">
+              Ver detalles
+            </Link>
           </div>
         </div>
       </section>

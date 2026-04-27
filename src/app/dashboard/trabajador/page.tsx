@@ -5,7 +5,7 @@ import { useAuth } from "@/context/AuthContext";
 
 const QUICK_ACTIONS = [
   { href: "/dashboard/trabajador/ruta", label: "Ruta del día", icon: "route", desc: "Ver y gestionar tu ruta" },
-  { href: "/dashboard/trabajador/resumen", label: "Resumen del día", icon: "chart", desc: "Estadísticas del día" },
+  { href: "/dashboard/trabajador/resumen", label: "Entrega de reporte", icon: "chart", desc: "Solicitud de entrega al administrador" },
   { href: "/dashboard/trabajador/cliente", label: "Cliente", icon: "client", desc: "Gestión de clientes" },
   { href: "/dashboard/trabajador/prestamo", label: "Préstamos", icon: "loan", desc: "Registrar y ver préstamos" },
   { href: "/dashboard/trabajador/simulacro", label: "Simulador de Crédito", icon: "calc", desc: "Calcular cuotas" },

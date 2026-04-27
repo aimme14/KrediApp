@@ -11,12 +11,8 @@ import {
   USERS_COLLECTION,
 } from "@/lib/empresas-db";
 import { descontarCajaAdmin } from "@/lib/admin-capital";
-import { descontarCajaEmpleado } from "@/lib/empleado-caja";
 import { descontarCajaEmpresa } from "@/lib/jefe-capital";
-import {
-  getJornadaActivaEmpleado,
-  registrarGastoJornadaDesdeApi,
-} from "@/lib/jornada-gasto-admin";
+import { registrarGastoOperativoEmpleadoDesdeApi } from "@/lib/empleado-gasto-operativo-admin";
 import { descontarCajaRutaAdmin } from "@/lib/ruta-financiera-admin";
 import { recordDebitMovement, type WalletType } from "@/lib/financial-ledger";
 import {
@@ -449,49 +445,29 @@ export async function POST(request: NextRequest) {
     return finalize(200, payload);
   }
 
-  /** ── Empleado: descuenta caja del empleado (jornada activa → cajaActual + ruta; si no, cajaEmpleado en usuarios) ── */
+  /** ── Empleado: descuenta cajaEmpleado y cuadra la ruta (cajasEmpleados / capitalTotal) ── */
+  const rutaIdEmp = apiUser.rutaId?.trim();
+  if (!rutaIdEmp) {
+    return finalize(400, { error: "No tienes ruta asignada" });
+  }
   if (monto > 0) {
-    const jornadaActiva = await getJornadaActivaEmpleado(
-      db,
-      apiUser.empresaId,
-      apiUser.uid
-    );
-    if (jornadaActiva) {
-      try {
-        await registrarGastoJornadaDesdeApi(
-          db,
-          apiUser.empresaId,
-          jornadaActiva.jornadaId,
-          jornadaActiva.rutaId,
-          monto,
-          descripcion.trim(),
-          tipoValido
-        );
-      } catch (e) {
-        return finalize(400, {
-          error:
-            e instanceof Error
-              ? e.message
-              : "No se pudo registrar el gasto contra la base del empleado",
-        });
-      }
-    } else {
-      try {
-        await descontarCajaEmpleado(
-          db,
-          apiUser.empresaId,
-          apiUser.uid,
-          monto,
-          descripcion.trim()
-        );
-      } catch (e) {
-        return finalize(400, {
-          error:
-            e instanceof Error
-              ? e.message
-              : "Saldo insuficiente en la base del empleado",
-        });
-      }
+    try {
+      await registrarGastoOperativoEmpleadoDesdeApi(
+        db,
+        apiUser.empresaId,
+        apiUser.uid,
+        rutaIdEmp,
+        monto,
+        descripcion.trim(),
+        tipoValido
+      );
+    } catch (e) {
+      return finalize(400, {
+        error:
+          e instanceof Error
+            ? e.message
+            : "No se pudo registrar el gasto contra la base del empleado",
+      });
     }
   }
 

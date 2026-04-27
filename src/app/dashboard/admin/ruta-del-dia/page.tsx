@@ -75,9 +75,8 @@ export default function RutaDelDiaPage() {
     <div className="card">
       <h2 style={{ marginTop: 0 }}>Ruta del día</h2>
       <p style={{ color: "var(--text-muted)", fontSize: "0.875rem", marginBottom: "1rem", lineHeight: 1.45 }}>
-        Tus rutas con la <strong>base de la ruta</strong> (efectivo en la ruta) y la <strong>base del trabajador</strong>{" "}
-        (dinero operativo del trabajador: sin jornada es su base; con jornada activa en esta ruta es su base del día). Podés pasar plata de la
-        base de la ruta a la base del trabajador cuando vaya a salir a cobrar.
+        Tus rutas con la <strong>caja de la ruta</strong> (efectivo en la ruta) y la <strong>caja del trabajador</strong>{" "}
+        (efectivo operativo en <code>cajaEmpleado</code>). Podés pasar plata de la caja de la ruta al trabajador cuando vaya a salir a cobrar.
       </p>
       {error && <p className="error-msg">{error}</p>}
       {loading ? (
@@ -124,7 +123,7 @@ export default function RutaDelDiaPage() {
               >
                 <div
                   className="card"
-                  title="Efectivo en la ruta disponible para asignar al trabajador"
+                    title="Efectivo en la ruta disponible para asignar a la caja del trabajador"
                   style={{
                     padding: "0.65rem 0.85rem",
                     margin: 0,
@@ -142,7 +141,7 @@ export default function RutaDelDiaPage() {
                       marginBottom: "0.25rem",
                     }}
                   >
-                    Base de la ruta
+                    Caja de la ruta
                   </span>
                   <span style={{ fontSize: "1.05rem", fontWeight: 700 }}>{formatMonto(r.cajaRuta)}</span>
                 </div>
@@ -176,11 +175,8 @@ export default function RutaDelDiaPage() {
                         <div style={{ flex: "1 1 160px" }}>
                           <div style={{ fontWeight: 600, fontSize: "0.9375rem" }}>{emp.nombre}</div>
                           <div style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginTop: "0.2rem" }}>
-                            Base del trabajador:{" "}
+                            Caja del trabajador:{" "}
                             <strong style={{ color: "var(--text)" }}>{formatMonto(emp.baseTrabajador)}</strong>
-                            {emp.jornadaActivaEnRuta ? (
-                              <span style={{ marginLeft: "0.35rem" }}>· Jornada activa</span>
-                            ) : null}
                           </div>
                         </div>
                         <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "0.5rem" }}>
@@ -204,7 +200,7 @@ export default function RutaDelDiaPage() {
                             disabled={busy || r.cajaRuta <= 0}
                             onClick={() => handleAsignarBase(r.id, emp.uid)}
                           >
-                            {busy ? "Asignando…" : "Asignar a la base del trabajador"}
+                            {busy ? "Asignando…" : "Asignar a la caja del trabajador"}
                           </button>
                         </div>
                       </div>

@@ -1,6 +1,6 @@
 /**
- * Efecto contable de un gasto operativo pagado desde la base del empleado (jornada).
- * Una sola fuente de verdad para cliente (jornadaService) y API (jornada-gasto-admin).
+ * Efecto contable de un gasto operativo pagado desde la caja del empleado (`cajaEmpleado`).
+ * Usado por la API de gastos del trabajador (Admin SDK).
  */
 
 import { computeCapitalTotalRutaDesdeSaldos } from "@/lib/capital-formulas";
@@ -29,7 +29,7 @@ export function assertCapitalRutaConsistente(params: {
 }
 
 /**
- * Descuenta efectivo del empleado y de `cajasEmpleados` de la ruta; sube gastos del día y acumulado de gastos en ruta.
+ * Descuenta efectivo del empleado y de `cajasEmpleados` de la ruta; recalcula capitalTotal de la ruta.
  */
 export function computeCamposTrasGastoOperativoEmpleado(p: {
   monto: number;

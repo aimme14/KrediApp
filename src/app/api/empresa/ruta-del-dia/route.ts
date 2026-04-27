@@ -4,7 +4,6 @@ import { getAdminFirestore } from "@/lib/firebase-admin";
 import { getApiUser } from "@/lib/api-auth";
 import {
   EMPRESAS_COLLECTION,
-  JORNADAS_SUBCOLLECTION,
   RUTAS_SUBCOLLECTION,
   USUARIOS_SUBCOLLECTION,
   USERS_COLLECTION,
@@ -67,26 +66,6 @@ export async function GET(_request: NextRequest) {
     .where("adminId", "==", apiUser.uid)
     .get();
 
-  const jornadasSnap = await db
-    .collection(EMPRESAS_COLLECTION)
-    .doc(empresaId)
-    .collection(JORNADAS_SUBCOLLECTION)
-    .where("estado", "==", "activa")
-    .get();
-
-  const jornadaPorEmpleado = new Map<
-    string,
-    { rutaId: string; cajaActual: number }
-  >();
-  for (const d of jornadasSnap.docs) {
-    const data = d.data() as Record<string, unknown>;
-    const empId = typeof data.empleadoId === "string" ? data.empleadoId : "";
-    if (!empId) continue;
-    const rutaId = typeof data.rutaId === "string" ? data.rutaId : "";
-    const cajaActual = typeof data.cajaActual === "number" ? data.cajaActual : 0;
-    jornadaPorEmpleado.set(empId, { rutaId, cajaActual });
-  }
-
   const rutas = await Promise.all(
     rutasSnap.docs.map(async (d) => {
       const data = d.data() as Record<string, unknown>;
@@ -97,24 +76,16 @@ export async function GET(_request: NextRequest) {
 
       const empleados = await Promise.all(
         empleadoUids.map(async (uid) => {
-          const j = jornadaPorEmpleado.get(uid);
-          const enJornadaEstaRuta = j && j.rutaId === d.id;
-
-          let baseTrabajador = 0;
-          if (enJornadaEstaRuta) {
-            baseTrabajador = round2(j!.cajaActual);
-          } else {
-            const uSnap = await db
-              .collection(EMPRESAS_COLLECTION)
-              .doc(empresaId)
-              .collection(USUARIOS_SUBCOLLECTION)
-              .doc(uid)
-              .get();
-            const ud = uSnap.data() as Record<string, unknown> | undefined;
-            baseTrabajador = round2(
-              ud && typeof ud.cajaEmpleado === "number" ? ud.cajaEmpleado : 0
-            );
-          }
+          const uSnap = await db
+            .collection(EMPRESAS_COLLECTION)
+            .doc(empresaId)
+            .collection(USUARIOS_SUBCOLLECTION)
+            .doc(uid)
+            .get();
+          const ud = uSnap.data() as Record<string, unknown> | undefined;
+          const baseTrabajador = round2(
+            ud && typeof ud.cajaEmpleado === "number" ? ud.cajaEmpleado : 0
+          );
 
           const authSnap = await db.collection(USERS_COLLECTION).doc(uid).get();
           const nombre =
@@ -125,7 +96,6 @@ export async function GET(_request: NextRequest) {
             uid,
             nombre,
             baseTrabajador,
-            jornadaActivaEnRuta: Boolean(enJornadaEstaRuta),
           };
         })
       );

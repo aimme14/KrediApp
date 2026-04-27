@@ -1,7 +1,7 @@
 import type { Timestamp } from "firebase/firestore";
 
 /**
- * Tipos financieros de nivel empresa/jefe, admin, ruta/jornada/cobros.
+ * Tipos financieros de nivel empresa/jefe, admin, ruta y cobros.
  * Se guardan en Firestore bajo /empresas/{empresaId} (o jefeUid para capital empresa).
  */
 
@@ -87,59 +87,6 @@ export interface RutaFinanciera {
 
   /** false = admin cerró la ruta; trabajadores no deben operar hasta reapertura. */
   rutaOperativa?: boolean;
-}
-
-// ── Jornada ───────────────────────────
-export type EstadoJornada = "activa" | "cerrada";
-
-export interface Jornada {
-  id: string;
-  rutaId: string;
-  empleadoId: string;
-  empleadoNombre: string;
-  fecha: Timestamp;
-  estado: EstadoJornada;
-
-  // Caja del empleado durante la jornada
-  entregaInicial: number;
-  cobrosDelDia: number;
-  gastosDelDia: number;
-  cajaActual: number; // entregaInicial + cobrosDelDia − gastosDelDia
-  devueltoAlCierre: number;
-
-  // Resumen de gestión
-  clientesVisitados: number;
-  clientesCobrados: number;
-  clientesNoPagaron: number;
-}
-
-// ── Movimiento ────────────────────────
-export type TipoMovimiento =
-  | "entrega_inicial"
-  | "cobro_cuota"
-  | "gasto"
-  | "cierre"
-  | "asignacion_admin";
-
-export type CategoriaGastoMovimiento = "transporte" | "alimentacion" | "otro";
-
-export interface Movimiento {
-  id: string;
-  tipo: TipoMovimiento;
-  monto: number;
-  descripcion: string;
-  fecha: Timestamp;
-
-  // Solo si tipo == "cobro_cuota"
-  prestamoId?: string;
-  cuotaId?: string;
-  clienteId?: string;
-  clienteNombre?: string;
-  cuotaCapital?: number;
-  cuotaGanancia?: number;
-
-  // Solo si tipo == "gasto"
-  categoriaGasto?: CategoriaGastoMovimiento;
 }
 
 // ── Estados y tipos de cuota / cobros ─

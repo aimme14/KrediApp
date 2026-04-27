@@ -16,7 +16,7 @@ export type RutaItem = {
   codigo?: string;
   /** Efectivo operable en la ruta (base para prestar / mover). */
   cajaRuta?: number;
-  /** Efectivo asignado a empleados en jornada. */
+  /** Efectivo asignado a empleados (cajas de trabajadores en ruta). */
   cajasEmpleados?: number;
   /** Capital colocado en préstamos (inversión). */
   inversiones?: number;
@@ -153,7 +153,6 @@ export type RutaDelDiaEmpleadoItem = {
   uid: string;
   nombre: string;
   baseTrabajador: number;
-  jornadaActivaEnRuta: boolean;
 };
 
 export type RutaDelDiaItem = {
@@ -172,7 +171,7 @@ export async function getRutaDelDia(token: string): Promise<RutaDelDiaItem[]> {
   return data.rutas ?? [];
 }
 
-/** Pasa efectivo de la base de la ruta a la base del trabajador (misma lógica que entrega en jornada). */
+/** Pasa efectivo de la base de la ruta a la caja del trabajador (`cajaEmpleado`). */
 export async function asignarBaseEmpleadoDesdeRuta(
   token: string,
   rutaId: string,
@@ -208,11 +207,35 @@ export async function patchRutaOperativa(
   if (!res.ok) throw new Error(data.error ?? "Error al actualizar la ruta");
 }
 
-/** Trabajador: pasa todo el efectivo de su base/jornada a la base de la ruta. */
-export async function entregarReporteDia(
+export type SolicitudEntregaReporteApi = {
+  id: string;
+  empleadoUid: string;
+  empleadoNombre: string;
+  rutaId: string;
+  rutaNombre: string;
+  adminId: string;
+  estado: string;
+  comentarioTrabajador: string | null;
+  montoAlSolicitar: number;
+  creadaEn: string | null;
+  resueltaEn: string | null;
+  resueltaPorUid: string | null;
+  motivoRechazo: string | null;
+  montoEntregadoEfectivo: number | null;
+};
+
+/**
+ * Trabajador: solicita entregar el reporte (el admin debe aprobar para que el efectivo pase a la base de la ruta).
+ */
+export async function solicitarEntregaReporteDia(
   token: string,
   options?: { comentario?: string }
-): Promise<{ monto: number; rutaId: string }> {
+): Promise<{
+  solicitudId: string;
+  montoAlSolicitar: number;
+  rutaId: string;
+  mensaje: string;
+}> {
   const body: Record<string, string> = {};
   if (options?.comentario !== undefined) {
     body.comentario = options.comentario;
@@ -222,8 +245,167 @@ export async function entregarReporteDia(
     body: JSON.stringify(body),
   });
   const data = await res.json();
-  if (!res.ok) throw new Error(data.error ?? "Error al entregar reporte");
-  return { monto: data.monto ?? 0, rutaId: data.rutaId ?? "" };
+  if (!res.ok) throw new Error(data.error ?? "Error al solicitar entrega de reporte");
+  return {
+    solicitudId: data.solicitudId ?? "",
+    montoAlSolicitar: typeof data.montoAlSolicitar === "number" ? data.montoAlSolicitar : 0,
+    rutaId: data.rutaId ?? "",
+    mensaje: typeof data.mensaje === "string" ? data.mensaje : "",
+  };
+}
+
+export async function getMiSolicitudEntregaReporte(token: string): Promise<{
+  pendiente: SolicitudEntregaReporteApi | null;
+  ultimaRechazada: SolicitudEntregaReporteApi | null;
+}> {
+  const res = await fetchWithAuth("/api/empresa/empleado/mi-solicitud-reporte", token);
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error ?? "Error al cargar solicitud");
+  return {
+    pendiente: data.pendiente ?? null,
+    ultimaRechazada: data.ultimaRechazada ?? null,
+  };
+}
+
+export type SolicitudEntregaPendienteAdmin = {
+  id: string;
+  empleadoUid: string;
+  empleadoNombre: string;
+  rutaId: string;
+  rutaNombre: string;
+  estado: string;
+  comentarioTrabajador: string | null;
+  montoAlSolicitar: number;
+  creadaEn: string | null;
+};
+
+export async function getSolicitudesEntregaReportePendientes(
+  token: string
+): Promise<SolicitudEntregaPendienteAdmin[]> {
+  const res = await fetchWithAuth("/api/empresa/solicitudes-entrega-reporte", token);
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error ?? "Error al cargar solicitudes");
+  return Array.isArray(data.solicitudes) ? data.solicitudes : [];
+}
+
+export async function aprobarSolicitudEntregaReporte(
+  token: string,
+  solicitudId: string
+): Promise<{ monto: number; rutaId: string; reporteDiaId: string }> {
+  const res = await fetchWithAuth(
+    `/api/empresa/solicitudes-entrega-reporte/${encodeURIComponent(solicitudId)}/aprobar`,
+    token,
+    { method: "POST", body: "{}" }
+  );
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error ?? "Error al aprobar");
+  return {
+    monto: typeof data.monto === "number" ? data.monto : 0,
+    rutaId: data.rutaId ?? "",
+    reporteDiaId: data.reporteDiaId ?? "",
+  };
+}
+
+export async function rechazarSolicitudEntregaReporte(
+  token: string,
+  solicitudId: string,
+  options?: { motivo?: string }
+): Promise<void> {
+  const res = await fetchWithAuth(
+    `/api/empresa/solicitudes-entrega-reporte/${encodeURIComponent(solicitudId)}/rechazar`,
+    token,
+    {
+      method: "POST",
+      body: JSON.stringify({ motivo: options?.motivo ?? "" }),
+    }
+  );
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error ?? "Error al rechazar");
+}
+
+export type CobroDiaItem = {
+  pagoId: string;
+  prestamoId: string;
+  clienteId: string;
+  clienteNombre: string;
+  monto: number;
+  metodoPago: string | null;
+  fecha: string | null;
+  saldoPendienteTrasPago: number;
+  saldoPendientePrestamoActual: number;
+};
+
+export type GastoDiaItem = {
+  id: string;
+  monto: number;
+  descripcion: string;
+  fecha: string | null;
+};
+
+export type CobrosDelDiaEmpleadoResponse = {
+  fechaDia: string;
+  rutaId: string;
+  cobros: CobroDiaItem[];
+  totalCobrosLista: number;
+  totalGastosDia: number;
+  /** Suma de traspasos ruta→empleado registrados ese día (Colombia); auditoría. */
+  totalBaseAsignadaDia: number;
+  /** `cajaEmpleado` + cobros del día − gastos del día (misma respuesta). */
+  cajaTotalDelDia: number;
+  gastosDelDia: GastoDiaItem[];
+  /** Saldo operativo (`usuarios.cajaEmpleado`). */
+  cajaEmpleado: number;
+  cajaDelDia: {
+    cobrosDelDia: number;
+    gastosDelDia: number;
+    totalBaseAsignadaDia: number;
+    cajaTotalDelDia: number;
+    cajaEsperadaDelDia: number;
+  };
+};
+
+export async function getCobrosDelDiaEmpleado(
+  token: string,
+  fecha?: string
+): Promise<CobrosDelDiaEmpleadoResponse> {
+  const qs = fecha ? `?fecha=${encodeURIComponent(fecha)}` : "";
+  const res = await fetchWithAuth(`/api/empresa/empleado/cobros-del-dia${qs}`, token);
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error ?? "Error al cargar cobros del día");
+  const totalBaseAsignadaDia =
+    typeof data.totalBaseAsignadaDia === "number" ? data.totalBaseAsignadaDia : 0;
+  const cajaTotalDelDia =
+    typeof data.cajaTotalDelDia === "number"
+      ? data.cajaTotalDelDia
+      : typeof data?.cajaDelDia?.cajaTotalDelDia === "number"
+        ? data.cajaDelDia.cajaTotalDelDia
+        : 0;
+
+  return {
+    fechaDia: data.fechaDia ?? "",
+    rutaId: data.rutaId ?? "",
+    cobros: Array.isArray(data.cobros) ? data.cobros : [],
+    totalCobrosLista: typeof data.totalCobrosLista === "number" ? data.totalCobrosLista : 0,
+    totalGastosDia: typeof data.totalGastosDia === "number" ? data.totalGastosDia : 0,
+    totalBaseAsignadaDia,
+    cajaTotalDelDia,
+    gastosDelDia: Array.isArray(data.gastosDelDia) ? data.gastosDelDia : [],
+    cajaEmpleado: typeof data.cajaEmpleado === "number" ? data.cajaEmpleado : 0,
+    cajaDelDia: {
+      cobrosDelDia: typeof data?.cajaDelDia?.cobrosDelDia === "number" ? data.cajaDelDia.cobrosDelDia : 0,
+      gastosDelDia: typeof data?.cajaDelDia?.gastosDelDia === "number" ? data.cajaDelDia.gastosDelDia : 0,
+      totalBaseAsignadaDia:
+        typeof data?.cajaDelDia?.totalBaseAsignadaDia === "number"
+          ? data.cajaDelDia.totalBaseAsignadaDia
+          : totalBaseAsignadaDia,
+      cajaTotalDelDia:
+        typeof data?.cajaDelDia?.cajaTotalDelDia === "number"
+          ? data.cajaDelDia.cajaTotalDelDia
+          : cajaTotalDelDia,
+      cajaEsperadaDelDia:
+        typeof data?.cajaDelDia?.cajaEsperadaDelDia === "number" ? data.cajaDelDia.cajaEsperadaDelDia : 0,
+    },
+  };
 }
 
 export type ReporteDiaItem = {

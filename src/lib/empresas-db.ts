@@ -20,14 +20,15 @@ export const GASTOS_ADMIN_SUBCOLLECTION = "gastosAdministrador";
 /** Gastos del empleado/trabajador. empresas/{empresaId}/gastosEmpleado/{gastoId} */
 export const GASTOS_EMPLEADO_SUBCOLLECTION = "gastosEmpleado";
 
+/** Traspaso admin: base ruta → caja empleado. empresas/{empresaId}/usuarios/{uid}/asignacionesBase/{id} */
+export const ASIGNACIONES_BASE_EMPLEADO_SUBCOLLECTION = "asignacionesBase";
+
 /** Entregas de reporte del día (trabajador → base ruta). empresas/{empresaId}/reportesDia/{id} */
 export const REPORTES_DIA_SUBCOLLECTION = "reportesDia";
 
-/** Jornadas de cobro. empresas/{empresaId}/jornadas/{jornadaId} */
-export const JORNADAS_SUBCOLLECTION = "jornadas";
+/** Solicitud de entrega de reporte (pendiente → admin aprueba/rechaza). empresas/{empresaId}/solicitudesEntregaReporte/{id} */
+export const SOLICITUDES_ENTREGA_REPORTE_SUBCOLLECTION = "solicitudesEntregaReporte";
 
-/** Movimientos dentro de una jornada. empresas/.../jornadas/{id}/movimientos/{movId} */
-export const MOVIMIENTOS_SUBCOLLECTION = "movimientos";
 /** Colección empresas/{jefeUid}/capital — documentos por capa (cajaEmpresa, cajaAdmin, cajaEmpleado) y rama para rutas. */
 export const CAPITAL_SUBCOLLECTION = "capital";
 

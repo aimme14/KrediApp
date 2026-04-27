@@ -70,6 +70,10 @@ button {
   font: inherit;
 }
 
+[data-theme="dark"] .caja-del-dia-fecha {
+  color-scheme: dark;
+}
+
 button {
   cursor: pointer;
 }
@@ -1571,6 +1575,207 @@ th {
 
 .dashboard-settings-item-danger:hover {
   background: rgba(220, 38, 38, 0.12);
+}
+
+/* Notificaciones del dashboard: campana + panel */
+.dashboard-notifications {
+  position: relative;
+}
+
+.dashboard-notifications-trigger {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  background: var(--btn-secondary-bg);
+  color: var(--text);
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.dashboard-notifications-trigger:hover {
+  background: var(--btn-secondary-hover);
+}
+
+.dashboard-notifications-trigger:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--link);
+}
+
+.dashboard-notifications-trigger svg {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.dashboard-notifications-badge {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  min-width: 1.125rem;
+  height: 1.125rem;
+  padding: 0 0.28rem;
+  border-radius: 999px;
+  background: #dc2626;
+  color: #fff;
+  font-size: 0.65rem;
+  font-weight: 700;
+  line-height: 1.125rem;
+  text-align: center;
+  box-shadow: 0 0 0 2px var(--bg);
+}
+
+.dashboard-header .dashboard-notifications .dashboard-notifications-trigger {
+  width: 36px;
+  height: 36px;
+}
+
+.dashboard-header .dashboard-notifications .dashboard-notifications-trigger svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.dashboard-notifications-panel {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 0.5rem;
+  width: min(360px, calc(100vw - 2rem));
+  max-height: min(420px, 70vh);
+  overflow-y: auto;
+  padding: 0.75rem 0;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 12px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+  z-index: 60;
+}
+
+.dashboard-notifications-panel-title {
+  padding: 0 1rem 0.65rem;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--card-border);
+  margin-bottom: 0.65rem;
+}
+
+.dashboard-notifications-alert {
+  margin: 0 0.75rem 0.65rem;
+  padding: 0.75rem 0.85rem;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  font-size: 0.875rem;
+  line-height: 1.45;
+}
+
+.dashboard-notifications-alert strong {
+  display: block;
+  margin-bottom: 0.35rem;
+  font-size: 0.9375rem;
+}
+
+.dashboard-notifications-alert-text {
+  margin: 0 0 0.5rem;
+  color: var(--text);
+  opacity: 0.95;
+}
+
+.dashboard-notifications-alert-warning {
+  background: rgba(234, 179, 8, 0.12);
+  border-color: rgba(234, 179, 8, 0.45);
+}
+
+.dashboard-notifications-alert-danger {
+  background: rgba(220, 38, 38, 0.1);
+  border-color: rgba(220, 38, 38, 0.35);
+}
+
+.dashboard-notifications-alert-danger .dashboard-notifications-alert-text {
+  color: var(--text);
+}
+
+.dashboard-notifications-alert-info {
+  background: rgba(167, 139, 250, 0.1);
+  border-color: rgba(167, 139, 250, 0.35);
+}
+
+.dashboard-notifications-link {
+  display: inline-block;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--link);
+  text-decoration: underline;
+}
+
+.dashboard-notifications-link:hover {
+  opacity: 0.9;
+}
+
+.dashboard-notifications-empty {
+  margin: 0.25rem 1rem 0.5rem;
+  font-size: 0.875rem;
+  color: var(--text-muted);
+}
+
+/* Detalle de admin: todo dentro del mismo aviso (no otra “tarjeta”) */
+.dashboard-notifications-admin-inner {
+  margin: 0.5rem 0 0.75rem;
+  padding: 0.5rem 0 0;
+  border-top: 1px solid rgba(167, 139, 250, 0.25);
+}
+
+.dashboard-notifications-admin-item {
+  display: block;
+  padding: 0.5rem 0 0.6rem;
+}
+
+.dashboard-notifications-admin-item-divider {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  margin-top: 0.45rem;
+  padding-top: 0.6rem;
+}
+
+[data-theme="light"] .dashboard-notifications-admin-item-divider {
+  border-top-color: rgba(0, 0, 0, 0.08);
+}
+
+.dashboard-notifications-admin-label {
+  display: block;
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  margin-bottom: 0.2rem;
+}
+
+.dashboard-notifications-admin-name {
+  display: block;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.3;
+}
+
+.dashboard-notifications-admin-meta {
+  display: block;
+  margin-top: 0.2rem;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.dashboard-notifications-admin-extra {
+  margin: 0 0 0.65rem;
+  font-size: 0.78rem;
+  color: var(--text-muted);
 }
 
 /* Panel Jefe: menú hamburguesa y drawer móvil */
@@ -5056,7 +5261,7 @@ th {
   }
 }
 
-/* ── Registrar gasto (jornada) ────────────────────────────────────────────── */
+/* ── Registrar gasto (trabajador) ───────────────────────────────────────────── */
 .registrar-gasto-card { max-width: 420px; margin: 0 auto; }
 .registrar-gasto-header { margin-bottom: 1.25rem; }
 .registrar-gasto-back {
@@ -5067,7 +5272,6 @@ th {
 }
 .registrar-gasto-title { margin: 0 0 0.25rem 0; font-size: 1.35rem; }
 .registrar-gasto-saldo { margin: 0; font-size: 0.875rem; color: var(--text-muted); }
-.registrar-gasto-sin-jornada { margin-bottom: 1rem; }
 .registrar-gasto-form .form-group { margin-bottom: 1rem; }
 .registrar-gasto-input, .registrar-gasto-select { width: 100%; padding: 0.5rem 0.75rem; border-radius: 6px; border: 1px solid var(--input-border); background: var(--input-bg); color: var(--text); }
 .registrar-gasto-actions { display: flex; gap: 0.75rem; margin-top: 1rem; flex-wrap: wrap; }

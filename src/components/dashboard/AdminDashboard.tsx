@@ -151,12 +151,12 @@ export default function AdminDashboard() {
               />
             </div>
             <div className="form-group">
-              <label>Base</label>
+              <label>Caja (referencia)</label>
               <input
                 type="text"
                 value={base}
                 onChange={(e) => setBase(e.target.value)}
-                placeholder="Base asignada"
+                placeholder="Ej. monto o nota de caja inicial"
               />
             </div>
             <div className="form-group">
@@ -201,7 +201,7 @@ export default function AdminDashboard() {
                 <th>Ubicación</th>
                 <th>Teléfono</th>
                 <th>Cédula</th>
-                <th>Base</th>
+                <th>Caja (ref.)</th>
               </tr>
             </thead>
             <tbody>

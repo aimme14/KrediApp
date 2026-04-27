@@ -8,7 +8,6 @@ import {
   PAGOS_SUBCOLLECTION,
   CLIENTES_SUBCOLLECTION,
   RUTAS_SUBCOLLECTION,
-  JORNADAS_SUBCOLLECTION,
   USUARIOS_SUBCOLLECTION,
 } from "@/lib/empresas-db";
 import {
@@ -16,7 +15,6 @@ import {
   computeRutaCamposTrasPerdidaPrestamo,
   splitMontoPagoEnCapitalYGanancia,
 } from "@/lib/ruta-financiera-admin";
-import { getJornadaActivaEmpleado } from "@/lib/jornada-gasto-admin";
 import { upsertCapitalRutaSnapshot } from "@/lib/capital-ruta-snapshot";
 import { recordCreditMovement } from "@/lib/financial-ledger";
 import {
@@ -179,13 +177,6 @@ export async function POST(
       typeof data.empleadoId === "string" && data.empleadoId.trim()
         ? data.empleadoId.trim()
         : apiUser.uid;
-    const rutaIdPrestamoNoPago =
-      typeof data.rutaId === "string" ? data.rutaId.trim() : "";
-    const preJornadaNoPago =
-      rutaIdPrestamoNoPago && empUidNoPago
-        ? await getJornadaActivaEmpleado(db, apiUser.empresaId, empUidNoPago)
-        : null;
-
     try {
       await db.runTransaction(async (tx) => {
         const prSnap = await tx.get(prestamoRef);
@@ -195,22 +186,6 @@ export async function POST(
         const pr = prSnap.data()!;
         const rutaIdPr =
           typeof pr.rutaId === "string" ? pr.rutaId.trim() : "";
-
-        const jRef =
-          preJornadaNoPago &&
-          preJornadaNoPago.rutaId === rutaIdPr &&
-          rutaIdPr
-            ? db
-                .collection(EMPRESAS_COLLECTION)
-                .doc(apiUser.empresaId)
-                .collection(JORNADAS_SUBCOLLECTION)
-                .doc(preJornadaNoPago.jornadaId)
-            : null;
-
-        let jSnap: FirebaseFirestore.DocumentSnapshot | null = null;
-        if (jRef) {
-          jSnap = await tx.get(jRef);
-        }
 
         const pagoRef = prestamoRef.collection(PAGOS_SUBCOLLECTION).doc();
         tx.set(pagoRef, {
@@ -236,24 +211,6 @@ export async function POST(
           estado: pasarAMora ? "mora" : "activo",
           updatedAt: now,
         });
-
-        const jd = jSnap?.data() as Record<string, unknown> | undefined;
-        if (
-          jRef &&
-          jSnap?.exists &&
-          jd &&
-          jd.estado === "activa" &&
-          (jd.rutaId as string) === rutaIdPr
-        ) {
-          const noPag =
-            typeof jd.clientesNoPagaron === "number" ? jd.clientesNoPagaron : 0;
-          const visit =
-            typeof jd.clientesVisitados === "number" ? jd.clientesVisitados : 0;
-          tx.update(jRef, {
-            clientesNoPagaron: noPag + 1,
-            clientesVisitados: visit + 1,
-          });
-        }
       });
     } catch (e) {
       const msg = e instanceof Error ? e.message : "";
@@ -443,10 +400,6 @@ export async function POST(
     prestamoPreRead.exists && typeof prestamoPreRead.data()?.rutaId === "string"
       ? (prestamoPreRead.data()!.rutaId as string).trim()
       : "";
-  const preJornadaCobro =
-    rutaIdPreRead && typeof monto === "number" && monto > 0
-      ? await getJornadaActivaEmpleado(db, apiUser.empresaId, empleadoTitularCobro)
-      : null;
   const keyTrimmed = typeof idempotencyKey === "string" ? idempotencyKey.trim() : "";
 
   try {
@@ -508,15 +461,6 @@ export async function POST(
         .collection(USUARIOS_SUBCOLLECTION)
         .doc(empUid);
 
-      const jRef =
-        preJornadaCobro && preJornadaCobro.rutaId === rutaIdPrestamo
-          ? db
-              .collection(EMPRESAS_COLLECTION)
-              .doc(apiUser.empresaId)
-              .collection(JORNADAS_SUBCOLLECTION)
-              .doc(preJornadaCobro.jornadaId)
-          : null;
-
       const rutaRef =
         rutaIdPrestamo && montoAplicar > 0
           ? db
@@ -528,31 +472,16 @@ export async function POST(
 
       // Firestore: todas las lecturas (tx.get) antes de cualquier escritura
       let rutaSnap: FirebaseFirestore.DocumentSnapshot | null = null;
-      let jSnap: FirebaseFirestore.DocumentSnapshot | null = null;
       let uSnap: FirebaseFirestore.DocumentSnapshot | null = null;
-        let walletBalanceAfter: number | undefined;
+      let walletBalanceAfter: number | undefined;
 
       if (rutaRef) {
         rutaSnap = await tx.get(rutaRef);
         if (!rutaSnap.exists) {
           throw new Error("RUTA_NOT_FOUND");
         }
-        if (jRef) {
-          jSnap = await tx.get(jRef);
-          const jd = jSnap.data() as Record<string, unknown> | undefined;
-          const jornadaActivaEnRuta =
-            jSnap.exists &&
-            jd &&
-            jd.estado === "activa" &&
-            (jd.rutaId as string) === rutaIdPrestamo;
-          if (!jornadaActivaEnRuta) {
-            uSnap = await tx.get(usuarioEmpRef);
-            if (!uSnap.exists) throw new Error("EMPLEADO_USUARIO_NOT_FOUND");
-          }
-        } else {
-          uSnap = await tx.get(usuarioEmpRef);
-          if (!uSnap.exists) throw new Error("EMPLEADO_USUARIO_NOT_FOUND");
-        }
+        uSnap = await tx.get(usuarioEmpRef);
+        if (!uSnap.exists) throw new Error("EMPLEADO_USUARIO_NOT_FOUND");
       }
 
       tx.set(pagoRef, pagoData);
@@ -579,34 +508,7 @@ export async function POST(
           ultimaActualizacion: nowTx,
         });
 
-        if (jRef && jSnap) {
-          const jd = jSnap.data() as Record<string, unknown> | undefined;
-          if (
-            jSnap.exists &&
-            jd &&
-            jd.estado === "activa" &&
-            (jd.rutaId as string) === rutaIdPrestamo
-          ) {
-            const cajaA = typeof jd.cajaActual === "number" ? jd.cajaActual : 0;
-            const cobrosDelDia = typeof jd.cobrosDelDia === "number" ? jd.cobrosDelDia : 0;
-            const clientesCobrados = typeof jd.clientesCobrados === "number" ? jd.clientesCobrados : 0;
-            const m = Math.round(montoAcreditarCajaEmpleado * 100) / 100;
-            walletBalanceAfter = Math.round((cajaA + m) * 100) / 100;
-            tx.update(jRef, {
-              cajaActual: walletBalanceAfter,
-              cobrosDelDia: Math.round((cobrosDelDia + m) * 100) / 100,
-              clientesCobrados: clientesCobrados + 1,
-            });
-          } else if (uSnap?.exists) {
-            const ud = uSnap.data() as Record<string, unknown>;
-            const cEmp = typeof ud.cajaEmpleado === "number" ? ud.cajaEmpleado : 0;
-            walletBalanceAfter = Math.round((cEmp + montoAcreditarCajaEmpleado) * 100) / 100;
-            tx.update(usuarioEmpRef, {
-              cajaEmpleado: walletBalanceAfter,
-              ultimaActualizacionCapital: nowTx,
-            });
-          }
-        } else if (uSnap?.exists) {
+        if (uSnap?.exists) {
           const ud = uSnap.data() as Record<string, unknown>;
           const cEmp = typeof ud.cajaEmpleado === "number" ? ud.cajaEmpleado : 0;
           walletBalanceAfter = Math.round((cEmp + montoAcreditarCajaEmpleado) * 100) / 100;

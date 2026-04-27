@@ -5,6 +5,7 @@ import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { roleLabel } from "@/types/roles";
+import DashboardNotifications from "@/components/DashboardNotifications";
 import DashboardSettings from "@/components/DashboardSettings";
 import InactivityLock from "@/components/InactivityLock";
 import { DashboardHeaderProvider } from "@/context/DashboardHeaderContext";
@@ -110,6 +111,7 @@ export default function DashboardLayout({
               </span>
             </div>
             <div className="header-right">
+              <DashboardNotifications />
               <DashboardSettings />
             </div>
           </header>

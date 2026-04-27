@@ -10,7 +10,8 @@ import { TrabajadorListaProvider } from "@/context/TrabajadorListaContext";
 const NAV_ITEMS = [
   { href: "/dashboard/trabajador", label: "Inicio", icon: "home" },
   { href: "/dashboard/trabajador/ruta", label: "Ruta del día", icon: "route" },
-  { href: "/dashboard/trabajador/resumen", label: "Resumen del día", icon: "chart" },
+  { href: "/dashboard/trabajador/caja-del-dia", label: "Caja del día", icon: "wallet" },
+  { href: "/dashboard/trabajador/resumen", label: "Entrega de reporte", icon: "chart" },
   { href: "/dashboard/trabajador/cliente", label: "Cliente", icon: "client" },
   { href: "/dashboard/trabajador/prestamo", label: "Prestamos", icon: "loan" },
   { href: "/dashboard/trabajador/simulacro", label: "Simulador de Crédito", icon: "calc" },
@@ -22,7 +23,7 @@ const NAV_ITEMS = [
 const BOTTOM_NAV_ITEMS = [
   { href: "/dashboard/trabajador", label: "Inicio", icon: "home" },
   { href: "/dashboard/trabajador/ruta", label: "Ruta", icon: "route" },
-  { href: "/dashboard/trabajador/resumen", label: "Resumen", icon: "chart" },
+  { href: "/dashboard/trabajador/resumen", label: "Entrega", icon: "chart" },
   { type: "menu" as const, label: "Más", icon: "menu" },
 ];
 
@@ -47,6 +48,14 @@ function NavIcon({ name }: { name: string }) {
       return (
         <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
           <line x1="18" y1="20" x2="18" y2="10" /><line x1="12" y1="20" x2="12" y2="4" /><line x1="6" y1="20" x2="6" y2="14" />
+        </svg>
+      );
+    case "wallet":
+      return (
+        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+          <path d="M21 9V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-2" />
+          <path d="M21 9h-6a2 2 0 0 0 0 4h6" />
+          <circle cx="16" cy="11" r="1" />
         </svg>
       );
     case "client":
@@ -95,7 +104,7 @@ function NavIcon({ name }: { name: string }) {
 
 /** Bloquea la operación si el admin cerró la ruta (`rutaOperativa === false`). Una sola suscripción en el provider. */
 function RutaOperativaGate({ children }: { children: React.ReactNode }) {
-  const { puedeOperar, loading, ruta } = useTrabajadorRuta();
+  const { puedeOperar, loading } = useTrabajadorRuta();
 
   if (loading || puedeOperar) {
     return <>{children}</>;
@@ -104,11 +113,7 @@ function RutaOperativaGate({ children }: { children: React.ReactNode }) {
   return (
     <div className="container" style={{ paddingTop: "2rem", maxWidth: "420px" }}>
       <div className="card ruta-operativa-cerrada-card">
-        <h2 className="ruta-operativa-cerrada-title">Ruta no disponible</h2>
-        <p className="ruta-operativa-cerrada-text">
-          Tu ruta <strong>{ruta?.nombre ? `«${ruta.nombre}»` : ""}</strong> está cerrada por el administrador.
-          No puedes registrar cobros ni operaciones de ruta hasta que la abran de nuevo.
-        </p>
+        <h2 className="ruta-operativa-cerrada-title">Ruta no disponible.</h2>
         <p className="ruta-operativa-cerrada-hint">
           Si necesitas trabajar ya, contacta al administrador para que habilite la operación del día.
         </p>
@@ -121,6 +126,7 @@ function RutaOperativaGate({ children }: { children: React.ReactNode }) {
 const PREFETCH_TRABAJADOR_HREFS = [
   "/dashboard/trabajador",
   "/dashboard/trabajador/ruta",
+  "/dashboard/trabajador/caja-del-dia",
   "/dashboard/trabajador/resumen",
   "/dashboard/trabajador/cliente",
   "/dashboard/trabajador/prestamo",

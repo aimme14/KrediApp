@@ -467,9 +467,9 @@ export default function PrestamoTrabajadorPage() {
               <li>Cuota por pago: <strong>{formatMoneda(cuotaPorPago)}</strong></li>
             </ul>
             <p style={{ margin: "0.75rem 0 0", fontSize: "0.8rem", color: "var(--text-muted)", lineHeight: 1.5 }}>
-              Al crear el préstamo, el monto a prestar sale de tu base y pasa a inversiones de la ruta.
-              Al cobrar, lo que corresponde a capital vuelve a tu base desde inversiones; el interés
-              suma a tu base como ganancia (no sale de inversiones).
+              Al crear el préstamo, el monto a prestar sale de tu caja y pasa a inversiones de la ruta.
+              Al cobrar, lo que corresponde a capital vuelve a tu caja desde inversiones; el interés
+              suma a tu caja como ganancia (no sale de inversiones).
             </p>
           </div>
         )}

@@ -1,6 +1,5 @@
 /**
  * Caja del empleado (trabajador) en empresas/{empresaId}/usuarios/{empleadoUid}.cajaEmpleado
- * Uso cuando no hay jornada activa; con jornada, el saldo operativo sigue jornada.cajaActual.
  */
 
 import type { Firestore } from "firebase-admin/firestore";

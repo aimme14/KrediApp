@@ -9,7 +9,7 @@ function roundMoney(n: number): number {
 
 /**
  * Patrimonio de ruta: base ruta + bases empleados + capital colocado en préstamos − pérdidas reconocidas.
- * La ganancia por intereses queda en la caja del trabajador (cajasEmpleados / caja jornada), no se suma aparte.
+ * La ganancia por intereses queda en la caja del trabajador (cajasEmpleados), no se suma aparte.
  */
 export function computeCapitalTotalRutaDesdeSaldos(r: {
   cajaRuta: number;

@@ -1,20 +1,17 @@
 /**
- * Pasa efectivo de cajaRuta (base de la ruta) a la base operativa del trabajador:
- * jornada activa en esa ruta → cajaActual + entregaInicial; si no → cajaEmpleado en usuarios.
+ * Pasa efectivo de cajaRuta (base de la ruta) a la caja del trabajador (`cajaEmpleado`).
  * capitalTotal no cambia (solo reparte entre cajaRuta y cajasEmpleados).
  */
 
-import type { DocumentReference, Firestore } from "firebase-admin/firestore";
+import type { Firestore } from "firebase-admin/firestore";
 import { Timestamp } from "firebase-admin/firestore";
 import {
+  ASIGNACIONES_BASE_EMPLEADO_SUBCOLLECTION,
   EMPRESAS_COLLECTION,
-  JORNADAS_SUBCOLLECTION,
-  MOVIMIENTOS_SUBCOLLECTION,
   RUTAS_SUBCOLLECTION,
   USUARIOS_SUBCOLLECTION,
 } from "@/lib/empresas-db";
 import { computeCapitalTotalRutaDesdeSaldos } from "@/lib/capital-formulas";
-import { getJornadaActivaEmpleado } from "@/lib/jornada-gasto-admin";
 import { upsertCapitalRutaSnapshot } from "@/lib/capital-ruta-snapshot";
 
 function round2(n: number): number {
@@ -75,11 +72,6 @@ export async function asignarBaseCajaRutaAEmpleado(
   const m = round2(monto);
   if (m <= 0) throw new Error("El monto debe ser mayor a cero");
 
-  const preJornada = await getJornadaActivaEmpleado(db, empresaId, empleadoUid);
-  if (preJornada && preJornada.rutaId !== rutaId) {
-    throw new Error("El trabajador tiene una jornada activa en otra ruta");
-  }
-
   const rutaRef = db
     .collection(EMPRESAS_COLLECTION)
     .doc(empresaId)
@@ -90,15 +82,6 @@ export async function asignarBaseCajaRutaAEmpleado(
     .doc(empresaId)
     .collection(USUARIOS_SUBCOLLECTION)
     .doc(empleadoUid);
-
-  const jornadaRefPre =
-    preJornada && preJornada.rutaId === rutaId
-      ? db
-          .collection(EMPRESAS_COLLECTION)
-          .doc(empresaId)
-          .collection(JORNADAS_SUBCOLLECTION)
-          .doc(preJornada.jornadaId)
-      : null;
 
   const resultado = await db.runTransaction(async (tx) => {
     const rutaSnap = await tx.get(rutaRef);
@@ -139,62 +122,35 @@ export async function asignarBaseCajaRutaAEmpleado(
       throw new Error("Saldo insuficiente en la base de la ruta");
     }
 
-    let jornadaRefOk: DocumentReference | null = null;
-    let entregaInicial = 0;
-    let cajaActual = 0;
-
-    if (jornadaRefPre) {
-      const jSnap = await tx.get(jornadaRefPre);
-      const jd = jSnap.data() as Record<string, unknown> | undefined;
-      if (
-        jSnap.exists &&
-        jd &&
-        jd.estado === "activa" &&
-        (jd.rutaId as string) === rutaId
-      ) {
-        jornadaRefOk = jornadaRefPre;
-        entregaInicial = typeof jd.entregaInicial === "number" ? jd.entregaInicial : 0;
-        cajaActual = typeof jd.cajaActual === "number" ? jd.cajaActual : 0;
-      }
+    if (!usuarioSnap.exists) throw new Error("Trabajador no encontrado en la empresa");
+    const ud = usuarioSnap.data() as Record<string, unknown>;
+    if ((ud.rol as string | undefined) !== "empleado") {
+      throw new Error("El usuario no es un trabajador");
     }
-
-    let cajaEmp = 0;
-    if (!jornadaRefOk) {
-      if (!usuarioSnap.exists) throw new Error("Trabajador no encontrado en la empresa");
-      const ud = usuarioSnap.data() as Record<string, unknown>;
-      if ((ud.rol as string | undefined) !== "empleado") {
-        throw new Error("El usuario no es un trabajador");
-      }
-      cajaEmp = typeof ud.cajaEmpleado === "number" ? ud.cajaEmpleado : 0;
-    }
+    const cajaEmp = typeof ud.cajaEmpleado === "number" ? ud.cajaEmpleado : 0;
 
     cajaRuta = round2(cajaRuta - m);
     cajasEmpleados = round2(cajasEmpleados + m);
     assertCapitalRuta(cajaRuta, cajasEmpleados, inversiones, perdidas, capitalTotal);
 
     const now = Timestamp.now();
-    const baseTrabajador = jornadaRefOk
-      ? round2(cajaActual + m)
-      : round2(cajaEmp + m);
+    const baseTrabajador = round2(cajaEmp + m);
 
-    if (jornadaRefOk) {
-      tx.update(jornadaRefOk, {
-        cajaActual: baseTrabajador,
-        entregaInicial: round2(entregaInicial + m),
-      });
-      const movRef = jornadaRefOk.collection(MOVIMIENTOS_SUBCOLLECTION).doc();
-      tx.set(movRef, {
-        tipo: "asignacion_admin",
-        monto: m,
-        descripcion: "Asignación desde base de la ruta",
-        fecha: now,
-      });
-    } else {
-      tx.update(usuarioRef, {
-        cajaEmpleado: baseTrabajador,
-        ultimaActualizacionCapital: new Date(),
-      });
-    }
+    const asignRef = usuarioRef
+      .collection(ASIGNACIONES_BASE_EMPLEADO_SUBCOLLECTION)
+      .doc();
+    tx.set(asignRef, {
+      monto: m,
+      fecha: now,
+      rutaId,
+      adminUid,
+      empresaId,
+    });
+
+    tx.update(usuarioRef, {
+      cajaEmpleado: baseTrabajador,
+      ultimaActualizacionCapital: now,
+    });
 
     tx.update(rutaRef, {
       cajaRuta,

@@ -1,18 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Timestamp } from "firebase-admin/firestore";
 import { getAdminFirestore } from "@/lib/firebase-admin";
 import { getApiUser } from "@/lib/api-auth";
-import {
-  EMPRESAS_COLLECTION,
-  REPORTES_DIA_SUBCOLLECTION,
-  RUTAS_SUBCOLLECTION,
-  USERS_COLLECTION,
-} from "@/lib/empresas-db";
-import { entregarReporteTrabajadorARuta } from "@/lib/entregar-reporte-empleado-admin";
+import { crearSolicitudEntregaReporte } from "@/lib/solicitud-entrega-reporte-admin";
 
 const MAX_COMENTARIO_REPORTE = 2000;
 
-/** POST: trabajador entrega a la base de la ruta el efectivo acumulado en su base / jornada. Body opcional: { comentario?: string } */
+/**
+ * POST: el trabajador solicita entregar el reporte diario (efectivo de su caja → base de la ruta).
+ * El traspaso real ocurre cuando el administrador aprueba la solicitud.
+ */
 export async function POST(request: NextRequest) {
   const apiUser = await getApiUser(request);
   if (!apiUser) {
@@ -40,52 +36,29 @@ export async function POST(request: NextRequest) {
 
   const db = getAdminFirestore();
   try {
-    const result = await entregarReporteTrabajadorARuta(db, apiUser.empresaId, apiUser.uid);
-    if (result.monto <= 0) {
-      return NextResponse.json({ error: "No hay monto que entregar" }, { status: 400 });
-    }
-
-    const rutaSnap = await db
-      .collection(EMPRESAS_COLLECTION)
-      .doc(apiUser.empresaId)
-      .collection(RUTAS_SUBCOLLECTION)
-      .doc(result.rutaId)
-      .get();
-    const adminId =
-      rutaSnap.exists && typeof rutaSnap.data()?.adminId === "string"
-        ? (rutaSnap.data()!.adminId as string)
-        : "";
-
-    const userSnap = await db.collection(USERS_COLLECTION).doc(apiUser.uid).get();
-    const empleadoNombre =
-      (userSnap.data()?.displayName as string | undefined)?.trim() || "—";
-
-    const hoy = new Date();
-    const fechaDia = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, "0")}-${String(hoy.getDate()).padStart(2, "0")}`;
-
-    await db
-      .collection(EMPRESAS_COLLECTION)
-      .doc(apiUser.empresaId)
-      .collection(REPORTES_DIA_SUBCOLLECTION)
-      .add({
-        fecha: Timestamp.now(),
-        fechaDia,
-        rutaId: result.rutaId,
-        empleadoId: apiUser.uid,
-        empleadoNombre,
-        montoEntregado: result.monto,
-        adminId,
-        comentario: comentarioTrimmed,
-      });
-
+    const result = await crearSolicitudEntregaReporte(
+      db,
+      apiUser.empresaId,
+      apiUser.uid,
+      comentarioTrimmed
+    );
     return NextResponse.json({
       ok: true,
-      monto: result.monto,
+      solicitudId: result.solicitudId,
+      montoAlSolicitar: result.montoAlSolicitar,
       rutaId: result.rutaId,
+      mensaje:
+        "Tu solicitud fue enviada al administrador. El efectivo se pasará a la base de la ruta cuando confirme la entrega.",
     });
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "Error al entregar reporte";
-    const status = msg.includes("No hay") || msg.includes("no coinciden") ? 400 : 500;
+    const msg = e instanceof Error ? e.message : "Error al solicitar entrega de reporte";
+    const status =
+      msg.includes("No hay efectivo") ||
+      msg.includes("Ya enviaste") ||
+      msg.includes("No tienes") ||
+      msg.includes("no tiene administrador")
+        ? 400
+        : 500;
     return NextResponse.json({ error: msg }, { status });
   }
 }

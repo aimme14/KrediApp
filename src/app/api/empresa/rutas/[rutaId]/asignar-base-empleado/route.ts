@@ -50,7 +50,7 @@ export async function POST(
       msg.includes("no está asignado") ||
       msg.includes("Solo puedes") ||
       msg.includes("Saldo insuficiente") ||
-      msg.includes("jornada activa en otra")
+      msg.includes("Datos incompletos")
         ? 400
         : 500;
     return NextResponse.json({ error: msg }, { status });
