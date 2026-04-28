@@ -24,7 +24,7 @@ function getAdminNumForRuta(data: Record<string, unknown> | undefined): number {
   return 0;
 }
 
-/** GET: lista rutas de la empresa del usuario */
+/** GET: lista rutas (admin: solo las suyas por adminId; jefe/empleado: todas las de la empresa) */
 export async function GET(request: NextRequest) {
   const apiUser = await getApiUser(request);
   if (!apiUser) {
@@ -36,11 +36,15 @@ export async function GET(request: NextRequest) {
     request.nextUrl.searchParams.get("sinEmpleado") === "true" ||
     request.nextUrl.searchParams.get("sinEmpleado") === "1";
 
-  const snap = await db
+  const rutasCol = db
     .collection(EMPRESAS_COLLECTION)
     .doc(apiUser.empresaId)
-    .collection(RUTAS_SUBCOLLECTION)
-    .get();
+    .collection(RUTAS_SUBCOLLECTION);
+
+  const snap =
+    apiUser.role === "admin"
+      ? await rutasCol.where("adminId", "==", apiUser.uid).get()
+      : await rutasCol.get();
 
   let rutaIdsOcupadasUsuarios: Set<string> | null = null;
   if (sinEmpleado) {
