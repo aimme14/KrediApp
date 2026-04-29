@@ -3,6 +3,11 @@
 import { useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { parseInteresPct } from "@/lib/interes-pct";
+import {
+  sanitizeMontoDecimalCOP,
+  formatMontoDecimalCOPDisplay,
+  interiorDecimalCOPToNumber,
+} from "@/lib/monto-input-es";
 
 const MODALIDADES = [
   { value: "diario", label: "Diario" },
@@ -31,9 +36,8 @@ export default function SimulacroPrestamoPage() {
   const [numeroCuotas, setNumeroCuotas] = useState("");
   const [interes, setInteres] = useState("");
   const [monto, setMonto] = useState("");
-  const [montoFocused, setMontoFocused] = useState(false);
 
-  const montoNum = parseFloat(monto.replace(",", ".")) || 0;
+  const montoNum = interiorDecimalCOPToNumber(monto) || 0;
   const nCuotas = Math.max(1, parseInt(numeroCuotas, 10) || 1);
   const iVal = parseInteresPct(interes);
   const { totalAPagar, cuota } = montoNum > 0
@@ -53,18 +57,8 @@ export default function SimulacroPrestamoPage() {
           <input
             type="text"
             inputMode="decimal"
-            value={
-              montoFocused
-                ? monto
-                : (monto ? formatMoneda(parseFloat(monto.replace(",", ".")) || 0) : "")
-            }
-            onChange={(e) => {
-              let v = e.target.value.replace(/\./g, "").replace(/[^\d,]/g, "");
-              if ((v.match(/,/g) || []).length > 1) return;
-              setMonto(v);
-            }}
-            onFocus={() => setMontoFocused(true)}
-            onBlur={() => setMontoFocused(false)}
+            value={monto ? formatMontoDecimalCOPDisplay(monto) : ""}
+            onChange={(e) => setMonto(sanitizeMontoDecimalCOP(e.target.value))}
             placeholder="0,00"
             aria-label="Cantidad a prestar"
           />

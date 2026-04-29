@@ -14,6 +14,7 @@ import {
 } from "@/lib/capital";
 import { listUsersByCreator } from "@/lib/users";
 import type { UserProfile } from "@/types/roles";
+import { formatMontoEnteroInput } from "@/lib/monto-input-es";
 /** Cuántas filas mostrar en cada panel de historial (el API puede devolver hasta 100). */
 const FLUJO_UI_LIMIT = 50;
 
@@ -685,7 +686,7 @@ export default function GestionFinancieraPage() {
                         inputMode="decimal"
                         value={invertirMonto}
                         onChange={(e) => {
-                          setInvertirMonto(e.target.value);
+                          setInvertirMonto(formatMontoEnteroInput(e.target.value));
                           setInvertirError(null);
                         }}
                         placeholder="Ej. 500000"
@@ -741,7 +742,7 @@ export default function GestionFinancieraPage() {
                         inputMode="decimal"
                         value={transferMonto}
                         onChange={(e) => {
-                          setTransferMonto(e.target.value);
+                          setTransferMonto(formatMontoEnteroInput(e.target.value));
                           setTransferError(null);
                         }}
                         placeholder="Ej. 200000"
@@ -801,7 +802,7 @@ export default function GestionFinancieraPage() {
                       inputMode="decimal"
                       value={inputValue}
                       onChange={(e) => {
-                        setInputValue(e.target.value);
+                        setInputValue(formatMontoEnteroInput(e.target.value));
                         setInputError(null);
                         setInputErrorConfirm(null);
                       }}
@@ -828,7 +829,7 @@ export default function GestionFinancieraPage() {
                       inputMode="decimal"
                       value={inputValueConfirm}
                       onChange={(e) => {
-                        setInputValueConfirm(e.target.value);
+                        setInputValueConfirm(formatMontoEnteroInput(e.target.value));
                         setInputErrorConfirm(null);
                       }}
                       placeholder="Ej. 5,000,000"

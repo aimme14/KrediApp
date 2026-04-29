@@ -35,3 +35,56 @@ export function fechaDiaColombiaHoy(): string {
     .toLocaleDateString("en-CA", { timeZone: "America/Bogota" })
     .slice(0, 10);
 }
+
+/**
+ * Convierte YYYY-MM-DD del cliente en el instante de inicio de ese día en Colombia.
+ * Evita guardar medianoche UTC (parse de ISO fecha), que al mostrar en zona local aparece como el día anterior.
+ */
+export function fechaGastoDesdeStringCliente(fecha?: string): Date {
+  if (!fecha?.trim()) return new Date();
+  const day = fecha.trim().slice(0, 10);
+  if (parseFechaDiaColombia(day).ok) {
+    return inicioDiaColombiaUtc(day) ?? new Date(day);
+  }
+  return new Date(fecha);
+}
+
+function fechaGuardadaMedianocheUtcPura(d: Date): boolean {
+  return (
+    d.getUTCHours() === 0 &&
+    d.getUTCMinutes() === 0 &&
+    d.getUTCSeconds() === 0 &&
+    d.getUTCMilliseconds() === 0
+  );
+}
+
+/**
+ * Etiqueta de calendario para un gasto: nuevos registros (inicio Bogotá) o legado (medianoche UTC de solo-fecha ISO).
+ */
+export function formatoFechaGastoColombia(isoStr: string | null | undefined): string {
+  if (!isoStr) return "—";
+  const d = new Date(isoStr);
+  const t = d.getTime();
+  if (!Number.isFinite(t)) return "—";
+  if (fechaGuardadaMedianocheUtcPura(d)) {
+    return d.toLocaleDateString("es-CO", { timeZone: "UTC" });
+  }
+  return d.toLocaleDateString("es-CO", { timeZone: "America/Bogota" });
+}
+
+/** YYYY-MM-DD alineado a `formatoFechaGastoColombia` (útil para comparar con fechaDiaColombiaHoy()). */
+export function fechaDiaCalendarioDesdeISO(isoStr: string | null | undefined): string | null {
+  if (!isoStr) return null;
+  const d = new Date(isoStr);
+  const t = d.getTime();
+  if (!Number.isFinite(t)) return null;
+  if (fechaGuardadaMedianocheUtcPura(d)) {
+    const y = d.getUTCFullYear();
+    const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+    const day = String(d.getUTCDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  }
+  return new Date(isoStr)
+    .toLocaleDateString("en-CA", { timeZone: "America/Bogota" })
+    .slice(0, 10);
+}

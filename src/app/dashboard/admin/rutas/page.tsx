@@ -13,6 +13,7 @@ import {
   type ClienteItem,
   type PrestamoItem,
 } from "@/lib/empresa-api";
+import { formatMontoEnteroInput, parseMontoEnteroFormatted } from "@/lib/monto-input-es";
 
 function formatMonto(value: number): string {
   const hasDecimals = Math.round(value * 100) % 100 !== 0;
@@ -74,7 +75,9 @@ export default function RutasPage() {
     setCreating(true);
     try {
       const token = await user.getIdToken();
-      const capitalNum = capitalInicial.trim() ? parseFloat(capitalInicial.replace(",", ".")) : undefined;
+      const capitalNum = capitalInicial.trim()
+        ? parseMontoEnteroFormatted(capitalInicial)
+        : undefined;
       await createRuta(token, {
         nombre: nombre.trim(),
         ubicacion: ubicacion.trim() || undefined,
@@ -163,7 +166,7 @@ export default function RutasPage() {
                 type="text"
                 inputMode="decimal"
                 value={capitalInicial}
-                onChange={(e) => setCapitalInicial(e.target.value)}
+                onChange={(e) => setCapitalInicial(formatMontoEnteroInput(e.target.value))}
                 placeholder="Ej: 2000000 (sale de tu base del administrador)"
               />
               <p style={{ fontSize: "0.875rem", color: "var(--text-muted)", marginTop: "0.25rem" }}>

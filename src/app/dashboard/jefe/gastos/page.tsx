@@ -3,7 +3,16 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { listGastos, createGasto, type GastoItem } from "@/lib/empresa-api";
+import {
+  sanitizeMontoDecimalCOP,
+  formatMontoDecimalCOPDisplay,
+  interiorDecimalCOPToNumber,
+} from "@/lib/monto-input-es";
 import { uploadImage, IMAGE_ACCEPT, getImageAccept } from "@/lib/storage";
+import {
+  fechaDiaColombiaHoy,
+  formatoFechaGastoColombia,
+} from "@/lib/colombia-day-bounds";
 
 const TIPOS = [
   { value: "transporte", label: "Transporte", icon: "transporte" },
@@ -121,7 +130,7 @@ export default function GastosPage() {
         const tipo = (g.tipo ?? "").toLowerCase();
         const hechoPor = (g.creadoPorNombre ?? "").toLowerCase();
         const montoStr = (g.monto ?? 0).toFixed(2);
-        const fechaStr = g.fecha ? new Date(g.fecha).toLocaleDateString().toLowerCase() : "";
+        const fechaStr = formatoFechaGastoColombia(g.fecha ?? null).replace("—", "").trim().toLowerCase();
         return (
           motivo.includes(searchLower) ||
           tipo.includes(searchLower) ||
@@ -232,7 +241,7 @@ export default function GastosPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user || !profile) return;
-    const montoNum = parseFloat(monto.replace(",", "."));
+    const montoNum = interiorDecimalCOPToNumber(monto);
     if (isNaN(montoNum) || montoNum < 0) {
       setError("Monto debe ser un número mayor o igual a 0");
       return;
@@ -254,7 +263,7 @@ export default function GastosPage() {
       await createGasto(token, {
         descripcion: motivo.trim(),
         monto: montoNum,
-        fecha: new Date().toISOString().slice(0, 10),
+        fecha: fechaDiaColombiaHoy(),
         tipo,
         evidencia: evidenciaUrl || undefined,
       });
@@ -302,8 +311,8 @@ export default function GastosPage() {
                 id="gastos-monto"
                 type="text"
                 inputMode="decimal"
-                value={monto}
-                onChange={(e) => setMonto(e.target.value)}
+                value={monto ? formatMontoDecimalCOPDisplay(monto) : ""}
+                onChange={(e) => setMonto(sanitizeMontoDecimalCOP(e.target.value))}
                 required
                 placeholder="Ej: 15000"
                 aria-required="true"
@@ -505,7 +514,7 @@ export default function GastosPage() {
                   {gastosOrdenados.map((g) => (
                   <tr key={g.id}>
                     <td className="gastos-col-nombre" title={g.creadoPorNombre ?? undefined}>{g.creadoPorNombre ?? "—"}</td>
-                    <td className="gastos-col-fecha">{g.fecha ? new Date(g.fecha).toLocaleDateString("es-CO") : "—"}</td>
+                    <td className="gastos-col-fecha">{formatoFechaGastoColombia(g.fecha ?? null)}</td>
                     <td className="gastos-col-tipo">{tipoLabel(g.tipo ?? "")}</td>
                     <td className="gastos-col-monto">{formatMoneda(g.monto ?? 0)}</td>
                     <td className="gastos-col-evidencia">

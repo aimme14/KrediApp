@@ -12,6 +12,8 @@ import {
   type InversionCajaRutaItem,
   type ResumenRutaItem,
 } from "@/lib/empresa-api";
+import { formatMontoEnteroInput } from "@/lib/monto-input-es";
+import { formatoFechaGastoColombia } from "@/lib/colombia-day-bounds";
 
 function formatMoneda(value: number): string {
   const hasDecimals = Math.round(value * 100) % 100 !== 0;
@@ -464,7 +466,7 @@ export default function GestionFinancieraPage() {
                       inputMode="decimal"
                       value={invertirMonto}
                       onChange={(e) => {
-                        setInvertirMonto(e.target.value);
+                        setInvertirMonto(formatMontoEnteroInput(e.target.value));
                         setInvertirError(null);
                       }}
                       placeholder="Ej. 500000"
@@ -599,7 +601,7 @@ export default function GestionFinancieraPage() {
                         return (
                           <tr key={`${g.id}-${g.alcance ?? i}`}>
                             <td className="col-num">{formatMoneda(g.monto)}</td>
-                            <td>{g.fecha ? formatFechaCorta(g.fecha) : "—"}</td>
+                            <td>{formatoFechaGastoColombia(g.fecha ?? null)}</td>
                             <td>{motivo}</td>
                             <td>{quien}</td>
                             <td>{rutaLabel}</td>

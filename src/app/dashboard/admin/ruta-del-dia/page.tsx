@@ -8,6 +8,7 @@ import {
   asignarBaseEmpleadoDesdeRuta,
   type RutaDelDiaItem,
 } from "@/lib/empresa-api";
+import { formatMontoEnteroInput, parseMontoEnteroFormatted } from "@/lib/monto-input-es";
 
 function formatMonto(value: number): string {
   const hasDecimals = Math.round(value * 100) % 100 !== 0;
@@ -49,8 +50,8 @@ export default function RutaDelDiaPage() {
   const handleAsignarBase = async (rutaId: string, empleadoUid: string) => {
     if (!user) return;
     const key = asignarKey(rutaId, empleadoUid);
-    const raw = (montosAsignar[key] ?? "").trim().replace(",", ".");
-    const monto = parseFloat(raw);
+    const raw = montosAsignar[key] ?? "";
+    const monto = parseMontoEnteroFormatted(raw);
     if (!Number.isFinite(monto) || monto <= 0) {
       setError("Ingresa un monto válido mayor a cero");
       return;
@@ -189,7 +190,10 @@ export default function RutaDelDiaPage() {
                               value={montosAsignar[key] ?? ""}
                               disabled={busy}
                               onChange={(e) =>
-                                setMontosAsignar((prev) => ({ ...prev, [key]: e.target.value }))
+                                setMontosAsignar((prev) => ({
+                                  ...prev,
+                                  [key]: formatMontoEnteroInput(e.target.value),
+                                }))
                               }
                               style={{ minWidth: "120px" }}
                             />

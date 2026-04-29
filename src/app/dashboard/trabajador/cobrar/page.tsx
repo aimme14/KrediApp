@@ -17,6 +17,11 @@ import {
 } from "@/lib/empresa-api";
 import { uploadImage, getImageAccept } from "@/lib/storage";
 import type { MotivoNoPago, MotivoPerdida } from "@/types/finanzas";
+import {
+  sanitizeMontoDecimalCOP,
+  formatMontoDecimalCOPDisplay,
+  interiorDecimalCOPToNumber,
+} from "@/lib/monto-input-es";
 
 /** Carga html2canvas solo en el cliente (evita fallos de bundle/SSR y reduce el JS inicial). */
 async function captureElementToCanvas(el: HTMLElement) {
@@ -256,7 +261,7 @@ function CobrarClientePageContent() {
   }, [showCamera]);
 
   const montoNum = useMemo(() => {
-    const n = parseFloat(montoInput.replace(",", "."));
+    const n = interiorDecimalCOPToNumber(montoInput);
     return Number.isFinite(n) && n >= 0 ? n : 0;
   }, [montoInput]);
 
@@ -534,7 +539,7 @@ function CobrarClientePageContent() {
   };
 
   const montoPerdidaNum = useMemo(() => {
-    const n = parseFloat(montoPerdidaInput.replace(",", "."));
+    const n = interiorDecimalCOPToNumber(montoPerdidaInput);
     return Number.isFinite(n) && n >= 0 ? n : 0;
   }, [montoPerdidaInput]);
 
@@ -868,8 +873,8 @@ function CobrarClientePageContent() {
           <input
             type="text"
             inputMode="decimal"
-            value={montoPerdidaInput}
-            onChange={(e) => setMontoPerdidaInput(e.target.value)}
+            value={montoPerdidaInput ? formatMontoDecimalCOPDisplay(montoPerdidaInput) : ""}
+            onChange={(e) => setMontoPerdidaInput(sanitizeMontoDecimalCOP(e.target.value))}
             placeholder={maxPerdida > 0 ? formatCurrency(maxPerdida) : "0"}
             className="cobrar-input"
           />
@@ -1085,8 +1090,8 @@ function CobrarClientePageContent() {
             <input
               type="text"
               inputMode="decimal"
-              value={montoInput}
-              onChange={(e) => setMontoInput(e.target.value)}
+              value={montoInput ? formatMontoDecimalCOPDisplay(montoInput) : ""}
+              onChange={(e) => setMontoInput(sanitizeMontoDecimalCOP(e.target.value))}
               placeholder={valorCuotaSugerido > 0 ? formatCurrency(valorCuotaSugerido) : "0"}
               className="cobrar-input cobrar-input-monto"
             />
@@ -1094,7 +1099,10 @@ function CobrarClientePageContent() {
               <button
                 type="button"
                 className="btn btn-secondary cobrar-usar-sugerencia"
-                onClick={() => setMontoInput(Math.round(valorCuotaSugerido).toString())}
+                onClick={() => {
+                  const r = Math.round(valorCuotaSugerido);
+                  setMontoInput(sanitizeMontoDecimalCOP(String(r).replace(".", ",")));
+                }}
               >
                 Usar sugerencia
               </button>

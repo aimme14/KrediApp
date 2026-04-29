@@ -7,6 +7,11 @@ import { useAuth } from "@/context/AuthContext";
 import { db } from "@/lib/firebase";
 import { EMPRESAS_COLLECTION, USUARIOS_SUBCOLLECTION } from "@/lib/empresas-db";
 import { createGasto } from "@/lib/empresa-api";
+import {
+  sanitizeMontoDecimalCOP,
+  formatMontoDecimalCOPDisplay,
+  interiorDecimalCOPToNumber,
+} from "@/lib/monto-input-es";
 
 const CATEGORIAS: { value: "transporte" | "alimentacion" | "otro"; label: string }[] = [
   { value: "transporte", label: "Transporte" },
@@ -51,7 +56,7 @@ export default function RegistrarGastoPage() {
   }, [user, profile?.empresaId, profile?.role]);
 
   const montoNum = (() => {
-    const n = parseFloat(monto.replace(",", "."));
+    const n = interiorDecimalCOPToNumber(monto);
     return Number.isFinite(n) && n >= 0 ? n : 0;
   })();
   const saldo = cajaEmpleado ?? 0;
@@ -126,8 +131,8 @@ export default function RegistrarGastoPage() {
           <input
             type="text"
             inputMode="decimal"
-            value={monto}
-            onChange={(e) => setMonto(e.target.value)}
+            value={monto ? formatMontoDecimalCOPDisplay(monto) : ""}
+            onChange={(e) => setMonto(sanitizeMontoDecimalCOP(e.target.value))}
             placeholder="0"
             className="registrar-gasto-input"
           />

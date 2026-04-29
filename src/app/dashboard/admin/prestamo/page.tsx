@@ -12,6 +12,11 @@ import {
   type PrestamoItem,
 } from "@/lib/empresa-api";
 import { formatInteresResumenPct, parseInteresPct } from "@/lib/interes-pct";
+import {
+  sanitizeMontoDecimalCOP,
+  formatMontoDecimalCOPDisplay,
+  interiorDecimalCOPToNumber,
+} from "@/lib/monto-input-es";
 
 const MODALIDADES = [
   { value: "diario", label: "Diario" },
@@ -80,7 +85,6 @@ export default function PrestamoPage() {
   const [numeroCuotas, setNumeroCuotas] = useState("");
   const [interes, setInteres] = useState("");
   const [monto, setMonto] = useState("");
-  const [montoFocused, setMontoFocused] = useState(false);
   const [creating, setCreating] = useState(false);
   const [confirmarMontoAlto, setConfirmarMontoAlto] = useState(false);
   const [filtroEstado, setFiltroEstado] = useState<"todos" | "activo" | "mora" | "pagado">("todos");
@@ -109,7 +113,7 @@ export default function PrestamoPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
-    const montoNum = parseFloat(monto.replace(",", "."));
+    const montoNum = interiorDecimalCOPToNumber(monto);
     const nCuotas = Math.max(1, parseInt(numeroCuotas, 10) || 1);
     const iVal = parseInteresPct(interes);
 
@@ -171,7 +175,7 @@ export default function PrestamoPage() {
     return m;
   }, [clientes]);
   const clienteSeleccionado = clienteId ? clientePorId[clienteId] : null;
-  const montoNum = parseFloat(monto.replace(",", "."));
+  const montoNum = interiorDecimalCOPToNumber(monto);
   const nCuotasVal = parseInt(numeroCuotas, 10) || 0;
   const iVal = parseInteresPct(interes);
   const totalAPagar = !isNaN(montoNum) && montoNum > 0 && nCuotasVal >= 1
@@ -436,18 +440,8 @@ export default function PrestamoPage() {
           <input
             type="text"
             inputMode="decimal"
-            value={
-              montoFocused
-                ? monto
-                : (monto ? formatMoneda(parseFloat(monto.replace(",", ".")) || 0) : "")
-            }
-            onChange={(e) => {
-              let v = e.target.value.replace(/\./g, "").replace(/[^\d,]/g, "");
-              if ((v.match(/,/g) || []).length > 1) return;
-              setMonto(v);
-            }}
-            onFocus={() => setMontoFocused(true)}
-            onBlur={() => setMontoFocused(false)}
+            value={monto ? formatMontoDecimalCOPDisplay(monto) : ""}
+            onChange={(e) => setMonto(sanitizeMontoDecimalCOP(e.target.value))}
             required
             placeholder="0,00"
           />
@@ -459,7 +453,7 @@ export default function PrestamoPage() {
             readOnly
             value={
               (() => {
-                const montoNum = parseFloat(monto.replace(",", "."));
+                const montoNum = interiorDecimalCOPToNumber(monto);
                 const nCuotas = parseInt(numeroCuotas, 10);
                 const iVal = parseInteresPct(interes);
                 if (isNaN(montoNum) || montoNum <= 0 || !nCuotas || nCuotas < 1) return "—";

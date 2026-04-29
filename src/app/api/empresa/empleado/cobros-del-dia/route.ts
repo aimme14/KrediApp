@@ -13,6 +13,7 @@ import {
   USUARIOS_SUBCOLLECTION,
 } from "@/lib/empresas-db";
 import {
+  fechaDiaCalendarioDesdeISO,
   fechaDiaColombiaHoy,
   finDiaColombiaUtc,
   inicioDiaColombiaUtc,
@@ -219,9 +220,6 @@ export async function GET(request: NextRequest) {
       .get(),
   ]);
 
-  const startMs = start.getTime();
-  const endMs = end.getTime();
-
   let totalGastosDia = 0;
   const gastosDetalle: Array<{ id: string; monto: number; descripcion: string; fecha: string | null }> =
     [];
@@ -229,8 +227,10 @@ export async function GET(request: NextRequest) {
     for (const d of snap.docs) {
       const g = d.data();
       const f = g.fecha as { toDate?: () => Date } | undefined;
-      const t = f?.toDate?.()?.getTime?.();
-      if (typeof t !== "number" || t < startMs || t > endMs) continue;
+      const dt = f?.toDate?.();
+      if (!dt) continue;
+      const diaGasto = fechaDiaCalendarioDesdeISO(dt.toISOString());
+      if (diaGasto !== fechaDia) continue;
       const m = typeof g.monto === "number" ? g.monto : 0;
       if (m <= 0) continue;
       totalGastosDia += m;
@@ -238,7 +238,7 @@ export async function GET(request: NextRequest) {
         id: d.id,
         monto: round2(m),
         descripcion: typeof g.descripcion === "string" ? g.descripcion : "",
-        fecha: f?.toDate?.()?.toISOString?.() ?? null,
+        fecha: dt.toISOString(),
       });
     }
   };

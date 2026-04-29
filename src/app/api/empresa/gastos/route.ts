@@ -20,6 +20,7 @@ import {
   finishIdempotentOperation,
 } from "@/lib/financial-idempotency";
 import type { TipoGasto } from "@/types/firestore";
+import { fechaGastoDesdeStringCliente } from "@/lib/colombia-day-bounds";
 
 export type AlcanceGastoAdmin = "ruta" | "admin";
 
@@ -224,7 +225,7 @@ export async function POST(request: NextRequest) {
 
   const tipoValido: TipoGasto =
     tipo === "transporte" || tipo === "alimentacion" ? tipo : "otro";
-  const fechaDate = fecha ? new Date(fecha) : new Date();
+  const fechaDate = fecha ? fechaGastoDesdeStringCliente(fecha) : new Date();
 
   const db = getAdminFirestore();
   const empresaRef = db.collection(EMPRESAS_COLLECTION).doc(apiUser.empresaId);
