@@ -7,8 +7,6 @@ import { doc, onSnapshot } from "firebase/firestore";
 import { useAuth } from "@/context/AuthContext";
 import { db } from "@/lib/firebase";
 import { EMPRESAS_COLLECTION, USUARIOS_SUBCOLLECTION } from "@/lib/empresas-db";
-import { fechaDiaColombiaHoy } from "@/lib/colombia-day-bounds";
-import { getCobrosDelDiaEmpleado } from "@/lib/empresa-api";
 import { useRuta } from "@/hooks/useRuta";
 import { NO_PAGOS_PARA_MORA, useRutaDia } from "@/hooks/useRutaDia";
 import type { ClienteRutaGrupo, PrioridadClienteRuta } from "@/types/finanzas";
@@ -87,8 +85,6 @@ export default function RutaDelDiaPage() {
   const { user, profile } = useAuth();
   const router = useRouter();
   const [cajaEmpleadoFirestore, setCajaEmpleadoFirestore] = useState<number | null>(null);
-  const [cajaTotalDelDia, setCajaTotalDelDia] = useState<number | null>(null);
-  const [loadingCajaTotal, setLoadingCajaTotal] = useState(true);
   const [filtroExpandido, setFiltroExpandido] = useState(false);
 
   useEffect(() => {
@@ -107,34 +103,6 @@ export default function RutaDelDiaPage() {
     });
     return () => unsub();
   }, [user, profile?.empresaId, profile?.role]);
-
-  useEffect(() => {
-    if (!user || profile?.role !== "trabajador") {
-      setCajaTotalDelDia(null);
-      setLoadingCajaTotal(false);
-      return;
-    }
-    let cancelled = false;
-    (async () => {
-      setLoadingCajaTotal(true);
-      try {
-        const token = await user.getIdToken();
-        const data = await getCobrosDelDiaEmpleado(token, fechaDiaColombiaHoy());
-        if (!cancelled) {
-          setCajaTotalDelDia(
-            typeof data.cajaTotalDelDia === "number" ? data.cajaTotalDelDia : null
-          );
-        }
-      } catch {
-        if (!cancelled) setCajaTotalDelDia(null);
-      } finally {
-        if (!cancelled) setLoadingCajaTotal(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [user, profile?.role, profile?.empresaId, cajaEmpleadoFirestore]);
 
   const {
     ruta,
@@ -212,12 +180,8 @@ export default function RutaDelDiaPage() {
     month: "short",
   });
 
-  const saldoBaseTrabajador = cajaEmpleadoFirestore ?? 0;
   const montoCajaTarjeta =
-    cajaTotalDelDia !== null ? cajaTotalDelDia : saldoBaseTrabajador;
-
-  /** Coherente con «Caja del día»: saldo en documento + cobros del día − gastos (Colombia). */
-  const etiquetaSaldoBase = "Caja total";
+    cajaEmpleadoFirestore === null ? null : cajaEmpleadoFirestore;
 
   const filtroActualLabel =
     FILTROS_OPCIONES.find((f) => f.id === filtro)?.label ?? "Todos";
@@ -252,14 +216,12 @@ export default function RutaDelDiaPage() {
         <div className="ruta-dia-caja-inner">
           <div className="ruta-dia-caja-text">
             <h3 id="ruta-dia-caja-heading" className="ruta-dia-caja-title">
-              {etiquetaSaldoBase}
+              Caja (efectivo)
             </h3>
           </div>
           <div className="ruta-dia-caja-monto-wrap">
             <span className="ruta-dia-caja-monto" aria-live="polite">
-              {loadingCajaTotal && cajaTotalDelDia === null
-                ? "…"
-                : formatCurrency(montoCajaTarjeta)}
+              {montoCajaTarjeta === null ? "…" : formatCurrency(montoCajaTarjeta)}
             </span>
             <Link href="/dashboard/trabajador/caja-del-dia" className="ruta-dia-caja-link">
               Ver detalles

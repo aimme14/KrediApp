@@ -180,28 +180,6 @@ export default function CajaDelDiaPage() {
               </span>
               <span style={{ fontSize: "1.05rem", fontWeight: 700 }}>{formatMonto(data.totalGastosDia)}</span>
             </div>
-            <div
-              className="card"
-              style={{
-                padding: "0.65rem 0.85rem",
-                margin: 0,
-                border: "1px solid var(--card-border)",
-              }}
-            >
-              <span
-                style={{
-                  fontSize: "0.7rem",
-                  color: "var(--text-muted)",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.03em",
-                  display: "block",
-                  marginBottom: "0.25rem",
-                }}
-              >
-                Caja total
-              </span>
-              <span style={{ fontSize: "1.05rem", fontWeight: 700 }}>{formatMonto(data.cajaTotalDelDia)}</span>
-            </div>
           </div>
 
           {esHoy && (
@@ -213,10 +191,9 @@ export default function CajaDelDiaPage() {
                 lineHeight: 1.5,
               }}
             >
-              «Caja total» es «Caja (efectivo)» + «Total cobrado» − «Gastos del día» con los valores de esta pantalla.
-              Si colocaste préstamos desde tu caja o entregaste reporte, puede no coincidir con tu efectivo real.
-              Si cambiás de fecha, cobros y gastos son históricos y «Caja (efectivo)» sigue siendo tu saldo vigente
-              actual.
+              Si colocaste préstamos desde tu caja o entregaste reporte, «Caja (efectivo)» puede no coincidir con tu
+              efectivo real. Si cambiás de fecha, cobros y gastos son históricos y «Caja (efectivo)» sigue siendo tu
+              saldo vigente actual.
             </p>
           )}
 
