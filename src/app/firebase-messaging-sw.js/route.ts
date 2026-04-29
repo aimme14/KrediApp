@@ -32,11 +32,13 @@ messaging.onBackgroundMessage(function (payload) {
   const title = n.title || 'KrediApp';
   const body = n.body || '';
   const data = payload.data || {};
-  if (data.type === 'gasto_empleado') {
+  if (data.type === 'gasto_empleado' || data.type === 'cuota_prestamo') {
+    var operativoKind = data.type === 'cuota_prestamo' ? 'cuota' : 'gasto';
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function (clients) {
       clients.forEach(function (client) {
         client.postMessage({
-          type: 'KREDI_FCM_GASTO',
+          type: 'KREDI_FCM_OPERATIVO',
+          kind: operativoKind,
           title: title,
           body: body,
         });

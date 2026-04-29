@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import type { Firestore } from "firebase-admin/firestore";
 import { FieldValue } from "firebase-admin/firestore";
-import { getAdminFirestore } from "@/lib/firebase-admin";
+import { getAdminFirestore, getAdminMessaging } from "@/lib/firebase-admin";
+import { notifyAdminCuotaPrestamo } from "@/lib/fcm-notify-admin";
 import { getApiUser } from "@/lib/api-auth";
 import {
   EMPRESAS_COLLECTION,
@@ -32,6 +34,76 @@ const MOTIVOS_PERDIDA = [
 const MAX_PAGOS_LIST = 50;
 /** Tras este número de «no pago» consecutivos el préstamo pasa a estado mora. */
 const NO_PAGOS_CONSECUTIVOS_PARA_MORA = 3;
+
+async function resolveClienteNombre(
+  db: Firestore,
+  empresaId: string,
+  clienteId: string
+): Promise<string> {
+  const cid = clienteId.trim();
+  if (!cid) return "—";
+  const ref = db
+    .collection(EMPRESAS_COLLECTION)
+    .doc(empresaId)
+    .collection(CLIENTES_SUBCOLLECTION)
+    .doc(cid);
+  const s = await ref.get();
+  if (!s.exists) return "—";
+  const n = (s.data() as Record<string, unknown>)?.nombre;
+  return typeof n === "string" && n.trim() ? n.trim() : "—";
+}
+
+/** Solo cuando el registro lo hace un empleado; no bloquea la respuesta HTTP. */
+function scheduleFcmCuotaToAdminIfEmpleado(params: {
+  db: Firestore;
+  apiUser: { uid: string; empresaId: string; role: string };
+  prestamoFlat: Record<string, unknown>;
+  prestamoId: string;
+  tipoRegistro: "pago" | "no_pago" | "perdida";
+  pagoId: string;
+  monto?: number;
+  motivoCodigo?: string;
+  metodoPago?: "efectivo" | "transferencia";
+}): void {
+  if (params.apiUser.role !== "empleado") return;
+  const adminUid =
+    typeof params.prestamoFlat.adminId === "string"
+      ? params.prestamoFlat.adminId.trim()
+      : "";
+  if (!adminUid) {
+    console.warn(
+      "[pagos] Préstamo sin adminId; no se envía FCM de cuota al administrador."
+    );
+    return;
+  }
+  const clienteId =
+    typeof params.prestamoFlat.clienteId === "string"
+      ? params.prestamoFlat.clienteId.trim()
+      : "";
+  void (async () => {
+    try {
+      const clienteNombre = await resolveClienteNombre(
+        params.db,
+        params.apiUser.empresaId,
+        clienteId
+      );
+      await notifyAdminCuotaPrestamo(getAdminMessaging(), {
+        adminUid,
+        empresaId: params.apiUser.empresaId,
+        prestamoId: params.prestamoId,
+        pagoId: params.pagoId,
+        clienteNombre,
+        clienteId,
+        tipoRegistro: params.tipoRegistro,
+        monto: params.monto,
+        motivoCodigo: params.motivoCodigo,
+        metodoPago: params.metodoPago,
+      });
+    } catch (e) {
+      console.warn("[pagos] FCM cuota admin:", e);
+    }
+  })();
+}
 
 /** GET: listar últimos pagos del préstamo (para historial). Empleado o admin de la ruta/empresa. */
 export async function GET(
@@ -173,19 +245,14 @@ export async function POST(
         ? (motivoNoPago as (typeof MOTIVOS_NO_PAGO)[number])
         : "otro";
 
-    const empUidNoPago =
-      typeof data.empleadoId === "string" && data.empleadoId.trim()
-        ? data.empleadoId.trim()
-        : apiUser.uid;
+    let pagoIdNoPago: string;
     try {
-      await db.runTransaction(async (tx) => {
+      pagoIdNoPago = await db.runTransaction(async (tx) => {
         const prSnap = await tx.get(prestamoRef);
         if (!prSnap.exists) {
           throw new Error("PRESTAMO_NOT_FOUND");
         }
         const pr = prSnap.data()!;
-        const rutaIdPr =
-          typeof pr.rutaId === "string" ? pr.rutaId.trim() : "";
 
         const pagoRef = prestamoRef.collection(PAGOS_SUBCOLLECTION).doc();
         tx.set(pagoRef, {
@@ -211,6 +278,7 @@ export async function POST(
           estado: pasarAMora ? "mora" : "activo",
           updatedAt: now,
         });
+        return pagoRef.id;
       });
     } catch (e) {
       const msg = e instanceof Error ? e.message : "";
@@ -219,6 +287,16 @@ export async function POST(
       }
       return finalize(400, { error: msg || "No se pudo registrar el no pago" });
     }
+
+    scheduleFcmCuotaToAdminIfEmpleado({
+      db,
+      apiUser,
+      prestamoFlat: data as Record<string, unknown>,
+      prestamoId,
+      tipoRegistro: "no_pago",
+      pagoId: pagoIdNoPago,
+      motivoCodigo: motivo,
+    });
 
     return finalize(200, { ok: true, tipo: "no_pago" });
   }
@@ -337,6 +415,8 @@ export async function POST(
           saldoPendiente: nuevoSaldo,
           adelantoCuota: adelantoParaGuardar,
           rutaId: rutaIdPrestamo || null,
+          pagoId: pagoRef.id,
+          montoAplicar,
         };
       });
 
@@ -356,6 +436,17 @@ export async function POST(
           );
         }
       }
+
+      scheduleFcmCuotaToAdminIfEmpleado({
+        db,
+        apiUser,
+        prestamoFlat: data as Record<string, unknown>,
+        prestamoId,
+        tipoRegistro: "perdida",
+        pagoId: result.pagoId,
+        monto: result.montoAplicar,
+        motivoCodigo: motivoP,
+      });
 
       return finalize(200, {
         ok: true,
@@ -536,10 +627,11 @@ export async function POST(
         saldoPendiente: nuevoSaldo,
         adelantoCuota: adelantoParaGuardar,
         rutaId: rutaIdPrestamo || null,
-          empleadoId: empUid,
-          cuotaCapital: parteCapital,
-          cuotaGanancia: parteGanancia,
-          walletBalanceAfter,
+        empleadoId: empUid,
+        cuotaCapital: parteCapital,
+        cuotaGanancia: parteGanancia,
+        walletBalanceAfter,
+        montoAplicado: montoAplicar,
       };
     });
 
@@ -605,6 +697,17 @@ export async function POST(
     } catch (e) {
       console.warn("[ledger] No se pudo registrar movimiento de pago", e);
     }
+
+    scheduleFcmCuotaToAdminIfEmpleado({
+      db,
+      apiUser,
+      prestamoFlat: prestamoPreRead.data()! as Record<string, unknown>,
+      prestamoId,
+      tipoRegistro: "pago",
+      pagoId: result.pagoId,
+      monto: result.montoAplicado,
+      metodoPago: metodo,
+    });
 
     return finalize(200, {
       ok: true,

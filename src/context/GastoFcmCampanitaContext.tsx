@@ -8,19 +8,25 @@ import React, {
   useState,
 } from "react";
 
-export type GastoFcmSessionItem = {
+/** Gastos operativos FCM vs registros de cuota por trabajador */
+export type OperativoFcmKind = "gasto" | "cuota";
+
+export type OperativoFcmSessionItem = {
+  kind: OperativoFcmKind;
   title: string;
   body: string;
   at: number;
 };
 
 type GastoFcmCampanitaContextValue = {
-  /** Contador para el badge (solo mensajes FCM en primer plano). Sin Firestore. */
-  foregroundGastoBadge: number;
-  /** Textos recibidos en esta sesión para mostrar en el panel */
-  sessionGastoLines: GastoFcmSessionItem[];
-  bumpFromFcm: (title: string, body: string) => void;
-  /** Solo pone el badge en 0 al abrir la campanita; las líneas siguen visibles en el panel */
+  /** Badge: gastos + cuotas en primer plano (sin Firestore). */
+  foregroundOperativoBadge: number;
+  sessionOperativoLines: OperativoFcmSessionItem[];
+  bumpOperativoFromFcm: (
+    kind: OperativoFcmKind,
+    title: string,
+    body: string
+  ) => void;
   clearBadgeOnly: () => void;
 };
 
@@ -32,30 +38,38 @@ export function GastoFcmCampanitaProvider({
 }: {
   children: React.ReactNode;
 }) {
-  const [foregroundGastoBadge, setForegroundGastoBadge] = useState(0);
-  const [sessionGastoLines, setSessionGastoLines] = useState<
-    GastoFcmSessionItem[]
+  const [foregroundOperativoBadge, setForegroundOperativoBadge] = useState(0);
+  const [sessionOperativoLines, setSessionOperativoLines] = useState<
+    OperativoFcmSessionItem[]
   >([]);
 
-  const bumpFromFcm = useCallback((title: string, body: string) => {
-    setForegroundGastoBadge((n) => n + 1);
-    setSessionGastoLines((prev) =>
-      [{ title, body, at: Date.now() }, ...prev].slice(0, 12)
-    );
-  }, []);
+  const bumpOperativoFromFcm = useCallback(
+    (kind: OperativoFcmKind, title: string, body: string) => {
+      setForegroundOperativoBadge((n) => n + 1);
+      setSessionOperativoLines((prev) =>
+        [{ kind, title, body, at: Date.now() }, ...prev].slice(0, 16)
+      );
+    },
+    []
+  );
 
   const clearBadgeOnly = useCallback(() => {
-    setForegroundGastoBadge(0);
+    setForegroundOperativoBadge(0);
   }, []);
 
   const value = useMemo(
     () => ({
-      foregroundGastoBadge,
-      sessionGastoLines,
-      bumpFromFcm,
+      foregroundOperativoBadge,
+      sessionOperativoLines,
+      bumpOperativoFromFcm,
       clearBadgeOnly,
     }),
-    [foregroundGastoBadge, sessionGastoLines, bumpFromFcm, clearBadgeOnly]
+    [
+      foregroundOperativoBadge,
+      sessionOperativoLines,
+      bumpOperativoFromFcm,
+      clearBadgeOnly,
+    ]
   );
 
   return (

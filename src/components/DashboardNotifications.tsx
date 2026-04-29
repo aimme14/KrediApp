@@ -30,8 +30,8 @@ function formatMonto(value: number): string {
 export default function DashboardNotifications() {
   const { user, profile } = useAuth();
   const {
-    foregroundGastoBadge,
-    sessionGastoLines,
+    foregroundOperativoBadge,
+    sessionOperativoLines,
     clearBadgeOnly,
   } = useGastoFcmCampanita();
   const [open, setOpen] = useState(false);
@@ -97,7 +97,7 @@ export default function DashboardNotifications() {
   }, [open]);
 
   const campanitaWasOpen = useRef(false);
-  /** Al abrir Avisos (transición cerrado → abierto), el badge de gasto FCM vuelve a 0. */
+  /** Al abrir Avisos (transición cerrado → abierto), el badge FCM operativo vuelve a 0. */
   useEffect(() => {
     if (role !== "admin") return;
     if (open && !campanitaWasOpen.current) {
@@ -114,7 +114,7 @@ export default function DashboardNotifications() {
       return n;
     }
     if (role === "admin") {
-      return adminPendientes.length + foregroundGastoBadge;
+      return adminPendientes.length + foregroundOperativoBadge;
     }
     return 0;
   }, [
@@ -122,7 +122,7 @@ export default function DashboardNotifications() {
     pendienteTrabajador,
     rechazadaTrabajador,
     adminPendientes.length,
-    foregroundGastoBadge,
+    foregroundOperativoBadge,
   ]);
 
   const badgeLabel =
@@ -242,16 +242,16 @@ export default function DashboardNotifications() {
                 <p className="dashboard-notifications-empty">No hay solicitudes de entrega pendientes.</p>
               )}
 
-              {sessionGastoLines.length > 0 && (
+              {sessionOperativoLines.length > 0 && (
                 <div
                   className="dashboard-notifications-alert dashboard-notifications-alert-warning dashboard-notifications-alert-gasto-fcm"
                   role="status"
                   style={{ marginTop: "0.75rem" }}
                 >
                   <div className="dashboard-notifications-admin-inner">
-                    {sessionGastoLines.slice(0, 8).map((row, idx) => (
+                    {sessionOperativoLines.slice(0, 8).map((row, idx) => (
                       <div
-                        key={`${row.at}-${idx}`}
+                        key={`${row.kind}-${row.at}-${idx}`}
                         className={`dashboard-notifications-admin-item${idx > 0 ? " dashboard-notifications-admin-item-divider" : ""}`}
                       >
                         <span className="dashboard-notifications-admin-label">{row.title}</span>
@@ -267,13 +267,26 @@ export default function DashboardNotifications() {
                       </div>
                     ))}
                   </div>
-                  <Link
-                    href="/dashboard/admin/gastos"
-                    className="dashboard-notifications-link"
-                    onClick={() => setOpen(false)}
-                  >
-                    Ver gastos operativos
-                  </Link>
+                  {sessionOperativoLines.some((l) => l.kind === "gasto") && (
+                    <Link
+                      href="/dashboard/admin/gastos"
+                      className="dashboard-notifications-link"
+                      onClick={() => setOpen(false)}
+                      style={{ display: "block", marginTop: "0.35rem" }}
+                    >
+                      Ver gastos operativos
+                    </Link>
+                  )}
+                  {sessionOperativoLines.some((l) => l.kind === "cuota") && (
+                    <Link
+                      href="/dashboard/admin/cobrar"
+                      className="dashboard-notifications-link"
+                      onClick={() => setOpen(false)}
+                      style={{ display: "block", marginTop: "0.35rem" }}
+                    >
+                      Ir a cobrar / préstamos
+                    </Link>
+                  )}
                 </div>
               )}
             </>

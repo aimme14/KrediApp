@@ -4,7 +4,18 @@ import { useEffect } from "react";
 import { getMessaging, onMessage } from "firebase/messaging";
 import { app } from "@/lib/firebase";
 import { useAuth } from "@/context/AuthContext";
-import { useGastoFcmCampanita } from "@/context/GastoFcmCampanitaContext";
+import {
+  useGastoFcmCampanita,
+  type OperativoFcmKind,
+} from "@/context/GastoFcmCampanitaContext";
+
+function kindFromFcmDataType(
+  t: string | undefined
+): OperativoFcmKind | null {
+  if (t === "gasto_empleado") return "gasto";
+  if (t === "cuota_prestamo") return "cuota";
+  return null;
+}
 
 /**
  * - Primer plano: `onMessage` recibe el push y actualiza la campanita.
@@ -12,30 +23,47 @@ import { useGastoFcmCampanita } from "@/context/GastoFcmCampanitaContext";
  */
 export function AdminFcmForegroundListener() {
   const { profile } = useAuth();
-  const { bumpFromFcm } = useGastoFcmCampanita();
+  const { bumpOperativoFromFcm } = useGastoFcmCampanita();
 
   useEffect(() => {
     if (!app || profile?.role !== "admin") return;
 
     const messaging = getMessaging(app);
     const unsubscribe = onMessage(messaging, (payload) => {
-      if (payload.data?.type !== "gasto_empleado") return;
+      const kind = kindFromFcmDataType(payload.data?.type);
+      if (!kind) return;
       const title =
-        payload.notification?.title?.trim() || "Nuevo gasto de un trabajador";
+        payload.notification?.title?.trim() ||
+        (kind === "cuota" ? "Cuota" : "Nuevo gasto de un trabajador");
       const body = payload.notification?.body?.trim() || "";
-      bumpFromFcm(title, body);
+      bumpOperativoFromFcm(kind, title, body);
     });
 
     return () => unsubscribe();
-  }, [profile?.role, bumpFromFcm]);
+  }, [profile?.role, bumpOperativoFromFcm]);
 
   useEffect(() => {
     if (profile?.role !== "admin") return;
 
     const onSwMessage = (event: MessageEvent) => {
       const d = event.data;
+      if (d?.type === "KREDI_FCM_OPERATIVO") {
+        const kind: OperativoFcmKind =
+          d.kind === "cuota" ? "cuota" : "gasto";
+        bumpOperativoFromFcm(
+          kind,
+          typeof d.title === "string"
+            ? d.title
+            : kind === "cuota"
+              ? "Cuota"
+              : "Nuevo gasto de un trabajador",
+          typeof d.body === "string" ? d.body : ""
+        );
+        return;
+      }
       if (d?.type === "KREDI_FCM_GASTO") {
-        bumpFromFcm(
+        bumpOperativoFromFcm(
+          "gasto",
           typeof d.title === "string" ? d.title : "Nuevo gasto de un trabajador",
           typeof d.body === "string" ? d.body : ""
         );
@@ -48,7 +76,7 @@ export function AdminFcmForegroundListener() {
       navigator.serviceWorker?.removeEventListener("message", onSwMessage);
       window.removeEventListener("message", onSwMessage);
     };
-  }, [profile?.role, bumpFromFcm]);
+  }, [profile?.role, bumpOperativoFromFcm]);
 
   return null;
 }
