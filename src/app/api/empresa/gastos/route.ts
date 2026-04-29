@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAdminFirestore } from "@/lib/firebase-admin";
+import { getAdminFirestore, getAdminMessaging } from "@/lib/firebase-admin";
+import { notifyAdminGastoEmpleado } from "@/lib/fcm-notify-admin";
 import { getApiUser } from "@/lib/api-auth";
 import {
   EMPRESAS_COLLECTION,
@@ -82,13 +83,17 @@ export async function GET(request: NextRequest) {
   }
 
   if (apiUser.role === "admin") {
-    const [legacySnap, nuevoSnap] = await Promise.all([
+    const [legacySnap, nuevoSnap, empleadoSnap] = await Promise.all([
       empresaRef
         .collection(GASTOS_SUBCOLLECTION)
         .where("adminId", "==", apiUser.uid)
         .get(),
       empresaRef
         .collection(GASTOS_ADMIN_SUBCOLLECTION)
+        .where("adminId", "==", apiUser.uid)
+        .get(),
+      empresaRef
+        .collection(GASTOS_EMPLEADO_SUBCOLLECTION)
         .where("adminId", "==", apiUser.uid)
         .get(),
     ]);
@@ -105,6 +110,14 @@ export async function GET(request: NextRequest) {
     nuevoSnap.docs.forEach((d) => {
       const data = d.data() as Record<string, unknown>;
       list.push(mapGastoDoc(d.id, data));
+    });
+    empleadoSnap.docs.forEach((d) => {
+      const data = d.data() as Record<string, unknown>;
+      list.push(
+        mapGastoDoc(d.id, data, {
+          alcance: "empleado",
+        })
+      );
     });
 
     const sinNombre = list.filter((g) => !(g.creadoPorNombre as string)?.trim());
@@ -483,8 +496,27 @@ export async function POST(request: NextRequest) {
     rol: "empleado",
     adminId: apiUser.adminId ?? "",
     empleadoId: apiUser.uid,
+    rutaId: rutaIdEmp,
     evidencia: (evidencia ?? "").trim() || null,
   });
+
+  const adminUid = (apiUser.adminId ?? "").trim();
+  if (adminUid) {
+    void (async () => {
+      try {
+        await notifyAdminGastoEmpleado(db, getAdminMessaging(), {
+          adminUid,
+          empleadoNombre: creadoPorNombre.trim() || apiUser.uid,
+          monto,
+          descripcion: descripcion.trim(),
+          gastoId: ref.id,
+          empresaId: apiUser.empresaId,
+        });
+      } catch (e) {
+        console.warn("[gastos] notify admin FCM:", e);
+      }
+    })();
+  }
 
   const payload = { id: ref.id };
   return finalize(200, payload);

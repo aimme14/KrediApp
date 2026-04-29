@@ -315,6 +315,10 @@ export default function GastosPage() {
 
   function etiquetaAlcance(g: GastoItem): string {
     const a = (g.alcance ?? "").trim();
+    if (a === "empleado") {
+      const r = g.rutaId ? rutas.find((x) => x.id === g.rutaId) : undefined;
+      return r ? `Trabajador · ${r.nombre}` : "Trabajador";
+    }
     if (a === "ruta") {
       const r = rutas.find((r) => r.id === g.rutaId);
       return r ? `Ruta: ${r.nombre}` : "Ruta";
@@ -327,7 +331,7 @@ export default function GastosPage() {
     <div className="card">
       <h2 style={{ marginTop: 0 }}>Gastos operativos</h2>
       <p style={{ color: "var(--text-muted)", marginTop: "-0.25rem", marginBottom: "1rem" }}>
-        Indica si el gasto es tuyo (administrador) o de una ruta específica. Se descuenta de tu base.
+        Tus gastos (administrador o ruta) se descuentan de tu base. El historial incluye también los gastos operativos registrados por tus trabajadores (desde su base).
       </p>
 
       {showForm && (
@@ -596,7 +600,7 @@ export default function GastosPage() {
                 </thead>
                 <tbody>
                   {gastosOrdenados.map((g) => (
-                  <tr key={g.id}>
+                  <tr key={`${g.rol}-${g.id}`}>
                     <td className="gastos-col-nombre" title={g.creadoPorNombre ?? undefined}>{g.creadoPorNombre ?? "—"}</td>
                     <td className="gastos-col-fecha">{formatoFechaGastoColombia(g.fecha ?? null)}</td>
                     <td className="gastos-col-tipo">{tipoLabel(g.tipo ?? "")}</td>

@@ -5,6 +5,7 @@ import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { useDashboardHeaderSlot } from "@/context/DashboardHeaderContext";
+import { AdminFcmRegistration } from "@/components/AdminFcmRegistration";
 
 const NAV_ITEMS = [
   { href: "/dashboard/admin", label: "Inicio", icon: "home" },
@@ -202,6 +203,7 @@ export default function AdminLayout({
 
   return (
     <div className="jefe-wrapper">
+      <AdminFcmRegistration />
       <aside
         className={`jefe-drawer ${menuOpen ? "jefe-drawer-open" : ""}`}
         aria-hidden={!menuOpen}
