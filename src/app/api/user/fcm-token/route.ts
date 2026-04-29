@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { FieldValue } from "firebase-admin/firestore";
-import { getAdminFirestore } from "@/lib/firebase-admin";
+import { getAdminFirestore, getAdminMessaging } from "@/lib/firebase-admin";
 import { getApiUser } from "@/lib/api-auth";
 import { USERS_COLLECTION } from "@/lib/empresas-db";
+import { topicGastosAdmin } from "@/lib/fcm-gasto-topic";
 
 const MAX_TOKENS = 12;
 
@@ -46,5 +47,20 @@ export async function POST(request: NextRequest) {
     { merge: true }
   );
 
-  return NextResponse.json({ ok: true });
+  let subscribedTopic = false;
+  let topicName = "";
+  try {
+    const messaging = getAdminMessaging();
+    topicName = topicGastosAdmin(apiUser.empresaId, apiUser.uid);
+    await messaging.subscribeToTopic([token], topicName);
+    subscribedTopic = true;
+  } catch (e) {
+    console.warn("[fcm] subscribeToTopic gastos:", e);
+  }
+
+  return NextResponse.json({
+    ok: true,
+    topic: topicName,
+    subscribedTopic,
+  });
 }

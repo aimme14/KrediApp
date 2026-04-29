@@ -1778,6 +1778,49 @@ th {
   color: var(--text-muted);
 }
 
+/* Aviso compacto: gasto FCM en campanita (menos padding, sin “doble” cabecera) */
+.dashboard-notifications-alert-gasto-fcm {
+  padding: 0.5rem 0.65rem;
+  margin: 0.5rem 0.75rem 0.5rem;
+  font-size: 0.8125rem;
+  line-height: 1.35;
+  border-radius: 8px;
+}
+
+.dashboard-notifications-alert-gasto-fcm .dashboard-notifications-admin-inner {
+  margin: 0 0 0.45rem;
+  padding: 0;
+  border-top: none;
+}
+
+.dashboard-notifications-alert-gasto-fcm .dashboard-notifications-admin-item {
+  padding: 0.15rem 0 0.25rem;
+}
+
+.dashboard-notifications-alert-gasto-fcm .dashboard-notifications-admin-item-divider {
+  margin-top: 0.35rem;
+  padding-top: 0.4rem;
+}
+
+.dashboard-notifications-alert-gasto-fcm .dashboard-notifications-admin-label {
+  font-size: 0.6rem;
+  margin-bottom: 0.1rem;
+}
+
+.dashboard-notifications-alert-gasto-fcm .dashboard-notifications-admin-name {
+  font-size: 0.875rem;
+}
+
+.dashboard-notifications-alert-gasto-fcm .dashboard-notifications-admin-meta {
+  font-size: 0.72rem;
+  margin-top: 0.1rem;
+}
+
+.dashboard-notifications-alert-gasto-fcm .dashboard-notifications-link {
+  font-size: 0.75rem;
+  margin-top: 0.15rem;
+}
+
 /* Panel Jefe: menú hamburguesa y drawer móvil */
 .jefe-wrapper {
   position: relative;

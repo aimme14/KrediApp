@@ -1,11 +1,10 @@
 /**
- * Envía push al administrador cuando un empleado registra un gasto.
- * Una lectura de `users/{adminUid}` para obtener `fcmTokens`; el resto son datos ya en memoria del POST.
+ * Push al administrador cuando un empleado registra un gasto.
+ * Envío por topic FCM: sin lectura de Firestore en el hot path (solo send).
  */
 
-import type { Firestore } from "firebase-admin/firestore";
 import type { Messaging } from "firebase-admin/messaging";
-import { USERS_COLLECTION } from "@/lib/empresas-db";
+import { topicGastosAdmin } from "@/lib/fcm-gasto-topic";
 
 export type PayloadGastoEmpleadoFcm = {
   adminUid: string;
@@ -22,33 +21,24 @@ function formatMontoCOP(monto: number): string {
 }
 
 export async function notifyAdminGastoEmpleado(
-  db: Firestore,
   messaging: Messaging,
   payload: PayloadGastoEmpleadoFcm
 ): Promise<void> {
-  const { adminUid, empleadoNombre, monto, descripcion, gastoId, empresaId } = payload;
-  if (!adminUid.trim()) return;
+  const { adminUid, empleadoNombre, monto, descripcion, gastoId, empresaId } =
+    payload;
+  if (!adminUid.trim() || !empresaId.trim()) return;
 
-  const adminSnap = await db.collection(USERS_COLLECTION).doc(adminUid).get();
-  if (!adminSnap.exists) return;
-
-  const raw = adminSnap.data()?.fcmTokens;
-  const tokens = Array.from(
-    new Set(
-      Array.isArray(raw)
-        ? (raw as unknown[]).filter((t): t is string => typeof t === "string" && t.length > 0)
-        : []
-    )
-  );
-  if (tokens.length === 0) return;
+  const topic = topicGastosAdmin(empresaId, adminUid);
 
   const title = "Nuevo gasto de un trabajador";
   const motivo = descripcion.trim() || "Sin descripción";
-  const body = `${empleadoNombre}: ${formatMontoCOP(monto)} — ${motivo.length > 90 ? `${motivo.slice(0, 87)}…` : motivo}`;
+  const body = `${empleadoNombre}: ${formatMontoCOP(monto)} — ${
+    motivo.length > 90 ? `${motivo.slice(0, 87)}…` : motivo
+  }`;
 
   try {
-    const res = await messaging.sendEachForMulticast({
-      tokens,
+    await messaging.send({
+      topic,
       notification: { title, body },
       data: {
         type: "gasto_empleado",
@@ -57,26 +47,10 @@ export async function notifyAdminGastoEmpleado(
         click_action: "/dashboard/admin/gastos",
       },
     });
-    if (res.failureCount > 0) {
-      const invalid = new Set<string>();
-      const staleCodes = new Set([
-        "messaging/registration-token-not-registered",
-        "messaging/invalid-registration-token",
-      ]);
-      res.responses.forEach((r, i) => {
-        if (!r.success && r.error?.code && staleCodes.has(r.error.code)) {
-          invalid.add(tokens[i]);
-        }
-      });
-      if (invalid.size > 0) {
-        const kept = tokens.filter((t) => !invalid.has(t));
-        await db.collection(USERS_COLLECTION).doc(adminUid).set(
-          { fcmTokens: kept },
-          { merge: true }
-        );
-      }
+    if (process.env.NODE_ENV === "development") {
+      console.info("[fcm] Push gasto empleado enviado al topic:", topic);
     }
   } catch (e) {
-    console.warn("[fcm] notifyAdminGastoEmpleado:", e);
+    console.warn("[fcm] notifyAdminGastoEmpleado falló (topic / API FCM / credenciales):", topic, e);
   }
 }

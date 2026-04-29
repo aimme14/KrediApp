@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
+import { useGastoFcmCampanita } from "@/context/GastoFcmCampanitaContext";
 import {
   getMiSolicitudEntregaReporte,
   getSolicitudesEntregaReportePendientes,
@@ -28,6 +29,11 @@ function formatMonto(value: number): string {
 
 export default function DashboardNotifications() {
   const { user, profile } = useAuth();
+  const {
+    foregroundGastoBadge,
+    sessionGastoLines,
+    clearBadgeOnly,
+  } = useGastoFcmCampanita();
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -90,6 +96,16 @@ export default function DashboardNotifications() {
     };
   }, [open]);
 
+  const campanitaWasOpen = useRef(false);
+  /** Al abrir Avisos (transición cerrado → abierto), el badge de gasto FCM vuelve a 0. */
+  useEffect(() => {
+    if (role !== "admin") return;
+    if (open && !campanitaWasOpen.current) {
+      clearBadgeOnly();
+    }
+    campanitaWasOpen.current = open;
+  }, [open, role, clearBadgeOnly]);
+
   const badgeCount = useMemo(() => {
     if (role === "trabajador") {
       let n = 0;
@@ -97,9 +113,17 @@ export default function DashboardNotifications() {
       if (rechazadaTrabajador) n += 1;
       return n;
     }
-    if (role === "admin") return adminPendientes.length;
+    if (role === "admin") {
+      return adminPendientes.length + foregroundGastoBadge;
+    }
     return 0;
-  }, [role, pendienteTrabajador, rechazadaTrabajador, adminPendientes.length]);
+  }, [
+    role,
+    pendienteTrabajador,
+    rechazadaTrabajador,
+    adminPendientes.length,
+    foregroundGastoBadge,
+  ]);
 
   const badgeLabel =
     badgeCount > 9 ? "9+" : badgeCount > 0 ? String(badgeCount) : null;
@@ -216,6 +240,41 @@ export default function DashboardNotifications() {
                 </div>
               ) : (
                 <p className="dashboard-notifications-empty">No hay solicitudes de entrega pendientes.</p>
+              )}
+
+              {sessionGastoLines.length > 0 && (
+                <div
+                  className="dashboard-notifications-alert dashboard-notifications-alert-warning dashboard-notifications-alert-gasto-fcm"
+                  role="status"
+                  style={{ marginTop: "0.75rem" }}
+                >
+                  <div className="dashboard-notifications-admin-inner">
+                    {sessionGastoLines.slice(0, 8).map((row, idx) => (
+                      <div
+                        key={`${row.at}-${idx}`}
+                        className={`dashboard-notifications-admin-item${idx > 0 ? " dashboard-notifications-admin-item-divider" : ""}`}
+                      >
+                        <span className="dashboard-notifications-admin-label">{row.title}</span>
+                        <span className="dashboard-notifications-admin-name">{row.body}</span>
+                        <span className="dashboard-notifications-admin-meta">
+                          {new Date(row.at).toLocaleString("es-CO", {
+                            day: "2-digit",
+                            month: "short",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                  <Link
+                    href="/dashboard/admin/gastos"
+                    className="dashboard-notifications-link"
+                    onClick={() => setOpen(false)}
+                  >
+                    Ver gastos operativos
+                  </Link>
+                </div>
               )}
             </>
           )}

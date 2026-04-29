@@ -30,11 +30,23 @@ const messaging = firebase.messaging();
 messaging.onBackgroundMessage(function (payload) {
   const n = payload.notification || {};
   const title = n.title || 'KrediApp';
-  const options = {
-    body: n.body || '',
-    data: payload.data || {},
-  };
-  return self.registration.showNotification(title, options);
+  const body = n.body || '';
+  const data = payload.data || {};
+  if (data.type === 'gasto_empleado') {
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function (clients) {
+      clients.forEach(function (client) {
+        client.postMessage({
+          type: 'KREDI_FCM_GASTO',
+          title: title,
+          body: body,
+        });
+      });
+    });
+  }
+  return self.registration.showNotification(title, {
+    body: body,
+    data: data,
+  });
 });
 `;
 

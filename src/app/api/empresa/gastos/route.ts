@@ -501,10 +501,15 @@ export async function POST(request: NextRequest) {
   });
 
   const adminUid = (apiUser.adminId ?? "").trim();
+  if (!adminUid) {
+    console.warn(
+      "[gastos] Empleado sin adminId en perfil; no se envía push FCM. Asigna administrador al trabajador en Firestore/users."
+    );
+  }
   if (adminUid) {
     void (async () => {
       try {
-        await notifyAdminGastoEmpleado(db, getAdminMessaging(), {
+        await notifyAdminGastoEmpleado(getAdminMessaging(), {
           adminUid,
           empleadoNombre: creadoPorNombre.trim() || apiUser.uid,
           monto,

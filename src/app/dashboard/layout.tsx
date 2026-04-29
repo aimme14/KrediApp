@@ -8,7 +8,9 @@ import { roleLabel } from "@/types/roles";
 import DashboardNotifications from "@/components/DashboardNotifications";
 import DashboardSettings from "@/components/DashboardSettings";
 import InactivityLock from "@/components/InactivityLock";
+import { AdminFcmForegroundListener } from "@/components/AdminFcmForegroundListener";
 import { DashboardHeaderProvider } from "@/context/DashboardHeaderContext";
+import { GastoFcmCampanitaProvider } from "@/context/GastoFcmCampanitaContext";
 import { getEmpresa } from "@/lib/empresa";
 import type { ReactNode } from "react";
 import type { EmpresaProfile } from "@/types/empresa";
@@ -83,41 +85,44 @@ export default function DashboardLayout({
 
   return (
     <InactivityLock>
-      <DashboardHeaderProvider value={setHeaderLeftSlot}>
-        <div className={`container container-dashboard${isGastosPage ? " dashboard-page-gastos" : ""}`}>
-          <header className="dashboard-header">
-            <div className="header-left">
-              {headerLeftSlot}
-              {showEmpresaEnHeader ? (
-                <Link
-                  href={empresaLinkHref}
-                  className={`dashboard-header-empresa ${empresaCompact ? "dashboard-header-empresa-compact" : ""}`}
-                  aria-label={`${nombreEmpresa} - Inicio`}
-                >
-                  <div className="dashboard-header-empresa-logo">
-                    {empresa?.logo ? (
-                      <img src={empresa.logo} alt="" />
-                    ) : (
-                      <span className="dashboard-header-empresa-iniciales">
-                        {nombreEmpresa.slice(0, 2).toUpperCase()}
-                      </span>
-                    )}
-                  </div>
-                  <span className="dashboard-header-empresa-nombre">{nombreEmpresa}</span>
-                </Link>
-              ) : null}
-              <span className={`badge badge-${profile.role} dashboard-header-badge`} style={{ textTransform: "capitalize" }}>
-                {roleLabel(profile.role)}
-              </span>
-            </div>
-            <div className="header-right">
-              <DashboardNotifications />
-              <DashboardSettings />
-            </div>
-          </header>
-          {children}
-        </div>
-      </DashboardHeaderProvider>
+      <GastoFcmCampanitaProvider>
+        <AdminFcmForegroundListener />
+        <DashboardHeaderProvider value={setHeaderLeftSlot}>
+          <div className={`container container-dashboard${isGastosPage ? " dashboard-page-gastos" : ""}`}>
+            <header className="dashboard-header">
+              <div className="header-left">
+                {headerLeftSlot}
+                {showEmpresaEnHeader ? (
+                  <Link
+                    href={empresaLinkHref}
+                    className={`dashboard-header-empresa ${empresaCompact ? "dashboard-header-empresa-compact" : ""}`}
+                    aria-label={`${nombreEmpresa} - Inicio`}
+                  >
+                    <div className="dashboard-header-empresa-logo">
+                      {empresa?.logo ? (
+                        <img src={empresa.logo} alt="" />
+                      ) : (
+                        <span className="dashboard-header-empresa-iniciales">
+                          {nombreEmpresa.slice(0, 2).toUpperCase()}
+                        </span>
+                      )}
+                    </div>
+                    <span className="dashboard-header-empresa-nombre">{nombreEmpresa}</span>
+                  </Link>
+                ) : null}
+                <span className={`badge badge-${profile.role} dashboard-header-badge`} style={{ textTransform: "capitalize" }}>
+                  {roleLabel(profile.role)}
+                </span>
+              </div>
+              <div className="header-right">
+                <DashboardNotifications />
+                <DashboardSettings />
+              </div>
+            </header>
+            {children}
+          </div>
+        </DashboardHeaderProvider>
+      </GastoFcmCampanitaProvider>
     </InactivityLock>
   );
 }
