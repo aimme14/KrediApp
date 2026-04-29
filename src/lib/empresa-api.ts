@@ -103,7 +103,7 @@ export type GastoItem = {
   adminId: string;
   empleadoId: string;
   evidencia: string;
-  /** empresa | admin | ruta (según subcolección / legacy) */
+  /** empresa | admin | ruta | empleado (según subcolección / legacy) */
   alcance?: string;
 };
 

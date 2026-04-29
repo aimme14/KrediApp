@@ -4,6 +4,8 @@ import { getAuth } from "firebase-admin/auth";
 import type { Auth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
 import type { Firestore } from "firebase-admin/firestore";
+import { getMessaging } from "firebase-admin/messaging";
+import type { Messaging } from "firebase-admin/messaging";
 
 const projectId = (process.env.FIREBASE_PROJECT_ID ?? "").trim();
 const clientEmail = (process.env.FIREBASE_CLIENT_EMAIL ?? "").trim();
@@ -27,4 +29,8 @@ export function getAdminAuth(): Auth {
 
 export function getAdminFirestore(): Firestore {
   return getFirestore(getAdminApp());
+}
+
+export function getAdminMessaging(): Messaging {
+  return getMessaging(getAdminApp());
 }

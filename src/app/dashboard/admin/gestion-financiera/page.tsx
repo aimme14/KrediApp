@@ -543,13 +543,13 @@ export default function GestionFinancieraPage() {
                   <span className="gf-capital-icon" aria-hidden>
                     📋
                   </span>
-                  <h2 className="gf-capital-card-title">Gastos del administrador</h2>
+                  <h2 className="gf-capital-card-title">Gastos operativos</h2>
                 </div>
                 <span className="gf-capital-badge-privado">🔒 Privado</span>
               </div>
               <p className="gf-capital-card-desc">
-                Total de gastos asociados a tu usuario (por ruta y generales). Para registrar un gasto nuevo
-                usa la sección Gastos del menú.
+                Total acumulado en rutas (incluye impacto de gastos de equipo). El historial lista tus gastos
+                y los registrados por tus trabajadores. Para registrar un gasto como admin, usa Gastos en el menú.
               </p>
 
               <div className="gf-capital-display">
@@ -585,9 +585,14 @@ export default function GestionFinancieraPage() {
                     </thead>
                     <tbody>
                       {gastosOrdenados.map((g, i) => {
-                        const rutaLabel = g.rutaId?.trim()
-                          ? rutaNombrePorId.get(g.rutaId) ?? `Ruta ${g.rutaId.slice(0, 8)}…`
-                          : "Gasto general";
+                        const rutaLabel =
+                          (g.alcance ?? "").trim() === "empleado"
+                            ? g.rutaId?.trim()
+                              ? rutaNombrePorId.get(g.rutaId) ?? `Ruta ${g.rutaId.slice(0, 8)}…`
+                              : "Trabajador"
+                            : g.rutaId?.trim()
+                              ? rutaNombrePorId.get(g.rutaId) ?? `Ruta ${g.rutaId.slice(0, 8)}…`
+                              : "Gasto general";
                         const quien =
                           (g.creadoPorNombre && String(g.creadoPorNombre).trim()) ||
                           (g.creadoPor === user?.uid
@@ -599,7 +604,7 @@ export default function GestionFinancieraPage() {
                         const motivoText = g.descripcion?.trim() || "—";
                         const motivo = g.tipo ? `${motivoText} (${g.tipo})` : motivoText;
                         return (
-                          <tr key={`${g.id}-${g.alcance ?? i}`}>
+                          <tr key={`${g.rol}-${g.id}-${g.alcance ?? i}`}>
                             <td className="col-num">{formatMoneda(g.monto)}</td>
                             <td>{formatoFechaGastoColombia(g.fecha ?? null)}</td>
                             <td>{motivo}</td>
