@@ -361,20 +361,9 @@ export type CobrosDelDiaEmpleadoResponse = {
   noPagos: NoPagoDiaItem[];
   totalCobrosLista: number;
   totalGastosDia: number;
-  /** Suma de traspasos ruta→empleado registrados ese día (Colombia); auditoría. */
-  totalBaseAsignadaDia: number;
-  /** `cajaEmpleado` + cobros del día − gastos del día (misma respuesta). */
-  cajaTotalDelDia: number;
   gastosDelDia: GastoDiaItem[];
   /** Saldo operativo (`usuarios.cajaEmpleado`). */
   cajaEmpleado: number;
-  cajaDelDia: {
-    cobrosDelDia: number;
-    gastosDelDia: number;
-    totalBaseAsignadaDia: number;
-    cajaTotalDelDia: number;
-    cajaEsperadaDelDia: number;
-  };
 };
 
 export async function getCobrosDelDiaEmpleado(
@@ -385,14 +374,6 @@ export async function getCobrosDelDiaEmpleado(
   const res = await fetchWithAuth(`/api/empresa/empleado/cobros-del-dia${qs}`, token);
   const data = await res.json();
   if (!res.ok) throw new Error(data.error ?? "Error al cargar cobros del día");
-  const totalBaseAsignadaDia =
-    typeof data.totalBaseAsignadaDia === "number" ? data.totalBaseAsignadaDia : 0;
-  const cajaTotalDelDia =
-    typeof data.cajaTotalDelDia === "number"
-      ? data.cajaTotalDelDia
-      : typeof data?.cajaDelDia?.cajaTotalDelDia === "number"
-        ? data.cajaDelDia.cajaTotalDelDia
-        : 0;
 
   return {
     fechaDia: data.fechaDia ?? "",
@@ -401,24 +382,8 @@ export async function getCobrosDelDiaEmpleado(
     noPagos: Array.isArray(data.noPagos) ? data.noPagos : [],
     totalCobrosLista: typeof data.totalCobrosLista === "number" ? data.totalCobrosLista : 0,
     totalGastosDia: typeof data.totalGastosDia === "number" ? data.totalGastosDia : 0,
-    totalBaseAsignadaDia,
-    cajaTotalDelDia,
     gastosDelDia: Array.isArray(data.gastosDelDia) ? data.gastosDelDia : [],
     cajaEmpleado: typeof data.cajaEmpleado === "number" ? data.cajaEmpleado : 0,
-    cajaDelDia: {
-      cobrosDelDia: typeof data?.cajaDelDia?.cobrosDelDia === "number" ? data.cajaDelDia.cobrosDelDia : 0,
-      gastosDelDia: typeof data?.cajaDelDia?.gastosDelDia === "number" ? data.cajaDelDia.gastosDelDia : 0,
-      totalBaseAsignadaDia:
-        typeof data?.cajaDelDia?.totalBaseAsignadaDia === "number"
-          ? data.cajaDelDia.totalBaseAsignadaDia
-          : totalBaseAsignadaDia,
-      cajaTotalDelDia:
-        typeof data?.cajaDelDia?.cajaTotalDelDia === "number"
-          ? data.cajaDelDia.cajaTotalDelDia
-          : cajaTotalDelDia,
-      cajaEsperadaDelDia:
-        typeof data?.cajaDelDia?.cajaEsperadaDelDia === "number" ? data.cajaDelDia.cajaEsperadaDelDia : 0,
-    },
   };
 }
 

@@ -3,7 +3,6 @@ import { Timestamp } from "firebase-admin/firestore";
 import { getAdminFirestore } from "@/lib/firebase-admin";
 import { getApiUser } from "@/lib/api-auth";
 import {
-  ASIGNACIONES_BASE_EMPLEADO_SUBCOLLECTION,
   EMPRESAS_COLLECTION,
   CLIENTES_SUBCOLLECTION,
   GASTOS_EMPLEADO_SUBCOLLECTION,
@@ -310,33 +309,6 @@ export async function GET(request: NextRequest) {
   addGastoDocs(nuevoG);
   totalGastosDia = round2(totalGastosDia);
 
-  let totalBaseAsignadaDia = 0;
-  try {
-    const asignSnap = await db
-      .collection(EMPRESAS_COLLECTION)
-      .doc(empresaId)
-      .collection(USUARIOS_SUBCOLLECTION)
-      .doc(apiUser.uid)
-      .collection(ASIGNACIONES_BASE_EMPLEADO_SUBCOLLECTION)
-      .where("fecha", ">=", Timestamp.fromDate(start))
-      .where("fecha", "<=", Timestamp.fromDate(end))
-      .get();
-    for (const d of asignSnap.docs) {
-      const x = d.data() as Record<string, unknown>;
-      const mo = typeof x.monto === "number" && Number.isFinite(x.monto) ? x.monto : 0;
-      if (mo > 0) totalBaseAsignadaDia += mo;
-    }
-    totalBaseAsignadaDia = round2(totalBaseAsignadaDia);
-  } catch {
-    totalBaseAsignadaDia = 0;
-  }
-
-  /**
-   * Saldo en documento (`cajaEmpleado`) + cobros del día − gastos del día.
-   * Coincide con la tarjeta «Caja (efectivo)» + «Total cobrado» − «Gastos» en esta misma respuesta.
-   */
-  const cajaTotalDelDia = round2(cajaEmpleado + totalCobrosLista - totalGastosDia);
-
   return NextResponse.json({
     fechaDia,
     rutaId,
@@ -344,17 +316,7 @@ export async function GET(request: NextRequest) {
     noPagos,
     totalCobrosLista,
     totalGastosDia,
-    totalBaseAsignadaDia,
-    cajaTotalDelDia,
     gastosDelDia: gastosDetalle,
     cajaEmpleado,
-    cajaDelDia: {
-      cobrosDelDia: totalCobrosLista,
-      gastosDelDia: totalGastosDia,
-      totalBaseAsignadaDia,
-      cajaTotalDelDia,
-      /** Saldo operativo actual (`usuarios.cajaEmpleado`). */
-      cajaEsperadaDelDia: cajaEmpleado,
-    },
   });
 }
