@@ -1674,6 +1674,40 @@ th {
   border: 1px solid transparent;
   font-size: 0.875rem;
   line-height: 1.45;
+  position: relative;
+}
+
+.dashboard-notifications-close {
+  position: absolute;
+  top: 0.35rem;
+  right: 0.35rem;
+  width: 24px;
+  height: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.22);
+  color: var(--text);
+  font-size: 0.95rem;
+  font-weight: 700;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.dashboard-notifications-close:hover {
+  background: rgba(0, 0, 0, 0.32);
+}
+
+.dashboard-notifications-close:focus {
+  outline: 2px solid rgba(167, 139, 250, 0.7);
+  outline-offset: 1px;
+}
+
+[data-theme="light"] .dashboard-notifications-close {
+  border-color: rgba(0, 0, 0, 0.12);
+  background: rgba(255, 255, 255, 0.84);
 }
 
 .dashboard-notifications-alert strong {

@@ -26,13 +26,17 @@ export default function ResumenDelDiaPage() {
   const [msgReporte, setMsgReporte] = useState<string | null>(null);
   const [errReporte, setErrReporte] = useState<string | null>(null);
   const [solicitudPendiente, setSolicitudPendiente] = useState<SolicitudEntregaReporteApi | null>(null);
+  const [solicitudRechazada, setSolicitudRechazada] = useState<SolicitudEntregaReporteApi | null>(null);
 
   const cargarSolicitudReporte = useCallback(async () => {
     if (!user) return;
     try {
       const token = await user.getIdToken();
-      const { pendiente } = await getMiSolicitudEntregaReporte(token);
+      const { pendiente, ultimaRechazada } = await getMiSolicitudEntregaReporte(token);
       setSolicitudPendiente(pendiente);
+      setSolicitudRechazada(
+        pendiente ? null : ultimaRechazada?.estado === "rechazada" ? ultimaRechazada : null
+      );
     } catch {
       /* silencioso */
     }
@@ -58,7 +62,6 @@ export default function ResumenDelDiaPage() {
 
   const cerrarModalEntrega = () => {
     setModalEntregaAbierto(false);
-    setComentarioEntrega("");
     setErrReporte(null);
   };
 
@@ -88,26 +91,74 @@ export default function ResumenDelDiaPage() {
 
   if (!profile || profile.role !== "trabajador") return null;
 
-  const btnTitle = solicitudPendiente
-    ? "Ya tenés una solicitud de entrega pendiente de confirmación."
-    : undefined;
+  const estadoSolicitud = solicitudPendiente
+    ? "en_curso"
+    : solicitudRechazada
+      ? "rechazada"
+      : "sin_solicitud";
+
+  const btnTitle =
+    estadoSolicitud === "en_curso"
+      ? "Ya tenés una solicitud de entrega pendiente de confirmación."
+      : undefined;
+
+  const ctaLabel = estadoSolicitud === "rechazada" ? "Corregir y reenviar" : "Solicitar entrega de reporte";
 
   return (
     <div className="card">
       <h2 style={{ marginTop: 0 }}>Entrega de reporte</h2>
 
+      {estadoSolicitud !== "sin_solicitud" && (
+        <div
+          style={{
+            marginBottom: "1rem",
+            padding: "0.75rem",
+            borderRadius: "10px",
+            border: "1px solid var(--card-border)",
+            background: "var(--card-bg)",
+          }}
+        >
+          <p style={{ margin: 0, fontSize: "0.875rem", color: "var(--text-muted)" }}>Estado de solicitud</p>
+          {estadoSolicitud === "en_curso" ? (
+            <>
+              <p style={{ margin: "0.35rem 0 0", fontWeight: 700, color: "var(--warning, #f4c430)" }}>
+                En curso
+              </p>
+              <p style={{ margin: "0.35rem 0 0", fontSize: "0.875rem", color: "var(--text-muted)" }}>
+                Tu solicitud está pendiente de validación por el administrador.
+              </p>
+            </>
+          ) : (
+            <>
+              <p style={{ margin: "0.35rem 0 0", fontWeight: 700, color: "var(--danger, #d9534f)" }}>
+                Rechazada
+              </p>
+              <p style={{ margin: "0.35rem 0 0", fontSize: "0.875rem", color: "var(--text-muted)" }}>
+                {solicitudRechazada?.motivoRechazo?.trim()
+                  ? `Motivo: ${solicitudRechazada.motivoRechazo}`
+                  : "Motivo: sin detalle del administrador."}
+              </p>
+            </>
+          )}
+        </div>
+      )}
+
       <div style={{ marginBottom: "1.25rem" }}>
         <button
           type="button"
           className="btn btn-primary"
-          disabled={entregando || Boolean(solicitudPendiente)}
+          disabled={entregando || estadoSolicitud === "en_curso"}
           title={btnTitle}
           onClick={() => {
             setModalEntregaAbierto(true);
+            setComentarioEntrega(
+              estadoSolicitud === "rechazada" ? solicitudRechazada?.comentarioTrabajador ?? "" : ""
+            );
+            setMsgReporte(null);
             setErrReporte(null);
           }}
         >
-          Solicitar entrega de reporte
+          {ctaLabel}
         </button>
         {msgReporte && (
           <p style={{ marginTop: "0.5rem", color: "var(--success, #6bbf6b)", fontSize: "0.875rem" }}>{msgReporte}</p>

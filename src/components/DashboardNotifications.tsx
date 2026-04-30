@@ -42,8 +42,54 @@ export default function DashboardNotifications() {
   const [rechazadaTrabajador, setRechazadaTrabajador] =
     useState<SolicitudEntregaReporteApi | null>(null);
   const [adminPendientes, setAdminPendientes] = useState<SolicitudEntregaPendienteAdmin[]>([]);
+  const [dismissedKeys, setDismissedKeys] = useState<string[]>([]);
 
   const role = profile?.role;
+  const storageKey = useMemo(() => {
+    if (!user?.uid || !role) return null;
+    return `kredi:dismissed-notifications:${role}:${user.uid}`;
+  }, [role, user?.uid]);
+  const dismissedSet = useMemo(() => new Set(dismissedKeys), [dismissedKeys]);
+
+  const dismissNotification = (key: string) => {
+    setDismissedKeys((prev) => (prev.includes(key) ? prev : [...prev, key]));
+  };
+
+  const workerPendingKey = pendienteTrabajador ? `worker-pending-${pendienteTrabajador.id}` : null;
+  const workerRejectedKey = rechazadaTrabajador ? `worker-rejected-${rechazadaTrabajador.id}` : null;
+  const adminPendingKey = "admin-pending-batch";
+  const adminOperativoKey = "admin-operativo-batch";
+
+  useEffect(() => {
+    if (!storageKey) {
+      setDismissedKeys([]);
+      return;
+    }
+    try {
+      const raw = window.localStorage.getItem(storageKey);
+      if (!raw) {
+        setDismissedKeys([]);
+        return;
+      }
+      const parsed = JSON.parse(raw) as unknown;
+      if (Array.isArray(parsed)) {
+        setDismissedKeys(parsed.filter((x): x is string => typeof x === "string"));
+      } else {
+        setDismissedKeys([]);
+      }
+    } catch {
+      setDismissedKeys([]);
+    }
+  }, [storageKey]);
+
+  useEffect(() => {
+    if (!storageKey) return;
+    try {
+      window.localStorage.setItem(storageKey, JSON.stringify(dismissedKeys));
+    } catch {
+      /* silencioso */
+    }
+  }, [storageKey, dismissedKeys]);
 
   useEffect(() => {
     if (!user || !role) return;
@@ -58,7 +104,7 @@ export default function DashboardNotifications() {
           if (cancelled) return;
           setPendienteTrabajador(pendiente);
           setRechazadaTrabajador(
-            ultimaRechazada?.estado === "rechazada" ? ultimaRechazada : null
+            pendiente ? null : ultimaRechazada?.estado === "rechazada" ? ultimaRechazada : null
           );
         } else if (role === "admin") {
           const list = await getSolicitudesEntregaReportePendientes(token);
@@ -108,19 +154,30 @@ export default function DashboardNotifications() {
 
   const badgeCount = useMemo(() => {
     if (role === "trabajador") {
-      let n = 0;
-      if (pendienteTrabajador) n += 1;
-      if (rechazadaTrabajador) n += 1;
-      return n;
+      const visiblePendiente =
+        !!pendienteTrabajador && !!workerPendingKey && !dismissedSet.has(workerPendingKey);
+      const visibleRechazada =
+        !!rechazadaTrabajador && !!workerRejectedKey && !dismissedSet.has(workerRejectedKey);
+      // Priorizamos "pendiente": si existe, no contamos rechazo histórico.
+      if (visiblePendiente) return 1;
+      if (visibleRechazada) return 1;
+      return 0;
     }
     if (role === "admin") {
-      return adminPendientes.length + foregroundOperativoBadge;
+      const pendingCount = dismissedSet.has(adminPendingKey) ? 0 : adminPendientes.length;
+      const operativoCount = dismissedSet.has(adminOperativoKey) ? 0 : foregroundOperativoBadge;
+      return pendingCount + operativoCount;
     }
     return 0;
   }, [
     role,
     pendienteTrabajador,
     rechazadaTrabajador,
+    workerPendingKey,
+    workerRejectedKey,
+    dismissedSet,
+    adminPendingKey,
+    adminOperativoKey,
     adminPendientes.length,
     foregroundOperativoBadge,
   ]);
@@ -160,8 +217,17 @@ export default function DashboardNotifications() {
 
           {role === "trabajador" && (
             <>
-              {pendienteTrabajador && (
+              {pendienteTrabajador && workerPendingKey && !dismissedSet.has(workerPendingKey) && (
                 <div className="dashboard-notifications-alert dashboard-notifications-alert-warning" role="status">
+                  <button
+                    type="button"
+                    className="dashboard-notifications-close"
+                    onClick={() => dismissNotification(workerPendingKey)}
+                    aria-label="Cerrar notificación"
+                    title="Cerrar"
+                  >
+                    ×
+                  </button>
                   <strong>Entrega de reporte pendiente</strong>
                   <p className="dashboard-notifications-alert-text">
                     Pediste entregar aproximadamente {formatMonto(pendienteTrabajador.montoAlSolicitar)}. El
@@ -176,8 +242,17 @@ export default function DashboardNotifications() {
                   </Link>
                 </div>
               )}
-              {rechazadaTrabajador && (
+              {rechazadaTrabajador && workerRejectedKey && !dismissedSet.has(workerRejectedKey) && (
                 <div className="dashboard-notifications-alert dashboard-notifications-alert-danger" role="alert">
+                  <button
+                    type="button"
+                    className="dashboard-notifications-close"
+                    onClick={() => dismissNotification(workerRejectedKey)}
+                    aria-label="Cerrar notificación"
+                    title="Cerrar"
+                  >
+                    ×
+                  </button>
                   <strong>Solicitud rechazada</strong>
                   <p className="dashboard-notifications-alert-text">
                     {rechazadaTrabajador.motivoRechazo?.trim()
@@ -193,7 +268,10 @@ export default function DashboardNotifications() {
                   </Link>
                 </div>
               )}
-              {!pendienteTrabajador && !rechazadaTrabajador && (
+              {(!pendienteTrabajador ||
+                (workerPendingKey ? dismissedSet.has(workerPendingKey) : false)) &&
+                (!rechazadaTrabajador ||
+                  (workerRejectedKey ? dismissedSet.has(workerRejectedKey) : false)) && (
                 <p className="dashboard-notifications-empty">No tenés avisos por ahora.</p>
               )}
             </>
@@ -201,8 +279,17 @@ export default function DashboardNotifications() {
 
           {role === "admin" && (
             <>
-              {adminPendientes.length > 0 ? (
+              {adminPendientes.length > 0 && !dismissedSet.has(adminPendingKey) ? (
                 <div className="dashboard-notifications-alert dashboard-notifications-alert-info" role="status">
+                  <button
+                    type="button"
+                    className="dashboard-notifications-close"
+                    onClick={() => dismissNotification(adminPendingKey)}
+                    aria-label="Cerrar notificación"
+                    title="Cerrar"
+                  >
+                    ×
+                  </button>
                   <strong>
                     {adminPendientes.length === 1
                       ? "1 solicitud de entrega pendiente"
@@ -242,12 +329,21 @@ export default function DashboardNotifications() {
                 <p className="dashboard-notifications-empty">No hay solicitudes de entrega pendientes.</p>
               )}
 
-              {sessionOperativoLines.length > 0 && (
+              {sessionOperativoLines.length > 0 && !dismissedSet.has(adminOperativoKey) && (
                 <div
                   className="dashboard-notifications-alert dashboard-notifications-alert-warning dashboard-notifications-alert-gasto-fcm"
                   role="status"
                   style={{ marginTop: "0.75rem" }}
                 >
+                  <button
+                    type="button"
+                    className="dashboard-notifications-close"
+                    onClick={() => dismissNotification(adminOperativoKey)}
+                    aria-label="Cerrar notificación"
+                    title="Cerrar"
+                  >
+                    ×
+                  </button>
                   <div className="dashboard-notifications-admin-inner">
                     {sessionOperativoLines.slice(0, 8).map((row, idx) => (
                       <div
