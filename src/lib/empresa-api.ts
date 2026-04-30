@@ -335,6 +335,18 @@ export type CobroDiaItem = {
   saldoPendientePrestamoActual: number;
 };
 
+/** Registros «no pagó» que el trabajador confirmó ese día (ruta del empleado). */
+export type NoPagoDiaItem = {
+  pagoId: string;
+  prestamoId: string;
+  clienteId: string;
+  clienteNombre: string;
+  fecha: string | null;
+  motivoNoPago: string;
+  nota: string | null;
+  saldoPendientePrestamoActual: number;
+};
+
 export type GastoDiaItem = {
   id: string;
   monto: number;
@@ -346,6 +358,7 @@ export type CobrosDelDiaEmpleadoResponse = {
   fechaDia: string;
   rutaId: string;
   cobros: CobroDiaItem[];
+  noPagos: NoPagoDiaItem[];
   totalCobrosLista: number;
   totalGastosDia: number;
   /** Suma de traspasos ruta→empleado registrados ese día (Colombia); auditoría. */
@@ -385,6 +398,7 @@ export async function getCobrosDelDiaEmpleado(
     fechaDia: data.fechaDia ?? "",
     rutaId: data.rutaId ?? "",
     cobros: Array.isArray(data.cobros) ? data.cobros : [],
+    noPagos: Array.isArray(data.noPagos) ? data.noPagos : [],
     totalCobrosLista: typeof data.totalCobrosLista === "number" ? data.totalCobrosLista : 0,
     totalGastosDia: typeof data.totalGastosDia === "number" ? data.totalGastosDia : 0,
     totalBaseAsignadaDia,

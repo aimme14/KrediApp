@@ -7,6 +7,7 @@ import {
   getCobrosDelDiaEmpleado,
   type CobrosDelDiaEmpleadoResponse,
   type CobroDiaItem,
+  type NoPagoDiaItem,
 } from "@/lib/empresa-api";
 import { fechaDiaColombiaHoy } from "@/lib/colombia-day-bounds";
 
@@ -29,6 +30,18 @@ function formatHora(iso: string | null): string {
   } catch {
     return "—";
   }
+}
+
+/** Mismas etiquetas que en cobrar → «No pagó». */
+const MOTIVO_NO_PAGO_LABEL: Record<string, string> = {
+  sin_fondos: "No tenía dinero",
+  no_estaba: "No estaba en casa",
+  promesa_pago: "Prometió pagar después",
+  otro: "Otro motivo",
+};
+
+function labelMotivoNoPago(codigo: string): string {
+  return MOTIVO_NO_PAGO_LABEL[codigo] ?? codigo;
 }
 
 export default function CajaDelDiaPage() {
@@ -222,6 +235,56 @@ export default function CajaDelDiaPage() {
                       <td>{c.metodoPago ?? "—"}</td>
                       <td className="col-num">{formatMonto(c.saldoPendienteTrasPago)}</td>
                       <td className="col-num">{formatMonto(c.saldoPendientePrestamoActual)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          <h3
+            style={{
+              fontSize: "1.05rem",
+              marginTop: "1.25rem",
+              marginBottom: "0.5rem",
+            }}
+          >
+            Clientes que no pagaron
+          </h3>
+          <p
+            style={{
+              marginBottom: "0.5rem",
+              fontSize: "0.8125rem",
+              color: "var(--text-muted)",
+              lineHeight: 1.45,
+            }}
+          >
+            Visitas donde registraste «No pagó» en Cobrar (misma fecha y tu usuario).
+          </p>
+          {(data.noPagos ?? []).length === 0 ? (
+            <p style={{ color: "var(--text-muted)" }}>
+              No hay registros de no pago para esta fecha.
+            </p>
+          ) : (
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Hora</th>
+                    <th>Cliente</th>
+                    <th>Motivo</th>
+                    <th>Nota</th>
+                    <th className="col-num">Saldo préstamo (actual)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(data.noPagos ?? []).map((n: NoPagoDiaItem) => (
+                    <tr key={`no-${n.prestamoId}-${n.pagoId}`}>
+                      <td>{formatHora(n.fecha)}</td>
+                      <td>{n.clienteNombre}</td>
+                      <td>{labelMotivoNoPago(n.motivoNoPago)}</td>
+                      <td>{n.nota ?? "—"}</td>
+                      <td className="col-num">{formatMonto(n.saldoPendientePrestamoActual)}</td>
                     </tr>
                   ))}
                 </tbody>

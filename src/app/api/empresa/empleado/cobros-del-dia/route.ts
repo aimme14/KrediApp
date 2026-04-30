@@ -36,7 +36,19 @@ export type CobroDiaItemApi = {
   saldoPendientePrestamoActual: number;
 };
 
-/** GET: cobros (cuotas pagadas) del día para el trabajador + totales y caja (`cajaEmpleado`). ?fecha=YYYY-MM-DD (Colombia). */
+/** Visitas sin cobro registradas ese día por este trabajador (`tipo: no_pago`). */
+export type NoPagoDiaItemApi = {
+  pagoId: string;
+  prestamoId: string;
+  clienteId: string;
+  clienteNombre: string;
+  fecha: string | null;
+  motivoNoPago: string;
+  nota: string | null;
+  saldoPendientePrestamoActual: number;
+};
+
+/** GET: cobros del día, «no pagó» del trabajador, totales y caja (`cajaEmpleado`). ?fecha=YYYY-MM-DD (Colombia). */
 export async function GET(request: NextRequest) {
   const apiUser = await getApiUser(request);
   if (!apiUser) {
@@ -115,7 +127,16 @@ export async function GET(request: NextRequest) {
     metodoPago: string | null;
   };
 
+  type NoPagoRow = {
+    pagoId: string;
+    prestamoId: string;
+    fechaMs: number;
+    motivoNoPago: string;
+    nota: string | null;
+  };
+
   const pagosRaw: PagoRow[] = [];
+  const noPagosRaw: NoPagoRow[] = [];
 
   const CHUNK = 12;
   const prestamoDocs = prestamosSnap.docs;
@@ -130,11 +151,35 @@ export async function GET(request: NextRequest) {
           .get();
         for (const p of pq.docs) {
           const pd = p.data() as Record<string, unknown>;
-          if ((pd.tipo as string) !== "pago") continue;
-          const monto = typeof pd.monto === "number" && pd.monto > 0 ? pd.monto : 0;
-          if (monto <= 0) continue;
+          const tipo = typeof pd.tipo === "string" ? pd.tipo : "";
           const f = pd.fecha as { toMillis?: () => number } | undefined;
           const fechaMs = typeof f?.toMillis === "function" ? f.toMillis() : 0;
+
+          if (tipo === "no_pago") {
+            const empId = typeof pd.empleadoId === "string" ? pd.empleadoId.trim() : "";
+            if (empId !== apiUser.uid) continue;
+            const motivo =
+              typeof pd.motivoNoPago === "string" && pd.motivoNoPago.trim()
+                ? pd.motivoNoPago.trim()
+                : "—";
+            const notaRaw = pd.nota;
+            const nota =
+              typeof notaRaw === "string" && notaRaw.trim()
+                ? notaRaw.trim()
+                : null;
+            noPagosRaw.push({
+              pagoId: p.id,
+              prestamoId: pdoc.id,
+              fechaMs,
+              motivoNoPago: motivo,
+              nota,
+            });
+            continue;
+          }
+
+          if (tipo !== "pago") continue;
+          const monto = typeof pd.monto === "number" && pd.monto > 0 ? pd.monto : 0;
+          if (monto <= 0) continue;
           const metodo =
             pd.metodoPago === "transferencia" || pd.metodoPago === "efectivo"
               ? (pd.metodoPago as string)
@@ -187,6 +232,25 @@ export async function GET(request: NextRequest) {
   }
 
   cobros.sort((a, b) => (b.fecha ?? "").localeCompare(a.fecha ?? ""));
+
+  const noPagos: NoPagoDiaItemApi[] = noPagosRaw.map((row) => {
+    const meta = prestamoMeta.get(row.prestamoId);
+    const cid = meta?.clienteId ?? "";
+    const nombre = clienteNombre.get(cid) ?? "—";
+    const saldoActual = meta?.saldoPendienteActual ?? 0;
+    const fechaIso = row.fechaMs > 0 ? new Date(row.fechaMs).toISOString() : null;
+    return {
+      pagoId: row.pagoId,
+      prestamoId: row.prestamoId,
+      clienteId: cid,
+      clienteNombre: nombre,
+      fecha: fechaIso,
+      motivoNoPago: row.motivoNoPago,
+      nota: row.nota,
+      saldoPendientePrestamoActual: round2(saldoActual),
+    };
+  });
+  noPagos.sort((a, b) => (b.fecha ?? "").localeCompare(a.fecha ?? ""));
 
   const totalCobrosLista = round2(cobros.reduce((s, c) => s + c.monto, 0));
 
@@ -277,6 +341,7 @@ export async function GET(request: NextRequest) {
     fechaDia,
     rutaId,
     cobros,
+    noPagos,
     totalCobrosLista,
     totalGastosDia,
     totalBaseAsignadaDia,
