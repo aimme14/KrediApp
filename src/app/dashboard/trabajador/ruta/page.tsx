@@ -3,10 +3,13 @@
 import { useMemo, useCallback, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { doc, onSnapshot } from "firebase/firestore";
 import { useAuth } from "@/context/AuthContext";
-import { db } from "@/lib/firebase";
-import { EMPRESAS_COLLECTION, USUARIOS_SUBCOLLECTION } from "@/lib/empresas-db";
+import { fechaDiaColombiaHoy } from "@/lib/colombia-day-bounds";
+import {
+  getCobrosDelDiaEmpleado,
+  type CobrosDelDiaEmpleadoResponse,
+} from "@/lib/empresa-api";
+import { tuCajaDelDiaDesdeTotales } from "@/lib/tu-caja-del-dia";
 import { useRuta } from "@/hooks/useRuta";
 import { NO_PAGOS_PARA_MORA, useRutaDia } from "@/hooks/useRutaDia";
 import type { ClienteRutaGrupo, PrioridadClienteRuta } from "@/types/finanzas";
@@ -84,25 +87,34 @@ function getBadgeLabel(
 export default function RutaDelDiaPage() {
   const { user, profile } = useAuth();
   const router = useRouter();
-  const [cajaEmpleadoFirestore, setCajaEmpleadoFirestore] = useState<number | null>(null);
+  const [cajaDelDiaResumen, setCajaDelDiaResumen] =
+    useState<CobrosDelDiaEmpleadoResponse | null>(null);
+  const [loadingCajaDelDia, setLoadingCajaDelDia] = useState(true);
   const [filtroExpandido, setFiltroExpandido] = useState(false);
 
   useEffect(() => {
-    if (!user || !profile?.empresaId || profile.role !== "trabajador") {
-      setCajaEmpleadoFirestore(null);
+    if (!user || profile?.role !== "trabajador") {
+      setCajaDelDiaResumen(null);
+      setLoadingCajaDelDia(false);
       return;
     }
-    if (!db) {
-      setCajaEmpleadoFirestore(0);
-      return;
-    }
-    const ref = doc(db, EMPRESAS_COLLECTION, profile.empresaId, USUARIOS_SUBCOLLECTION, user.uid);
-    const unsub = onSnapshot(ref, (snap) => {
-      const v = snap.data()?.cajaEmpleado;
-      setCajaEmpleadoFirestore(typeof v === "number" ? v : 0);
-    });
-    return () => unsub();
-  }, [user, profile?.empresaId, profile?.role]);
+    let cancelled = false;
+    setLoadingCajaDelDia(true);
+    void (async () => {
+      try {
+        const token = await user.getIdToken();
+        const data = await getCobrosDelDiaEmpleado(token, fechaDiaColombiaHoy());
+        if (!cancelled) setCajaDelDiaResumen(data);
+      } catch {
+        if (!cancelled) setCajaDelDiaResumen(null);
+      } finally {
+        if (!cancelled) setLoadingCajaDelDia(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user, profile?.role]);
 
   const {
     ruta,
@@ -180,9 +192,6 @@ export default function RutaDelDiaPage() {
     month: "short",
   });
 
-  const montoCajaTarjeta =
-    cajaEmpleadoFirestore === null ? null : cajaEmpleadoFirestore;
-
   const filtroActualLabel =
     FILTROS_OPCIONES.find((f) => f.id === filtro)?.label ?? "Todos";
   const filtroLabel =
@@ -216,12 +225,19 @@ export default function RutaDelDiaPage() {
         <div className="ruta-dia-caja-inner">
           <div className="ruta-dia-caja-text">
             <h3 id="ruta-dia-caja-heading" className="ruta-dia-caja-title">
-              Caja (efectivo)
+              Tu caja del día
             </h3>
+            {cajaDelDiaResumen?.fechaDia ? (
+              <p className="ruta-dia-caja-desc">{cajaDelDiaResumen.fechaDia}</p>
+            ) : null}
           </div>
           <div className="ruta-dia-caja-monto-wrap">
             <span className="ruta-dia-caja-monto" aria-live="polite">
-              {montoCajaTarjeta === null ? "…" : formatCurrency(montoCajaTarjeta)}
+              {loadingCajaDelDia
+                ? "…"
+                : cajaDelDiaResumen
+                  ? formatCurrency(tuCajaDelDiaDesdeTotales(cajaDelDiaResumen))
+                  : "—"}
             </span>
             <Link href="/dashboard/trabajador/caja-del-dia" className="ruta-dia-caja-link">
               Ver detalles

@@ -148,11 +148,10 @@ export async function listRutas(
   return data.rutas ?? [];
 }
 
-/** Rutas del administrador con bases para la vista «ruta del día». */
+/** Rutas del administrador para la vista «ruta del día». */
 export type RutaDelDiaEmpleadoItem = {
   uid: string;
   nombre: string;
-  baseTrabajador: number;
 };
 
 export type RutaDelDiaItem = {
@@ -360,10 +359,12 @@ export type CobrosDelDiaEmpleadoResponse = {
   cobros: CobroDiaItem[];
   noPagos: NoPagoDiaItem[];
   totalCobrosLista: number;
+  /** Cobros del día que por reglas de negocio ingresan a tu billetera (titular del préstamo o cobrador si no hay titular). */
+  totalCobrosAcreditanTuCaja: number;
   totalGastosDia: number;
   gastosDelDia: GastoDiaItem[];
-  /** Saldo operativo (`usuarios.cajaEmpleado`). */
-  cajaEmpleado: number;
+  /** Suma de traspasos base ruta → tu caja ese día (`asignacionesBase`). */
+  totalBaseAsignadaDia: number;
 };
 
 export async function getCobrosDelDiaEmpleado(
@@ -381,9 +382,14 @@ export async function getCobrosDelDiaEmpleado(
     cobros: Array.isArray(data.cobros) ? data.cobros : [],
     noPagos: Array.isArray(data.noPagos) ? data.noPagos : [],
     totalCobrosLista: typeof data.totalCobrosLista === "number" ? data.totalCobrosLista : 0,
+    totalCobrosAcreditanTuCaja:
+      typeof data.totalCobrosAcreditanTuCaja === "number"
+        ? data.totalCobrosAcreditanTuCaja
+        : 0,
     totalGastosDia: typeof data.totalGastosDia === "number" ? data.totalGastosDia : 0,
     gastosDelDia: Array.isArray(data.gastosDelDia) ? data.gastosDelDia : [],
-    cajaEmpleado: typeof data.cajaEmpleado === "number" ? data.cajaEmpleado : 0,
+    totalBaseAsignadaDia:
+      typeof data.totalBaseAsignadaDia === "number" ? data.totalBaseAsignadaDia : 0,
   };
 }
 

@@ -46,7 +46,7 @@ async function uidsEmpleadosPorRutaEnUsuarios(
   return out;
 }
 
-/** GET: datos para la sección «ruta del día» (admin): bases de ruta y de cada trabajador asignado. */
+/** GET: datos para «ruta del día» (admin): caja de la ruta y trabajadores asignados (sin leer saldo del trabajador). */
 export async function GET(_request: NextRequest) {
   const apiUser = await getApiUser(_request);
   if (!apiUser) {
@@ -76,17 +76,6 @@ export async function GET(_request: NextRequest) {
 
       const empleados = await Promise.all(
         empleadoUids.map(async (uid) => {
-          const uSnap = await db
-            .collection(EMPRESAS_COLLECTION)
-            .doc(empresaId)
-            .collection(USUARIOS_SUBCOLLECTION)
-            .doc(uid)
-            .get();
-          const ud = uSnap.data() as Record<string, unknown> | undefined;
-          const baseTrabajador = round2(
-            ud && typeof ud.cajaEmpleado === "number" ? ud.cajaEmpleado : 0
-          );
-
           const authSnap = await db.collection(USERS_COLLECTION).doc(uid).get();
           const nombre =
             (authSnap.data()?.displayName as string | undefined)?.trim() ||
@@ -95,7 +84,6 @@ export async function GET(_request: NextRequest) {
           return {
             uid,
             nombre,
-            baseTrabajador,
           };
         })
       );

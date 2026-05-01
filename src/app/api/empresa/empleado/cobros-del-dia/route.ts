@@ -3,6 +3,7 @@ import { Timestamp } from "firebase-admin/firestore";
 import { getAdminFirestore } from "@/lib/firebase-admin";
 import { getApiUser } from "@/lib/api-auth";
 import {
+  ASIGNACIONES_BASE_EMPLEADO_SUBCOLLECTION,
   EMPRESAS_COLLECTION,
   CLIENTES_SUBCOLLECTION,
   GASTOS_EMPLEADO_SUBCOLLECTION,
@@ -47,7 +48,7 @@ export type NoPagoDiaItemApi = {
   saldoPendientePrestamoActual: number;
 };
 
-/** GET: cobros del día, «no pagó» del trabajador, totales y caja (`cajaEmpleado`). ?fecha=YYYY-MM-DD (Colombia). */
+/** GET: cobros del día, «no pagó», totales y base asignada. La tarjeta «Tu caja» se calcula en el cliente. ?fecha=YYYY-MM-DD (Colombia). */
 export async function GET(request: NextRequest) {
   const apiUser = await getApiUser(request);
   if (!apiUser) {
@@ -86,18 +87,29 @@ export async function GET(request: NextRequest) {
 
   const prestamoMeta = new Map<
     string,
-    { clienteId: string; saldoPendienteActual: number }
+    {
+      clienteId: string;
+      saldoPendienteActual: number;
+      /** Titular del préstamo (destino del cobro en billetera); si está vacío, aplica la regla del cobrador en el pago. */
+      empleadoTitularId: string;
+    }
   >();
   const clienteIds = new Set<string>();
 
   for (const d of prestamosSnap.docs) {
     const x = d.data() as Record<string, unknown>;
     const clienteId = typeof x.clienteId === "string" ? x.clienteId.trim() : "";
+    const empleadoTitularId =
+      typeof x.empleadoId === "string" ? x.empleadoId.trim() : "";
     const saldo =
       typeof x.saldoPendiente === "number" && Number.isFinite(x.saldoPendiente)
         ? x.saldoPendiente
         : 0;
-    prestamoMeta.set(d.id, { clienteId, saldoPendienteActual: round2(saldo) });
+    prestamoMeta.set(d.id, {
+      clienteId,
+      saldoPendienteActual: round2(saldo),
+      empleadoTitularId,
+    });
     if (clienteId) clienteIds.add(clienteId);
   }
 
@@ -124,6 +136,8 @@ export async function GET(request: NextRequest) {
     fechaMs: number;
     monto: number;
     metodoPago: string | null;
+    /** Registro del cobro (`pagos.empleadoId`); si el préstamo no tiene titular, la caja acredita a este usuario. */
+    empleadoIdRegistro: string;
   };
 
   type NoPagoRow = {
@@ -183,12 +197,15 @@ export async function GET(request: NextRequest) {
             pd.metodoPago === "transferencia" || pd.metodoPago === "efectivo"
               ? (pd.metodoPago as string)
               : null;
+          const empleadoIdRegistro =
+            typeof pd.empleadoId === "string" ? pd.empleadoId.trim() : "";
           pagosRaw.push({
             pagoId: p.id,
             prestamoId: pdoc.id,
             fechaMs,
             monto: round2(monto),
             metodoPago: metodo,
+            empleadoIdRegistro,
           });
         }
       })
@@ -232,6 +249,17 @@ export async function GET(request: NextRequest) {
 
   cobros.sort((a, b) => (b.fecha ?? "").localeCompare(a.fecha ?? ""));
 
+  /** Alineado a `pagos` POST: caja del titular del préstamo, o del cobrador si el préstamo no tiene titular. */
+  let totalCobrosAcreditanTuCaja = 0;
+  for (const row of pagosRaw) {
+    const titular = prestamoMeta.get(row.prestamoId)?.empleadoTitularId ?? "";
+    const vaATuCaja = titular
+      ? titular === apiUser.uid
+      : row.empleadoIdRegistro === apiUser.uid;
+    if (vaATuCaja) totalCobrosAcreditanTuCaja += row.monto;
+  }
+  totalCobrosAcreditanTuCaja = round2(totalCobrosAcreditanTuCaja);
+
   const noPagos: NoPagoDiaItemApi[] = noPagosRaw.map((row) => {
     const meta = prestamoMeta.get(row.prestamoId);
     const cid = meta?.clienteId ?? "";
@@ -252,19 +280,6 @@ export async function GET(request: NextRequest) {
   noPagos.sort((a, b) => (b.fecha ?? "").localeCompare(a.fecha ?? ""));
 
   const totalCobrosLista = round2(cobros.reduce((s, c) => s + c.monto, 0));
-
-  const usuarioSnap = await db
-    .collection(EMPRESAS_COLLECTION)
-    .doc(empresaId)
-    .collection(USUARIOS_SUBCOLLECTION)
-    .doc(apiUser.uid)
-    .get();
-  let cajaEmpleado = 0;
-  if (usuarioSnap.exists) {
-    const ud = usuarioSnap.data() as Record<string, unknown>;
-    cajaEmpleado =
-      typeof ud.cajaEmpleado === "number" ? round2(ud.cajaEmpleado) : 0;
-  }
 
   const [legacyG, nuevoG] = await Promise.all([
     db
@@ -309,14 +324,36 @@ export async function GET(request: NextRequest) {
   addGastoDocs(nuevoG);
   totalGastosDia = round2(totalGastosDia);
 
+  const asignSnap = await db
+    .collection(EMPRESAS_COLLECTION)
+    .doc(empresaId)
+    .collection(USUARIOS_SUBCOLLECTION)
+    .doc(apiUser.uid)
+    .collection(ASIGNACIONES_BASE_EMPLEADO_SUBCOLLECTION)
+    .where("fecha", ">=", startTs)
+    .where("fecha", "<=", endTs)
+    .get();
+
+  let totalBaseAsignadaDia = 0;
+  for (const d of asignSnap.docs) {
+    const x = d.data() as Record<string, unknown>;
+    const rid = typeof x.rutaId === "string" ? x.rutaId.trim() : "";
+    if (rid !== rutaId) continue;
+    const m =
+      typeof x.monto === "number" && Number.isFinite(x.monto) ? x.monto : 0;
+    if (m > 0) totalBaseAsignadaDia += m;
+  }
+  totalBaseAsignadaDia = round2(totalBaseAsignadaDia);
+
   return NextResponse.json({
     fechaDia,
     rutaId,
     cobros,
     noPagos,
     totalCobrosLista,
+    totalCobrosAcreditanTuCaja,
     totalGastosDia,
     gastosDelDia: gastosDetalle,
-    cajaEmpleado,
+    totalBaseAsignadaDia,
   });
 }

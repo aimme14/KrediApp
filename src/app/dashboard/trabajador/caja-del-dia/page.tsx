@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
@@ -10,6 +11,7 @@ import {
   type NoPagoDiaItem,
 } from "@/lib/empresa-api";
 import { fechaDiaColombiaHoy } from "@/lib/colombia-day-bounds";
+import { tuCajaDelDiaDesdeTotales } from "@/lib/tu-caja-del-dia";
 
 function formatMonto(value: number): string {
   const hasDecimals = Math.round(value * 100) % 100 !== 0;
@@ -44,6 +46,33 @@ function labelMotivoNoPago(codigo: string): string {
   return MOTIVO_NO_PAGO_LABEL[codigo] ?? codigo;
 }
 
+const TARJETA_RESUMEN_STYLE = {
+  padding: "0.65rem 0.85rem",
+  margin: 0,
+  border: "1px solid var(--card-border)",
+} as const;
+
+function TarjetaResumen(props: { etiqueta: ReactNode; valor: string }) {
+  const { etiqueta, valor } = props;
+  return (
+    <div className="card" style={TARJETA_RESUMEN_STYLE}>
+      <span
+        style={{
+          fontSize: "0.7rem",
+          color: "var(--text-muted)",
+          textTransform: "uppercase",
+          letterSpacing: "0.03em",
+          display: "block",
+          marginBottom: "0.25rem",
+        }}
+      >
+        {etiqueta}
+      </span>
+      <span style={{ fontSize: "1.05rem", fontWeight: 700 }}>{valor}</span>
+    </div>
+  );
+}
+
 export default function CajaDelDiaPage() {
   const { user, profile } = useAuth();
   const [fecha, setFecha] = useState(() => fechaDiaColombiaHoy());
@@ -72,8 +101,6 @@ export default function CajaDelDiaPage() {
   }, [load]);
 
   if (!profile || profile.role !== "trabajador") return null;
-
-  const esHoy = fecha === fechaDiaColombiaHoy();
 
   return (
     <div className="card">
@@ -125,90 +152,20 @@ export default function CajaDelDiaPage() {
               marginBottom: "1.25rem",
             }}
           >
-            <div
-              className="card"
-              style={{
-                padding: "0.65rem 0.85rem",
-                margin: 0,
-                border: "1px solid var(--card-border)",
-              }}
-            >
-              <span
-                style={{
-                  fontSize: "0.7rem",
-                  color: "var(--text-muted)",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.03em",
-                  display: "block",
-                  marginBottom: "0.25rem",
-                }}
-              >
-                Caja (efectivo)
-              </span>
-              <span style={{ fontSize: "1.05rem", fontWeight: 700 }}>
-                {formatMonto(data.cajaEmpleado)}
-              </span>
-            </div>
-            <div
-              className="card"
-              style={{
-                padding: "0.65rem 0.85rem",
-                margin: 0,
-                border: "1px solid var(--card-border)",
-              }}
-            >
-              <span
-                style={{
-                  fontSize: "0.7rem",
-                  color: "var(--text-muted)",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.03em",
-                  display: "block",
-                  marginBottom: "0.25rem",
-                }}
-              >
-                Total cobrado ({data.fechaDia})
-              </span>
-              <span style={{ fontSize: "1.05rem", fontWeight: 700 }}>{formatMonto(data.totalCobrosLista)}</span>
-            </div>
-            <div
-              className="card"
-              style={{
-                padding: "0.65rem 0.85rem",
-                margin: 0,
-                border: "1px solid var(--card-border)",
-              }}
-            >
-              <span
-                style={{
-                  fontSize: "0.7rem",
-                  color: "var(--text-muted)",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.03em",
-                  display: "block",
-                  marginBottom: "0.25rem",
-                }}
-              >
-                Gastos del día
-              </span>
-              <span style={{ fontSize: "1.05rem", fontWeight: 700 }}>{formatMonto(data.totalGastosDia)}</span>
-            </div>
+            <TarjetaResumen
+              etiqueta={`Tu caja del día (${data.fechaDia})`}
+              valor={formatMonto(tuCajaDelDiaDesdeTotales(data))}
+            />
+            <TarjetaResumen
+              etiqueta={`Total cobrado en la ruta (${data.fechaDia})`}
+              valor={formatMonto(data.totalCobrosLista)}
+            />
+            <TarjetaResumen etiqueta="Gastos del día" valor={formatMonto(data.totalGastosDia)} />
+            <TarjetaResumen
+              etiqueta={`Base asignada (${data.fechaDia})`}
+              valor={formatMonto(data.totalBaseAsignadaDia)}
+            />
           </div>
-
-          {esHoy && (
-            <p
-              style={{
-                marginBottom: "1.25rem",
-                fontSize: "0.8125rem",
-                color: "var(--text-muted)",
-                lineHeight: 1.5,
-              }}
-            >
-              Si colocaste préstamos desde tu caja o entregaste reporte, «Caja (efectivo)» puede no coincidir con tu
-              efectivo real. Si cambiás de fecha, cobros y gastos son históricos y «Caja (efectivo)» sigue siendo tu
-              saldo vigente actual.
-            </p>
-          )}
 
           <h3 style={{ fontSize: "1.05rem", marginBottom: "0.5rem" }}>Cuotas pagadas</h3>
           {data.cobros.length === 0 ? (

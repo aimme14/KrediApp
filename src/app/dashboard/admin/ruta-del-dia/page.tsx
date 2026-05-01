@@ -75,10 +75,6 @@ export default function RutaDelDiaPage() {
   return (
     <div className="card">
       <h2 style={{ marginTop: 0 }}>Ruta del día</h2>
-      <p style={{ color: "var(--text-muted)", fontSize: "0.875rem", marginBottom: "1rem", lineHeight: 1.45 }}>
-        Tus rutas con la <strong>caja de la ruta</strong> (efectivo en la ruta) y la <strong>caja del trabajador</strong>{" "}
-        (efectivo operativo en <code>cajaEmpleado</code>). Podés pasar plata de la caja de la ruta al trabajador cuando vaya a salir a cobrar.
-      </p>
       {error && <p className="error-msg">{error}</p>}
       {loading ? (
         <p style={{ color: "var(--text-muted)" }}>Cargando…</p>
@@ -173,12 +169,8 @@ export default function RutaDelDiaPage() {
                           background: "rgba(0,0,0,0.04)",
                         }}
                       >
-                        <div style={{ flex: "1 1 160px" }}>
-                          <div style={{ fontWeight: 600, fontSize: "0.9375rem" }}>{emp.nombre}</div>
-                          <div style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginTop: "0.2rem" }}>
-                            Caja del trabajador:{" "}
-                            <strong style={{ color: "var(--text)" }}>{formatMonto(emp.baseTrabajador)}</strong>
-                          </div>
+                        <div style={{ flex: "1 1 160px", fontWeight: 600, fontSize: "0.9375rem" }}>
+                          {emp.nombre}
                         </div>
                         <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "0.5rem" }}>
                           <label style={{ display: "flex", flexDirection: "column", gap: "0.25rem", fontSize: "0.8rem" }}>
