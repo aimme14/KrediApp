@@ -134,6 +134,21 @@ async function fetchWithAuth(
   });
 }
 
+/** Evita el error críptico «Unexpected token '<'» cuando el servidor devuelve HTML en lugar de JSON. */
+async function parseJsonResponse(res: Response): Promise<Record<string, unknown>> {
+  const text = await res.text();
+  try {
+    return JSON.parse(text) as Record<string, unknown>;
+  } catch {
+    const looksHtml = text.trimStart().startsWith("<");
+    throw new Error(
+      looksHtml
+        ? `Respuesta inválida (${res.status}): el servidor envió HTML en lugar de JSON. Revisa la terminal donde corre «next dev».`
+        : `Respuesta inválida (${res.status}): ${text.slice(0, 180)}`
+    );
+  }
+}
+
 export async function listRutas(
   token: string,
   options?: { sinEmpleado?: boolean }
@@ -282,8 +297,8 @@ export async function getSolicitudesEntregaReportePendientes(
   token: string
 ): Promise<SolicitudEntregaPendienteAdmin[]> {
   const res = await fetchWithAuth("/api/empresa/solicitudes-entrega-reporte", token);
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error ?? "Error al cargar solicitudes");
+  const data = await parseJsonResponse(res);
+  if (!res.ok) throw new Error(String(data.error ?? "Error al cargar solicitudes"));
   return Array.isArray(data.solicitudes) ? data.solicitudes : [];
 }
 
@@ -608,8 +623,8 @@ export async function getReportesDia(
     ? `/api/empresa/reportes-dia?fecha=${encodeURIComponent(fecha)}`
     : "/api/empresa/reportes-dia";
   const res = await fetchWithAuth(url, token);
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error ?? "Error al cargar reportes");
+  const data = await parseJsonResponse(res);
+  if (!res.ok) throw new Error(String(data.error ?? "Error al cargar reportes"));
   const itemsRaw = Array.isArray(data.items) ? data.items : [];
   const items: ReporteDiaItem[] = itemsRaw.map((row: Record<string, unknown>) => ({
     id: String(row.id ?? ""),
@@ -628,7 +643,7 @@ export async function getReportesDia(
   }));
 
   return {
-    fechaDia: data.fechaDia ?? "",
+    fechaDia: typeof data.fechaDia === "string" ? data.fechaDia : "",
     items,
     totalMonto: typeof data.totalMonto === "number" ? data.totalMonto : 0,
   };

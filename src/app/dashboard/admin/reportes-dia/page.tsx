@@ -24,6 +24,66 @@ function formatMonto(value: number): string {
   })}`;
 }
 
+const REPORTES_DIA_ICON = 18;
+
+function IconComentario({ size = REPORTES_DIA_ICON }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+    </svg>
+  );
+}
+
+function IconDescargar({ size = REPORTES_DIA_ICON }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+      <polyline points="7 10 12 15 17 10" />
+      <line x1="12" y1="15" x2="12" y2="3" />
+    </svg>
+  );
+}
+
+function IconReintentar({ size = REPORTES_DIA_ICON }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M23 4v6h-6" />
+      <path d="M1 20v-6h6" />
+      <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+    </svg>
+  );
+}
+
 function totalesVistaPreviaReporte(s: CobrosDelDiaEmpleadoResponse) {
   const prestamos = s.prestamosDesembolsoDelDia ?? [];
   return {
@@ -45,7 +105,6 @@ export default function ReportesDiaPage() {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   });
   const [items, setItems] = useState<ReporteDiaItem[]>([]);
-  const [totalMonto, setTotalMonto] = useState(0);
   const [fechaDia, setFechaDia] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -67,6 +126,11 @@ export default function ReportesDiaPage() {
   const [pdfLoadingId, setPdfLoadingId] = useState<string | null>(null);
   const [regenerarPdfId, setRegenerarPdfId] = useState<string | null>(null);
   const [regenerarPdfErr, setRegenerarPdfErr] = useState<string | null>(null);
+  const [comentarioModal, setComentarioModal] = useState<{
+    trabajador: string;
+    ruta: string;
+    texto: string | null;
+  } | null>(null);
 
   const load = useCallback(async () => {
     if (!user) return;
@@ -80,13 +144,11 @@ export default function ReportesDiaPage() {
         getSolicitudesEntregaReportePendientes(token),
       ]);
       setItems(res.items);
-      setTotalMonto(res.totalMonto);
       setFechaDia(res.fechaDia);
       setSolicitudes(pend);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al cargar");
       setItems([]);
-      setTotalMonto(0);
       setSolicitudes([]);
     } finally {
       setLoading(false);
@@ -310,8 +372,7 @@ export default function ReportesDiaPage() {
               {previewMeta ? (
                 <>
                   {" "}
-                  · {previewMeta.empleadoNombre} · {previewMeta.rutaNombre || "—"} · Monto solicitado:{" "}
-                  {formatMonto(previewMeta.montoAlSolicitar)}
+                  · {previewMeta.empleadoNombre} · {previewMeta.rutaNombre || "—"}
                 </>
               ) : null}
             </p>
@@ -555,9 +616,53 @@ export default function ReportesDiaPage() {
               {regenerarPdfErr}
             </p>
           ) : null}
-          <p style={{ marginBottom: "0.75rem", fontWeight: 600 }}>
-            Total del día: {formatMonto(totalMonto)}
-          </p>
+          {comentarioModal && (
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="comentario-modal-title"
+              style={{
+                position: "fixed",
+                inset: 0,
+                background: "rgba(0,0,0,0.45)",
+                zIndex: 1000,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: "1rem",
+              }}
+              onClick={() => setComentarioModal(null)}
+            >
+              <div
+                className="card"
+                style={{ maxWidth: "480px", width: "100%", margin: 0 }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "1rem" }}>
+                  <h3 id="comentario-modal-title" style={{ marginTop: 0 }}>
+                    Comentario
+                  </h3>
+                  <button type="button" className="btn btn-secondary" onClick={() => setComentarioModal(null)}>
+                    Cerrar
+                  </button>
+                </div>
+                <p style={{ margin: "0 0 0.5rem", fontSize: "0.875rem", color: "var(--text-muted)" }}>
+                  {comentarioModal.trabajador} · {comentarioModal.ruta}
+                </p>
+                <p
+                  style={{
+                    margin: 0,
+                    fontSize: "0.95rem",
+                    whiteSpace: "pre-wrap",
+                    wordBreak: "break-word",
+                    color: comentarioModal.texto ? "var(--text)" : "var(--text-muted)",
+                  }}
+                >
+                  {comentarioModal.texto?.trim() ? comentarioModal.texto : "Sin comentario."}
+                </p>
+              </div>
+            </div>
+          )}
           <div className="table-wrap">
             <table>
               <thead>
@@ -566,7 +671,6 @@ export default function ReportesDiaPage() {
                   <th>Ruta</th>
                   <th>Trabajador</th>
                   <th>Comentario</th>
-                  <th className="col-num">Monto entregado</th>
                   <th>PDF</th>
                 </tr>
               </thead>
@@ -581,37 +685,69 @@ export default function ReportesDiaPage() {
                           })
                         : "—"}
                     </td>
-                    <td>
-                      {row.rutaNombre || row.rutaId}
-                      {row.rutaNombre ? (
-                        <span style={{ color: "var(--text-muted)", fontSize: "0.8rem", display: "block" }}>
-                          {row.rutaId}
-                        </span>
-                      ) : null}
-                    </td>
+                    <td>{row.rutaNombre || "—"}</td>
                     <td>{row.empleadoNombre}</td>
-                    <td
-                      style={{
-                        maxWidth: "280px",
-                        fontSize: "0.875rem",
-                        color: row.comentario ? "var(--text)" : "var(--text-muted)",
-                        whiteSpace: "pre-wrap",
-                        wordBreak: "break-word",
-                      }}
-                    >
-                      {row.comentario ?? "—"}
+                    <td>
+                      <button
+                        type="button"
+                        className="btn btn-secondary"
+                        aria-label="Ver comentario"
+                        title="Ver comentario"
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          width: "2.25rem",
+                          height: "2.25rem",
+                          padding: 0,
+                        }}
+                        onClick={() =>
+                          setComentarioModal({
+                            trabajador: row.empleadoNombre,
+                            ruta: row.rutaNombre || row.rutaId,
+                            texto: row.comentario ?? null,
+                          })
+                        }
+                      >
+                        <IconComentario />
+                      </button>
                     </td>
-                    <td className="col-num">{formatMonto(row.montoEntregado)}</td>
                     <td>
                       {row.tienePdf ? (
                         <button
                           type="button"
                           className="btn btn-secondary"
-                          style={{ padding: "0.25rem 0.5rem", fontSize: "0.85rem" }}
+                          aria-label={
+                            pdfLoadingId === row.id ? "Abriendo PDF…" : "Descargar PDF"
+                          }
+                          title={pdfLoadingId === row.id ? "Abriendo…" : "Descargar PDF"}
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            width: "2.25rem",
+                            height: "2.25rem",
+                            padding: 0,
+                          }}
                           disabled={pdfLoadingId === row.id}
                           onClick={() => void abrirPdfReporte(row.id)}
                         >
-                          {pdfLoadingId === row.id ? "…" : "Descargar"}
+                          {pdfLoadingId === row.id ? (
+                            <span
+                              style={{
+                                display: "inline-block",
+                                width: "1rem",
+                                height: "1rem",
+                                border: "2px solid var(--text-muted)",
+                                borderTopColor: "currentColor",
+                                borderRadius: "50%",
+                                animation: "gf-spin 0.8s linear infinite",
+                              }}
+                              aria-hidden
+                            />
+                          ) : (
+                            <IconDescargar />
+                          )}
                         </button>
                       ) : row.pdfError ? (
                         <div
@@ -631,11 +767,39 @@ export default function ReportesDiaPage() {
                           <button
                             type="button"
                             className="btn btn-secondary"
-                            style={{ padding: "0.25rem 0.5rem", fontSize: "0.85rem" }}
+                            aria-label={
+                              regenerarPdfId === row.id ? "Regenerando PDF…" : "Reintentar generar PDF"
+                            }
+                            title={
+                              regenerarPdfId === row.id ? "Regenerando…" : "Reintentar PDF"
+                            }
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              width: "2.25rem",
+                              height: "2.25rem",
+                              padding: 0,
+                            }}
                             disabled={regenerarPdfId === row.id}
                             onClick={() => void reintentarPdfReporte(row.id)}
                           >
-                            {regenerarPdfId === row.id ? "Regenerando…" : "Reintentar PDF"}
+                            {regenerarPdfId === row.id ? (
+                              <span
+                                style={{
+                                  display: "inline-block",
+                                  width: "1rem",
+                                  height: "1rem",
+                                  border: "2px solid var(--text-muted)",
+                                  borderTopColor: "currentColor",
+                                  borderRadius: "50%",
+                                  animation: "gf-spin 0.8s linear infinite",
+                                }}
+                                aria-hidden
+                              />
+                            ) : (
+                              <IconReintentar />
+                            )}
                           </button>
                         </div>
                       ) : (

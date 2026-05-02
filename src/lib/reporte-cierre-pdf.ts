@@ -1,4 +1,4 @@
-import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
+import { PDFDocument, PDFFont, StandardFonts, rgb } from "pdf-lib";
 import type { CierreDiaSnapshot } from "@/lib/cierre-dia-snapshot";
 import { formatoCuotasRestanteTotal } from "@/lib/cuotas-display";
 
@@ -46,19 +46,34 @@ export type ReporteCierrePdfMeta = {
 const PAGE_W = 595;
 const PAGE_H = 842;
 const M = 48;
+
+/** Azul barra de sección (como mock) */
+const NAV = rgb(0.1, 0.26, 0.52);
+const NAV_LIGHT = rgb(0.18, 0.42, 0.72);
+const WHITE = rgb(1, 1, 1);
+
 const COL = {
   text: rgb(0.11, 0.13, 0.17),
   muted: rgb(0.42, 0.44, 0.48),
-  accent: rgb(0.16, 0.36, 0.58),
   accentDark: rgb(0.1, 0.22, 0.4),
-  band: rgb(0.93, 0.95, 0.98),
-  bandStrong: rgb(0.88, 0.93, 0.98),
+  band: rgb(0.93, 0.94, 0.96),
   rule: rgb(0.78, 0.81, 0.86),
   highlight: rgb(0.94, 0.97, 0.95),
   footer: rgb(0.5, 0.52, 0.55),
+  tableHead: rgb(0.22, 0.24, 0.28),
+  metaBg: rgb(0.96, 0.97, 0.98),
 };
 
 const MAX_ROWS_DETALLE = 80;
+const TB = { fs: 7.5, hdr: 8, lh: 9.5 };
+
+/** Ancho útil entre márgenes interiores del PDF (líneas y tablas alineadas). */
+function tableInnerBounds() {
+  const inset = 4;
+  const x0 = M + inset;
+  const w = PAGE_W - 2 * M - 2 * inset;
+  return { x0, w, inset };
+}
 
 export async function buildReporteCierrePdf(
   snapshot: CierreDiaSnapshot,
@@ -70,14 +85,14 @@ export async function buildReporteCierrePdf(
 
   const FS = {
     title: 17,
-    subtitle: 9.5,
     body: 9,
     small: 7.5,
-    section: 10.5,
-    meta: 9,
+    section: 10,
+    meta: 8.5,
+    metaLbl: 7,
   };
 
-  const LH = { body: 11.5, tight: 10, sectionGap: 14 };
+  const LH = { body: 11.5, tight: 10 };
 
   let page = pdf.addPage([PAGE_W, PAGE_H]);
   let y = PAGE_H - M;
@@ -116,259 +131,770 @@ export async function buildReporteCierrePdf(
     page.drawLine({
       start: { x: M, y },
       end: { x: PAGE_W - M, y },
-      thickness: 0.6,
+      thickness: 0.5,
       color: COL.rule,
     });
     y -= 10;
   };
 
-  const section = (title: string) => {
-    ensureBottom(36);
-    spacer(8);
-    const barH = 20;
-    const yBottom = y - barH + 3;
+  type CellOpts = {
+    bold?: boolean;
+    color?: ReturnType<typeof rgb>;
+    size?: number;
+    align?: "left" | "right";
+    /** Sin truncar (p. ej. hora larga si cabe en columna ancha). */
+    noTrunc?: boolean;
+  };
+
+  const drawCell = (text: string, x: number, yy: number, w: number, opts?: CellOpts) => {
+    const sz = opts?.size ?? TB.fs;
+    const f = opts?.bold ? fontBold : font;
+    const c = opts?.color ?? COL.text;
+    let t2 = sanitizarTextoPdf(text);
+    if (!opts?.noTrunc) {
+      const maxCh = Math.max(6, Math.floor(w / (sz * 0.45)));
+      t2 = trunc(t2, maxCh);
+    }
+    const align = opts?.align ?? "left";
+    if (align === "right") {
+      let tw = f.widthOfTextAtSize(t2, sz);
+      while (tw > w && t2.length > 1) {
+        t2 = `${t2.slice(0, -2)}…`;
+        tw = f.widthOfTextAtSize(t2, sz);
+      }
+      const drawX = Math.max(x, x + w - tw - 0.5);
+      page.drawText(t2, { x: drawX, y: yy, size: sz, font: f, color: c });
+    } else {
+      page.drawText(t2, { x, y: yy, size: sz, font: f, color: c, maxWidth: w });
+    }
+  };
+
+  type TableCell = { text: string; x: number; w: number } & CellOpts;
+
+  const tableRow = (cells: TableCell[], yy: number) => {
+    for (const c of cells) {
+      drawCell(c.text, c.x, yy, c.w, {
+        bold: c.bold,
+        color: c.color,
+        size: c.size,
+        align: c.align,
+        noTrunc: c.noTrunc,
+      });
+    }
+  };
+
+  /** Barra azul; `cursorY` es la posición vertical actual (misma convención que el resto del PDF). */
+  const sectionBarDark = (title: string, x: number, width: number, cursorY: number): number => {
+    const barH = 18;
+    ensureBottom(barH + 24);
+    const yRect = cursorY - barH + 2;
     page.drawRectangle({
-      x: M,
-      y: yBottom,
-      width: PAGE_W - 2 * M,
+      x,
+      y: yRect,
+      width,
       height: barH,
-      color: COL.bandStrong,
-      borderColor: COL.rule,
-      borderWidth: 0.4,
+      color: NAV,
+      borderColor: NAV,
+      borderWidth: 0.3,
     });
     page.drawText(sanitizarTextoPdf(title), {
-      x: M + 10,
-      y: yBottom + 6,
+      x: x + 8,
+      y: yRect + 5,
       size: FS.section,
       font: fontBold,
-      color: COL.accentDark,
+      color: WHITE,
     });
-    y = yBottom - 8;
+    return yRect - 8;
   };
 
-  const keyVal = (label: string, value: string, opts?: { emphasize?: boolean }) => {
-    ensureBottom(20);
-    const labelS = sanitizarTextoPdf(label);
-    const valueS = sanitizarTextoPdf(value);
-    const labelPart = `${labelS} `;
-    const lw = font.widthOfTextAtSize(labelPart, FS.meta);
-    page.drawText(labelPart, {
-      x: M,
-      y,
-      size: FS.meta,
-      font,
-      color: COL.muted,
-    });
-    page.drawText(valueS, {
-      x: M + Math.min(lw, 220),
-      y,
-      size: opts?.emphasize ? FS.meta + 0.5 : FS.meta,
-      font: opts?.emphasize ? fontBold : font,
-      color: opts?.emphasize ? COL.accentDark : COL.text,
-    });
-    y -= LH.body;
+  let rowBudget = MAX_ROWS_DETALLE;
+
+  const advanceY = (delta: number) => {
+    y -= delta;
+    ensureBottom(24);
   };
 
-  const highlightBand = (lines: { label: string; value: string }[]) => {
-    ensureBottom(28 + lines.length * LH.body);
-    const pad = 10;
-    const lineH = LH.body;
-    const boxH = pad * 2 + lines.length * lineH;
+  const { x0: tblEdge, w: tblW } = tableInnerBounds();
+
+  const hrTable = () => {
+    page.drawLine({
+      start: { x: tblEdge, y: y + 4 },
+      end: { x: tblEdge + tblW, y: y + 4 },
+      thickness: 0.45,
+      color: COL.rule,
+    });
+    y -= 2;
+  };
+
+  // ——— Título (solo texto, sin recuadro — ahorra espacio vertical) ———
+  const titleText = "Reporte del Día";
+  const titleW = fontBold.widthOfTextAtSize(sanitizarTextoPdf(titleText), FS.title);
+  const titleX = (PAGE_W - titleW) / 2;
+  page.drawText(sanitizarTextoPdf(titleText), {
+    x: titleX,
+    y,
+    size: FS.title,
+    font: fontBold,
+    color: NAV,
+  });
+  y -= 22;
+  spacer(4);
+
+  // ——— Metadatos: 4 columnas (etiqueta + valor) ———
+  {
+    const innerW = PAGE_W - 2 * M;
+    const cw = innerW / 4;
+    const aprobStr = meta.aprobadoEn.toLocaleString("es-CO", { timeZone: "America/Bogota" });
+    const cols: { lbl: string; val: string }[] = [
+      { lbl: "Fecha", val: snapshot.fechaDia },
+      { lbl: "Ruta", val: trunc(meta.rutaNombre, 28) },
+      { lbl: "Trabajador", val: trunc(meta.empleadoNombre, 28) },
+      { lbl: "Aprobado", val: trunc(aprobStr, 36) },
+    ];
+    const boxH = 38;
+    ensureBottom(boxH + 8);
     const yBottom = y - boxH + 4;
     page.drawRectangle({
       x: M,
       y: yBottom,
-      width: PAGE_W - 2 * M,
+      width: innerW,
       height: boxH,
-      color: COL.highlight,
-      borderColor: rgb(0.72, 0.82, 0.76),
-      borderWidth: 0.5,
+      color: WHITE,
+      borderColor: COL.rule,
+      borderWidth: 0.6,
     });
-    let yy = yBottom + boxH - pad - 2;
-    for (const row of lines) {
-      const lab = sanitizarTextoPdf(row.label);
-      const val = sanitizarTextoPdf(row.value);
-      const lw = font.widthOfTextAtSize(`${lab} `, FS.meta);
-      page.drawText(`${lab} `, {
-        x: M + pad,
-        y: yy,
-        size: FS.meta,
+    let cx = M + 8;
+    for (let i = 0; i < 4; i++) {
+      const col = cols[i];
+      page.drawText(sanitizarTextoPdf(col.lbl), {
+        x: cx,
+        y: yBottom + boxH - 12,
+        size: FS.metaLbl,
         font,
         color: COL.muted,
       });
-      page.drawText(val, {
-        x: M + pad + Math.min(lw, 200),
-        y: yy,
+      page.drawText(sanitizarTextoPdf(col.val), {
+        x: cx,
+        y: yBottom + boxH - 26,
         size: FS.meta,
         font: fontBold,
-        color: COL.accentDark,
+        color: COL.text,
       });
-      yy -= lineH;
+      cx += cw;
     }
     y = yBottom - 10;
-  };
+  }
 
-  // ——— Cabecera ———
-  page.drawRectangle({
-    x: M,
-    y: y - 52,
-    width: PAGE_W - 2 * M,
-    height: 56,
-    color: COL.band,
-    borderColor: COL.rule,
-    borderWidth: 0.5,
-  });
-  page.drawText(sanitizarTextoPdf("Reporte de cierre"), {
-    x: M + 12,
-    y: y - 22,
-    size: FS.title,
-    font: fontBold,
-    color: COL.accentDark,
-  });
-  page.drawText(
-    sanitizarTextoPdf("KrediApp · Documento operativo (Colombia)"),
-    {
-    x: M + 12,
-    y: y - 40,
-    size: FS.subtitle,
-    font,
-    color: COL.muted,
-    }
-  );
-  y -= 64;
-  spacer(4);
-
-  keyVal("Fecha operativa:", snapshot.fechaDia);
-  keyVal("Ruta:", trunc(meta.rutaNombre, 72));
-  keyVal("Trabajador:", trunc(meta.empleadoNombre, 72));
-  highlightBand([
-    {
-      label: "Monto entregado a caja ruta:",
-      value: fmtMoney(meta.montoEntregado),
-    },
-  ]);
-  keyVal(
-    "Aprobado:",
-    meta.aprobadoEn.toLocaleString("es-CO", { timeZone: "America/Bogota" })
-  );
-  spacer(4);
-  line(
-    meta.comentarioTrabajador
-      ? `Comentario del trabajador: ${trunc(meta.comentarioTrabajador, 480)}`
-      : "Comentario del trabajador: —",
-    { size: FS.meta, color: COL.text }
-  );
-  hr();
-
-  // ——— Resumen ———
-  section("Resumen");
-  keyVal("Total cobros del día:", fmtMoney(snapshot.totalCobrosLista));
-  keyVal("Base asignada ese día:", fmtMoney(snapshot.totalBaseAsignadaDia));
-  keyVal("Total gastos del día:", fmtMoney(snapshot.totalGastosDia));
-  keyVal(
-    "Préstamos desde tu caja:",
-    fmtMoney(snapshot.totalPrestamosDesembolsoDia ?? 0)
-  );
-  keyVal("Tu caja del día:", fmtMoney(snapshot.tuCajaDelDia), { emphasize: true });
-  line("Fórmula: cobros del día + base − gastos − préstamos desde tu caja.", {
-    size: FS.small,
-    color: COL.muted,
-  });
-  keyVal("Clientes que pagaron:", String(snapshot.cobros.length));
-  keyVal("Clientes que no pagaron:", String(snapshot.noPagos.length));
   spacer(6);
 
-  let rowBudget = MAX_ROWS_DETALLE;
-
-  const bodyRow = (t: string) => {
-    ensureBottom(18);
-    page.drawText(sanitizarTextoPdf(trunc(t, 96)), {
-      x: M + 4,
-      y,
-      size: FS.body - 0.5,
-      font,
-      color: COL.text,
-    });
-    y -= LH.tight;
-    rowBudget--;
-  };
-
-  section("Préstamos otorgados desde tu caja");
-  const prestamosRows = snapshot.prestamosDesembolsoDelDia ?? [];
-  if (prestamosRows.length === 0) {
-    line("Sin movimientos este día.", { color: COL.muted, size: FS.meta });
-  } else {
-    for (const p of prestamosRows) {
-      if (rowBudget <= 0) break;
-      const hora = p.fecha
-        ? new Date(p.fecha).toLocaleTimeString("es-CO", { timeZone: "America/Bogota" })
-        : "—";
-      bodyRow(
-        `${trunc(p.clienteNombre, 20)} · Capital ${fmtMoney(p.monto)} · Total a pagar ${fmtMoney(p.totalAPagar)} · ${hora}`
-      );
-    }
-  }
-  spacer(4);
-
-  section("Cobros del día");
-  for (const c of snapshot.cobros) {
-    if (rowBudget <= 0) break;
-    const hora = c.fecha
-      ? new Date(c.fecha).toLocaleTimeString("es-CO", { timeZone: "America/Bogota" })
-      : "—";
-    const cuotasTxt = formatoCuotasRestanteTotal(c.cuotasFaltantes, c.numeroCuotas);
-    bodyRow(
-      `${trunc(c.clienteNombre, 14)} · Cobro ${fmtMoney(c.monto)} · Tot.prést ${fmtMoney(c.totalAPagar)} · Debe ${fmtMoney(c.saldoPendienteTrasPago)} · Cuotas ${cuotasTxt} · ${c.metodoPago ?? "—"} · ${hora}`
+  // ——— Monto (izq azul) + contexto (der gris) ———
+  {
+    const gap = 12;
+    const mid = PAGE_W / 2;
+    const leftX = M;
+    const leftW = mid - gap / 2 - M;
+    const rightX = mid + gap / 2;
+    const rightW = PAGE_W - M - rightX;
+    const pad = 10;
+    const comRaw = meta.comentarioTrabajador?.trim() ? trunc(meta.comentarioTrabajador.trim(), 280) : "—";
+    const rightTxt = sanitizarTextoPdf(
+      `Base asignada: ${fmtMoney(snapshot.totalBaseAsignadaDia)} · Préstamos desde caja: ${fmtMoney(snapshot.totalPrestamosDesembolsoDia ?? 0)} · Nota del trabajador: ${comRaw}`
     );
-  }
-  if (snapshot.cobros.length > MAX_ROWS_DETALLE) {
-    line(`… y ${snapshot.cobros.length - MAX_ROWS_DETALLE} cobros más (consultar en el sistema).`, {
-      color: COL.muted,
-      size: FS.small,
+    const rightLines = wrapPdfLines(rightTxt, font, FS.small, rightW - pad * 2);
+    const lineH = LH.tight;
+    const leftH = pad * 2 + lineH * 2 + 6;
+    const rightH = pad * 2 + rightLines.length * lineH + 4;
+    const boxH = Math.max(leftH, rightH);
+
+    ensureBottom(boxH + 16);
+    const yBottom = y - boxH + 4;
+
+    page.drawRectangle({
+      x: leftX,
+      y: yBottom,
+      width: leftW,
+      height: boxH,
+      color: NAV_LIGHT,
+      borderColor: NAV,
+      borderWidth: 0.5,
     });
+    let ly = yBottom + boxH - pad - 4;
+    page.drawText(sanitizarTextoPdf("Monto entregado a caja ruta"), {
+      x: leftX + pad,
+      y: ly,
+      size: FS.meta,
+      font,
+      color: WHITE,
+    });
+    ly -= lineH + 2;
+    page.drawText(fmtMoney(snapshot.tuCajaDelDia), {
+      x: leftX + pad,
+      y: ly,
+      size: FS.section + 1,
+      font: fontBold,
+      color: WHITE,
+    });
+
+    page.drawRectangle({
+      x: rightX,
+      y: yBottom,
+      width: rightW,
+      height: boxH,
+      color: COL.band,
+      borderColor: COL.rule,
+      borderWidth: 0.5,
+    });
+    let ry = yBottom + boxH - pad - 4;
+    for (const ln of rightLines) {
+      page.drawText(ln, {
+        x: rightX + pad,
+        y: ry,
+        size: FS.small,
+        font,
+        color: COL.text,
+      });
+      ry -= lineH;
+    }
+
+    y = yBottom - 10;
   }
-  spacer(4);
+
+  spacer(8);
+
+  // ——— Resumen: una fila de 6 métricas ———
+  {
+    y = sectionBarDark("Resumen", M, PAGE_W - 2 * M, y);
+    const innerW = PAGE_W - 2 * M - 16;
+    const x0 = M + 8;
+    const nCol = 6;
+    const colW = innerW / nCol;
+    const hdrH = 13;
+    const valH = 20;
+    const blockH = hdrH + valH;
+    const labels = [
+      "Total cobros",
+      "Total gastos",
+      "Caja del día",
+      "Clientes pagaron",
+      "Clientes no pagaron",
+      "Préstamos caja",
+    ];
+    const vals = [
+      fmtMoney(snapshot.totalCobrosLista),
+      fmtMoney(snapshot.totalGastosDia),
+      fmtMoney(snapshot.tuCajaDelDia),
+      String(snapshot.cobros.length),
+      String(snapshot.noPagos.length),
+      fmtMoney(snapshot.totalPrestamosDesembolsoDia ?? 0),
+    ];
+
+    ensureBottom(blockH + 16);
+    const blockBottom = y - blockH + 2;
+    page.drawRectangle({
+      x: M + 4,
+      y: blockBottom,
+      width: PAGE_W - 2 * M - 8,
+      height: blockH,
+      color: COL.metaBg,
+      borderColor: COL.rule,
+      borderWidth: 0.45,
+    });
+
+    const yLabelRow = blockBottom + valH + 10;
+    const yValRow = blockBottom + 7;
+    let cx = x0;
+    for (let i = 0; i < nCol; i++) {
+      page.drawText(sanitizarTextoPdf(labels[i]), {
+        x: cx + 2,
+        y: yLabelRow,
+        size: FS.metaLbl,
+        font,
+        color: COL.muted,
+      });
+      const isCaja = i === 2;
+      if (isCaja) {
+        page.drawRectangle({
+          x: cx,
+          y: blockBottom + 2,
+          width: colW - 4,
+          height: valH - 4,
+          color: rgb(0.88, 0.93, 0.98),
+          borderColor: NAV_LIGHT,
+          borderWidth: 0.35,
+        });
+      }
+      page.drawText(sanitizarTextoPdf(vals[i]), {
+        x: cx + 4,
+        y: yValRow,
+        size: isCaja ? FS.section : FS.meta,
+        font: fontBold,
+        color: isCaja ? NAV : COL.text,
+      });
+      cx += colW;
+    }
+
+    y = blockBottom - 10;
+  }
+
+  spacer(10);
+
+  // ——— Cobros del día ———
+  {
+    y = sectionBarDark("Cobros del día", M, PAGE_W - 2 * M, y);
+    const innerPad = 2;
+    const x0 = tblEdge + innerPad;
+    const sumW = tblW - 2 * innerPad;
+    const wHr = 80;
+    const wMet = 38;
+    const wCuo = 44;
+    const wDeb = 52;
+    const wTP = 52;
+    const wCob = 52;
+    const wCli = sumW - (wHr + wMet + wCuo + wDeb + wTP + wCob);
+
+    ensureBottom(TB.lh + 8);
+    page.drawRectangle({
+      x: tblEdge,
+      y: y - TB.lh - 2,
+      width: tblW,
+      height: TB.lh + 4,
+      color: COL.band,
+      borderWidth: 0,
+    });
+    tableRow(
+      [
+        { text: "Cliente", x: x0, w: wCli, bold: true, color: COL.tableHead },
+        { text: "Cobro", x: x0 + wCli, w: wCob, bold: true, color: COL.tableHead, align: "right" },
+        { text: "Tot. préstamo", x: x0 + wCli + wCob, w: wTP, bold: true, color: COL.tableHead, align: "right" },
+        { text: "Debe", x: x0 + wCli + wCob + wTP, w: wDeb, bold: true, color: COL.tableHead, align: "right" },
+        { text: "Cuotas", x: x0 + wCli + wCob + wTP + wDeb, w: wCuo, bold: true, color: COL.tableHead, align: "right" },
+        { text: "Método", x: x0 + wCli + wCob + wTP + wDeb + wCuo, w: wMet, bold: true, color: COL.tableHead },
+        { text: "Hora", x: x0 + wCli + wCob + wTP + wDeb + wCuo + wMet, w: wHr, bold: true, color: COL.tableHead },
+      ],
+      y
+    );
+    advanceY(TB.lh + 4);
+    let sumCobros = 0;
+    for (const c of snapshot.cobros) {
+      if (rowBudget <= 0) break;
+      sumCobros += c.monto;
+      const hora = c.fecha
+        ? new Date(c.fecha).toLocaleTimeString("es-CO", {
+            timeZone: "America/Bogota",
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit",
+          })
+        : "—";
+      const cuotasTxt = formatoCuotasRestanteTotal(c.cuotasFaltantes, c.numeroCuotas);
+      ensureBottom(TB.lh + 6);
+      tableRow(
+        [
+          { text: trunc(c.clienteNombre, 42), x: x0, w: wCli },
+          {
+            text: fmtMoney(c.monto),
+            x: x0 + wCli,
+            w: wCob,
+            align: "right",
+          },
+          {
+            text: fmtMoney(c.totalAPagar),
+            x: x0 + wCli + wCob,
+            w: wTP,
+            align: "right",
+          },
+          {
+            text: fmtMoney(c.saldoPendienteTrasPago),
+            x: x0 + wCli + wCob + wTP,
+            w: wDeb,
+            align: "right",
+          },
+          {
+            text: cuotasTxt,
+            x: x0 + wCli + wCob + wTP + wDeb,
+            w: wCuo,
+            align: "right",
+          },
+          {
+            text: trunc(c.metodoPago ?? "—", 14),
+            x: x0 + wCli + wCob + wTP + wDeb + wCuo,
+            w: wMet,
+          },
+          {
+            text: hora,
+            x: x0 + wCli + wCob + wTP + wDeb + wCuo + wMet,
+            w: wHr,
+            noTrunc: true,
+          },
+        ],
+        y
+      );
+      advanceY(TB.lh);
+      rowBudget--;
+    }
+    if (snapshot.cobros.length > MAX_ROWS_DETALLE) {
+      line(`… y ${snapshot.cobros.length - MAX_ROWS_DETALLE} cobros más (consultar en el sistema).`, {
+        color: COL.muted,
+        size: FS.small,
+      });
+    }
+    ensureBottom(TB.lh + 8);
+    hrTable();
+    tableRow(
+      [
+        { text: "Total cobros", x: x0, w: wCli, bold: true },
+        {
+          text: fmtMoney(sumCobros),
+          x: x0 + wCli,
+          w: wCob,
+          bold: true,
+          align: "right",
+        },
+        { text: "", x: x0 + wCli + wCob, w: wTP },
+        { text: "", x: x0 + wCli + wCob + wTP, w: wDeb },
+        { text: "", x: x0 + wCli + wCob + wTP + wDeb, w: wCuo },
+        { text: "", x: x0 + wCli + wCob + wTP + wDeb + wCuo, w: wMet },
+        { text: "", x: x0 + wCli + wCob + wTP + wDeb + wCuo + wMet, w: wHr },
+      ],
+      y
+    );
+    advanceY(TB.lh + 8);
+  }
+
+  spacer(8);
 
   rowBudget = Math.min(40, MAX_ROWS_DETALLE);
-  section('Visitas «no pagó»');
-  if (snapshot.noPagos.length === 0) {
-    line("Sin registros.", { color: COL.muted, size: FS.meta });
-  } else {
-    for (const n of snapshot.noPagos) {
-      if (rowBudget <= 0) break;
-      const cuotasNp = formatoCuotasRestanteTotal(n.cuotasPendientes, n.numeroCuotas);
-      const notaTxt = n.nota?.trim() ? trunc(n.nota.trim(), 20) : "—";
-      bodyRow(
-        `${trunc(n.clienteNombre, 14)} · ${trunc(n.motivoNoPago, 14)} · ${notaTxt} · Cuotas ${cuotasNp} · Debe ${fmtMoney(n.saldoPendientePrestamoActual)} · Tot.prést ${fmtMoney(n.totalAPagar)}`
-      );
-    }
-  }
-  spacer(4);
 
-  section("Gastos del día");
-  if (snapshot.gastosDelDia.length === 0) {
-    line("Sin gastos registrados.", { color: COL.muted, size: FS.meta });
-  } else {
-    for (const g of snapshot.gastosDelDia) {
-      bodyRow(
-        `${fmtMoney(g.monto)} · Motivo: ${trunc(g.motivo, 16)} · ${trunc(g.descripcion, 48)}`
-      );
+  // ——— Visitas "no pagó" (sin columna Nota, como mock) ———
+  {
+    y = sectionBarDark('Visitas "no pagó"', M, PAGE_W - 2 * M, y);
+    const innerPad = 2;
+    const x0 = tblEdge + innerPad;
+    const sumW = tblW - 2 * innerPad;
+    const wCli = Math.floor(sumW * 0.22);
+    const wMot = Math.floor(sumW * 0.22);
+    const wCuo = Math.floor(sumW * 0.1);
+    const wDeb = Math.floor(sumW * 0.23);
+    const wTP = sumW - wCli - wMot - wCuo - wDeb;
+
+    ensureBottom(TB.lh + 8);
+    page.drawRectangle({
+      x: tblEdge,
+      y: y - TB.lh - 2,
+      width: tblW,
+      height: TB.lh + 4,
+      color: COL.band,
+      borderWidth: 0,
+    });
+    tableRow(
+      [
+        { text: "Cliente", x: x0, w: wCli, bold: true, color: COL.tableHead },
+        { text: "Motivo", x: x0 + wCli, w: wMot, bold: true, color: COL.tableHead },
+        { text: "Cuotas", x: x0 + wCli + wMot, w: wCuo, bold: true, color: COL.tableHead, align: "right" },
+        { text: "Debe", x: x0 + wCli + wMot + wCuo, w: wDeb, bold: true, color: COL.tableHead, align: "right" },
+        {
+          text: "Tot. préstamo",
+          x: x0 + wCli + wMot + wCuo + wDeb,
+          w: wTP,
+          bold: true,
+          color: COL.tableHead,
+          align: "right",
+        },
+      ],
+      y
+    );
+    advanceY(TB.lh + 4);
+    let sumDebe = 0;
+    if (snapshot.noPagos.length === 0) {
+      line("Sin registros.", { color: COL.muted, size: FS.meta });
+    } else {
+      for (const n of snapshot.noPagos) {
+        if (rowBudget <= 0) break;
+        sumDebe += n.saldoPendientePrestamoActual;
+        const cuotasNp = formatoCuotasRestanteTotal(n.cuotasPendientes, n.numeroCuotas);
+        ensureBottom(TB.lh + 6);
+        tableRow(
+          [
+            { text: trunc(n.clienteNombre, 36), x: x0, w: wCli },
+            { text: trunc(n.motivoNoPago, 28), x: x0 + wCli, w: wMot },
+            {
+              text: cuotasNp,
+              x: x0 + wCli + wMot,
+              w: wCuo,
+              align: "right",
+            },
+            {
+              text: fmtMoney(n.saldoPendientePrestamoActual),
+              x: x0 + wCli + wMot + wCuo,
+              w: wDeb,
+              align: "right",
+            },
+            {
+              text: fmtMoney(n.totalAPagar),
+              x: x0 + wCli + wMot + wCuo + wDeb,
+              w: wTP,
+              align: "right",
+            },
+          ],
+          y
+        );
+        advanceY(TB.lh);
+        rowBudget--;
+      }
     }
+    ensureBottom(TB.lh + 8);
+    hrTable();
+    tableRow(
+      [
+        { text: "Total saldo debe", x: x0, w: wCli + wMot + wCuo, bold: true },
+        {
+          text: snapshot.noPagos.length ? fmtMoney(sumDebe) : fmtMoney(0),
+          x: x0 + wCli + wMot + wCuo,
+          w: wDeb,
+          bold: true,
+          align: "right",
+        },
+        { text: "", x: x0 + wCli + wMot + wCuo + wDeb, w: wTP },
+      ],
+      y
+    );
+    advanceY(TB.lh + 8);
+  }
+
+  spacer(10);
+
+  // ——— Gastos (izq) + Préstamos (der), misma altura inicial ———
+  {
+    ensureBottom(280);
+    const gap = 10;
+    const colW = (PAGE_W - 2 * M - gap) / 2;
+    const xL = M;
+    const xR = M + colW + gap;
+    const yStart = y;
+
+    const drawPrestamosBlock = (startY: number): number => {
+      let yy = sectionBarDark("Préstamos otorgados", xR, colW, startY);
+      const innerPad = 2;
+      const px = xR + innerPad + 4;
+      const usable = colW - 12 - 2 * innerPad;
+      const wh = Math.max(72, Math.floor(usable * 0.28));
+      const wc = Math.floor((usable - wh) * 0.45);
+      const cap = Math.floor((usable - wh) * 0.28);
+      const wt = usable - wh - wc - cap;
+
+      page.drawRectangle({
+        x: xR + 4,
+        y: yy - TB.lh - 2,
+        width: colW - 8,
+        height: TB.lh + 4,
+        color: COL.band,
+        borderWidth: 0,
+      });
+      tableRow(
+        [
+          { text: "Cliente", x: px, w: wc, bold: true, color: COL.tableHead },
+          { text: "Capital", x: px + wc, w: cap, bold: true, color: COL.tableHead, align: "right" },
+          { text: "Tot. pagar", x: px + wc + cap, w: wt, bold: true, color: COL.tableHead, align: "right" },
+          { text: "Hora", x: px + wc + cap + wt, w: wh, bold: true, color: COL.tableHead },
+        ],
+        yy
+      );
+      yy -= TB.lh + 4;
+      const prestamosRows = snapshot.prestamosDesembolsoDelDia ?? [];
+      let sumCap = 0;
+      let sumTot = 0;
+      if (prestamosRows.length === 0) {
+        page.drawText(sanitizarTextoPdf("Sin movimientos este día."), {
+          x: px,
+          y: yy,
+          size: FS.meta,
+          font,
+          color: COL.muted,
+        });
+        yy -= TB.lh + 4;
+      } else {
+        for (const p of prestamosRows) {
+          if (rowBudget <= 0) break;
+          sumCap += p.monto;
+          sumTot += p.totalAPagar;
+          const hora = p.fecha
+            ? new Date(p.fecha).toLocaleTimeString("es-CO", {
+                timeZone: "America/Bogota",
+                hour: "2-digit",
+                minute: "2-digit",
+                second: "2-digit",
+              })
+            : "—";
+          tableRow(
+            [
+              { text: trunc(p.clienteNombre, 22), x: px, w: wc },
+              {
+                text: fmtMoney(p.monto),
+                x: px + wc,
+                w: cap,
+                align: "right",
+              },
+              {
+                text: fmtMoney(p.totalAPagar),
+                x: px + wc + cap,
+                w: wt,
+                align: "right",
+              },
+              { text: hora, x: px + wc + cap + wt, w: wh, noTrunc: true },
+            ],
+            yy
+          );
+          yy -= TB.lh;
+          rowBudget--;
+        }
+      }
+      page.drawLine({
+        start: { x: xR + 4, y: yy + 4 },
+        end: { x: xR + colW - 4, y: yy + 4 },
+        thickness: 0.45,
+        color: COL.rule,
+      });
+      yy -= 2;
+      tableRow(
+        [
+          { text: "Total", x: px, w: wc, bold: true },
+          {
+            text: prestamosRows.length ? fmtMoney(sumCap) : fmtMoney(0),
+            x: px + wc,
+            w: cap,
+            bold: true,
+            align: "right",
+          },
+          {
+            text: prestamosRows.length ? fmtMoney(sumTot) : fmtMoney(0),
+            x: px + wc + cap,
+            w: wt,
+            bold: true,
+            align: "right",
+          },
+          { text: "", x: px + wc + cap + wt, w: wh },
+        ],
+        yy
+      );
+      yy -= TB.lh + 6;
+      return yy;
+    };
+
+    const drawGastosBlock = (startY: number): number => {
+      let yy = sectionBarDark("Gastos del día", xL, colW, startY);
+      const innerPad = 2;
+      const px = xL + innerPad + 4;
+      const usable = colW - 12 - 2 * innerPad;
+      const wMonto = 64;
+      const wMot = 72;
+      const wDesc = usable - wMonto - wMot;
+
+      page.drawRectangle({
+        x: xL + 4,
+        y: yy - TB.lh - 2,
+        width: colW - 8,
+        height: TB.lh + 4,
+        color: COL.band,
+        borderWidth: 0,
+      });
+      tableRow(
+        [
+          { text: "Monto", x: px, w: wMonto, bold: true, color: COL.tableHead, align: "right" },
+          { text: "Motivo", x: px + wMonto, w: wMot, bold: true, color: COL.tableHead },
+          { text: "Descripción", x: px + wMonto + wMot, w: wDesc, bold: true, color: COL.tableHead },
+        ],
+        yy
+      );
+      yy -= TB.lh + 4;
+      let sumG = 0;
+      const gastos = snapshot.gastosDelDia;
+      if (gastos.length === 0) {
+        page.drawText(sanitizarTextoPdf("Sin gastos registrados."), {
+          x: px,
+          y: yy,
+          size: FS.meta,
+          font,
+          color: COL.muted,
+        });
+        yy -= TB.lh + 4;
+      } else {
+        for (const g of gastos) {
+          if (rowBudget <= 0) break;
+          sumG += g.monto;
+          tableRow(
+            [
+              {
+                text: fmtMoney(g.monto),
+                x: px,
+                w: wMonto,
+                align: "right",
+              },
+              { text: trunc(g.motivo, 18), x: px + wMonto, w: wMot },
+              { text: trunc(g.descripcion, 48), x: px + wMonto + wMot, w: wDesc },
+            ],
+            yy
+          );
+          yy -= TB.lh;
+          rowBudget--;
+        }
+      }
+      page.drawLine({
+        start: { x: xL + 4, y: yy + 4 },
+        end: { x: xL + colW - 4, y: yy + 4 },
+        thickness: 0.45,
+        color: COL.rule,
+      });
+      yy -= 2;
+      tableRow(
+        [
+          {
+            text: gastos.length ? fmtMoney(sumG) : fmtMoney(0),
+            x: px,
+            w: wMonto,
+            bold: true,
+            align: "right",
+          },
+          { text: "Total gastos", x: px + wMonto, w: wMot, bold: true },
+          { text: "", x: px + wMonto + wMot, w: wDesc },
+        ],
+        yy
+      );
+      yy -= TB.lh + 6;
+      return yy;
+    };
+
+    const endL = drawGastosBlock(yStart);
+    const endR = drawPrestamosBlock(yStart);
+    y = Math.min(endL, endR);
   }
 
   hr();
   ensureBottom(28);
-  page.drawText(
-    sanitizarTextoPdf("Documento generado al aprobar la entrega. No modificar."),
-    {
+  page.drawText(sanitizarTextoPdf("Documento generado al aprobar la entrega. No modificar."), {
     x: M,
     y: M + 8,
     size: FS.small,
     font,
     color: COL.footer,
-    }
-  );
+  });
 
   const bytes = await pdf.save();
   return bytes;
+}
+
+function wrapPdfLines(text: string, font: PDFFont, size: number, maxW: number): string[] {
+  const words = text.split(/\s+/).filter(Boolean);
+  const lines: string[] = [];
+  let cur = "";
+  for (const w of words) {
+    const tryLine = cur ? `${cur} ${w}` : w;
+    if (font.widthOfTextAtSize(tryLine, size) <= maxW) {
+      cur = tryLine;
+    } else {
+      if (cur) lines.push(cur);
+      cur = w;
+    }
+  }
+  if (cur) lines.push(cur);
+  return lines.length ? lines : [""];
 }
