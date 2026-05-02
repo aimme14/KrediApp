@@ -65,7 +65,12 @@ const COL = {
 };
 
 const MAX_ROWS_DETALLE = 80;
-const TB = { fs: 7.5, hdr: 8, lh: 9.5 };
+/** Espacio vertical por fila de tabla (texto + respiro). */
+const TB = { fs: 7.5, hdr: 8, lh: 10.5 };
+/** Hueco horizontal entre columnas adyacentes (evita “CuotasMétodo”, etc.). */
+const COL_GAP = 5;
+/** Padding interior izquierdo/derecho dentro de cada celda (pt). */
+const CELL_PAD_X = 2;
 
 /** Ancho útil entre márgenes interiores del PDF (líneas y tablas alineadas). */
 function tableInnerBounds() {
@@ -141,7 +146,7 @@ export async function buildReporteCierrePdf(
     bold?: boolean;
     color?: ReturnType<typeof rgb>;
     size?: number;
-    align?: "left" | "right";
+    align?: "left" | "right" | "center";
     /** Sin truncar (p. ej. hora larga si cabe en columna ancha). */
     noTrunc?: boolean;
   };
@@ -150,22 +155,32 @@ export async function buildReporteCierrePdf(
     const sz = opts?.size ?? TB.fs;
     const f = opts?.bold ? fontBold : font;
     const c = opts?.color ?? COL.text;
+    const innerW = Math.max(8, w - 2 * CELL_PAD_X);
+    const px = x + CELL_PAD_X;
     let t2 = sanitizarTextoPdf(text);
     if (!opts?.noTrunc) {
-      const maxCh = Math.max(6, Math.floor(w / (sz * 0.45)));
+      const maxCh = Math.max(6, Math.floor(innerW / (sz * 0.45)));
       t2 = trunc(t2, maxCh);
     }
     const align = opts?.align ?? "left";
     if (align === "right") {
       let tw = f.widthOfTextAtSize(t2, sz);
-      while (tw > w && t2.length > 1) {
+      while (tw > innerW && t2.length > 1) {
         t2 = `${t2.slice(0, -2)}…`;
         tw = f.widthOfTextAtSize(t2, sz);
       }
-      const drawX = Math.max(x, x + w - tw - 0.5);
+      const drawX = Math.max(px, px + innerW - tw);
+      page.drawText(t2, { x: drawX, y: yy, size: sz, font: f, color: c });
+    } else if (align === "center") {
+      let tw = f.widthOfTextAtSize(t2, sz);
+      while (tw > innerW && t2.length > 1) {
+        t2 = `${t2.slice(0, -2)}…`;
+        tw = f.widthOfTextAtSize(t2, sz);
+      }
+      const drawX = px + (innerW - tw) / 2;
       page.drawText(t2, { x: drawX, y: yy, size: sz, font: f, color: c });
     } else {
-      page.drawText(t2, { x, y: yy, size: sz, font: f, color: c, maxWidth: w });
+      page.drawText(t2, { x: px, y: yy, size: sz, font: f, color: c, maxWidth: innerW });
     }
   };
 
@@ -216,14 +231,16 @@ export async function buildReporteCierrePdf(
 
   const { x0: tblEdge, w: tblW } = tableInnerBounds();
 
+  /** Línea sobre la fila de totales: pegada al contenido, más fina y neutra. */
   const hrTable = () => {
+    const lift = 7;
     page.drawLine({
-      start: { x: tblEdge, y: y + 4 },
-      end: { x: tblEdge + tblW, y: y + 4 },
-      thickness: 0.45,
+      start: { x: tblEdge, y: y + lift },
+      end: { x: tblEdge + tblW, y: y + lift },
+      thickness: 0.35,
       color: COL.rule,
     });
-    y -= 2;
+    y -= 6;
   };
 
   // ——— Título (solo texto, sin recuadro — ahorra espacio vertical) ———
@@ -368,9 +385,12 @@ export async function buildReporteCierrePdf(
     const x0 = M + 8;
     const nCol = 6;
     const colW = innerW / nCol;
-    const hdrH = 13;
-    const valH = 20;
-    const blockH = hdrH + valH;
+    const padTop = 11;
+    const padBottom = 11;
+    const gapLabelValor = 10;
+    const valBand = 18;
+    const labelBand = 10;
+    const blockH = padTop + labelBand + gapLabelValor + valBand + padBottom;
     const labels = [
       "Total cobros",
       "Total gastos",
@@ -400,35 +420,33 @@ export async function buildReporteCierrePdf(
       borderWidth: 0.45,
     });
 
-    const yLabelRow = blockBottom + valH + 10;
-    const yValRow = blockBottom + 7;
+    const yTopInner = blockBottom + blockH;
+    const yLabelRow = yTopInner - padTop - 1;
+    const yValRow = blockBottom + padBottom + 6;
     let cx = x0;
     for (let i = 0; i < nCol; i++) {
-      page.drawText(sanitizarTextoPdf(labels[i]), {
-        x: cx + 2,
-        y: yLabelRow,
-        size: FS.metaLbl,
-        font,
-        color: COL.muted,
-      });
       const isCaja = i === 2;
+      drawCell(labels[i], cx, yLabelRow, colW, {
+        size: FS.metaLbl,
+        color: COL.muted,
+        align: "center",
+      });
       if (isCaja) {
         page.drawRectangle({
-          x: cx,
-          y: blockBottom + 2,
-          width: colW - 4,
-          height: valH - 4,
+          x: cx + 3,
+          y: blockBottom + padBottom - 1,
+          width: colW - 6,
+          height: valBand + 2,
           color: rgb(0.88, 0.93, 0.98),
           borderColor: NAV_LIGHT,
           borderWidth: 0.35,
         });
       }
-      page.drawText(sanitizarTextoPdf(vals[i]), {
-        x: cx + 4,
-        y: yValRow,
+      drawCell(vals[i], cx, yValRow, colW, {
         size: isCaja ? FS.section : FS.meta,
-        font: fontBold,
+        bold: true,
         color: isCaja ? NAV : COL.text,
+        align: "center",
       });
       cx += colW;
     }
@@ -444,32 +462,33 @@ export async function buildReporteCierrePdf(
     const innerPad = 2;
     const x0 = tblEdge + innerPad;
     const sumW = tblW - 2 * innerPad;
-    const wHr = 80;
-    const wMet = 38;
-    const wCuo = 44;
-    const wDeb = 52;
-    const wTP = 52;
-    const wCob = 52;
-    const wCli = sumW - (wHr + wMet + wCuo + wDeb + wTP + wCob);
+    const gapsCobros = 6 * COL_GAP;
+    const wHr = 70;
+    const wMet = 34;
+    const wCuo = 38;
+    const wDeb = 50;
+    const wTP = 58;
+    const wCob = 56;
+    const wCli = sumW - (wHr + wMet + wCuo + wDeb + wTP + wCob + gapsCobros);
+
+    const xCli = x0;
+    const xCob = xCli + wCli + COL_GAP;
+    const xTP = xCob + wCob + COL_GAP;
+    const xDeb = xTP + wTP + COL_GAP;
+    const xCuo = xDeb + wDeb + COL_GAP;
+    const xMet = xCuo + wCuo + COL_GAP;
+    const xHr = xMet + wMet + COL_GAP;
 
     ensureBottom(TB.lh + 8);
-    page.drawRectangle({
-      x: tblEdge,
-      y: y - TB.lh - 2,
-      width: tblW,
-      height: TB.lh + 4,
-      color: COL.band,
-      borderWidth: 0,
-    });
     tableRow(
       [
-        { text: "Cliente", x: x0, w: wCli, bold: true, color: COL.tableHead },
-        { text: "Cobro", x: x0 + wCli, w: wCob, bold: true, color: COL.tableHead, align: "right" },
-        { text: "Tot. préstamo", x: x0 + wCli + wCob, w: wTP, bold: true, color: COL.tableHead, align: "right" },
-        { text: "Debe", x: x0 + wCli + wCob + wTP, w: wDeb, bold: true, color: COL.tableHead, align: "right" },
-        { text: "Cuotas", x: x0 + wCli + wCob + wTP + wDeb, w: wCuo, bold: true, color: COL.tableHead, align: "right" },
-        { text: "Método", x: x0 + wCli + wCob + wTP + wDeb + wCuo, w: wMet, bold: true, color: COL.tableHead },
-        { text: "Hora", x: x0 + wCli + wCob + wTP + wDeb + wCuo + wMet, w: wHr, bold: true, color: COL.tableHead },
+        { text: "Cliente", x: xCli, w: wCli, bold: true, color: COL.tableHead },
+        { text: "Cobro", x: xCob, w: wCob, bold: true, color: COL.tableHead, align: "right" },
+        { text: "Tot. préstamo", x: xTP, w: wTP, bold: true, color: COL.tableHead, align: "right" },
+        { text: "Debe", x: xDeb, w: wDeb, bold: true, color: COL.tableHead, align: "right" },
+        { text: "Cuotas", x: xCuo, w: wCuo, bold: true, color: COL.tableHead, align: "right" },
+        { text: "Método", x: xMet, w: wMet, bold: true, color: COL.tableHead },
+        { text: "Hora", x: xHr, w: wHr, bold: true, color: COL.tableHead },
       ],
       y
     );
@@ -490,39 +509,39 @@ export async function buildReporteCierrePdf(
       ensureBottom(TB.lh + 6);
       tableRow(
         [
-          { text: trunc(c.clienteNombre, 42), x: x0, w: wCli },
+          { text: trunc(c.clienteNombre, 42), x: xCli, w: wCli },
           {
             text: fmtMoney(c.monto),
-            x: x0 + wCli,
+            x: xCob,
             w: wCob,
             align: "right",
           },
           {
             text: fmtMoney(c.totalAPagar),
-            x: x0 + wCli + wCob,
+            x: xTP,
             w: wTP,
             align: "right",
           },
           {
             text: fmtMoney(c.saldoPendienteTrasPago),
-            x: x0 + wCli + wCob + wTP,
+            x: xDeb,
             w: wDeb,
             align: "right",
           },
           {
             text: cuotasTxt,
-            x: x0 + wCli + wCob + wTP + wDeb,
+            x: xCuo,
             w: wCuo,
             align: "right",
           },
           {
             text: trunc(c.metodoPago ?? "—", 14),
-            x: x0 + wCli + wCob + wTP + wDeb + wCuo,
+            x: xMet,
             w: wMet,
           },
           {
             text: hora,
-            x: x0 + wCli + wCob + wTP + wDeb + wCuo + wMet,
+            x: xHr,
             w: wHr,
             noTrunc: true,
           },
@@ -542,19 +561,19 @@ export async function buildReporteCierrePdf(
     hrTable();
     tableRow(
       [
-        { text: "Total cobros", x: x0, w: wCli, bold: true },
+        { text: "Total cobros", x: xCli, w: wCli, bold: true },
         {
           text: fmtMoney(sumCobros),
-          x: x0 + wCli,
+          x: xCob,
           w: wCob,
           bold: true,
           align: "right",
         },
-        { text: "", x: x0 + wCli + wCob, w: wTP },
-        { text: "", x: x0 + wCli + wCob + wTP, w: wDeb },
-        { text: "", x: x0 + wCli + wCob + wTP + wDeb, w: wCuo },
-        { text: "", x: x0 + wCli + wCob + wTP + wDeb + wCuo, w: wMet },
-        { text: "", x: x0 + wCli + wCob + wTP + wDeb + wCuo + wMet, w: wHr },
+        { text: "", x: xTP, w: wTP },
+        { text: "", x: xDeb, w: wDeb },
+        { text: "", x: xCuo, w: wCuo },
+        { text: "", x: xMet, w: wMet },
+        { text: "", x: xHr, w: wHr },
       ],
       y
     );
@@ -571,30 +590,32 @@ export async function buildReporteCierrePdf(
     const innerPad = 2;
     const x0 = tblEdge + innerPad;
     const sumW = tblW - 2 * innerPad;
-    const wCli = Math.floor(sumW * 0.22);
-    const wMot = Math.floor(sumW * 0.22);
-    const wCuo = Math.floor(sumW * 0.1);
-    const wDeb = Math.floor(sumW * 0.23);
-    const wTP = sumW - wCli - wMot - wCuo - wDeb;
+    const gapsNp = 4 * COL_GAP;
+    const innerSum = sumW - gapsNp;
+    const wCli = Math.max(36, Math.floor(innerSum * 0.22));
+    const wMot = Math.max(36, Math.floor(innerSum * 0.22));
+    const wCuo = Math.max(26, Math.floor(innerSum * 0.1));
+    const wDeb = Math.max(42, Math.floor(innerSum * 0.23));
+    const wTP = innerSum - wCli - wMot - wCuo - wDeb;
+
+    const xCli = x0;
+    const xMot = xCli + wCli + COL_GAP;
+    const xCuo = xMot + wMot + COL_GAP;
+    const xDeb = xCuo + wCuo + COL_GAP;
+    const xTP = xDeb + wDeb + COL_GAP;
+
+    const wTotEtiqueta = wCli + wMot + wCuo + 3 * COL_GAP;
 
     ensureBottom(TB.lh + 8);
-    page.drawRectangle({
-      x: tblEdge,
-      y: y - TB.lh - 2,
-      width: tblW,
-      height: TB.lh + 4,
-      color: COL.band,
-      borderWidth: 0,
-    });
     tableRow(
       [
-        { text: "Cliente", x: x0, w: wCli, bold: true, color: COL.tableHead },
-        { text: "Motivo", x: x0 + wCli, w: wMot, bold: true, color: COL.tableHead },
-        { text: "Cuotas", x: x0 + wCli + wMot, w: wCuo, bold: true, color: COL.tableHead, align: "right" },
-        { text: "Debe", x: x0 + wCli + wMot + wCuo, w: wDeb, bold: true, color: COL.tableHead, align: "right" },
+        { text: "Cliente", x: xCli, w: wCli, bold: true, color: COL.tableHead },
+        { text: "Motivo", x: xMot, w: wMot, bold: true, color: COL.tableHead },
+        { text: "Cuotas", x: xCuo, w: wCuo, bold: true, color: COL.tableHead, align: "right" },
+        { text: "Debe", x: xDeb, w: wDeb, bold: true, color: COL.tableHead, align: "right" },
         {
           text: "Tot. préstamo",
-          x: x0 + wCli + wMot + wCuo + wDeb,
+          x: xTP,
           w: wTP,
           bold: true,
           color: COL.tableHead,
@@ -615,23 +636,23 @@ export async function buildReporteCierrePdf(
         ensureBottom(TB.lh + 6);
         tableRow(
           [
-            { text: trunc(n.clienteNombre, 36), x: x0, w: wCli },
-            { text: trunc(n.motivoNoPago, 28), x: x0 + wCli, w: wMot },
+            { text: trunc(n.clienteNombre, 36), x: xCli, w: wCli },
+            { text: trunc(n.motivoNoPago, 28), x: xMot, w: wMot },
             {
               text: cuotasNp,
-              x: x0 + wCli + wMot,
+              x: xCuo,
               w: wCuo,
               align: "right",
             },
             {
               text: fmtMoney(n.saldoPendientePrestamoActual),
-              x: x0 + wCli + wMot + wCuo,
+              x: xDeb,
               w: wDeb,
               align: "right",
             },
             {
               text: fmtMoney(n.totalAPagar),
-              x: x0 + wCli + wMot + wCuo + wDeb,
+              x: xTP,
               w: wTP,
               align: "right",
             },
@@ -646,15 +667,15 @@ export async function buildReporteCierrePdf(
     hrTable();
     tableRow(
       [
-        { text: "Total saldo debe", x: x0, w: wCli + wMot + wCuo, bold: true },
+        { text: "Total saldo debe", x: xCli, w: wTotEtiqueta, bold: true },
         {
           text: snapshot.noPagos.length ? fmtMoney(sumDebe) : fmtMoney(0),
-          x: x0 + wCli + wMot + wCuo,
+          x: xDeb,
           w: wDeb,
           bold: true,
           align: "right",
         },
-        { text: "", x: x0 + wCli + wMot + wCuo + wDeb, w: wTP },
+        { text: "", x: xTP, w: wTP },
       ],
       y
     );
@@ -663,7 +684,7 @@ export async function buildReporteCierrePdf(
 
   spacer(10);
 
-  // ——— Gastos (izq) + Préstamos (der), misma altura inicial ———
+  // ——— Gastos (izq) + Préstamos (der), pies alineados ———
   {
     ensureBottom(280);
     const gap = 10;
@@ -672,35 +693,52 @@ export async function buildReporteCierrePdf(
     const xR = M + colW + gap;
     const yStart = y;
 
-    const drawPrestamosBlock = (startY: number): number => {
+    const gastos = snapshot.gastosDelDia;
+    const prestamosRows = snapshot.prestamosDesembolsoDelDia ?? [];
+    const bodyLinesG = gastos.length === 0 ? 1 : gastos.length;
+    const bodyLinesP = prestamosRows.length === 0 ? 1 : prestamosRows.length;
+    const maxBodyLines = Math.max(bodyLinesG, bodyLinesP);
+    const padGastos = maxBodyLines - bodyLinesG;
+    const padPrestamos = maxBodyLines - bodyLinesP;
+
+    const hrDual = (xBox: number, yy: number) => {
+      const lift = 7;
+      page.drawLine({
+        start: { x: xBox + 4, y: yy + lift },
+        end: { x: xBox + colW - 4, y: yy + lift },
+        thickness: 0.35,
+        color: COL.rule,
+      });
+      return yy - 6;
+    };
+
+    const drawPrestamosBlock = (startY: number, blankRows: number): number => {
       let yy = sectionBarDark("Préstamos otorgados", xR, colW, startY);
       const innerPad = 2;
       const px = xR + innerPad + 4;
       const usable = colW - 12 - 2 * innerPad;
-      const wh = Math.max(72, Math.floor(usable * 0.28));
-      const wc = Math.floor((usable - wh) * 0.45);
-      const cap = Math.floor((usable - wh) * 0.28);
-      const wt = usable - wh - wc - cap;
+      const gapsP = 3 * COL_GAP;
+      const uInner = usable - gapsP;
+      const wh = Math.max(68, Math.floor(uInner * 0.28));
+      const wc = Math.floor((uInner - wh) * 0.45);
+      const cap = Math.floor((uInner - wh) * 0.28);
+      const wt = uInner - wh - wc - cap;
 
-      page.drawRectangle({
-        x: xR + 4,
-        y: yy - TB.lh - 2,
-        width: colW - 8,
-        height: TB.lh + 4,
-        color: COL.band,
-        borderWidth: 0,
-      });
+      const xPc = px;
+      const xPcap = xPc + wc + COL_GAP;
+      const xPtot = xPcap + cap + COL_GAP;
+      const xPh = xPtot + wt + COL_GAP;
+
       tableRow(
         [
-          { text: "Cliente", x: px, w: wc, bold: true, color: COL.tableHead },
-          { text: "Capital", x: px + wc, w: cap, bold: true, color: COL.tableHead, align: "right" },
-          { text: "Tot. pagar", x: px + wc + cap, w: wt, bold: true, color: COL.tableHead, align: "right" },
-          { text: "Hora", x: px + wc + cap + wt, w: wh, bold: true, color: COL.tableHead },
+          { text: "Cliente", x: xPc, w: wc, bold: true, color: COL.tableHead },
+          { text: "Capital", x: xPcap, w: cap, bold: true, color: COL.tableHead, align: "right" },
+          { text: "Tot. pagar", x: xPtot, w: wt, bold: true, color: COL.tableHead, align: "right" },
+          { text: "Hora", x: xPh, w: wh, bold: true, color: COL.tableHead },
         ],
         yy
       );
       yy -= TB.lh + 4;
-      const prestamosRows = snapshot.prestamosDesembolsoDelDia ?? [];
       let sumCap = 0;
       let sumTot = 0;
       if (prestamosRows.length === 0) {
@@ -711,7 +749,7 @@ export async function buildReporteCierrePdf(
           font,
           color: COL.muted,
         });
-        yy -= TB.lh + 4;
+        yy -= TB.lh;
       } else {
         for (const p of prestamosRows) {
           if (rowBudget <= 0) break;
@@ -727,20 +765,20 @@ export async function buildReporteCierrePdf(
             : "—";
           tableRow(
             [
-              { text: trunc(p.clienteNombre, 22), x: px, w: wc },
+              { text: trunc(p.clienteNombre, 22), x: xPc, w: wc },
               {
                 text: fmtMoney(p.monto),
-                x: px + wc,
+                x: xPcap,
                 w: cap,
                 align: "right",
               },
               {
                 text: fmtMoney(p.totalAPagar),
-                x: px + wc + cap,
+                x: xPtot,
                 w: wt,
                 align: "right",
               },
-              { text: hora, x: px + wc + cap + wt, w: wh, noTrunc: true },
+              { text: hora, x: xPh, w: wh, noTrunc: true },
             ],
             yy
           );
@@ -748,31 +786,28 @@ export async function buildReporteCierrePdf(
           rowBudget--;
         }
       }
-      page.drawLine({
-        start: { x: xR + 4, y: yy + 4 },
-        end: { x: xR + colW - 4, y: yy + 4 },
-        thickness: 0.45,
-        color: COL.rule,
-      });
-      yy -= 2;
+      for (let i = 0; i < blankRows; i++) {
+        yy -= TB.lh;
+      }
+      yy = hrDual(xR, yy);
       tableRow(
         [
-          { text: "Total", x: px, w: wc, bold: true },
+          { text: "Total", x: xPc, w: wc, bold: true },
           {
             text: prestamosRows.length ? fmtMoney(sumCap) : fmtMoney(0),
-            x: px + wc,
+            x: xPcap,
             w: cap,
             bold: true,
             align: "right",
           },
           {
             text: prestamosRows.length ? fmtMoney(sumTot) : fmtMoney(0),
-            x: px + wc + cap,
+            x: xPtot,
             w: wt,
             bold: true,
             align: "right",
           },
-          { text: "", x: px + wc + cap + wt, w: wh },
+          { text: "", x: xPh, w: wh },
         ],
         yy
       );
@@ -780,34 +815,30 @@ export async function buildReporteCierrePdf(
       return yy;
     };
 
-    const drawGastosBlock = (startY: number): number => {
+    const drawGastosBlock = (startY: number, blankRows: number): number => {
       let yy = sectionBarDark("Gastos del día", xL, colW, startY);
       const innerPad = 2;
       const px = xL + innerPad + 4;
       const usable = colW - 12 - 2 * innerPad;
-      const wMonto = 64;
-      const wMot = 72;
-      const wDesc = usable - wMonto - wMot;
+      const gapsG = 2 * COL_GAP;
+      const wMonto = 58;
+      const wMot = 66;
+      const wDesc = Math.max(24, usable - wMonto - wMot - gapsG);
 
-      page.drawRectangle({
-        x: xL + 4,
-        y: yy - TB.lh - 2,
-        width: colW - 8,
-        height: TB.lh + 4,
-        color: COL.band,
-        borderWidth: 0,
-      });
+      const xGm = px;
+      const xGt = xGm + wMonto + COL_GAP;
+      const xGd = xGt + wMot + COL_GAP;
+
       tableRow(
         [
-          { text: "Monto", x: px, w: wMonto, bold: true, color: COL.tableHead, align: "right" },
-          { text: "Motivo", x: px + wMonto, w: wMot, bold: true, color: COL.tableHead },
-          { text: "Descripción", x: px + wMonto + wMot, w: wDesc, bold: true, color: COL.tableHead },
+          { text: "Monto", x: xGm, w: wMonto, bold: true, color: COL.tableHead, align: "right" },
+          { text: "Motivo", x: xGt, w: wMot, bold: true, color: COL.tableHead },
+          { text: "Descripción", x: xGd, w: wDesc, bold: true, color: COL.tableHead },
         ],
         yy
       );
       yy -= TB.lh + 4;
       let sumG = 0;
-      const gastos = snapshot.gastosDelDia;
       if (gastos.length === 0) {
         page.drawText(sanitizarTextoPdf("Sin gastos registrados."), {
           x: px,
@@ -816,7 +847,7 @@ export async function buildReporteCierrePdf(
           font,
           color: COL.muted,
         });
-        yy -= TB.lh + 4;
+        yy -= TB.lh;
       } else {
         for (const g of gastos) {
           if (rowBudget <= 0) break;
@@ -825,12 +856,12 @@ export async function buildReporteCierrePdf(
             [
               {
                 text: fmtMoney(g.monto),
-                x: px,
+                x: xGm,
                 w: wMonto,
                 align: "right",
               },
-              { text: trunc(g.motivo, 18), x: px + wMonto, w: wMot },
-              { text: trunc(g.descripcion, 48), x: px + wMonto + wMot, w: wDesc },
+              { text: trunc(g.motivo, 18), x: xGt, w: wMot },
+              { text: trunc(g.descripcion, 48), x: xGd, w: wDesc },
             ],
             yy
           );
@@ -838,24 +869,21 @@ export async function buildReporteCierrePdf(
           rowBudget--;
         }
       }
-      page.drawLine({
-        start: { x: xL + 4, y: yy + 4 },
-        end: { x: xL + colW - 4, y: yy + 4 },
-        thickness: 0.45,
-        color: COL.rule,
-      });
-      yy -= 2;
+      for (let i = 0; i < blankRows; i++) {
+        yy -= TB.lh;
+      }
+      yy = hrDual(xL, yy);
       tableRow(
         [
           {
             text: gastos.length ? fmtMoney(sumG) : fmtMoney(0),
-            x: px,
+            x: xGm,
             w: wMonto,
             bold: true,
             align: "right",
           },
-          { text: "Total gastos", x: px + wMonto, w: wMot, bold: true },
-          { text: "", x: px + wMonto + wMot, w: wDesc },
+          { text: "Total gastos", x: xGt, w: wMot, bold: true },
+          { text: "", x: xGd, w: wDesc },
         ],
         yy
       );
@@ -863,8 +891,8 @@ export async function buildReporteCierrePdf(
       return yy;
     };
 
-    const endL = drawGastosBlock(yStart);
-    const endR = drawPrestamosBlock(yStart);
+    const endL = drawGastosBlock(yStart, padGastos);
+    const endR = drawPrestamosBlock(yStart, padPrestamos);
     y = Math.min(endL, endR);
   }
 
