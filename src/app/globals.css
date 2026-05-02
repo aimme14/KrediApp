@@ -652,11 +652,74 @@ button {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
   margin: 0 -0.5rem;
+  /* Evita que tablas anchas queden recortadas dentro de flex/grid */
+  min-width: 0;
+  width: 100%;
 }
 
 @media (max-width: 768px) {
   .table-wrap {
     margin: 0 -0.25rem;
+  }
+}
+
+/* Caja del día (trabajador): títulos de columna más cortos en móvil */
+.table-wrap-caja-dia .th-compact-short {
+  display: none;
+}
+@media (max-width: 480px) {
+  .table-wrap-caja-dia .th-compact-long {
+    display: none;
+  }
+  .table-wrap-caja-dia .th-compact-short {
+    display: inline;
+  }
+}
+
+/*
+  Cuotas pagadas (caja del día): en móvil evita huecos entre Cliente y Pagado/Método/Cuotas
+  repartiendo el ancho con columnas fijas y menos padding entre las tres últimas columnas.
+*/
+@media (max-width: 768px) {
+  .table-wrap table.caja-dia-table-cobros {
+    table-layout: fixed;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+  .table-wrap table.caja-dia-table-cobros th:nth-child(1),
+  .table-wrap table.caja-dia-table-cobros td:nth-child(1) {
+    width: 21%;
+    white-space: nowrap;
+  }
+  .table-wrap table.caja-dia-table-cobros th:nth-child(2),
+  .table-wrap table.caja-dia-table-cobros td:nth-child(2) {
+    width: 27%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .table-wrap table.caja-dia-table-cobros th:nth-child(3),
+  .table-wrap table.caja-dia-table-cobros td:nth-child(3) {
+    width: 17%;
+  }
+  .table-wrap table.caja-dia-table-cobros th:nth-child(4),
+  .table-wrap table.caja-dia-table-cobros td:nth-child(4) {
+    width: 14%;
+    white-space: nowrap;
+  }
+  .table-wrap table.caja-dia-table-cobros th:nth-child(5),
+  .table-wrap table.caja-dia-table-cobros td:nth-child(5) {
+    width: 21%;
+  }
+  .table-wrap table.caja-dia-table-cobros th:nth-child(3),
+  .table-wrap table.caja-dia-table-cobros td:nth-child(3),
+  .table-wrap table.caja-dia-table-cobros th:nth-child(4),
+  .table-wrap table.caja-dia-table-cobros td:nth-child(4),
+  .table-wrap table.caja-dia-table-cobros th:nth-child(5),
+  .table-wrap table.caja-dia-table-cobros td:nth-child(5) {
+    padding-left: 0.12rem;
+    padding-right: 0.12rem;
   }
 }
 
@@ -704,6 +767,15 @@ td {
 }
 
 @media (max-width: 768px) {
+  /*
+    Después de .table-wrap table { table-layout: fixed } arriba: en pantallas estrechas
+    el ancho intrínseco + scroll horizontal evita columnas recortadas.
+  */
+  .table-wrap table {
+    table-layout: auto;
+    width: max-content;
+    min-width: 100%;
+  }
   .table-wrap table th,
   .table-wrap table td {
     padding: 0.22rem 0.35rem;

@@ -192,7 +192,7 @@ export default function CajaDelDiaPage() {
               No hay préstamos desde tu caja para esta fecha.
             </p>
           ) : (
-            <div className="table-wrap" style={{ marginBottom: "1.25rem" }}>
+            <div className="table-wrap table-wrap-caja-dia" style={{ marginBottom: "1.25rem" }}>
               <table>
                 <thead>
                   <tr>
@@ -220,17 +220,18 @@ export default function CajaDelDiaPage() {
           {data.cobros.length === 0 ? (
             <p style={{ color: "var(--text-muted)" }}>No hay cobros registrados para esta fecha.</p>
           ) : (
-            <div className="table-wrap">
-              <table>
+            <div className="table-wrap table-wrap-caja-dia">
+              <table className="caja-dia-table-cobros">
                 <thead>
                   <tr>
                     <th>Hora</th>
                     <th>Cliente</th>
                     <th className="col-num">Pagado</th>
                     <th>Método</th>
-                    <th className="col-num">Total préstamo</th>
-                    <th className="col-num">Debe tras cobro</th>
-                    <th className="col-num">Cuotas (rest./total)</th>
+                    <th className="col-num" title="Cuotas (rest./total)">
+                      <span className="th-compact-long">Cuotas (rest./total)</span>
+                      <span className="th-compact-short">Cuotas</span>
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -240,8 +241,6 @@ export default function CajaDelDiaPage() {
                       <td>{c.clienteNombre}</td>
                       <td className="col-num">{formatMonto(c.monto)}</td>
                       <td>{c.metodoPago ?? "—"}</td>
-                      <td className="col-num">{formatMonto(c.totalAPagar)}</td>
-                      <td className="col-num">{formatMonto(c.saldoPendienteTrasPago)}</td>
                       <td className="col-num">
                         {formatoCuotasRestanteTotal(c.cuotasFaltantes, c.numeroCuotas)}
                       </td>
@@ -276,14 +275,17 @@ export default function CajaDelDiaPage() {
               No hay registros de no pago para esta fecha.
             </p>
           ) : (
-            <div className="table-wrap">
+            <div className="table-wrap table-wrap-caja-dia">
               <table>
                 <thead>
                   <tr>
                     <th>Cliente</th>
                     <th>Motivo</th>
                     <th>Nota</th>
-                    <th className="col-num">Cuotas (pend./total)</th>
+                    <th className="col-num" title="Cuotas (pend./total)">
+                      <span className="th-compact-long">Cuotas (pend./total)</span>
+                      <span className="th-compact-short">Cuotas</span>
+                    </th>
                     <th className="col-num">Total debe</th>
                     <th className="col-num">Total préstamo</th>
                   </tr>
@@ -309,7 +311,7 @@ export default function CajaDelDiaPage() {
           {data.gastosDelDia.length > 0 && (
             <>
               <h3 style={{ fontSize: "1.05rem", marginTop: "1.25rem", marginBottom: "0.5rem" }}>Gastos del día</h3>
-              <div className="table-wrap">
+              <div className="table-wrap table-wrap-caja-dia">
                 <table>
                   <thead>
                     <tr>
