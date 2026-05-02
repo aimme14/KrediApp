@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, type CSSProperties } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { formatoCuotasRestanteTotal } from "@/lib/cuotas-display";
 import {
@@ -22,6 +22,20 @@ function formatMonto(value: number): string {
     minimumFractionDigits: hasDecimals ? 2 : 0,
     maximumFractionDigits: 2,
   })}`;
+}
+
+function totalesVistaPreviaReporte(s: CobrosDelDiaEmpleadoResponse) {
+  const prestamos = s.prestamosDesembolsoDelDia ?? [];
+  return {
+    prestamosCapital: prestamos.reduce((a, p) => a + p.monto, 0),
+    prestamosTotalAPagar: prestamos.reduce((a, p) => a + p.totalAPagar, 0),
+    cobrosMonto: s.cobros.reduce((a, c) => a + c.monto, 0),
+    cobrosTotalAPagar: s.cobros.reduce((a, c) => a + c.totalAPagar, 0),
+    cobrosSaldoTras: s.cobros.reduce((a, c) => a + c.saldoPendienteTrasPago, 0),
+    noPagoDebe: s.noPagos.reduce((a, n) => a + n.saldoPendientePrestamoActual, 0),
+    noPagoTotalPrestamo: s.noPagos.reduce((a, n) => a + n.totalAPagar, 0),
+    gastosMonto: s.gastosDelDia.reduce((a, g) => a + g.monto, 0),
+  };
 }
 
 export default function ReportesDiaPage() {
@@ -174,14 +188,7 @@ export default function ReportesDiaPage() {
                 }}
               >
                 <p style={{ margin: "0 0 0.5rem", fontSize: "0.95rem" }}>
-                  <strong>{s.empleadoNombre}</strong> desea entregarte el reporte diario (efectivo de su caja hacia la caja de la ruta{" "}
-                  {s.rutaNombre ? `«${s.rutaNombre}»` : s.rutaId}).
-                </p>
-                <p style={{ margin: "0 0 0.5rem", fontSize: "0.875rem", color: "var(--text-muted)" }}>
-                  Monto al momento de la solicitud: <strong style={{ color: "var(--text)" }}>{formatMonto(s.montoAlSolicitar)}</strong>
-                  {s.creadaEn
-                    ? ` · ${new Date(s.creadaEn).toLocaleString("es-CO")}`
-                    : ""}
+                  <strong>{s.empleadoNombre}</strong> desea entregarte el reporte diario.
                 </p>
                 {s.comentarioTrabajador ? (
                   <p style={{ margin: "0 0 0.75rem", fontSize: "0.875rem" }}>
@@ -315,7 +322,13 @@ export default function ReportesDiaPage() {
             ) : null}
             {previewLoading && <p>Cargando vista previa…</p>}
             {previewErr && <p className="error-msg">{previewErr}</p>}
-            {previewSnapshot && !previewLoading && (
+            {previewSnapshot && !previewLoading && (() => {
+              const t = totalesVistaPreviaReporte(previewSnapshot);
+              const footCellStyle: CSSProperties = {
+                borderTop: "1px solid var(--card-border)",
+                fontWeight: 600,
+              };
+              return (
               <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
                 <div>
                   <strong>Resumen</strong>
@@ -361,6 +374,17 @@ export default function ReportesDiaPage() {
                         ))
                       )}
                     </tbody>
+                    <tfoot>
+                      <tr>
+                        <td style={footCellStyle}>Total</td>
+                        <td className="col-num" style={footCellStyle}>
+                          {formatMonto(t.prestamosCapital)}
+                        </td>
+                        <td className="col-num" style={footCellStyle}>
+                          {formatMonto(t.prestamosTotalAPagar)}
+                        </td>
+                      </tr>
+                    </tfoot>
                   </table>
                 </div>
                 <div className="table-wrap">
@@ -398,6 +422,22 @@ export default function ReportesDiaPage() {
                         ))
                       )}
                     </tbody>
+                    <tfoot>
+                      <tr>
+                        <td style={footCellStyle}>Total</td>
+                        <td className="col-num" style={footCellStyle}>
+                          {formatMonto(t.cobrosMonto)}
+                        </td>
+                        <td style={footCellStyle} />
+                        <td className="col-num" style={footCellStyle}>
+                          {formatMonto(t.cobrosTotalAPagar)}
+                        </td>
+                        <td className="col-num" style={footCellStyle}>
+                          {formatMonto(t.cobrosSaldoTras)}
+                        </td>
+                        <td className="col-num" style={footCellStyle} />
+                      </tr>
+                    </tfoot>
                   </table>
                   {previewSnapshot.cobros.length > 80 ? (
                     <p style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>
@@ -440,6 +480,20 @@ export default function ReportesDiaPage() {
                         ))
                       )}
                     </tbody>
+                    <tfoot>
+                      <tr>
+                        <td style={footCellStyle}>Total</td>
+                        <td style={footCellStyle} />
+                        <td style={footCellStyle} />
+                        <td className="col-num" style={footCellStyle} />
+                        <td className="col-num" style={footCellStyle}>
+                          {formatMonto(t.noPagoDebe)}
+                        </td>
+                        <td className="col-num" style={footCellStyle}>
+                          {formatMonto(t.noPagoTotalPrestamo)}
+                        </td>
+                      </tr>
+                    </tfoot>
                   </table>
                 </div>
                 <div className="table-wrap">
@@ -469,10 +523,20 @@ export default function ReportesDiaPage() {
                         ))
                       )}
                     </tbody>
+                    <tfoot>
+                      <tr>
+                        <td style={footCellStyle}>Total</td>
+                        <td style={footCellStyle} />
+                        <td className="col-num" style={footCellStyle}>
+                          {formatMonto(t.gastosMonto)}
+                        </td>
+                      </tr>
+                    </tfoot>
                   </table>
                 </div>
               </div>
-            )}
+              );
+            })()}
           </div>
         </div>
       )}
