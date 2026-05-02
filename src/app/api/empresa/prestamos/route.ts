@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { FieldValue } from "firebase-admin/firestore";
 import { getAdminFirestore } from "@/lib/firebase-admin";
 import { getApiUser } from "@/lib/api-auth";
 import {
@@ -254,6 +255,13 @@ export async function POST(request: NextRequest) {
     fechaVencimiento,
     multaMora: typeof multaMora === "number" ? multaMora : 0,
     adelantoCuota: 0,
+    creadoEn: FieldValue.serverTimestamp(),
+    ...(rutaIdPrestamo
+      ? {
+          desembolsoDesde:
+            apiUser.role === "empleado" ? "caja_empleado" : "caja_ruta",
+        }
+      : {}),
   });
 
   if (clienteSnap.exists) {

@@ -4,6 +4,10 @@
 
 import type { Firestore } from "firebase-admin/firestore";
 import { Timestamp } from "firebase-admin/firestore";
+import { fechaDiaColombiaHoy } from "@/lib/colombia-day-bounds";
+import { buildCierreDiaSnapshot } from "@/lib/cierre-dia-snapshot";
+import { buildReporteCierrePdf } from "@/lib/reporte-cierre-pdf";
+import { uploadReporteCierrePdfBuffer } from "@/lib/reporte-cierre-storage";
 import {
   EMPRESAS_COLLECTION,
   REPORTES_DIA_SUBCOLLECTION,
@@ -207,27 +211,27 @@ async function appendReporteDia(
     adminId: string;
     comentario: string | null;
   }
-): Promise<string> {
-  const hoy = new Date();
-  const fechaDia = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, "0")}-${String(hoy.getDate()).padStart(2, "0")}`;
+): Promise<{ id: string; fechaDia: string }> {
+  const fechaDia = fechaDiaColombiaHoy();
 
-  const docRef = await db
+  const col = db
     .collection(EMPRESAS_COLLECTION)
     .doc(empresaId)
-    .collection(REPORTES_DIA_SUBCOLLECTION)
-    .add({
-      fecha: Timestamp.now(),
-      fechaDia,
-      rutaId: params.rutaId,
-      empleadoId: params.empleadoId,
-      empleadoNombre: params.empleadoNombre,
-      montoEntregado: params.montoEntregado,
-      adminId: params.adminId,
-      comentario: params.comentario,
-      solicitudId: params.solicitudId,
-    });
+    .collection(REPORTES_DIA_SUBCOLLECTION);
+  const docRef = col.doc();
+  await docRef.set({
+    fecha: Timestamp.now(),
+    fechaDia,
+    rutaId: params.rutaId,
+    empleadoId: params.empleadoId,
+    empleadoNombre: params.empleadoNombre,
+    montoEntregado: params.montoEntregado,
+    adminId: params.adminId,
+    comentario: params.comentario,
+    solicitudId: params.solicitudId,
+  });
 
-  return docRef.id;
+  return { id: docRef.id, fechaDia };
 }
 
 export type AprobarSolicitudEntregaResult = {
@@ -278,18 +282,58 @@ export async function aprobarSolicitudEntregaReporte(
       ? sol.comentarioTrabajador.trim()
       : null;
 
-  const reporteDiaId = await appendReporteDia(db, empresaId, {
+  const empleadoNombre =
+    typeof sol.empleadoNombre === "string" && sol.empleadoNombre.trim()
+      ? sol.empleadoNombre.trim()
+      : "—";
+
+  const { id: reporteDiaId, fechaDia } = await appendReporteDia(db, empresaId, {
     solicitudId,
     rutaId: result.rutaId,
     empleadoId: empleadoUid,
-    empleadoNombre:
-      typeof sol.empleadoNombre === "string" && sol.empleadoNombre.trim()
-        ? sol.empleadoNombre.trim()
-        : "—",
+    empleadoNombre,
     montoEntregado: result.monto,
     adminId: adminUid,
     comentario: comentarioTrabajador,
   });
+
+  const reporteRef = db
+    .collection(EMPRESAS_COLLECTION)
+    .doc(empresaId)
+    .collection(REPORTES_DIA_SUBCOLLECTION)
+    .doc(reporteDiaId);
+
+  try {
+    const snapshot = await buildCierreDiaSnapshot(db, {
+      empresaId,
+      empleadoUid,
+      rutaId: result.rutaId,
+      fechaDia,
+    });
+    const rutaNombre =
+      typeof sol.rutaNombre === "string" && sol.rutaNombre.trim()
+        ? sol.rutaNombre.trim()
+        : result.rutaId;
+    const pdfBytes = await buildReporteCierrePdf(snapshot, {
+      rutaNombre,
+      empleadoNombre,
+      montoEntregado: result.monto,
+      comentarioTrabajador,
+      aprobadoEn: new Date(),
+    });
+    const pdfStoragePath = await uploadReporteCierrePdfBuffer(empresaId, reporteDiaId, pdfBytes);
+    await reporteRef.update({
+      pdfStoragePath,
+      pdfGeneradoEn: Timestamp.now(),
+      snapshotVersion: 1,
+    });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error("[reporte-cierre] No se pudo generar o subir el PDF:", msg);
+    await reporteRef.update({
+      pdfError: msg,
+    });
+  }
 
   const now = Timestamp.now();
   await solRef.update({

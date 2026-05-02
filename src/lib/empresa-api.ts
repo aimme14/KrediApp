@@ -330,8 +330,13 @@ export type CobroDiaItem = {
   monto: number;
   metodoPago: string | null;
   fecha: string | null;
+  /** Total del préstamo (`totalAPagar`). */
+  totalAPagar: number;
   saldoPendienteTrasPago: number;
   saldoPendientePrestamoActual: number;
+  /** Estimado con cuotas iguales. */
+  cuotasFaltantes: number;
+  numeroCuotas: number;
 };
 
 /** Registros «no pagó» que el trabajador confirmó ese día (ruta del empleado). */
@@ -344,6 +349,9 @@ export type NoPagoDiaItem = {
   motivoNoPago: string;
   nota: string | null;
   saldoPendientePrestamoActual: number;
+  totalAPagar: number;
+  numeroCuotas: number;
+  cuotasPendientes: number;
 };
 
 export type GastoDiaItem = {
@@ -351,6 +359,16 @@ export type GastoDiaItem = {
   monto: number;
   descripcion: string;
   fecha: string | null;
+  motivo: string;
+};
+
+export type PrestamoDesembolsoDiaItem = {
+  prestamoId: string;
+  clienteId: string;
+  clienteNombre: string;
+  monto: number;
+  fecha: string | null;
+  totalAPagar: number;
 };
 
 export type CobrosDelDiaEmpleadoResponse = {
@@ -359,13 +377,119 @@ export type CobrosDelDiaEmpleadoResponse = {
   cobros: CobroDiaItem[];
   noPagos: NoPagoDiaItem[];
   totalCobrosLista: number;
+  /** Total cobrado en ruta + base − gastos − préstamos desde tu caja (tarjeta «Tu caja del día»). */
+  tuCajaDelDia: number;
   /** Cobros del día que por reglas de negocio ingresan a tu billetera (titular del préstamo o cobrador si no hay titular). */
   totalCobrosAcreditanTuCaja: number;
   totalGastosDia: number;
   gastosDelDia: GastoDiaItem[];
   /** Suma de traspasos base ruta → tu caja ese día (`asignacionesBase`). */
   totalBaseAsignadaDia: number;
+  prestamosDesembolsoDelDia: PrestamoDesembolsoDiaItem[];
+  totalPrestamosDesembolsoDia: number;
 };
+
+/** Admin: vista previa del cierre (misma data que cobros del día del trabajador). Solo solicitudes pendientes. */
+export async function getPreviewEntregaReporteAdmin(
+  token: string,
+  solicitudId: string
+): Promise<{
+  fechaDiaPreview: string;
+  solicitud: {
+    id: string;
+    empleadoNombre: string;
+    rutaNombre: string;
+    rutaId: string;
+    montoAlSolicitar: number;
+    comentarioTrabajador: string | null;
+  };
+  snapshot: CobrosDelDiaEmpleadoResponse;
+}> {
+  const res = await fetchWithAuth(
+    `/api/empresa/solicitudes-entrega-reporte/${encodeURIComponent(solicitudId)}/preview`,
+    token
+  );
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error ?? "Error al cargar la vista previa");
+  const gastosPrevRaw = Array.isArray(data.snapshot?.gastosDelDia) ? data.snapshot.gastosDelDia : [];
+  const gastosDelDiaPreview: GastoDiaItem[] = gastosPrevRaw.map((row: Record<string, unknown>) => ({
+    id: String(row.id ?? ""),
+    monto: typeof row.monto === "number" ? row.monto : 0,
+    descripcion: typeof row.descripcion === "string" ? row.descripcion : "",
+    fecha: typeof row.fecha === "string" ? row.fecha : null,
+    motivo: typeof row.motivo === "string" ? row.motivo : "—",
+  }));
+  const prestamosPrevRaw = Array.isArray(data.snapshot?.prestamosDesembolsoDelDia)
+    ? data.snapshot.prestamosDesembolsoDelDia
+    : [];
+  const prestamosDesembolsoDelDia: PrestamoDesembolsoDiaItem[] = prestamosPrevRaw.map(
+    (row: Record<string, unknown>) => ({
+      prestamoId: String(row.prestamoId ?? ""),
+      clienteId: String(row.clienteId ?? ""),
+      clienteNombre: String(row.clienteNombre ?? ""),
+      monto: typeof row.monto === "number" ? row.monto : 0,
+      fecha: typeof row.fecha === "string" ? row.fecha : null,
+      totalAPagar: typeof row.totalAPagar === "number" ? row.totalAPagar : 0,
+    })
+  );
+
+  return {
+    fechaDiaPreview: data.fechaDiaPreview ?? "",
+    solicitud: data.solicitud ?? {},
+    snapshot: {
+      fechaDia: data.snapshot?.fechaDia ?? "",
+      rutaId: data.snapshot?.rutaId ?? "",
+      cobros: Array.isArray(data.snapshot?.cobros) ? data.snapshot.cobros : [],
+      noPagos: Array.isArray(data.snapshot?.noPagos) ? data.snapshot.noPagos : [],
+      totalCobrosLista: typeof data.snapshot?.totalCobrosLista === "number" ? data.snapshot.totalCobrosLista : 0,
+      tuCajaDelDia: typeof data.snapshot?.tuCajaDelDia === "number" ? data.snapshot.tuCajaDelDia : 0,
+      totalCobrosAcreditanTuCaja:
+        typeof data.snapshot?.totalCobrosAcreditanTuCaja === "number"
+          ? data.snapshot.totalCobrosAcreditanTuCaja
+          : 0,
+      totalGastosDia: typeof data.snapshot?.totalGastosDia === "number" ? data.snapshot.totalGastosDia : 0,
+      gastosDelDia: gastosDelDiaPreview,
+      totalBaseAsignadaDia:
+        typeof data.snapshot?.totalBaseAsignadaDia === "number" ? data.snapshot.totalBaseAsignadaDia : 0,
+      prestamosDesembolsoDelDia,
+      totalPrestamosDesembolsoDia:
+        typeof data.snapshot?.totalPrestamosDesembolsoDia === "number"
+          ? data.snapshot.totalPrestamosDesembolsoDia
+          : 0,
+    },
+  };
+}
+
+/** Admin: URL firmada (corta) para descargar el PDF del reporte. */
+export async function getReporteDiaPdfUrl(
+  token: string,
+  reporteId: string
+): Promise<{ url: string; expiresInSeconds: number }> {
+  const res = await fetchWithAuth(
+    `/api/empresa/reportes-dia/${encodeURIComponent(reporteId)}/pdf`,
+    token
+  );
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error ?? "Error al generar enlace de descarga");
+  return {
+    url: typeof data.url === "string" ? data.url : "",
+    expiresInSeconds: typeof data.expiresInSeconds === "number" ? data.expiresInSeconds : 0,
+  };
+}
+
+/** Admin: vuelve a generar y sube el PDF (p. ej. tras corregir el generador o un fallo de Storage). */
+export async function regenerarReporteDiaPdf(
+  token: string,
+  reporteId: string
+): Promise<void> {
+  const res = await fetchWithAuth(
+    `/api/empresa/reportes-dia/${encodeURIComponent(reporteId)}/regenerar-pdf`,
+    token,
+    { method: "POST", body: "{}" }
+  );
+  const data = (await res.json()) as { error?: string };
+  if (!res.ok) throw new Error(data.error ?? "No se pudo regenerar el PDF");
+}
 
 export async function getCobrosDelDiaEmpleado(
   token: string,
@@ -376,20 +500,88 @@ export async function getCobrosDelDiaEmpleado(
   const data = await res.json();
   if (!res.ok) throw new Error(data.error ?? "Error al cargar cobros del día");
 
+  const cobrosRaw = Array.isArray(data.cobros) ? data.cobros : [];
+  const cobros: CobroDiaItem[] = cobrosRaw.map((row: Record<string, unknown>) => ({
+    pagoId: String(row.pagoId ?? ""),
+    prestamoId: String(row.prestamoId ?? ""),
+    clienteId: String(row.clienteId ?? ""),
+    clienteNombre: String(row.clienteNombre ?? ""),
+    monto: typeof row.monto === "number" ? row.monto : 0,
+    metodoPago:
+      row.metodoPago === "transferencia" || row.metodoPago === "efectivo"
+        ? (row.metodoPago as string)
+        : null,
+    fecha: typeof row.fecha === "string" ? row.fecha : null,
+    totalAPagar: typeof row.totalAPagar === "number" ? row.totalAPagar : 0,
+    saldoPendienteTrasPago:
+      typeof row.saldoPendienteTrasPago === "number" ? row.saldoPendienteTrasPago : 0,
+    saldoPendientePrestamoActual:
+      typeof row.saldoPendientePrestamoActual === "number"
+        ? row.saldoPendientePrestamoActual
+        : 0,
+    cuotasFaltantes: typeof row.cuotasFaltantes === "number" ? row.cuotasFaltantes : 0,
+    numeroCuotas: typeof row.numeroCuotas === "number" ? row.numeroCuotas : 0,
+  }));
+
+  const gastosRaw = Array.isArray(data.gastosDelDia) ? data.gastosDelDia : [];
+  const gastosDelDia: GastoDiaItem[] = gastosRaw.map((row: Record<string, unknown>) => ({
+    id: String(row.id ?? ""),
+    monto: typeof row.monto === "number" ? row.monto : 0,
+    descripcion: typeof row.descripcion === "string" ? row.descripcion : "",
+    fecha: typeof row.fecha === "string" ? row.fecha : null,
+    motivo: typeof row.motivo === "string" ? row.motivo : "—",
+  }));
+
+  const noPagosRaw = Array.isArray(data.noPagos) ? data.noPagos : [];
+  const noPagos: NoPagoDiaItem[] = noPagosRaw.map((row: Record<string, unknown>) => ({
+    pagoId: String(row.pagoId ?? ""),
+    prestamoId: String(row.prestamoId ?? ""),
+    clienteId: String(row.clienteId ?? ""),
+    clienteNombre: String(row.clienteNombre ?? ""),
+    fecha: typeof row.fecha === "string" ? row.fecha : null,
+    motivoNoPago: typeof row.motivoNoPago === "string" ? row.motivoNoPago : "",
+    nota: typeof row.nota === "string" && row.nota.trim() ? row.nota : null,
+    saldoPendientePrestamoActual:
+      typeof row.saldoPendientePrestamoActual === "number"
+        ? row.saldoPendientePrestamoActual
+        : 0,
+    totalAPagar: typeof row.totalAPagar === "number" ? row.totalAPagar : 0,
+    numeroCuotas: typeof row.numeroCuotas === "number" ? row.numeroCuotas : 0,
+    cuotasPendientes: typeof row.cuotasPendientes === "number" ? row.cuotasPendientes : 0,
+  }));
+
+  const prestamosRaw = Array.isArray(data.prestamosDesembolsoDelDia)
+    ? data.prestamosDesembolsoDelDia
+    : [];
+  const prestamosDesembolsoDelDia: PrestamoDesembolsoDiaItem[] = prestamosRaw.map(
+    (row: Record<string, unknown>) => ({
+      prestamoId: String(row.prestamoId ?? ""),
+      clienteId: String(row.clienteId ?? ""),
+      clienteNombre: String(row.clienteNombre ?? ""),
+      monto: typeof row.monto === "number" ? row.monto : 0,
+      fecha: typeof row.fecha === "string" ? row.fecha : null,
+      totalAPagar: typeof row.totalAPagar === "number" ? row.totalAPagar : 0,
+    })
+  );
+
   return {
     fechaDia: data.fechaDia ?? "",
     rutaId: data.rutaId ?? "",
-    cobros: Array.isArray(data.cobros) ? data.cobros : [],
-    noPagos: Array.isArray(data.noPagos) ? data.noPagos : [],
+    cobros,
+    noPagos,
     totalCobrosLista: typeof data.totalCobrosLista === "number" ? data.totalCobrosLista : 0,
+    tuCajaDelDia: typeof data.tuCajaDelDia === "number" ? data.tuCajaDelDia : 0,
     totalCobrosAcreditanTuCaja:
       typeof data.totalCobrosAcreditanTuCaja === "number"
         ? data.totalCobrosAcreditanTuCaja
         : 0,
     totalGastosDia: typeof data.totalGastosDia === "number" ? data.totalGastosDia : 0,
-    gastosDelDia: Array.isArray(data.gastosDelDia) ? data.gastosDelDia : [],
+    gastosDelDia,
     totalBaseAsignadaDia:
       typeof data.totalBaseAsignadaDia === "number" ? data.totalBaseAsignadaDia : 0,
+    prestamosDesembolsoDelDia,
+    totalPrestamosDesembolsoDia:
+      typeof data.totalPrestamosDesembolsoDia === "number" ? data.totalPrestamosDesembolsoDia : 0,
   };
 }
 
@@ -404,6 +596,8 @@ export type ReporteDiaItem = {
   fecha: string | null;
   /** Nota opcional del trabajador al entregar el reporte */
   comentario?: string | null;
+  tienePdf?: boolean;
+  pdfError?: string | null;
 };
 
 export async function getReportesDia(
@@ -416,9 +610,26 @@ export async function getReportesDia(
   const res = await fetchWithAuth(url, token);
   const data = await res.json();
   if (!res.ok) throw new Error(data.error ?? "Error al cargar reportes");
+  const itemsRaw = Array.isArray(data.items) ? data.items : [];
+  const items: ReporteDiaItem[] = itemsRaw.map((row: Record<string, unknown>) => ({
+    id: String(row.id ?? ""),
+    fechaDia: String(row.fechaDia ?? ""),
+    rutaId: String(row.rutaId ?? ""),
+    rutaNombre: String(row.rutaNombre ?? ""),
+    empleadoId: String(row.empleadoId ?? ""),
+    empleadoNombre: String(row.empleadoNombre ?? ""),
+    montoEntregado: typeof row.montoEntregado === "number" ? row.montoEntregado : 0,
+    fecha: typeof row.fecha === "string" ? row.fecha : null,
+    comentario:
+      typeof row.comentario === "string" && row.comentario.trim() ? row.comentario : null,
+    tienePdf: Boolean(row.tienePdf),
+    pdfError:
+      typeof row.pdfError === "string" && row.pdfError.trim() ? row.pdfError : null,
+  }));
+
   return {
     fechaDia: data.fechaDia ?? "",
-    items: Array.isArray(data.items) ? data.items : [],
+    items,
     totalMonto: typeof data.totalMonto === "number" ? data.totalMonto : 0,
   };
 }

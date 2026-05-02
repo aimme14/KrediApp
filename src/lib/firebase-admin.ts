@@ -6,6 +6,7 @@ import { getFirestore } from "firebase-admin/firestore";
 import type { Firestore } from "firebase-admin/firestore";
 import { getMessaging } from "firebase-admin/messaging";
 import type { Messaging } from "firebase-admin/messaging";
+import { getStorage } from "firebase-admin/storage";
 
 const projectId = (process.env.FIREBASE_PROJECT_ID ?? "").trim();
 const clientEmail = (process.env.FIREBASE_CLIENT_EMAIL ?? "").trim();
@@ -33,4 +34,14 @@ export function getAdminFirestore(): Firestore {
 
 export function getAdminMessaging(): Messaging {
   return getMessaging(getAdminApp());
+}
+
+/** Bucket por defecto del proyecto o `FIREBASE_STORAGE_BUCKET` / `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET`. */
+export function getAdminBucket() {
+  const app = getAdminApp();
+  const name =
+    process.env.FIREBASE_STORAGE_BUCKET?.trim() ||
+    process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET?.trim() ||
+    "";
+  return name ? getStorage(app).bucket(name) : getStorage(app).bucket();
 }

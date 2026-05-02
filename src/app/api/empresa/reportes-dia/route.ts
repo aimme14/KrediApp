@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAdminFirestore } from "@/lib/firebase-admin";
 import { getApiUser } from "@/lib/api-auth";
 import { EMPRESAS_COLLECTION, REPORTES_DIA_SUBCOLLECTION, RUTAS_SUBCOLLECTION } from "@/lib/empresas-db";
+import { fechaDiaColombiaHoy } from "@/lib/colombia-day-bounds";
 
 /** GET: reportes de entrega del día (admin: rutas que administra). ?fecha=YYYY-MM-DD opcional (hoy por defecto). */
 export async function GET(request: NextRequest) {
@@ -14,11 +15,10 @@ export async function GET(request: NextRequest) {
   }
 
   const fechaParam = request.nextUrl.searchParams.get("fecha");
-  const hoy = new Date();
   const fechaDia =
     fechaParam && /^\d{4}-\d{2}-\d{2}$/.test(fechaParam)
       ? fechaParam
-      : `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, "0")}-${String(hoy.getDate()).padStart(2, "0")}`;
+      : fechaDiaColombiaHoy();
 
   const db = getAdminFirestore();
   const empresaId = apiUser.empresaId;
@@ -54,6 +54,13 @@ export async function GET(request: NextRequest) {
           ? comentarioRaw.trim()
           : null;
 
+      const pdfStoragePath =
+        typeof x.pdfStoragePath === "string" && x.pdfStoragePath.trim()
+          ? x.pdfStoragePath.trim()
+          : "";
+      const pdfError =
+        typeof x.pdfError === "string" && x.pdfError.trim() ? x.pdfError.trim() : null;
+
       return {
         id: doc.id,
         fechaDia: typeof x.fechaDia === "string" ? x.fechaDia : fechaDia,
@@ -64,6 +71,8 @@ export async function GET(request: NextRequest) {
         montoEntregado: typeof x.montoEntregado === "number" ? x.montoEntregado : 0,
         fecha: x.fecha?.toDate?.()?.toISOString?.() ?? null,
         comentario,
+        tienePdf: Boolean(pdfStoragePath),
+        pdfError,
       };
     })
     .filter(Boolean) as Array<{
@@ -76,6 +85,8 @@ export async function GET(request: NextRequest) {
     montoEntregado: number;
     fecha: string | null;
     comentario: string | null;
+    tienePdf: boolean;
+    pdfError: string | null;
   }>;
 
   items.sort((a, b) => (b.fecha ?? "").localeCompare(a.fecha ?? ""));

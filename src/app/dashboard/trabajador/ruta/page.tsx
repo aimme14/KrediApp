@@ -236,7 +236,9 @@ export default function RutaDelDiaPage() {
               {loadingCajaDelDia
                 ? "…"
                 : cajaDelDiaResumen
-                  ? formatCurrency(tuCajaDelDiaDesdeTotales(cajaDelDiaResumen))
+                  ? formatCurrency(
+                      cajaDelDiaResumen.tuCajaDelDia ?? tuCajaDelDiaDesdeTotales(cajaDelDiaResumen)
+                    )
                   : "—"}
             </span>
             <Link href="/dashboard/trabajador/caja-del-dia" className="ruta-dia-caja-link">

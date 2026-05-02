@@ -9,8 +9,10 @@ import {
   type CobrosDelDiaEmpleadoResponse,
   type CobroDiaItem,
   type NoPagoDiaItem,
+  type PrestamoDesembolsoDiaItem,
 } from "@/lib/empresa-api";
 import { fechaDiaColombiaHoy } from "@/lib/colombia-day-bounds";
+import { formatoCuotasRestanteTotal } from "@/lib/cuotas-display";
 import { tuCajaDelDiaDesdeTotales } from "@/lib/tu-caja-del-dia";
 
 function formatMonto(value: number): string {
@@ -154,7 +156,7 @@ export default function CajaDelDiaPage() {
           >
             <TarjetaResumen
               etiqueta={`Tu caja del día (${data.fechaDia})`}
-              valor={formatMonto(tuCajaDelDiaDesdeTotales(data))}
+              valor={formatMonto(data.tuCajaDelDia ?? tuCajaDelDiaDesdeTotales(data))}
             />
             <TarjetaResumen
               etiqueta={`Total cobrado en la ruta (${data.fechaDia})`}
@@ -162,10 +164,57 @@ export default function CajaDelDiaPage() {
             />
             <TarjetaResumen etiqueta="Gastos del día" valor={formatMonto(data.totalGastosDia)} />
             <TarjetaResumen
+              etiqueta={`Préstamos desde tu caja (${data.fechaDia})`}
+              valor={formatMonto(data.totalPrestamosDesembolsoDia ?? 0)}
+            />
+            <TarjetaResumen
               etiqueta={`Base asignada (${data.fechaDia})`}
               valor={formatMonto(data.totalBaseAsignadaDia)}
             />
           </div>
+
+          <h3 style={{ fontSize: "1.05rem", marginBottom: "0.5rem" }}>
+            Préstamos otorgados (tu caja)
+          </h3>
+          <p
+            style={{
+              marginBottom: "0.5rem",
+              fontSize: "0.8125rem",
+              color: "var(--text-muted)",
+              lineHeight: 1.45,
+            }}
+          >
+            Dinero desembolsado al crear préstamos con tu base (no aplica si el admin cargó el préstamo a la
+            caja de la ruta).
+          </p>
+          {(data.prestamosDesembolsoDelDia ?? []).length === 0 ? (
+            <p style={{ color: "var(--text-muted)", marginBottom: "1.25rem" }}>
+              No hay préstamos desde tu caja para esta fecha.
+            </p>
+          ) : (
+            <div className="table-wrap" style={{ marginBottom: "1.25rem" }}>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Hora</th>
+                    <th>Cliente</th>
+                    <th className="col-num">Capital entregado</th>
+                    <th className="col-num">Total a pagar</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(data.prestamosDesembolsoDelDia ?? []).map((p: PrestamoDesembolsoDiaItem) => (
+                    <tr key={p.prestamoId}>
+                      <td>{formatHora(p.fecha)}</td>
+                      <td>{p.clienteNombre}</td>
+                      <td className="col-num">{formatMonto(p.monto)}</td>
+                      <td className="col-num">{formatMonto(p.totalAPagar)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
 
           <h3 style={{ fontSize: "1.05rem", marginBottom: "0.5rem" }}>Cuotas pagadas</h3>
           {data.cobros.length === 0 ? (
@@ -179,8 +228,9 @@ export default function CajaDelDiaPage() {
                     <th>Cliente</th>
                     <th className="col-num">Pagado</th>
                     <th>Método</th>
-                    <th className="col-num">Saldo préstamo tras cobro</th>
-                    <th className="col-num">Saldo actual préstamo</th>
+                    <th className="col-num">Total préstamo</th>
+                    <th className="col-num">Debe tras cobro</th>
+                    <th className="col-num">Cuotas (rest./total)</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -190,8 +240,11 @@ export default function CajaDelDiaPage() {
                       <td>{c.clienteNombre}</td>
                       <td className="col-num">{formatMonto(c.monto)}</td>
                       <td>{c.metodoPago ?? "—"}</td>
+                      <td className="col-num">{formatMonto(c.totalAPagar)}</td>
                       <td className="col-num">{formatMonto(c.saldoPendienteTrasPago)}</td>
-                      <td className="col-num">{formatMonto(c.saldoPendientePrestamoActual)}</td>
+                      <td className="col-num">
+                        {formatoCuotasRestanteTotal(c.cuotasFaltantes, c.numeroCuotas)}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -227,21 +280,25 @@ export default function CajaDelDiaPage() {
               <table>
                 <thead>
                   <tr>
-                    <th>Hora</th>
                     <th>Cliente</th>
                     <th>Motivo</th>
                     <th>Nota</th>
-                    <th className="col-num">Saldo préstamo (actual)</th>
+                    <th className="col-num">Cuotas (pend./total)</th>
+                    <th className="col-num">Total debe</th>
+                    <th className="col-num">Total préstamo</th>
                   </tr>
                 </thead>
                 <tbody>
                   {(data.noPagos ?? []).map((n: NoPagoDiaItem) => (
                     <tr key={`no-${n.prestamoId}-${n.pagoId}`}>
-                      <td>{formatHora(n.fecha)}</td>
                       <td>{n.clienteNombre}</td>
                       <td>{labelMotivoNoPago(n.motivoNoPago)}</td>
                       <td>{n.nota ?? "—"}</td>
+                      <td className="col-num">
+                        {formatoCuotasRestanteTotal(n.cuotasPendientes, n.numeroCuotas)}
+                      </td>
                       <td className="col-num">{formatMonto(n.saldoPendientePrestamoActual)}</td>
+                      <td className="col-num">{formatMonto(n.totalAPagar)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -257,6 +314,7 @@ export default function CajaDelDiaPage() {
                   <thead>
                     <tr>
                       <th>Hora</th>
+                      <th>Motivo</th>
                       <th>Descripción</th>
                       <th className="col-num">Monto</th>
                     </tr>
@@ -265,6 +323,7 @@ export default function CajaDelDiaPage() {
                     {data.gastosDelDia.map((g) => (
                       <tr key={g.id}>
                         <td>{formatHora(g.fecha)}</td>
+                        <td>{g.motivo || "—"}</td>
                         <td>{g.descripcion || "—"}</td>
                         <td className="col-num">{formatMonto(g.monto)}</td>
                       </tr>
