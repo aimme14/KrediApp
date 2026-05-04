@@ -17,8 +17,11 @@ const VISITADOS_STORAGE_PREFIX = "krediapp-ruta-visitados-";
 /** No refetch al volver a la pestaña si la última carga fue hace menos de esto. */
 const VISIBILITY_MIN_INTERVAL_MS = 45_000;
 
-/** Debe coincidir con la API: mora tras 3 no pagos consecutivos; UI alerta en 1–2. */
-export const NO_PAGOS_PARA_MORA = 3;
+/**
+ * Umbral solo para la UI (ruta del día: fila naranja / prioridad 2).
+ * No afecta el estado del préstamo en la API.
+ */
+export const UMBRAL_INTENTOS_ALERTA = 3;
 
 function getVisitadosKey(): string {
   return `${VISITADOS_STORAGE_PREFIX}${new Date().toISOString().slice(0, 10)}`;
@@ -76,7 +79,6 @@ function calcularDiasMora(
 function calcularPrioridad(
   fechaVencimiento: Date | null,
   estado: string,
-  diasMora: number,
   intentosFallidos: number
 ): PrioridadClienteRuta {
   const hoy = new Date();
@@ -84,7 +86,7 @@ function calcularPrioridad(
   if (
     estado === "activo" &&
     intentosFallidos >= 1 &&
-    intentosFallidos < NO_PAGOS_PARA_MORA
+    intentosFallidos < UMBRAL_INTENTOS_ALERTA
   ) {
     return 2;
   }
@@ -151,7 +153,7 @@ function buildClientesRuta(
     const estado = p.estado ?? "activo";
     const diasMora = calcularDiasMora(fechaV, estado);
     const intentosFallidos = p.intentosFallidos ?? 0;
-    const prioridad = calcularPrioridad(fechaV, estado, diasMora, intentosFallidos);
+    const prioridad = calcularPrioridad(fechaV, estado, intentosFallidos);
 
     const cuotaPagadaHoy = isMismoDia(p.ultimoPagoFecha ?? null);
 
@@ -173,6 +175,7 @@ function buildClientesRuta(
       prioridad,
       visitado: visitados.has(p.clienteId),
       cuotaPagadaHoy,
+      moroso: c?.moroso === true,
     });
   }
 
@@ -277,6 +280,7 @@ export function useRutaDia(): UseRutaDiaState {
         prioridadMax,
         diasMoraMax,
         visitado,
+        moroso: sorted.some((i) => i.moroso),
         items: sorted,
       });
     });

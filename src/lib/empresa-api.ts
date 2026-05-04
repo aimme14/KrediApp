@@ -85,7 +85,7 @@ export type PrestamoItem = {
   adelantoCuota?: number;
   /** Fecha del último pago (ISO). Para semáforo "cuota del día pagada" en ruta del día. */
   ultimoPagoFecha?: string | null;
-  /** No pagos consecutivos registrados (sin pago). A las 3 pasará el préstamo a mora. */
+  /** Veces que se registró «no pago» consecutivo (informativo; no cambia mora automáticamente). */
   intentosFallidos?: number;
 };
 

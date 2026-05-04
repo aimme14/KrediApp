@@ -11,18 +11,19 @@ import {
 } from "@/lib/empresa-api";
 import { tuCajaDelDiaDesdeTotales } from "@/lib/tu-caja-del-dia";
 import { useRuta } from "@/hooks/useRuta";
-import { NO_PAGOS_PARA_MORA, useRutaDia } from "@/hooks/useRutaDia";
+import { UMBRAL_INTENTOS_ALERTA, useRutaDia } from "@/hooks/useRutaDia";
 import type { ClienteRutaGrupo, PrioridadClienteRuta } from "@/types/finanzas";
 
-/** Semáforo: rojo = mora, naranja = 1–2 no pagos, amarillo = pendiente, verde = cuota del día pagada */
+/** Semáforo: rojo = préstamo en mora (BD), naranja = alerta informativa (1–2 no pagos), amarillo = pendiente, verde = cuota del día pagada */
 export type SemaforoRuta = "rojo" | "naranja" | "amarillo" | "verde";
 
+/** Alerta visual por intentos fallidos; no cambia mora en servidor. */
 function tieneAlertaNoPago(grupo: ClienteRutaGrupo): boolean {
   return grupo.items.some(
     (i) =>
       i.estado === "activo" &&
       i.intentosFallidos >= 1 &&
-      i.intentosFallidos < NO_PAGOS_PARA_MORA
+      i.intentosFallidos < UMBRAL_INTENTOS_ALERTA
   );
 }
 
@@ -41,7 +42,7 @@ function getSemaforoLabel(semaforo: SemaforoRuta): string {
     case "rojo":
       return "En mora";
     case "naranja":
-      return "Sin pago (1 o 2 veces)";
+      return "Sin pago reciente (informativo)";
     case "amarillo":
       return "Pendiente por cobrar";
     case "verde":
@@ -77,8 +78,8 @@ function getBadgeLabel(
   const allCuotaPagadaHoy =
     grupo.items.length > 0 && grupo.items.every((i) => i.cuotaPagadaHoy);
   if (hasMora) return "Mora";
-  if (tieneAlertaNoPago(grupo)) return "Alerta";
   if (allCuotaPagadaHoy) return "Pagada hoy";
+  if (tieneAlertaNoPago(grupo)) return "Alerta";
   if (prioridad === 3) return "Hoy";
   if (prioridad === 4) return "Mañana";
   return "Pronto";
@@ -154,7 +155,7 @@ export default function RutaDelDiaPage() {
     { prioridad: 1 as PrioridadClienteRuta, titulo: "URGENTE · EN MORA" },
     {
       prioridad: 2 as PrioridadClienteRuta,
-      titulo: "ADVERTENCIA · SIN PAGO (1–2 veces)",
+      titulo: "ADVERTENCIA · SIN PAGO RECIENTE (informativo)",
     },
     { prioridad: 3 as PrioridadClienteRuta, titulo: "VENCEN HOY" },
     { prioridad: 4 as PrioridadClienteRuta, titulo: "MAÑANA" },
@@ -352,15 +353,18 @@ export default function RutaDelDiaPage() {
                           ? "alerta"
                           : (grupo.items[0]?.estado?.toLowerCase() ?? "activo");
 
+                    const ariaMoroso = grupo.moroso
+                      ? " Cliente marcado como moroso por el administrador."
+                      : "";
                     return (
                       <li
                         key={grupo.clienteId}
-                        className={`ruta-dia-item ruta-dia-item-semaforo-${semaforo} ${grupo.visitado ? "ruta-dia-item-visitado" : ""}`}
+                        className={`ruta-dia-item ruta-dia-item-semaforo-${semaforo} ${grupo.visitado ? "ruta-dia-item-visitado" : ""} ${grupo.moroso ? "ruta-dia-item-moroso" : ""}`}
                         role="button"
                         tabIndex={0}
                         onClick={() => handleClickCliente(grupo)}
                         onKeyDown={(e) => handleKeyDown(e, grupo)}
-                        aria-label={`${grupo.clienteNombre}, ${getSemaforoLabel(semaforo)}. Saldo a cobrar ahora ${formatCurrency(grupo.items[0]?.monto ?? 0)}${grupo.cantidadPrestamos > 1 ? `; total ${grupo.cantidadPrestamos} préstamos ${formatCurrency(grupo.totalMonto)}` : ""}. ${grupo.visitado ? "Visitado" : ""}`}
+                        aria-label={`${grupo.clienteNombre}, ${getSemaforoLabel(semaforo)}. Saldo a cobrar ahora ${formatCurrency(grupo.items[0]?.monto ?? 0)}${grupo.cantidadPrestamos > 1 ? `; total ${grupo.cantidadPrestamos} préstamos ${formatCurrency(grupo.totalMonto)}` : ""}.${ariaMoroso} ${grupo.visitado ? "Visitado" : ""}`}
                       >
                         <span
                           className="ruta-dia-semaforo-wrap"
@@ -386,6 +390,14 @@ export default function RutaDelDiaPage() {
                           )}
                         </div>
                         <div className="ruta-dia-item-main">
+                          {grupo.moroso ? (
+                            <div className="ruta-dia-moroso-banner" role="status">
+                              <span className="ruta-dia-moroso-banner-icon" aria-hidden>
+                                ⚠
+                              </span>
+                              <span>Cliente moroso</span>
+                            </div>
+                          ) : null}
                           <div className="ruta-dia-item-row">
                             <span className="ruta-dia-item-nombre">
                               {grupo.clienteNombre}

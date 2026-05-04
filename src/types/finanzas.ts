@@ -180,6 +180,8 @@ export interface ClienteRuta {
   visitado: boolean;
   /** True si el último pago del préstamo fue hoy (semáforo verde en ruta del día). */
   cuotaPagadaHoy: boolean;
+  /** Marcado moroso por el admin (solo UI; no es el estado mora del préstamo). */
+  moroso: boolean;
 }
 
 /** Grupo de ítems de ruta agrupados por cliente (una fila por cliente en la UI) */
@@ -198,6 +200,8 @@ export interface ClienteRutaGrupo {
   diasMoraMax: number;
   /** Si el cobrador ya visitó a este cliente hoy (localStorage) */
   visitado: boolean;
+  /** Cliente marcado moroso por administrador (solo señal en UI). */
+  moroso: boolean;
   /** Ítems ordenados por urgencia (misma regla que la lista); el primero abre en Cobrar */
   items: ClienteRuta[];
 }

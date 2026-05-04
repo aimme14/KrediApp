@@ -32,8 +32,6 @@ const MOTIVOS_PERDIDA = [
   "otro",
 ] as const;
 const MAX_PAGOS_LIST = 50;
-/** Tras este número de «no pago» consecutivos el préstamo pasa a estado mora. */
-const NO_PAGOS_CONSECUTIVOS_PARA_MORA = 3;
 
 async function resolveClienteNombre(
   db: Firestore,
@@ -269,13 +267,17 @@ export async function POST(
         const prevFallos =
           typeof pr.intentosFallidos === "number" ? pr.intentosFallidos : 0;
         const intentosFallidos = prevFallos + 1;
-        const yaEnMora = pr.estado === "mora";
-        const pasarAMora =
-          yaEnMora || intentosFallidos >= NO_PAGOS_CONSECUTIVOS_PARA_MORA;
+        /** No se pasa a mora por no pagos; estado «mora» solo puede quedar por datos previos. */
+        const estadoPrestamo =
+          pr.estado === "pagado"
+            ? "pagado"
+            : pr.estado === "mora"
+              ? "mora"
+              : "activo";
 
         tx.update(prestamoRef, {
           intentosFallidos,
-          estado: pasarAMora ? "mora" : "activo",
+          estado: estadoPrestamo,
           updatedAt: now,
         });
         return pagoRef.id;

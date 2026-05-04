@@ -4769,6 +4769,41 @@ th {
 .ruta-dia-item-semaforo-verde {
   border-left: 4px solid #16a34a;
 }
+/* Cliente marcado moroso por admin (señal visual; datos ya en lista de clientes) */
+.ruta-dia-item-moroso {
+  background: #fef2f2;
+  border-color: #fecaca;
+  border-left-width: 4px;
+  border-left-color: #b91c1c;
+}
+.ruta-dia-item-moroso:hover {
+  background: #fee2e2;
+}
+.ruta-dia-moroso-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #991b1b;
+  margin-bottom: 0.35rem;
+  letter-spacing: 0.02em;
+}
+.ruta-dia-moroso-banner-icon {
+  font-size: 0.875rem;
+  line-height: 1;
+}
+[data-theme="dark"] .ruta-dia-item-moroso {
+  background: rgba(220, 38, 38, 0.14);
+  border-color: rgba(248, 113, 113, 0.4);
+  border-left-color: #f87171;
+}
+[data-theme="dark"] .ruta-dia-item-moroso:hover {
+  background: rgba(220, 38, 38, 0.22);
+}
+[data-theme="dark"] .ruta-dia-moroso-banner {
+  color: #fca5a5;
+}
 .ruta-dia-item-visitado {
   opacity: 0.85;
 }
