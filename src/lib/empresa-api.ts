@@ -739,25 +739,6 @@ export async function registrarPago(
   };
 }
 
-/** Actualiza el comprobante (URL de la imagen) de un pago. */
-export async function actualizarComprobantePago(
-  token: string,
-  prestamoId: string,
-  pagoId: string,
-  comprobanteUrl: string
-): Promise<void> {
-  const res = await fetchWithAuth(
-    `/api/empresa/prestamos/${encodeURIComponent(prestamoId)}/pagos/${encodeURIComponent(pagoId)}`,
-    token,
-    {
-      method: "PATCH",
-      body: JSON.stringify({ comprobanteUrl }),
-    }
-  );
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error ?? "Error al guardar comprobante");
-}
-
 /** Registra un intento sin pago en la subcolección pagos del préstamo (tipo no_pago). */
 export async function registrarNoPago(
   token: string,
