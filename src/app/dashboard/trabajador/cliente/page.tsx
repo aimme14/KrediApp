@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useTrabajadorLista } from "@/context/TrabajadorListaContext";
 import { createCliente, formatClienteCodigoCorto } from "@/lib/empresa-api";
@@ -21,6 +21,7 @@ export default function ClienteTrabajadorPage() {
   const [telefono, setTelefono] = useState("");
   const [cedula, setCedula] = useState("");
   const [creating, setCreating] = useState(false);
+  const [clienteExpandidoId, setClienteExpandidoId] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -43,6 +44,7 @@ export default function ClienteTrabajadorPage() {
       setTelefono("");
       setCedula("");
       setShowForm(false);
+      setClienteExpandidoId(null);
       await refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al crear cliente");
@@ -111,25 +113,57 @@ export default function ClienteTrabajadorPage() {
             <table>
               <thead>
                 <tr>
-                  <th>Código</th>
+                  <th className="clientes-col-codigo">Código</th>
                   <th>Nombre</th>
-                  <th>Ubicación</th>
-                  <th>Teléfono</th>
-                  <th>Cédula</th>
+                  <th className="clientes-col-ubicacion">Ubicación</th>
+                  <th className="clientes-col-telefono">Teléfono</th>
+                  <th className="clientes-col-cedula">Cédula</th>
+                  <th className="clientes-col-info-mobile">Información</th>
                 </tr>
               </thead>
               <tbody>
-                {clientes.map((c) => (
-                  <tr key={c.id}>
-                    <td title={c.codigo ?? undefined}>
-                      {formatClienteCodigoCorto(c.codigo)}
-                    </td>
-                    <td>{c.nombre}</td>
-                    <td>{c.ubicacion || "—"}</td>
-                    <td>{c.telefono || "—"}</td>
-                    <td>{c.cedula || "—"}</td>
-                  </tr>
-                ))}
+                {clientes.map((c) => {
+                  const estaExpandido = clienteExpandidoId === c.id;
+                  return (
+                    <Fragment key={c.id}>
+                      <tr>
+                        <td className="clientes-col-codigo" title={c.codigo ?? undefined}>
+                          {formatClienteCodigoCorto(c.codigo)}
+                        </td>
+                        <td>{c.nombre}</td>
+                        <td className="clientes-col-ubicacion">{c.ubicacion || "—"}</td>
+                        <td className="clientes-col-telefono">{c.telefono || "—"}</td>
+                        <td className="clientes-col-cedula">{c.cedula || "—"}</td>
+                        <td className="clientes-col-info-mobile">
+                          <button
+                            type="button"
+                            className="clientes-info-btn"
+                            aria-label={estaExpandido ? `Ocultar información de ${c.nombre}` : `Ver información de ${c.nombre}`}
+                            onClick={() => setClienteExpandidoId((prev) => (prev === c.id ? null : c.id))}
+                          >
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                              <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z" />
+                              <circle cx="12" cy="12" r="3" />
+                            </svg>
+                          </button>
+                        </td>
+                      </tr>
+                      {estaExpandido && (
+                        <tr className="clientes-info-row-mobile">
+                          <td colSpan={6}>
+                            <div className="clientes-info-card-mobile">
+                              <p><strong>Código:</strong> {formatClienteCodigoCorto(c.codigo)}</p>
+                              <p><strong>Ubicación:</strong> {c.ubicacion || "—"}</p>
+                              <p><strong>Dirección:</strong> {c.direccion || "—"}</p>
+                              <p><strong>Teléfono:</strong> {c.telefono || "—"}</p>
+                              <p><strong>Cédula:</strong> {c.cedula || "—"}</p>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
+                  );
+                })}
               </tbody>
             </table>
           </div>
