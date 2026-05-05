@@ -58,7 +58,6 @@ export default function AdministradoresPage() {
     displayName: "",
     cedula: "",
     lugar: "",
-    base: "",
     email: "",
     password: "",
     passwordConfirm: "",
@@ -101,9 +100,8 @@ export default function AdministradoresPage() {
         createdByUid: profile.uid,
         cedula: form.cedula || undefined,
         lugar: form.lugar || undefined,
-        base: form.base || undefined,
       });
-      setForm({ displayName: "", cedula: "", lugar: "", base: "", email: "", password: "", passwordConfirm: "" });
+      setForm({ displayName: "", cedula: "", lugar: "", email: "", password: "", passwordConfirm: "" });
       setShowForm(false);
       const list = await listUsersByCreator(profile.uid, "admin");
       setAdmins(list);
@@ -192,18 +190,6 @@ export default function AdministradoresPage() {
                   placeholder="Ciudad o zona"
                   className="admin-jefe-input"
                   autoComplete="address-level2"
-                />
-              </div>
-              <div className="form-group">
-                <label htmlFor="admin-base" className="admin-jefe-label">BASE</label>
-                <input
-                  id="admin-base"
-                  type="text"
-                  value={form.base}
-                  onChange={(e) => setForm((f) => ({ ...f, base: e.target.value }))}
-                  placeholder="Base o sede asignada"
-                  className="admin-jefe-input"
-                  autoComplete="off"
                 />
               </div>
             </div>
