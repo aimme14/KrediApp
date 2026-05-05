@@ -307,7 +307,7 @@ export default function DashboardNotifications() {
                         <span className="dashboard-notifications-admin-label">Trabajador</span>
                         <span className="dashboard-notifications-admin-name">{s.empleadoNombre}</span>
                         <span className="dashboard-notifications-admin-meta">
-                          {s.rutaNombre || "—"} · {formatMonto(s.montoAlSolicitar)}
+                          {s.rutaNombre || "—"}
                         </span>
                       </div>
                     ))}
