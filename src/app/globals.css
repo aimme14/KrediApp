@@ -804,6 +804,76 @@ td {
   }
 }
 
+/* Tabla clientes (trabajador): en desktop se mantiene tabla completa */
+.clientes-col-info-mobile,
+.clientes-info-row-mobile {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .clientes-col-codigo,
+  .clientes-col-ubicacion,
+  .clientes-col-telefono,
+  .clientes-col-cedula {
+    display: none;
+  }
+
+  .clientes-col-info-mobile {
+    display: table-cell;
+    text-align: center;
+    width: 5.25rem;
+    white-space: nowrap;
+  }
+
+  .clientes-info-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 999px;
+    border: 1px solid var(--card-border);
+    background: var(--card-bg);
+    color: var(--text);
+    cursor: pointer;
+    transition: background 0.2s ease, border-color 0.2s ease;
+  }
+
+  .clientes-info-btn:hover,
+  .clientes-info-btn:focus-visible {
+    background: var(--btn-secondary-hover);
+    border-color: var(--text-muted);
+    outline: none;
+  }
+
+  .clientes-info-row-mobile {
+    display: table-row;
+  }
+
+  .clientes-info-row-mobile td {
+    padding: 0.45rem 0.25rem 0.55rem;
+    border-bottom: 1px solid var(--table-border);
+  }
+
+  .clientes-info-card-mobile {
+    background: var(--bg-secondary);
+    border: 1px solid var(--card-border);
+    border-radius: 10px;
+    padding: 0.55rem 0.65rem;
+    box-shadow: 0 8px 18px rgba(0, 0, 0, 0.22);
+  }
+
+  .clientes-info-card-mobile p {
+    margin: 0;
+    font-size: 0.78rem;
+    line-height: 1.35;
+  }
+
+  .clientes-info-card-mobile p + p {
+    margin-top: 0.22rem;
+  }
+}
+
 /* Tabla de historial (préstamos): mismo padding reducido, títulos pequeños */
 .table-historial th,
 .table-historial td {
