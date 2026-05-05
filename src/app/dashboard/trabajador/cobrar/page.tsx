@@ -10,7 +10,6 @@ import {
   registrarPago,
   registrarNoPago,
   registrarPerdida,
-  actualizarComprobantePago,
   type ClienteItem,
   type PrestamoItem,
   type PagoItem,
@@ -168,15 +167,12 @@ function CobrarClientePageContent() {
   /** Texto auxiliar durante envío (subidas en paralelo + API). */
   const [submitStatus, setSubmitStatus] = useState<string | null>(null);
   const [confirmado, setConfirmado] = useState(false);
-  const [pagoIdConfirmado, setPagoIdConfirmado] = useState<string | null>(null);
   const comprobanteRef = useRef<HTMLDivElement>(null);
   const comprobanteBlobRef = useRef<Blob | null>(null);
   const comprobanteObjectUrlRef = useRef<string | null>(null);
-  /** Vista previa local (blob:) o URL remota tras guardar en Storage. */
+  /** Vista previa local (blob:) solo en esta pantalla; no se persiste en Storage ni en Firestore. */
   const [comprobanteDisplayUrl, setComprobanteDisplayUrl] = useState<string | null>(null);
   const [comprobanteGenerando, setComprobanteGenerando] = useState(false);
-  const [comprobanteSubiendo, setComprobanteSubiendo] = useState(false);
-  const [comprobanteRemotoOk, setComprobanteRemotoOk] = useState(false);
   const [comprobanteError, setComprobanteError] = useState<string | null>(null);
   const [showShareMenu, setShowShareMenu] = useState(false);
   const shareMenuRef = useRef<HTMLDivElement>(null);
@@ -334,7 +330,6 @@ function CobrarClientePageContent() {
     const el = comprobanteRef.current;
     if (!el) throw new Error("No se encontró el comprobante en pantalla");
     setComprobanteError(null);
-    setComprobanteRemotoOk(false);
     setComprobanteGenerando(true);
     try {
       const canvas = await captureElementToCanvas(el);
@@ -359,48 +354,16 @@ function CobrarClientePageContent() {
     }
   }, []);
 
-  const subirComprobanteAlServidor = useCallback(async () => {
-    const blob = comprobanteBlobRef.current;
-    if (!blob || !prestamo || !pagoIdConfirmado || !user) return;
-    setComprobanteError(null);
-    setComprobanteSubiendo(true);
-    try {
-      const file = new File([blob], "comprobante-pago.png", { type: "image/png" });
-      const token = await user.getIdToken();
-      const url = await uploadImage(file, {
-        folder: "comprobantes",
-        ownerId: prestamo.id,
-        filename: pagoIdConfirmado,
-      });
-      await actualizarComprobantePago(token, prestamo.id, pagoIdConfirmado, url);
-      if (comprobanteObjectUrlRef.current) {
-        URL.revokeObjectURL(comprobanteObjectUrlRef.current);
-        comprobanteObjectUrlRef.current = null;
-      }
-      setComprobanteDisplayUrl(url);
-      setComprobanteRemotoOk(true);
-    } catch (e) {
-      setComprobanteError(e instanceof Error ? e.message : "Error al guardar comprobante en el préstamo");
-    } finally {
-      setComprobanteSubiendo(false);
-    }
-  }, [prestamo, pagoIdConfirmado, user]);
-
   const reintentarComprobante = useCallback(async () => {
-    if (comprobanteBlobRef.current && comprobanteDisplayUrl && comprobanteError) {
-      await subirComprobanteAlServidor();
-      return;
-    }
     try {
       await generarComprobanteLocal();
-      await subirComprobanteAlServidor();
     } catch {
       /* generarComprobanteLocal ya registró el error */
     }
-  }, [comprobanteDisplayUrl, comprobanteError, generarComprobanteLocal, subirComprobanteAlServidor]);
+  }, [generarComprobanteLocal]);
 
   useEffect(() => {
-    if (!confirmado || !pagoIdConfirmado || !prestamo || !user || comprobanteDisplayUrl) return;
+    if (!confirmado || !prestamo || comprobanteDisplayUrl) return;
     const el = comprobanteRef.current;
     if (!el) return;
     let cancelled = false;
@@ -409,7 +372,6 @@ function CobrarClientePageContent() {
         try {
           await generarComprobanteLocal();
           if (cancelled) return;
-          void subirComprobanteAlServidor();
         } catch {
           /* error de generación */
         }
@@ -419,7 +381,7 @@ function CobrarClientePageContent() {
       cancelled = true;
       clearTimeout(t);
     };
-  }, [confirmado, pagoIdConfirmado, prestamo?.id, user, comprobanteDisplayUrl, generarComprobanteLocal, subirComprobanteAlServidor]);
+  }, [confirmado, prestamo?.id, comprobanteDisplayUrl, generarComprobanteLocal]);
 
   const descargarComprobanteDesdeDOM = useCallback(async () => {
     const blobCached = comprobanteBlobRef.current;
@@ -495,7 +457,6 @@ function CobrarClientePageContent() {
         idempotencyKey,
       });
       setNuevoSaldoPendiente(res.saldoPendiente);
-      setPagoIdConfirmado(res.pagoId ?? null);
       setConfirmado(true);
       const nuevoPago: PagoItem = {
         id: res.pagoId ?? "",
@@ -628,12 +589,9 @@ function CobrarClientePageContent() {
     let comprobanteEstadoMsg: string | null = null;
     if (comprobanteGenerando) {
       comprobanteEstadoMsg = null;
-    } else if (comprobanteDisplayUrl && comprobanteSubiendo) {
-      comprobanteEstadoMsg = "Guardando copia del comprobante en el préstamo…";
-    } else if (comprobanteDisplayUrl && comprobanteRemotoOk) {
-      comprobanteEstadoMsg = "Copia del comprobante guardada en el préstamo.";
-    } else if (comprobanteDisplayUrl && !comprobanteRemotoOk && !comprobanteSubiendo && !comprobanteError) {
-      comprobanteEstadoMsg = "Listo para compartir.";
+    } else if (comprobanteDisplayUrl && !comprobanteError) {
+      comprobanteEstadoMsg =
+        "Imagen solo en este dispositivo: compártela ahora; al volver a la ruta no quedará guardada.";
     }
     const textoComprobanteWa =
       `Comprobante KrediApp — ${cliente.nombre}\n` +
@@ -667,7 +625,7 @@ function CobrarClientePageContent() {
                 type="button"
                 className="btn btn-secondary"
                 onClick={() => void reintentarComprobante()}
-                disabled={comprobanteGenerando || comprobanteSubiendo}
+                disabled={comprobanteGenerando}
               >
                 {comprobanteGenerando ? "Generando…" : "Reintentar comprobante"}
               </button>
@@ -677,24 +635,6 @@ function CobrarClientePageContent() {
                 onClick={() => descargarComprobanteDesdeDOM()}
               >
                 Descargar comprobante (desde pantalla)
-              </button>
-            </div>
-          </div>
-        )}
-        {comprobanteError && comprobanteDisplayUrl && (
-          <div className="cobrar-comprobante-error cobrar-comprobante-error-soft" role="alert">
-            <p className="cobrar-comprobante-error-msg">
-              Ya puedes compartir la imagen del comprobante. No se pudo guardar la copia en el préstamo.
-            </p>
-            <p className="cobrar-comprobante-error-detail">{comprobanteError}</p>
-            <div className="cobrar-comprobante-error-actions">
-              <button
-                type="button"
-                className="btn btn-secondary"
-                onClick={() => void subirComprobanteAlServidor()}
-                disabled={comprobanteSubiendo}
-              >
-                {comprobanteSubiendo ? "Guardando…" : "Reintentar guardar en el préstamo"}
               </button>
             </div>
           </div>

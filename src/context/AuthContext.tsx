@@ -16,7 +16,16 @@ import {
   reauthenticateWithCredential,
   EmailAuthProvider,
 } from "firebase/auth";
-import { doc, getDoc, collection, query, where, getDocs } from "firebase/firestore";
+import {
+  doc,
+  getDoc,
+  collection,
+  query,
+  where,
+  getDocs,
+  onSnapshot,
+  type DocumentData,
+} from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 import type { UserProfile, Role } from "@/types/roles";
 import { SUPER_ADMIN_COLLECTION } from "@/types/superAdmin";
@@ -81,6 +90,40 @@ interface AuthContextValue extends AuthState {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+function superAdminDataToProfile(profileUid: string, data: DocumentData): UserProfile {
+  return {
+    uid: profileUid,
+    email: data.email ?? "",
+    displayName: data.displayName,
+    role: "superAdmin",
+    enabled: data.enabled !== false,
+    createdBy: data.createdBy ?? "",
+    createdAt: data.createdAt?.toDate?.() ?? new Date(),
+    updatedAt: data.updatedAt?.toDate?.(),
+  };
+}
+
+function usersDataToProfile(docUid: string, data: DocumentData): UserProfile {
+  const roleRaw = data.role as string;
+  const role: Role = roleRaw === "empleado" ? "trabajador" : (roleRaw as Role);
+  return {
+    uid: docUid,
+    email: data.email ?? "",
+    displayName: data.displayName,
+    role,
+    enabled: data.enabled !== false,
+    createdBy: data.createdBy ?? "",
+    createdAt: data.createdAt?.toDate?.() ?? new Date(),
+    updatedAt: data.updatedAt?.toDate?.(),
+    empresaId: data.empresaId,
+    cedula: data.cedula,
+    lugar: data.lugar,
+    base: data.base,
+    adminId: data.adminId,
+    rutaId: data.rutaId ?? undefined,
+  };
+}
+
 async function fetchUserProfile(
   uid: string,
   email?: string | null
@@ -97,17 +140,7 @@ async function fetchUserProfile(
     const superRef = doc(db, SUPER_ADMIN_COLLECTION, uid);
     const superSnap = await getDoc(superRef);
     if (superSnap.exists()) {
-      const data = superSnap.data();
-      return {
-        uid: superSnap.id,
-        email: data.email ?? "",
-        displayName: data.displayName,
-        role: "superAdmin" as Role,
-        enabled: data.enabled !== false,
-        createdBy: data.createdBy ?? "",
-        createdAt: data.createdAt?.toDate?.() ?? new Date(),
-        updatedAt: data.updatedAt?.toDate?.(),
-      };
+      return superAdminDataToProfile(superSnap.id, superSnap.data());
     }
 
     // Fallback: buscar Super Admin por email (por si el UID no coincide)
@@ -119,17 +152,7 @@ async function fetchUserProfile(
       const emailSnap = await getDocs(q);
       if (!emailSnap.empty) {
         const docSnap = emailSnap.docs[0];
-        const data = docSnap.data();
-        return {
-          uid, // Mantener el uid del usuario autenticado
-          email: data.email ?? "",
-          displayName: data.displayName,
-          role: "superAdmin" as Role,
-          enabled: data.enabled !== false,
-          createdBy: data.createdBy ?? "",
-          createdAt: data.createdAt?.toDate?.() ?? new Date(),
-          updatedAt: data.updatedAt?.toDate?.(),
-        };
+        return superAdminDataToProfile(uid, docSnap.data());
       }
     }
 
@@ -138,32 +161,41 @@ async function fetchUserProfile(
     const userRef = doc(db, USERS_COLLECTION, uid);
     const userSnap = await getDoc(userRef);
     if (!userSnap.exists()) return null;
-    const data = userSnap.data();
-    const roleRaw = data.role as string;
-    // Mapear "empleado" (Firestore) a "trabajador" (Role) para compatibilidad
-    const role: Role = roleRaw === "empleado" ? "trabajador" : (roleRaw as Role);
-    return {
-      uid: userSnap.id,
-      email: data.email ?? "",
-      displayName: data.displayName,
-      role,
-      enabled: data.enabled !== false,
-      createdBy: data.createdBy ?? "",
-      createdAt: data.createdAt?.toDate?.() ?? new Date(),
-      updatedAt: data.updatedAt?.toDate?.(),
-      empresaId: data.empresaId,
-      cedula: data.cedula,
-      lugar: data.lugar,
-      base: data.base,
-      adminId: data.adminId,
-      rutaId: data.rutaId ?? undefined,
-    };
+    return usersDataToProfile(userSnap.id, userSnap.data());
   } catch (err) {
     if (typeof window !== "undefined") {
       console.error("[Auth] Error al obtener perfil:", err);
     }
     throw err;
   }
+}
+
+/** True si conviene volver a llamar a sync-claims por cambios que viajan en el token. */
+function shouldResyncClaims(prev: UserProfile | null, next: UserProfile): boolean {
+  if (!prev) return true;
+  if (prev.role !== next.role) return true;
+  if ((prev.enabled !== false) !== (next.enabled !== false)) return true;
+  if (next.role === "superAdmin") return false;
+  if ((prev.empresaId ?? "") !== (next.empresaId ?? "")) return true;
+  if ((prev.rutaId ?? "") !== (next.rutaId ?? "")) return true;
+  if ((prev.adminId ?? "") !== (next.adminId ?? "")) return true;
+  return false;
+}
+
+/** Refresca claims en Auth cuando el perfil en Firestore cambia campos relevantes. */
+function queueClaimsSync(user: User) {
+  queueMicrotask(() => {
+    user
+      .getIdToken()
+      .then((idToken) =>
+        fetch("/api/users/me/sync-claims", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${idToken}` },
+        })
+      )
+      .then(() => user.getIdToken(true))
+      .catch(() => {});
+  });
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -234,6 +266,71 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
     return () => unsub();
   }, []);
+
+  /** Escucha cambios en el documento del usuario (p. ej. enabled) sin polling. */
+  useEffect(() => {
+    if (!db || !state.user || !state.profile) return;
+
+    const uid = state.user.uid;
+    const role = state.profile.role;
+
+    if (role === "superAdmin") {
+      const ref = doc(db, SUPER_ADMIN_COLLECTION, uid);
+      const unsub = onSnapshot(
+        ref,
+        (snap) => {
+          if (!snap.exists()) return;
+          setState((s) => {
+            if (!s.user || s.user.uid !== uid || s.profile?.role !== "superAdmin") return s;
+            const nextProf = superAdminDataToProfile(uid, snap.data()!);
+            if (shouldResyncClaims(s.profile, nextProf) && s.user) queueClaimsSync(s.user);
+            return { ...s, profile: nextProf, error: null };
+          });
+        },
+        (err) => {
+          if (typeof window !== "undefined") {
+            console.error("[Auth] Listener superAdmin:", err);
+          }
+        }
+      );
+      return unsub;
+    }
+
+    if (role === "jefe" || role === "admin" || role === "trabajador") {
+      const ref = doc(db, USERS_COLLECTION, uid);
+      const unsub = onSnapshot(
+        ref,
+        (snap) => {
+          if (!snap.exists()) {
+            setState((s) =>
+              s.user?.uid === uid
+                ? {
+                    ...s,
+                    profile: null,
+                    error: "Tu perfil ya no está disponible en el sistema.",
+                  }
+                : s
+            );
+            return;
+          }
+          setState((s) => {
+            if (!s.user || s.user.uid !== uid) return s;
+            const nextProf = usersDataToProfile(uid, snap.data()!);
+            if (shouldResyncClaims(s.profile, nextProf) && s.user) queueClaimsSync(s.user);
+            return { ...s, profile: nextProf, error: null };
+          });
+        },
+        (err) => {
+          if (typeof window !== "undefined") {
+            console.error("[Auth] Listener users:", err);
+          }
+        }
+      );
+      return unsub;
+    }
+
+    return undefined;
+  }, [state.user?.uid, state.profile?.role]);
 
   const signIn = async (email: string, password: string) => {
     if (!auth) throw new Error("Firebase no está configurado. Revisa las variables de entorno.");
