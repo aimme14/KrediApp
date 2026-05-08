@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, type CSSProperties } from "react";
+import { useState, useEffect, useCallback, useRef, type CSSProperties } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { formatoCuotasRestanteTotal } from "@/lib/cuotas-display";
 import {
@@ -11,9 +11,11 @@ import {
   regenerarReporteDiaPdf,
   aprobarSolicitudEntregaReporte,
   rechazarSolicitudEntregaReporte,
+  listRutas,
   type ReporteDiaItem,
   type SolicitudEntregaPendienteAdmin,
   type CobrosDelDiaEmpleadoResponse,
+  type RutaItem,
 } from "@/lib/empresa-api";
 
 function normalizarMetodoPago(metodo: string | null | undefined): "efectivo" | "transferencia" | "otro" {
@@ -134,6 +136,12 @@ export default function ReportesDiaPage() {
   const [pdfLoadingId, setPdfLoadingId] = useState<string | null>(null);
   const [regenerarPdfId, setRegenerarPdfId] = useState<string | null>(null);
   const [regenerarPdfErr, setRegenerarPdfErr] = useState<string | null>(null);
+  const [rutaValor, setRutaValor] = useState<{
+    capitalTotal: number;
+    inversiones: number;
+    ganancias: number;
+  } | null>(null);
+  const rutasCacheRef = useRef<Map<string, RutaItem>>(new Map());
   const [comentarioModal, setComentarioModal] = useState<{
     trabajador: string;
     ruta: string;
@@ -141,7 +149,13 @@ export default function ReportesDiaPage() {
   } | null>(null);
 
   const load = useCallback(async () => {
-    if (!user) return;
+    if (!user) {
+      setLoading(false);
+      setError("No autenticado. Recarga la página o vuelve a iniciar sesión.");
+      setItems([]);
+      setSolicitudes([]);
+      return;
+    }
     setLoading(true);
     setError(null);
     setRegenerarPdfErr(null);
@@ -172,6 +186,7 @@ export default function ReportesDiaPage() {
       setPreviewSnapshot(null);
       setPreviewMeta(null);
       setPreviewErr(null);
+      setRutaValor(null);
       return;
     }
     let cancelled = false;
@@ -204,6 +219,53 @@ export default function ReportesDiaPage() {
       cancelled = true;
     };
   }, [previewSolicitudId, user]);
+
+  useEffect(() => {
+    if (!user) return;
+    const rutaId = previewSnapshot?.rutaId?.trim();
+    if (!rutaId) {
+      setRutaValor(null);
+      return;
+    }
+
+    const cached = rutasCacheRef.current.get(rutaId);
+    if (cached) {
+      setRutaValor({
+        capitalTotal: typeof cached.capitalTotal === "number" ? cached.capitalTotal : 0,
+        inversiones: typeof cached.inversiones === "number" ? cached.inversiones : 0,
+        ganancias: typeof cached.ganancias === "number" ? cached.ganancias : 0,
+      });
+      return;
+    }
+
+    let cancelled = false;
+    void (async () => {
+      try {
+        const token = await user.getIdToken();
+        const rutas = await listRutas(token);
+        if (cancelled) return;
+        for (const r of rutas) {
+          rutasCacheRef.current.set(r.id, r);
+        }
+        const found = rutas.find((r) => r.id === rutaId);
+        setRutaValor(
+          found
+            ? {
+                capitalTotal: typeof found.capitalTotal === "number" ? found.capitalTotal : 0,
+                inversiones: typeof found.inversiones === "number" ? found.inversiones : 0,
+                ganancias: typeof found.ganancias === "number" ? found.ganancias : 0,
+              }
+            : null
+        );
+      } catch {
+        if (!cancelled) setRutaValor(null);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [previewSnapshot?.rutaId, user]);
 
   const abrirPdfReporte = async (reporteId: string) => {
     if (!user) return;
@@ -414,6 +476,18 @@ export default function ReportesDiaPage() {
                     </li>
                     <li>Clientes que pagaron: {previewSnapshot.cobros.length}</li>
                     <li>Clientes que no pagaron: {previewSnapshot.noPagos.length}</li>
+                    <li style={{ marginTop: "0.4rem" }}>
+                      <strong>Valor de la ruta</strong>
+                    </li>
+                    <li>
+                      Capital de la ruta: {formatMonto(rutaValor?.capitalTotal ?? 0)}
+                    </li>
+                    <li>
+                      Invertido en la ruta: {formatMonto(rutaValor?.inversiones ?? 0)}
+                    </li>
+                    <li>
+                      Ganancias de la ruta: {formatMonto(rutaValor?.ganancias ?? 0)}
+                    </li>
                   </ul>
                 </div>
                 <div className="table-wrap">

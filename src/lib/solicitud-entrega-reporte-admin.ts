@@ -314,11 +314,18 @@ export async function aprobarSolicitudEntregaReporte(
       typeof sol.rutaNombre === "string" && sol.rutaNombre.trim()
         ? sol.rutaNombre.trim()
         : result.rutaId;
+    const rutaData = rutaSnap.data() as Record<string, unknown>;
+    const rutaCapitalTotal = typeof rutaData?.capitalTotal === "number" ? rutaData.capitalTotal : 0;
+    const rutaInversiones = typeof rutaData?.inversiones === "number" ? rutaData.inversiones : 0;
+    const rutaGanancias = typeof rutaData?.ganancias === "number" ? rutaData.ganancias : 0;
     const pdfBytes = await buildReporteCierrePdf(snapshot, {
       rutaNombre,
       empleadoNombre,
       montoEntregado: result.monto,
       comentarioTrabajador,
+      rutaCapitalTotal,
+      rutaInversiones,
+      rutaGanancias,
       aprobadoEn: new Date(),
     });
     const pdfStoragePath = await uploadReporteCierrePdfBuffer(empresaId, reporteDiaId, pdfBytes);

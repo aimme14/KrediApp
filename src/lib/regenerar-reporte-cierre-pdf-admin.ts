@@ -60,6 +60,10 @@ export async function regenerarPdfReporteCierreDia(
     typeof rutaNombreRaw === "string" && rutaNombreRaw.trim()
       ? rutaNombreRaw.trim()
       : rutaId;
+  const rutaData = (rutaSnap.exists ? (rutaSnap.data() as Record<string, unknown>) : {}) as Record<string, unknown>;
+  const rutaCapitalTotal = typeof rutaData?.capitalTotal === "number" ? rutaData.capitalTotal : 0;
+  const rutaInversiones = typeof rutaData?.inversiones === "number" ? rutaData.inversiones : 0;
+  const rutaGanancias = typeof rutaData?.ganancias === "number" ? rutaData.ganancias : 0;
 
   const snapshot = await buildCierreDiaSnapshot(db, {
     empresaId,
@@ -73,6 +77,9 @@ export async function regenerarPdfReporteCierreDia(
     empleadoNombre,
     montoEntregado,
     comentarioTrabajador,
+    rutaCapitalTotal,
+    rutaInversiones,
+    rutaGanancias,
     aprobadoEn,
   });
 

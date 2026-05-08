@@ -48,6 +48,9 @@ export type ReporteCierrePdfMeta = {
   empleadoNombre: string;
   montoEntregado: number;
   comentarioTrabajador: string | null;
+  rutaCapitalTotal: number;
+  rutaInversiones: number;
+  rutaGanancias: number;
   aprobadoEn: Date;
 };
 
@@ -454,6 +457,59 @@ export async function buildReporteCierrePdf(
         size: isCaja ? FS.section : FS.meta,
         bold: true,
         color: isCaja ? NAV : COL.text,
+        align: "center",
+      });
+      cx += colW;
+    }
+
+    y = blockBottom - 10;
+  }
+
+  spacer(10);
+
+  // ——— Valor de ruta: 3 tarjetas (capital / invertido / ganancias) ———
+  {
+    y = sectionBarDark("Valor de ruta", M, PAGE_W - 2 * M, y);
+    const innerW = PAGE_W - 2 * M - 16;
+    const x0 = M + 8;
+    const nCol = 3;
+    const colW = innerW / nCol;
+    const padTop = 11;
+    const padBottom = 11;
+    const gapLabelValor = 10;
+    const valBand = 18;
+    const labelBand = 10;
+    const blockH = padTop + labelBand + gapLabelValor + valBand + padBottom;
+
+    const labels = ["Capital de la ruta", "Invertido en la ruta", "Ganancias de la ruta"];
+    const vals = [fmtMoney(meta.rutaCapitalTotal), fmtMoney(meta.rutaInversiones), fmtMoney(meta.rutaGanancias)];
+
+    ensureBottom(blockH + 16);
+    const blockBottom = y - blockH + 2;
+    page.drawRectangle({
+      x: M + 4,
+      y: blockBottom,
+      width: PAGE_W - 2 * M - 8,
+      height: blockH,
+      color: COL.metaBg,
+      borderColor: COL.rule,
+      borderWidth: 0.45,
+    });
+
+    const yTopInner = blockBottom + blockH;
+    const yLabelRow = yTopInner - padTop - 1;
+    const yValRow = blockBottom + padBottom + 6;
+    let cx = x0;
+    for (let i = 0; i < nCol; i++) {
+      drawCell(labels[i], cx, yLabelRow, colW, {
+        size: FS.metaLbl,
+        color: COL.muted,
+        align: "center",
+      });
+      drawCell(vals[i], cx, yValRow, colW, {
+        size: FS.section,
+        bold: true,
+        color: NAV,
         align: "center",
       });
       cx += colW;
