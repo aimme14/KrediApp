@@ -16,6 +16,14 @@ import {
   type CobrosDelDiaEmpleadoResponse,
 } from "@/lib/empresa-api";
 
+function normalizarMetodoPago(metodo: string | null | undefined): "efectivo" | "transferencia" | "otro" {
+  const m = (metodo ?? "").trim().toLowerCase();
+  if (!m) return "otro";
+  if (m.includes("efectivo")) return "efectivo";
+  if (m.includes("transfer")) return "transferencia";
+  return "otro";
+}
+
 function formatMonto(value: number): string {
   const hasDecimals = Math.round(value * 100) % 100 !== 0;
   return `$ ${value.toLocaleString("es-CO", {
@@ -450,61 +458,119 @@ export default function ReportesDiaPage() {
                 </div>
                 <div className="table-wrap">
                   <strong>Cobros del día</strong>
-                  <table>
-                    <thead>
-                      <tr>
-                        <th>Cliente</th>
-                        <th className="col-num">Monto</th>
-                        <th>Método</th>
-                        <th className="col-num">Total préstamo</th>
-                        <th className="col-num">Debe tras cobro</th>
-                        <th className="col-num">Cuotas (rest./total)</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {previewSnapshot.cobros.length === 0 ? (
-                        <tr>
-                          <td colSpan={6} style={{ color: "var(--text-muted)" }}>
-                            Sin cobros este día
-                          </td>
-                        </tr>
-                      ) : (
-                        previewSnapshot.cobros.slice(0, 80).map((c) => (
-                          <tr key={c.pagoId}>
-                            <td>{c.clienteNombre}</td>
-                            <td className="col-num">{formatMonto(c.monto)}</td>
-                            <td>{c.metodoPago ?? "—"}</td>
-                            <td className="col-num">{formatMonto(c.totalAPagar)}</td>
-                            <td className="col-num">{formatMonto(c.saldoPendienteTrasPago)}</td>
-                            <td className="col-num">
-                              {formatoCuotasRestanteTotal(c.cuotasFaltantes, c.numeroCuotas)}
-                            </td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                    <tfoot>
-                      <tr>
-                        <td style={footCellStyle}>Total</td>
-                        <td className="col-num" style={footCellStyle}>
-                          {formatMonto(t.cobrosMonto)}
-                        </td>
-                        <td style={footCellStyle} />
-                        <td className="col-num" style={footCellStyle}>
-                          {formatMonto(t.cobrosTotalAPagar)}
-                        </td>
-                        <td className="col-num" style={footCellStyle}>
-                          {formatMonto(t.cobrosSaldoTras)}
-                        </td>
-                        <td className="col-num" style={footCellStyle} />
-                      </tr>
-                    </tfoot>
-                  </table>
-                  {previewSnapshot.cobros.length > 80 ? (
-                    <p style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>
-                      Mostrando 80 de {previewSnapshot.cobros.length} (el PDF incluye hasta el límite configurado).
-                    </p>
-                  ) : null}
+                  {(() => {
+                    const limite = 80;
+                    const cobrosMostrados = previewSnapshot.cobros.slice(0, limite);
+                    const efectivo = cobrosMostrados.filter((c) => normalizarMetodoPago(c.metodoPago) === "efectivo");
+                    const transferencia = cobrosMostrados.filter(
+                      (c) => normalizarMetodoPago(c.metodoPago) === "transferencia"
+                    );
+                    const otros = cobrosMostrados.filter((c) => normalizarMetodoPago(c.metodoPago) === "otro");
+
+                    const renderTabla = (titulo: string, rows: typeof cobrosMostrados) => {
+                      const subtotalMonto = rows.reduce((a, c) => a + c.monto, 0);
+                      const subtotalTotalAPagar = rows.reduce((a, c) => a + c.totalAPagar, 0);
+                      const subtotalSaldoTras = rows.reduce((a, c) => a + c.saldoPendienteTrasPago, 0);
+                      return (
+                        <div style={{ marginTop: "0.6rem" }}>
+                          <div style={{ fontWeight: 700, fontSize: "0.9rem", marginBottom: "0.35rem" }}>
+                            {titulo}
+                          </div>
+                          <table>
+                            <thead>
+                              <tr>
+                                <th>Cliente</th>
+                                <th className="col-num">Monto</th>
+                                <th>Método</th>
+                                <th className="col-num">Total préstamo</th>
+                                <th className="col-num">Debe tras cobro</th>
+                                <th className="col-num">Cuotas (rest./total)</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {rows.length === 0 ? (
+                                <tr>
+                                  <td colSpan={6} style={{ color: "var(--text-muted)" }}>
+                                    —
+                                  </td>
+                                </tr>
+                              ) : (
+                                rows.map((c) => (
+                                  <tr key={c.pagoId}>
+                                    <td>{c.clienteNombre}</td>
+                                    <td className="col-num">{formatMonto(c.monto)}</td>
+                                    <td>{c.metodoPago ?? "—"}</td>
+                                    <td className="col-num">{formatMonto(c.totalAPagar)}</td>
+                                    <td className="col-num">{formatMonto(c.saldoPendienteTrasPago)}</td>
+                                    <td className="col-num">
+                                      {formatoCuotasRestanteTotal(c.cuotasFaltantes, c.numeroCuotas)}
+                                    </td>
+                                  </tr>
+                                ))
+                              )}
+                            </tbody>
+                            <tfoot>
+                              <tr>
+                                <td style={footCellStyle}>Subtotal</td>
+                                <td className="col-num" style={footCellStyle}>
+                                  {formatMonto(subtotalMonto)}
+                                </td>
+                                <td style={footCellStyle} />
+                                <td className="col-num" style={footCellStyle}>
+                                  {formatMonto(subtotalTotalAPagar)}
+                                </td>
+                                <td className="col-num" style={footCellStyle}>
+                                  {formatMonto(subtotalSaldoTras)}
+                                </td>
+                                <td className="col-num" style={footCellStyle} />
+                              </tr>
+                            </tfoot>
+                          </table>
+                        </div>
+                      );
+                    };
+
+                    if (previewSnapshot.cobros.length === 0) {
+                      return (
+                        <p style={{ margin: "0.5rem 0 0", color: "var(--text-muted)" }}>
+                          Sin cobros este día
+                        </p>
+                      );
+                    }
+
+                    return (
+                      <>
+                        {renderTabla("Efectivo", efectivo)}
+                        {renderTabla("Transferencia", transferencia)}
+                        {otros.length ? renderTabla("Otros / sin método", otros) : null}
+                        <div style={{ marginTop: "0.75rem" }}>
+                          <table>
+                            <tfoot>
+                              <tr>
+                                <td style={footCellStyle}>Total</td>
+                                <td className="col-num" style={footCellStyle}>
+                                  {formatMonto(t.cobrosMonto)}
+                                </td>
+                                <td style={footCellStyle} />
+                                <td className="col-num" style={footCellStyle}>
+                                  {formatMonto(t.cobrosTotalAPagar)}
+                                </td>
+                                <td className="col-num" style={footCellStyle}>
+                                  {formatMonto(t.cobrosSaldoTras)}
+                                </td>
+                                <td className="col-num" style={footCellStyle} />
+                              </tr>
+                            </tfoot>
+                          </table>
+                        </div>
+                        {previewSnapshot.cobros.length > limite ? (
+                          <p style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>
+                            Mostrando {limite} de {previewSnapshot.cobros.length} (el PDF incluye hasta el límite configurado).
+                          </p>
+                        ) : null}
+                      </>
+                    );
+                  })()}
                 </div>
                 <div className="table-wrap">
                   <strong>No pagó</strong>

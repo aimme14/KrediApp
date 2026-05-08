@@ -36,6 +36,18 @@ function formatHora(iso: string | null): string {
   }
 }
 
+function formatFechaDia(yyyyMmDd: string): string {
+  // yyyy-mm-dd → Date en UTC para evitar desplazamientos por zona horaria
+  const date = new Date(`${yyyyMmDd}T00:00:00Z`);
+  if (Number.isNaN(date.getTime())) return yyyyMmDd;
+  return date.toLocaleDateString("es-CO", {
+    timeZone: "America/Bogota",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+}
+
 /** Mismas etiquetas que en cobrar → «No pagó». */
 const MOTIVO_NO_PAGO_LABEL: Record<string, string> = {
   sin_fondos: "No tenía dinero",
@@ -53,6 +65,15 @@ const TARJETA_RESUMEN_STYLE = {
   margin: 0,
   border: "1px solid var(--card-border)",
 } as const;
+
+function normalizaMetodoPago(metodo: string | null | undefined): string {
+  return (metodo ?? "")
+    .toString()
+    .trim()
+    .toLocaleLowerCase("es-CO")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
 
 function TarjetaResumen(props: { etiqueta: ReactNode; valor: string }) {
   const { etiqueta, valor } = props;
@@ -77,13 +98,16 @@ function TarjetaResumen(props: { etiqueta: ReactNode; valor: string }) {
 
 export default function CajaDelDiaPage() {
   const { user, profile } = useAuth();
-  const [fecha, setFecha] = useState(() => fechaDiaColombiaHoy());
+  const [fecha] = useState(() => fechaDiaColombiaHoy());
   const [data, setData] = useState<CobrosDelDiaEmpleadoResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    if (!user) return;
+    if (!user) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
@@ -99,6 +123,10 @@ export default function CajaDelDiaPage() {
   }, [user, fecha]);
 
   useEffect(() => {
+    if (!user) {
+      setLoading(false);
+      return;
+    }
     void load();
   }, [load]);
 
@@ -121,13 +149,11 @@ export default function CajaDelDiaPage() {
         <h2 style={{ margin: 0, lineHeight: 1.25, flex: "1 1 auto", minWidth: 0 }}>
           Caja del día
         </h2>
-        <input
+        <div
           className="caja-del-dia-fecha"
-          type="date"
-          value={fecha}
-          onChange={(e) => setFecha(e.target.value)}
-          disabled={loading}
           aria-label="Fecha (Colombia)"
+          aria-live="polite"
+          aria-busy={loading}
           style={{
             maxWidth: "11rem",
             flexShrink: 0,
@@ -136,8 +162,12 @@ export default function CajaDelDiaPage() {
             border: "1px solid var(--input-border)",
             background: "var(--input-bg)",
             color: "var(--text)",
+            textAlign: "center",
+            userSelect: "none",
           }}
-        />
+        >
+          {formatFechaDia(fecha)}
+        </div>
       </div>
 
       {error && <p className="error-msg">{error}</p>}
@@ -146,110 +176,219 @@ export default function CajaDelDiaPage() {
         <p style={{ color: "var(--text-muted)" }}>Cargando…</p>
       ) : data ? (
         <>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
-              gap: "0.65rem",
-              marginBottom: "1.25rem",
-            }}
-          >
-            <TarjetaResumen
-              etiqueta={`Tu caja del día (${data.fechaDia})`}
-              valor={formatMonto(data.tuCajaDelDia ?? tuCajaDelDiaDesdeTotales(data))}
-            />
-            <TarjetaResumen
-              etiqueta={`Total cobrado en la ruta (${data.fechaDia})`}
-              valor={formatMonto(data.totalCobrosLista)}
-            />
-            <TarjetaResumen etiqueta="Gastos del día" valor={formatMonto(data.totalGastosDia)} />
-            <TarjetaResumen
-              etiqueta={`Préstamos desde tu caja (${data.fechaDia})`}
-              valor={formatMonto(data.totalPrestamosDesembolsoDia ?? 0)}
-            />
-            <TarjetaResumen
-              etiqueta={`Base asignada (${data.fechaDia})`}
-              valor={formatMonto(data.totalBaseAsignadaDia)}
-            />
-          </div>
+          {(() => {
+            const cobros = data.cobros ?? [];
+            const cobrosEfectivo = cobros.filter((c) => {
+              const m = normalizaMetodoPago(c.metodoPago);
+              return m === "efectivo" || m.includes("efect");
+            });
+            const cobrosTransferencia = cobros.filter((c) => {
+              const m = normalizaMetodoPago(c.metodoPago);
+              return m === "transferencia" || m.includes("transf") || m.includes("transfer");
+            });
+            const cobrosOtros = cobros.filter((c) => {
+              const m = normalizaMetodoPago(c.metodoPago);
+              const esEfectivo = m === "efectivo" || m.includes("efect");
+              const esTransfer =
+                m === "transferencia" || m.includes("transf") || m.includes("transfer");
+              return !esEfectivo && !esTransfer;
+            });
 
-          <h3 style={{ fontSize: "1.05rem", marginBottom: "0.5rem" }}>
-            Préstamos otorgados (tu caja)
-          </h3>
-          <p
-            style={{
-              marginBottom: "0.5rem",
-              fontSize: "0.8125rem",
-              color: "var(--text-muted)",
-              lineHeight: 1.45,
-            }}
-          >
-            Dinero desembolsado al crear préstamos con tu base (no aplica si el admin cargó el préstamo a la
-            caja de la ruta).
-          </p>
-          {(data.prestamosDesembolsoDelDia ?? []).length === 0 ? (
-            <p style={{ color: "var(--text-muted)", marginBottom: "1.25rem" }}>
-              No hay préstamos desde tu caja para esta fecha.
-            </p>
-          ) : (
-            <div className="table-wrap table-wrap-caja-dia" style={{ marginBottom: "1.25rem" }}>
-              <table>
-                <thead>
-                  <tr>
-                    <th>Hora</th>
-                    <th>Cliente</th>
-                    <th className="col-num">Capital entregado</th>
-                    <th className="col-num">Total a pagar</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(data.prestamosDesembolsoDelDia ?? []).map((p: PrestamoDesembolsoDiaItem) => (
-                    <tr key={p.prestamoId}>
-                      <td>{formatHora(p.fecha)}</td>
-                      <td>{p.clienteNombre}</td>
-                      <td className="col-num">{formatMonto(p.monto)}</td>
-                      <td className="col-num">{formatMonto(p.totalAPagar)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+            return (
+              <>
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
+                    gap: "0.65rem",
+                    marginBottom: "1.25rem",
+                  }}
+                >
+                  <TarjetaResumen
+                    etiqueta={`Tu caja del día (${data.fechaDia})`}
+                    valor={formatMonto(data.tuCajaDelDia ?? tuCajaDelDiaDesdeTotales(data))}
+                  />
+                  <TarjetaResumen
+                    etiqueta={`Total cobrado en la ruta (${data.fechaDia})`}
+                    valor={formatMonto(data.totalCobrosLista)}
+                  />
+                  <TarjetaResumen
+                    etiqueta="Gastos del día"
+                    valor={formatMonto(data.totalGastosDia)}
+                  />
+                  <TarjetaResumen
+                    etiqueta={`Préstamos desde tu caja (${data.fechaDia})`}
+                    valor={formatMonto(data.totalPrestamosDesembolsoDia ?? 0)}
+                  />
+                  <TarjetaResumen
+                    etiqueta={`Base asignada (${data.fechaDia})`}
+                    valor={formatMonto(data.totalBaseAsignadaDia)}
+                  />
+                </div>
 
-          <h3 style={{ fontSize: "1.05rem", marginBottom: "0.5rem" }}>Cuotas pagadas</h3>
-          {data.cobros.length === 0 ? (
-            <p style={{ color: "var(--text-muted)" }}>No hay cobros registrados para esta fecha.</p>
-          ) : (
-            <div className="table-wrap table-wrap-caja-dia">
-              <table className="caja-dia-table-cobros">
-                <thead>
-                  <tr>
-                    <th>Hora</th>
-                    <th>Cliente</th>
-                    <th className="col-num">Pagado</th>
-                    <th>Método</th>
-                    <th className="col-num" title="Cuotas (rest./total)">
-                      <span className="th-compact-long">Cuotas (rest./total)</span>
-                      <span className="th-compact-short">Cuotas</span>
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.cobros.map((c: CobroDiaItem) => (
-                    <tr key={`${c.prestamoId}-${c.pagoId}`}>
-                      <td>{formatHora(c.fecha)}</td>
-                      <td>{c.clienteNombre}</td>
-                      <td className="col-num">{formatMonto(c.monto)}</td>
-                      <td>{c.metodoPago ?? "—"}</td>
-                      <td className="col-num">
-                        {formatoCuotasRestanteTotal(c.cuotasFaltantes, c.numeroCuotas)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+                <h3 style={{ fontSize: "1.05rem", marginBottom: "0.5rem" }}>
+                  Préstamos otorgados (tu caja)
+                </h3>
+                <p
+                  style={{
+                    marginBottom: "0.5rem",
+                    fontSize: "0.8125rem",
+                    color: "var(--text-muted)",
+                    lineHeight: 1.45,
+                  }}
+                >
+                  Dinero desembolsado al crear préstamos con tu base (no aplica si el admin cargó el préstamo a
+                  la caja de la ruta).
+                </p>
+                {(data.prestamosDesembolsoDelDia ?? []).length === 0 ? (
+                  <p style={{ color: "var(--text-muted)", marginBottom: "1.25rem" }}>
+                    No hay préstamos desde tu caja para esta fecha.
+                  </p>
+                ) : (
+                  <div className="table-wrap table-wrap-caja-dia" style={{ marginBottom: "1.25rem" }}>
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Hora</th>
+                          <th>Cliente</th>
+                          <th className="col-num">Capital entregado</th>
+                          <th className="col-num">Total a pagar</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(data.prestamosDesembolsoDelDia ?? []).map((p: PrestamoDesembolsoDiaItem) => (
+                          <tr key={p.prestamoId}>
+                            <td>{formatHora(p.fecha)}</td>
+                            <td>{p.clienteNombre}</td>
+                            <td className="col-num">{formatMonto(p.monto)}</td>
+                            <td className="col-num">{formatMonto(p.totalAPagar)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                <h3 style={{ fontSize: "1.05rem", marginBottom: "0.5rem" }}>Cuotas pagadas</h3>
+                {cobros.length === 0 ? (
+                  <p style={{ color: "var(--text-muted)" }}>No hay cobros registrados para esta fecha.</p>
+                ) : (
+                  <>
+                    <h4 style={{ marginTop: 0, marginBottom: "0.35rem" }}>
+                      Efectivo ({cobrosEfectivo.length})
+                    </h4>
+                    {cobrosEfectivo.length === 0 ? (
+                      <p style={{ color: "var(--text-muted)", marginBottom: "0.75rem" }}>
+                        No hay cobros en efectivo.
+                      </p>
+                    ) : (
+                      <div className="table-wrap table-wrap-caja-dia" style={{ marginBottom: "0.85rem" }}>
+                        <table className="caja-dia-table-cobros">
+                          <thead>
+                            <tr>
+                              <th>Hora</th>
+                              <th>Cliente</th>
+                              <th className="col-num">Pagado</th>
+                              <th className="col-num" title="Cuotas (rest./total)">
+                                <span className="th-compact-long">Cuotas (rest./total)</span>
+                                <span className="th-compact-short">Cuotas</span>
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {cobrosEfectivo.map((c: CobroDiaItem) => (
+                              <tr key={`efectivo-${c.prestamoId}-${c.pagoId}`}>
+                                <td>{formatHora(c.fecha)}</td>
+                                <td>{c.clienteNombre}</td>
+                                <td className="col-num">{formatMonto(c.monto)}</td>
+                                <td className="col-num">
+                                  {formatoCuotasRestanteTotal(c.cuotasFaltantes, c.numeroCuotas)}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+
+                    <h4 style={{ marginTop: 0, marginBottom: "0.35rem" }}>
+                      Transferencia ({cobrosTransferencia.length})
+                    </h4>
+                    {cobrosTransferencia.length === 0 ? (
+                      <p style={{ color: "var(--text-muted)", marginBottom: "0.75rem" }}>
+                        No hay cobros por transferencia.
+                      </p>
+                    ) : (
+                      <div className="table-wrap table-wrap-caja-dia" style={{ marginBottom: "0.85rem" }}>
+                        <table className="caja-dia-table-cobros">
+                          <thead>
+                            <tr>
+                              <th>Hora</th>
+                              <th>Cliente</th>
+                              <th className="col-num">Pagado</th>
+                              <th className="col-num" title="Cuotas (rest./total)">
+                                <span className="th-compact-long">Cuotas (rest./total)</span>
+                                <span className="th-compact-short">Cuotas</span>
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {cobrosTransferencia.map((c: CobroDiaItem) => (
+                              <tr key={`transfer-${c.prestamoId}-${c.pagoId}`}>
+                                <td>{formatHora(c.fecha)}</td>
+                                <td>{c.clienteNombre}</td>
+                                <td className="col-num">{formatMonto(c.monto)}</td>
+                                <td className="col-num">
+                                  {formatoCuotasRestanteTotal(c.cuotasFaltantes, c.numeroCuotas)}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+
+                    {cobrosOtros.length > 0 && (
+                      <>
+                        <h4 style={{ marginTop: 0, marginBottom: "0.35rem" }}>
+                          Otros ({cobrosOtros.length})
+                        </h4>
+                        <div className="table-wrap table-wrap-caja-dia">
+                          <table className="caja-dia-table-cobros">
+                            <thead>
+                              <tr>
+                                <th>Hora</th>
+                                <th>Cliente</th>
+                                <th className="col-num">Pagado</th>
+                                <th>Método</th>
+                                <th className="col-num" title="Cuotas (rest./total)">
+                                  <span className="th-compact-long">Cuotas (rest./total)</span>
+                                  <span className="th-compact-short">Cuotas</span>
+                                </th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {cobrosOtros.map((c: CobroDiaItem) => (
+                                <tr key={`otros-${c.prestamoId}-${c.pagoId}`}>
+                                  <td>{formatHora(c.fecha)}</td>
+                                  <td>{c.clienteNombre}</td>
+                                  <td className="col-num">{formatMonto(c.monto)}</td>
+                                  <td>{c.metodoPago ?? "—"}</td>
+                                  <td className="col-num">
+                                    {formatoCuotasRestanteTotal(c.cuotasFaltantes, c.numeroCuotas)}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </>
+                    )}
+                  </>
+                )}
+              </>
+            );
+          })()}
 
           <h3
             style={{

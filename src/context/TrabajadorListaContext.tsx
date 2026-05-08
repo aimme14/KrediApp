@@ -43,7 +43,11 @@ export function TrabajadorListaProvider({ children }: { children: ReactNode }) {
   const hasLoadedOnce = useRef(false);
 
   const refresh = useCallback(async () => {
-    if (!user || !profile || profile.role !== "trabajador") {
+    // Este provider se usa en pantallas que necesitan listas (clientes / préstamos)
+    // tanto para trabajador como para admin.
+    const canUse =
+      !!user && !!profile && (profile.role === "trabajador" || profile.role === "admin");
+    if (!canUse) {
       setClientes([]);
       setPrestamos([]);
       setError(null);

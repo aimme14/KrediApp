@@ -35,6 +35,14 @@ function trunc(s: string, max: number): string {
   return t.length <= max ? t : `${t.slice(0, max - 1)}…`;
 }
 
+function normalizarMetodoPagoPdf(metodo: string | null | undefined): "efectivo" | "transferencia" | "otro" {
+  const m = (metodo ?? "").trim().toLowerCase();
+  if (!m) return "otro";
+  if (m.includes("efectivo")) return "efectivo";
+  if (m.includes("transfer")) return "transferencia";
+  return "otro";
+}
+
 export type ReporteCierrePdfMeta = {
   rutaNombre: string;
   empleadoNombre: string;
@@ -479,96 +487,113 @@ export async function buildReporteCierrePdf(
     const xMet = xCuo + wCuo + COL_GAP;
     const xHr = xMet + wMet + COL_GAP;
 
-    ensureBottom(TB.lh + 8);
-    tableRow(
-      [
-        { text: "Cliente", x: xCli, w: wCli, bold: true, color: COL.tableHead },
-        { text: "Cobro", x: xCob, w: wCob, bold: true, color: COL.tableHead, align: "right" },
-        { text: "Tot. préstamo", x: xTP, w: wTP, bold: true, color: COL.tableHead, align: "right" },
-        { text: "Debe", x: xDeb, w: wDeb, bold: true, color: COL.tableHead, align: "right" },
-        { text: "Cuotas", x: xCuo, w: wCuo, bold: true, color: COL.tableHead, align: "right" },
-        { text: "Método", x: xMet, w: wMet, bold: true, color: COL.tableHead },
-        { text: "Hora", x: xHr, w: wHr, bold: true, color: COL.tableHead },
-      ],
-      y
-    );
-    advanceY(TB.lh + 4);
-    let sumCobros = 0;
-    for (const c of snapshot.cobros) {
-      if (rowBudget <= 0) break;
-      sumCobros += c.monto;
-      const hora = c.fecha
-        ? new Date(c.fecha).toLocaleTimeString("es-CO", {
-            timeZone: "America/Bogota",
-            hour: "2-digit",
-            minute: "2-digit",
-            second: "2-digit",
-          })
-        : "—";
-      const cuotasTxt = formatoCuotasRestanteTotal(c.cuotasFaltantes, c.numeroCuotas);
-      ensureBottom(TB.lh + 6);
+    const drawCobrosHeader = () => {
+      ensureBottom(TB.lh + 8);
       tableRow(
         [
-          { text: trunc(c.clienteNombre, 42), x: xCli, w: wCli },
-          {
-            text: fmtMoney(c.monto),
-            x: xCob,
-            w: wCob,
-            align: "right",
-          },
-          {
-            text: fmtMoney(c.totalAPagar),
-            x: xTP,
-            w: wTP,
-            align: "right",
-          },
-          {
-            text: fmtMoney(c.saldoPendienteTrasPago),
-            x: xDeb,
-            w: wDeb,
-            align: "right",
-          },
-          {
-            text: cuotasTxt,
-            x: xCuo,
-            w: wCuo,
-            align: "right",
-          },
-          {
-            text: trunc(c.metodoPago ?? "—", 14),
-            x: xMet,
-            w: wMet,
-          },
-          {
-            text: hora,
-            x: xHr,
-            w: wHr,
-            noTrunc: true,
-          },
+          { text: "Cliente", x: xCli, w: wCli, bold: true, color: COL.tableHead },
+          { text: "Cobro", x: xCob, w: wCob, bold: true, color: COL.tableHead, align: "right" },
+          { text: "Tot. préstamo", x: xTP, w: wTP, bold: true, color: COL.tableHead, align: "right" },
+          { text: "Debe", x: xDeb, w: wDeb, bold: true, color: COL.tableHead, align: "right" },
+          { text: "Cuotas", x: xCuo, w: wCuo, bold: true, color: COL.tableHead, align: "right" },
+          { text: "Método", x: xMet, w: wMet, bold: true, color: COL.tableHead },
+          { text: "Hora", x: xHr, w: wHr, bold: true, color: COL.tableHead },
         ],
         y
       );
-      advanceY(TB.lh);
-      rowBudget--;
-    }
+      advanceY(TB.lh + 4);
+    };
+
+    const subTitle = (t: string) => {
+      ensureBottom(18);
+      page.drawText(sanitizarTextoPdf(t), {
+        x: M,
+        y,
+        size: FS.meta,
+        font: fontBold,
+        color: COL.accentDark,
+      });
+      y -= 12;
+    };
+
+    const renderCobrosGroup = (titulo: string, rows: typeof snapshot.cobros) => {
+      subTitle(titulo);
+      if (rows.length === 0) {
+        line("—", { color: COL.muted, size: FS.meta });
+        spacer(2);
+        return;
+      }
+      drawCobrosHeader();
+      let sum = 0;
+      for (const c of rows) {
+        if (rowBudget <= 0) break;
+        sum += c.monto;
+        const hora = c.fecha
+          ? new Date(c.fecha).toLocaleTimeString("es-CO", {
+              timeZone: "America/Bogota",
+              hour: "2-digit",
+              minute: "2-digit",
+              second: "2-digit",
+            })
+          : "—";
+        const cuotasTxt = formatoCuotasRestanteTotal(c.cuotasFaltantes, c.numeroCuotas);
+        ensureBottom(TB.lh + 6);
+        tableRow(
+          [
+            { text: trunc(c.clienteNombre, 42), x: xCli, w: wCli },
+            { text: fmtMoney(c.monto), x: xCob, w: wCob, align: "right" },
+            { text: fmtMoney(c.totalAPagar), x: xTP, w: wTP, align: "right" },
+            { text: fmtMoney(c.saldoPendienteTrasPago), x: xDeb, w: wDeb, align: "right" },
+            { text: cuotasTxt, x: xCuo, w: wCuo, align: "right" },
+            { text: trunc(c.metodoPago ?? "—", 14), x: xMet, w: wMet },
+            { text: hora, x: xHr, w: wHr, noTrunc: true },
+          ],
+          y
+        );
+        advanceY(TB.lh);
+        rowBudget--;
+      }
+      ensureBottom(TB.lh + 8);
+      hrTable();
+      tableRow(
+        [
+          { text: "Subtotal", x: xCli, w: wCli, bold: true },
+          { text: fmtMoney(sum), x: xCob, w: wCob, bold: true, align: "right" },
+          { text: "", x: xTP, w: wTP },
+          { text: "", x: xDeb, w: wDeb },
+          { text: "", x: xCuo, w: wCuo },
+          { text: "", x: xMet, w: wMet },
+          { text: "", x: xHr, w: wHr },
+        ],
+        y
+      );
+      advanceY(TB.lh + 6);
+    };
+
+    const cobrosEfectivo = snapshot.cobros.filter((c) => normalizarMetodoPagoPdf(c.metodoPago) === "efectivo");
+    const cobrosTransferencia = snapshot.cobros.filter(
+      (c) => normalizarMetodoPagoPdf(c.metodoPago) === "transferencia"
+    );
+    const cobrosOtros = snapshot.cobros.filter((c) => normalizarMetodoPagoPdf(c.metodoPago) === "otro");
+
+    const totalCobrosTodos = snapshot.cobros.reduce((a, c) => a + c.monto, 0);
+
+    renderCobrosGroup("Efectivo", cobrosEfectivo);
+    renderCobrosGroup("Transferencia", cobrosTransferencia);
+    if (cobrosOtros.length) renderCobrosGroup("Otros / sin método", cobrosOtros);
+
     if (snapshot.cobros.length > MAX_ROWS_DETALLE) {
       line(`… y ${snapshot.cobros.length - MAX_ROWS_DETALLE} cobros más (consultar en el sistema).`, {
         color: COL.muted,
         size: FS.small,
       });
     }
+
     ensureBottom(TB.lh + 8);
-    hrTable();
     tableRow(
       [
         { text: "Total cobros", x: xCli, w: wCli, bold: true },
-        {
-          text: fmtMoney(sumCobros),
-          x: xCob,
-          w: wCob,
-          bold: true,
-          align: "right",
-        },
+        { text: fmtMoney(totalCobrosTodos), x: xCob, w: wCob, bold: true, align: "right" },
         { text: "", x: xTP, w: wTP },
         { text: "", x: xDeb, w: wDeb },
         { text: "", x: xCuo, w: wCuo },

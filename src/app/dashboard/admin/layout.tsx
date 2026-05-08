@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { useDashboardHeaderSlot } from "@/context/DashboardHeaderContext";
 import { AdminFcmRegistration } from "@/components/AdminFcmRegistration";
+import { TrabajadorListaProvider } from "@/context/TrabajadorListaContext";
 
 const NAV_ITEMS = [
   { href: "/dashboard/admin", label: "Inicio", icon: "home" },
@@ -202,43 +203,45 @@ export default function AdminLayout({
   }
 
   return (
-    <div className="jefe-wrapper">
-      <AdminFcmRegistration />
-      <aside
-        className={`jefe-drawer ${menuOpen ? "jefe-drawer-open" : ""}`}
-        aria-hidden={!menuOpen}
-      >
-        <div className="jefe-drawer-inner">
-          <nav className="jefe-drawer-nav">
-            {NAV_ITEMS.map((item) => {
-              const isActive = pathname === item.href;
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={`jefe-drawer-link ${isActive ? "jefe-drawer-link-active" : ""}`}
-                >
-                  <span className="jefe-drawer-icon">
-                    <NavIcon name={item.icon} />
-                  </span>
-                  <span className="jefe-drawer-label">{item.label}</span>
-                </Link>
-              );
-            })}
-          </nav>
-        </div>
-      </aside>
+    <TrabajadorListaProvider>
+      <div className="jefe-wrapper">
+        <AdminFcmRegistration />
+        <aside
+          className={`jefe-drawer ${menuOpen ? "jefe-drawer-open" : ""}`}
+          aria-hidden={!menuOpen}
+        >
+          <div className="jefe-drawer-inner">
+            <nav className="jefe-drawer-nav">
+              {NAV_ITEMS.map((item) => {
+                const isActive = pathname === item.href;
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={`jefe-drawer-link ${isActive ? "jefe-drawer-link-active" : ""}`}
+                  >
+                    <span className="jefe-drawer-icon">
+                      <NavIcon name={item.icon} />
+                    </span>
+                    <span className="jefe-drawer-label">{item.label}</span>
+                  </Link>
+                );
+              })}
+            </nav>
+          </div>
+        </aside>
 
-      {menuOpen && (
-        <button
-          type="button"
-          className="jefe-drawer-backdrop"
-          onClick={() => setMenuOpen(false)}
-          aria-label="Cerrar menú"
-        />
-      )}
+        {menuOpen && (
+          <button
+            type="button"
+            className="jefe-drawer-backdrop"
+            onClick={() => setMenuOpen(false)}
+            aria-label="Cerrar menú"
+          />
+        )}
 
-      <main className="jefe-main">{children}</main>
-    </div>
+        <main className="jefe-main">{children}</main>
+      </div>
+    </TrabajadorListaProvider>
   );
 }

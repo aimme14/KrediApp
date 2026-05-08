@@ -478,6 +478,15 @@ export async function POST(
     return finalize(400, { error: "Monto debe ser un número positivo" });
   }
   const metodo = metodoPago === "transferencia" ? "transferencia" : "efectivo";
+  const evidenciaTrim = typeof evidencia === "string" ? evidencia.trim() : "";
+  if (metodo === "transferencia") {
+    if (!evidenciaTrim) {
+      return finalize(400, { error: "Transferencia requiere evidencia (1 foto)" });
+    }
+    if (evidenciaTrim.includes(",")) {
+      return finalize(400, { error: "Solo se permite 1 foto de evidencia" });
+    }
+  }
 
   const prestamoPreRead = await prestamoRef.get();
   if (!prestamoPreRead.exists) {
@@ -536,7 +545,7 @@ export async function POST(
         empleadoId: apiUser.uid,
         tipo: "pago",
         metodoPago: metodo,
-        evidencia: (evidencia ?? "").trim() || null,
+        evidencia: evidenciaTrim || null,
         registradoPorUid: uidRegistro,
         registradoPorNombre: nombreRegistro,
         cuotaCapital: parteCapital,

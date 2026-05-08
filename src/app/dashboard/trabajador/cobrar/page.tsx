@@ -154,13 +154,12 @@ function CobrarClientePageContent() {
 
   const [montoInput, setMontoInput] = useState("");
   const [metodoPago, setMetodoPago] = useState<"efectivo" | "transferencia">("efectivo");
-  const [evidenciaFiles, setEvidenciaFiles] = useState<(File | null)[]>([null, null]);
-  const [evidenciaPreviews, setEvidenciaPreviews] = useState<(string | null)[]>([null, null]);
+  const [evidenciaFile, setEvidenciaFile] = useState<File | null>(null);
+  const [evidenciaPreview, setEvidenciaPreview] = useState<string | null>(null);
   const [showCamera, setShowCamera] = useState(false);
-  const [cameraSlot, setCameraSlot] = useState<0 | 1>(0);
+  const [cameraSlot, setCameraSlot] = useState<0>(0);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const fileInputRef0 = useRef<HTMLInputElement>(null);
-  const fileInputRef1 = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -277,33 +276,23 @@ function CobrarClientePageContent() {
   if (sugerenciaBruta <= 0 && valorCuotaFija > 0) sugerenciaBruta = valorCuotaFija;
   const valorCuotaSugerido = Math.min(sugerenciaBruta, saldoPendiente);
 
-  const fotosRequeridas = metodoPago === "transferencia" ? 2 : 1;
-  const fotosActuales = evidenciaFiles.slice(0, fotosRequeridas).filter(Boolean).length;
+  const evidenciaRequerida = metodoPago === "transferencia";
   const puedeConfirmar = montoNum > 0 && metodoPago;
 
-  const setEvidenciaAt = (index: 0 | 1, file: File | null) => {
-    setEvidenciaFiles((prev) => {
-      const next = [...prev];
-      next[index] = file;
-      if (metodoPago === "efectivo" && index === 1) return next;
-      return next;
-    });
-    setEvidenciaPreviews((prev) => {
-      const next = [...prev];
-      if (prev[index]) URL.revokeObjectURL(prev[index]!);
-      next[index] = file ? URL.createObjectURL(file) : null;
-      return next;
+  const setEvidencia = (file: File | null) => {
+    setEvidenciaFile(file);
+    setEvidenciaPreview((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return file ? URL.createObjectURL(file) : null;
     });
   };
 
   useEffect(() => {
-    if (metodoPago === "efectivo") {
-      setEvidenciaFiles((prev) => [prev[0], null]);
-      setEvidenciaPreviews((prev) => {
-        if (prev[1]) URL.revokeObjectURL(prev[1]);
-        return [prev[0], null];
-      });
+    // Si cambia el método a efectivo, se limpia la evidencia para evitar subir fotos innecesarias.
+    if (metodoPago === "efectivo" && evidenciaFile) {
+      setEvidencia(null);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [metodoPago]);
 
   useEffect(() => {
@@ -417,41 +406,30 @@ function CobrarClientePageContent() {
     e.preventDefault();
     if (!user || !prestamo || !puedeConfirmar || !profile) return;
     setError(null);
+    if (evidenciaRequerida && !evidenciaFile) {
+      setError("Transferencia: debes adjuntar 1 foto de evidencia.");
+      return;
+    }
     setSubmitting(true);
     setSubmitStatus(null);
     const idempotencyKey = idempotencyKeyRef.current ?? crypto.randomUUID();
     idempotencyKeyRef.current = idempotencyKey;
     try {
-      const filesToUpload = evidenciaFiles.slice(0, fotosRequeridas).filter((f): f is File => f != null);
-      let doneUploads = 0;
-      const urls =
-        filesToUpload.length === 0
-          ? []
-          : await Promise.all(
-              filesToUpload.map((file, i) =>
-                uploadImage(file, {
-                  folder: "pagos",
-                  ownerId: user.uid,
-                  filename: `evidencia-${i + 1}`,
-                }).then((url) => {
-                  doneUploads++;
-                  if (filesToUpload.length > 1) {
-                    setSubmitStatus(
-                      `Subiendo evidencias (${doneUploads}/${filesToUpload.length})…`
-                    );
-                  }
-                  return url;
-                })
-              )
-            );
+      const url =
+        evidenciaFile
+          ? await uploadImage(evidenciaFile, {
+              folder: "pagos",
+              ownerId: user.uid,
+              filename: "evidencia-1",
+            })
+          : "";
       setSubmitStatus("Registrando pago…");
-      const evidenciaUrl = urls.join(",");
       const token = await user.getIdToken();
       const nombreRegistro = profile.displayName ?? profile.email ?? "";
       const res = await registrarPago(token, prestamo.id, {
         monto: montoAplicar,
         metodoPago,
-        evidencia: evidenciaUrl || undefined,
+        evidencia: url || undefined,
         registradoPorUid: user.uid,
         registradoPorNombre: nombreRegistro || undefined,
         idempotencyKey,
@@ -1062,27 +1040,22 @@ function CobrarClientePageContent() {
           </select>
         </div>
 
-        <div className="form-group">
-          <label>Evidencia del pago (opcional)</label>
-          <p className="cobrar-evidencia-hint">
-            {metodoPago === "efectivo"
-              ? "Efectivo: puedes adjuntar hasta 1 foto (subir o tomar con cámara)."
-              : "Transferencia: puedes adjuntar hasta 2 fotos (subir o tomar con cámara)."}
-          </p>
-          <p className="cobrar-evidencia-progress">
-            {fotosActuales} de {fotosRequeridas} foto{fotosRequeridas === 2 ? "s" : ""}
-          </p>
-          <div className="cobrar-evidencia-slots">
-            {([0, 1] as const).slice(0, fotosRequeridas).map((index) => (
-              <div key={index} className="cobrar-evidencia-slot">
-                <span className="cobrar-evidencia-slot-label">Foto {index + 1}</span>
-                {evidenciaPreviews[index] ? (
+        {metodoPago === "transferencia" && (
+          <div className="form-group">
+            <label>Evidencia del pago (obligatoria)</label>
+            <p className="cobrar-evidencia-hint">
+              Transferencia: adjunta 1 foto (subir o tomar con cámara).
+            </p>
+            <div className="cobrar-evidencia-slots">
+              <div className="cobrar-evidencia-slot">
+                <span className="cobrar-evidencia-slot-label">Foto 1</span>
+                {evidenciaPreview ? (
                   <div className="cobrar-evidencia-preview">
-                    <img src={evidenciaPreviews[index]!} alt={`Evidencia ${index + 1}`} />
+                    <img src={evidenciaPreview} alt="Evidencia 1" />
                     <button
                       type="button"
                       className="cobrar-evidencia-remove"
-                      onClick={() => setEvidenciaAt(index, null)}
+                      onClick={() => setEvidencia(null)}
                       aria-label="Quitar foto"
                     >
                       <CloseIcon />
@@ -1091,22 +1064,22 @@ function CobrarClientePageContent() {
                 ) : (
                   <div className="cobrar-evidencia-buttons">
                     <input
-                      ref={index === 0 ? fileInputRef0 : fileInputRef1}
+                      ref={fileInputRef0}
                       type="file"
                       accept={getImageAccept()}
                       onChange={(e) => {
                         const file = e.target.files?.[0];
-                        if (file) setEvidenciaAt(index, file);
+                        if (file) setEvidencia(file);
                         e.target.value = "";
                       }}
                       className="cobrar-file-hidden"
-                      aria-label={`Subir foto ${index + 1}`}
+                      aria-label="Subir foto 1"
                     />
                     <button
                       type="button"
                       className="cobrar-evidencia-btn"
-                      onClick={() => (index === 0 ? fileInputRef0 : fileInputRef1).current?.click()}
-                      aria-label={`Subir imagen ${index + 1}`}
+                      onClick={() => fileInputRef0.current?.click()}
+                      aria-label="Subir imagen 1"
                     >
                       <UploadIcon />
                       <span>Subir imagen</span>
@@ -1115,11 +1088,11 @@ function CobrarClientePageContent() {
                       type="button"
                       className="cobrar-evidencia-btn"
                       onClick={() => {
-                        setCameraSlot(index);
+                        setCameraSlot(0);
                         setCameraError(null);
                         setShowCamera(true);
                       }}
-                      aria-label={`Tomar foto ${index + 1}`}
+                      aria-label="Tomar foto 1"
                     >
                       <CameraIcon />
                       <span>Tomar foto</span>
@@ -1127,9 +1100,9 @@ function CobrarClientePageContent() {
                   </div>
                 )}
               </div>
-            ))}
+            </div>
           </div>
-        </div>
+        )}
 
         {showCamera && (
           <div className="cobrar-camera-overlay" role="dialog" aria-modal="true" aria-label="Tomar foto">
@@ -1164,7 +1137,7 @@ function CobrarClientePageContent() {
                     canvas.toBlob((blob) => {
                       if (!blob) return;
                       const file = new File([blob], `evidencia-${cameraSlot + 1}.png`, { type: "image/png" });
-                      setEvidenciaAt(cameraSlot, file);
+                      setEvidencia(file);
                       streamRef.current?.getTracks().forEach((t) => t.stop());
                       streamRef.current = null;
                       if (video) video.srcObject = null;
