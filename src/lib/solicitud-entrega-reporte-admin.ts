@@ -35,6 +35,7 @@ export type SolicitudEntregaReporteDoc = {
   resueltaEn: Date | null;
   resueltaPorUid: string | null;
   motivoRechazo: string | null;
+  /** Seteado al aprobar: monto transferido desde `cajaEmpleado` a la ruta. */
   montoEntregadoEfectivo: number | null;
 };
 
@@ -272,7 +273,16 @@ export async function aprobarSolicitudEntregaReporte(
     throw new Error("La ruta ya no está bajo tu administración");
   }
 
-  const result = await entregarReporteTrabajadorARuta(db, empresaId, empleadoUid);
+  // Compatibilidad: solicitudes pendientes creadas con traspaso anticipado (campo legacy en Firestore).
+  const legacyTraspasoAnticipado =
+    sol.traspasoEjecutadoEn != null &&
+    typeof sol.montoEntregadoEfectivo === "number" &&
+    (sol.montoEntregadoEfectivo as number) > 0;
+
+  const result = legacyTraspasoAnticipado
+    ? { monto: sol.montoEntregadoEfectivo as number, rutaId: rutaIdSol }
+    : await entregarReporteTrabajadorARuta(db, empresaId, empleadoUid);
+
   if (result.monto <= 0) {
     throw new Error("No hubo efectivo que transferir. Es posible que el trabajador ya no tenga saldo.");
   }

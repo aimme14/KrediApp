@@ -6,10 +6,12 @@ import { useAuth } from "@/context/AuthContext";
 import {
   listClientes,
   listPrestamos,
+  listRutas,
   createPrestamo,
   clienteNumFromCodigo,
   type ClienteItem,
   type PrestamoItem,
+  type RutaItem,
 } from "@/lib/empresa-api";
 import { formatInteresResumenPct, parseInteresPct } from "@/lib/interes-pct";
 import {
@@ -76,9 +78,11 @@ function hoyDDMMAAAA(): string {
 export default function PrestamoPage() {
   const { user, profile } = useAuth();
   const [clientes, setClientes] = useState<ClienteItem[]>([]);
+  const [rutas, setRutas] = useState<RutaItem[]>([]);
   const [prestamos, setPrestamos] = useState<PrestamoItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [rutaIdForm, setRutaIdForm] = useState("");
   const [clienteId, setClienteId] = useState("");
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [modalidad, setModalidad] = useState<"diario" | "semanal" | "mensual">("mensual");
@@ -97,10 +101,11 @@ export default function PrestamoPage() {
   const loadData = useCallback(async () => {
     if (!user) return;
     const token = await user.getIdToken();
-    Promise.all([listClientes(token), listPrestamos(token)])
-      .then(([c, p]) => {
+    Promise.all([listClientes(token), listPrestamos(token), listRutas(token)])
+      .then(([c, p, r]) => {
         setClientes(c);
         setPrestamos(p);
+        setRutas(r);
       })
       .catch((e) => setError(e instanceof Error ? e.message : "Error al cargar"))
       .finally(() => setLoading(false));
@@ -109,6 +114,10 @@ export default function PrestamoPage() {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  useEffect(() => {
+    setClienteId("");
+  }, [rutaIdForm]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -137,6 +146,10 @@ export default function PrestamoPage() {
       setError(`Confirma que deseas crear un préstamo de ${formatMoneda(montoNum)} marcando la casilla`);
       return;
     }
+    if (!rutaIdForm.trim()) {
+      setError("Selecciona una ruta");
+      return;
+    }
     if (!clienteId.trim()) {
       setError("Selecciona un cliente");
       return;
@@ -153,6 +166,7 @@ export default function PrestamoPage() {
         numeroCuotas: nCuotas,
         fechaInicio: new Date().toISOString().slice(0, 10),
       });
+      setRutaIdForm("");
       setClienteId("");
       setMonto("");
       setNumeroCuotas("");
@@ -169,6 +183,8 @@ export default function PrestamoPage() {
   };
 
   const clientesSinPrestamo = clientes.filter((c) => !c.prestamo_activo && !c.moroso);
+  const clientesDeRuta = rutaIdForm ? clientes.filter((c) => c.rutaId === rutaIdForm) : [];
+  const clientesSinPrestamoDeRuta = clientesSinPrestamo.filter((c) => c.rutaId === rutaIdForm);
   const clientePorId = useMemo(() => {
     const m: Record<string, ClienteItem> = {};
     clientes.forEach((c) => { m[c.id] = c; });
@@ -265,16 +281,35 @@ export default function PrestamoPage() {
           </button>
         </div>
         <div className="form-group">
+          <label>Ruta</label>
+          <select
+            value={rutaIdForm}
+            onChange={(e) => setRutaIdForm(e.target.value)}
+            required
+            style={{ width: "100%", padding: "0.5rem" }}
+            aria-label="Seleccionar ruta"
+          >
+            <option value="">Seleccionar ruta</option>
+            {rutas.map((r) => (
+              <option key={r.id} value={r.id}>
+                {r.nombre}
+                {r.ubicacion ? ` · ${r.ubicacion}` : ""}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="form-group">
           <label>Cliente</label>
           <select
             value={clienteId}
             onChange={(e) => setClienteId(e.target.value)}
-            required
+            required={Boolean(rutaIdForm)}
+            disabled={!rutaIdForm}
             style={{ width: "100%", padding: "0.5rem" }}
             aria-label="Seleccionar cliente"
           >
-            <option value="">Seleccionar cliente</option>
-            {clientesSinPrestamo.map((c) => {
+            <option value="">{rutaIdForm ? "Seleccionar cliente" : "Primero elige una ruta"}</option>
+            {clientesSinPrestamoDeRuta.map((c) => {
               const num = clienteNumFromCodigo(c.codigo);
               const codigoPart = num ? `#${num} · ` : "";
               const cedulaPart = c.cedula ? ` · ${c.cedula}` : "";
@@ -284,8 +319,11 @@ export default function PrestamoPage() {
                 </option>
               );
             })}
-            {clientesSinPrestamo.length === 0 && clientes.length > 0 && (
-              <option value="" disabled>Todos los clientes tienen préstamo activo</option>
+            {rutaIdForm && clientesDeRuta.length === 0 && (
+              <option value="" disabled>No hay clientes en esta ruta</option>
+            )}
+            {rutaIdForm && clientesDeRuta.length > 0 && clientesSinPrestamoDeRuta.length === 0 && (
+              <option value="" disabled>Todos los clientes de esta ruta tienen préstamo activo o están marcados como morosos</option>
             )}
           </select>
           {clienteSeleccionado && (
