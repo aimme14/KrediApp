@@ -103,7 +103,10 @@ export type MiEstadoSolicitudesEmpleado = {
   ultimaRechazada: SolicitudEntregaReporteDoc | null;
 };
 
-/** Historial reciente en memoria (sin orderBy compuesto en Firestore). */
+/**
+ * Estado actual para el trabajador: pendiente (si hay) y último rechazo solo si
+ * no hubo una aprobación posterior (`resueltaEn`). Sin historial en UI.
+ */
 export async function getMiEstadoSolicitudesEmpleado(
   db: Firestore,
   empresaId: string,
@@ -122,7 +125,19 @@ export async function getMiEstadoSolicitudesEmpleado(
   const rechazadas = mapped
     .filter((s) => s.estado === "rechazada" && s.resueltaEn)
     .sort((a, b) => (b.resueltaEn?.getTime() ?? 0) - (a.resueltaEn?.getTime() ?? 0));
-  const ultimaRechazada = rechazadas[0] ?? null;
+  let ultimaRechazada: SolicitudEntregaReporteDoc | null = rechazadas[0] ?? null;
+
+  if (ultimaRechazada?.resueltaEn) {
+    const rechazoMs = ultimaRechazada.resueltaEn.getTime();
+    const maxAprobadaMs = mapped.reduce((acc, s) => {
+      if (s.estado !== "aprobada" || !s.resueltaEn) return acc;
+      const t = s.resueltaEn.getTime();
+      return t > acc ? t : acc;
+    }, 0);
+    if (maxAprobadaMs > rechazoMs) {
+      ultimaRechazada = null;
+    }
+  }
 
   return { pendiente, ultimaRechazada };
 }
