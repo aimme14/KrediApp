@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import {
@@ -10,8 +10,8 @@ import {
   listClientes,
   listPrestamos,
   listGastos,
+  type ResumenRutaItem,
 } from "@/lib/empresa-api";
-import { listUsersByCreator } from "@/lib/users";
 
 function formatMoneda(value: number): string {
   const hasDecimals = Math.round(value * 100) % 100 !== 0;
@@ -21,104 +21,19 @@ function formatMoneda(value: number): string {
   })}`;
 }
 
-const QUICK_LINKS = [
-  { href: "/dashboard/admin/ruta-del-dia", label: "Ruta del día", icon: "ruta-dia" },
-  { href: "/dashboard/admin/rutas", label: "Rutas", icon: "route" },
-  { href: "/dashboard/admin/empleado", label: "Empleados", icon: "user" },
-  { href: "/dashboard/admin/cliente", label: "Clientes", icon: "client" },
-  { href: "/dashboard/admin/prestamo", label: "Crear préstamo", icon: "loan" },
-  { href: "/dashboard/admin/gastos", label: "Gastos operativos", icon: "expense" },
-  { href: "/dashboard/admin/reportes-dia", label: "Reportes del día", icon: "report" },
-  { href: "/dashboard/admin/gestion-financiera", label: "Gestión financiera", icon: "wallet" },
-  { href: "/dashboard/admin/resumen", label: "Resumen económico", icon: "chart" },
-  { href: "/dashboard/admin/permisos", label: "Permisos", icon: "lock" },
-  { href: "/dashboard/admin/cliente-moroso", label: "Clientes morosos", icon: "alert" },
-] as const;
-
-function QuickLinkIcon({ name }: { name: string }) {
-  const size = 20;
-  switch (name) {
-    case "ruta-dia":
-      return (
-        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-          <circle cx="12" cy="12" r="4" />
-          <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
-        </svg>
-      );
-    case "route":
-      return (
-        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-          <path d="M5 8l6 6" /><path d="M4 14l6-6 2-3" /><path d="M2 5h12" /><circle cx="16.5" cy="8.5" r="2.5" /><circle cx="7.5" cy="14.5" r="2.5" />
-        </svg>
-      );
-    case "user":
-      return (
-        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" />
-        </svg>
-      );
-    case "client":
-      return (
-        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
-        </svg>
-      );
-    case "loan":
-      return (
-        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-          <line x1="12" y1="1" x2="12" y2="23" /><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-        </svg>
-      );
-    case "expense":
-      return (
-        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" />
-        </svg>
-      );
-    case "report":
-      return (
-        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-          <polyline points="14 2 14 8 20 8" />
-          <line x1="16" y1="13" x2="8" y2="13" />
-          <line x1="16" y1="17" x2="8" y2="17" />
-          <line x1="10" y1="9" x2="8" y2="9" />
-        </svg>
-      );
-    case "chart":
-      return (
-        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-          <line x1="18" y1="20" x2="18" y2="10" /><line x1="12" y1="20" x2="12" y2="4" /><line x1="6" y1="20" x2="6" y2="14" />
-        </svg>
-      );
-    case "wallet":
-      return (
-        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-          <path d="M21 9V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-2" />
-          <path d="M21 9h-6a2 2 0 0 0 0 4h6" />
-          <circle cx="16" cy="11" r="1" />
-        </svg>
-      );
-    case "lock":
-      return (
-        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-          <rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" />
-        </svg>
-      );
-    case "alert":
-      return (
-        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-          <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
-        </svg>
-      );
-    default:
-      return null;
-  }
+function formatFechaCabecera(d: Date): string {
+  const raw = d.toLocaleDateString("es-CO", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+  return raw.charAt(0).toUpperCase() + raw.slice(1);
 }
 
 type Stats = {
-  rutas: number;
-  empleados: number;
+  rutasProgramadas: number;
+  rutasActivas: number;
   clientes: number;
   prestamosActivos: number;
   morosos: number;
@@ -130,8 +45,8 @@ export default function AdminDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [stats, setStats] = useState<Stats>({
-    rutas: 0,
-    empleados: 0,
+    rutasProgramadas: 0,
+    rutasActivas: 0,
     clientes: 0,
     prestamosActivos: 0,
     morosos: 0,
@@ -139,6 +54,27 @@ export default function AdminDashboardPage() {
   });
   const [cajaAdmin, setCajaAdmin] = useState(0);
   const [capitalAdmin, setCapitalAdmin] = useState(0);
+  const [rutasResumen, setRutasResumen] = useState<ResumenRutaItem[]>([]);
+
+  const fechaTitulo = useMemo(() => formatFechaCabecera(new Date()), []);
+
+  const nombreBienvenida = useMemo(() => {
+    if (!profile) return "Administrador";
+    const n = profile.displayName?.trim();
+    if (n) return n;
+    const em = (profile.email || user?.email || "").trim();
+    if (em) {
+      const local = em.split("@")[0] ?? "";
+      if (local) return local.replace(/[._]+/g, " ").trim() || em;
+    }
+    return "Administrador";
+  }, [profile, user?.email]);
+
+  const rutasOrdenadas = useMemo(() => {
+    return [...rutasResumen].sort((a, b) =>
+      (a.nombre || "").localeCompare(b.nombre || "", "es", { sensitivity: "base" })
+    );
+  }, [rutasResumen]);
 
   useEffect(() => {
     if (!user || !profile || profile.role !== "admin") return;
@@ -147,10 +83,9 @@ export default function AdminDashboardPage() {
     const load = async () => {
       try {
         const token = await user.getIdToken();
-        const [rutas, empleados, clientes, prestamos, clientesMorosos, gastos, caja, resumen] =
+        const [rutas, clientes, prestamos, clientesMorosos, gastos, caja, resumen] =
           await Promise.all([
             listRutas(token),
-            listUsersByCreator(profile.uid, "trabajador"),
             listClientes(token),
             listPrestamos(token),
             listClientes(token, undefined, { moroso: true }),
@@ -160,9 +95,11 @@ export default function AdminDashboardPage() {
           ]);
         if (cancelled) return;
         const activos = prestamos.filter((p) => p.estado !== "pagado");
+        const programadas = rutas.length;
+        const activas = Math.min(resumen.rutas.length, programadas);
         setStats({
-          rutas: rutas.length,
-          empleados: empleados.length,
+          rutasProgramadas: programadas,
+          rutasActivas: activas,
           clientes: clientes.length,
           prestamosActivos: activos.length,
           morosos: clientesMorosos.length,
@@ -170,6 +107,7 @@ export default function AdminDashboardPage() {
         });
         setCajaAdmin(caja);
         setCapitalAdmin(resumen.capitalAdmin ?? 0);
+        setRutasResumen(resumen.rutas ?? []);
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : "Error al cargar datos");
       } finally {
@@ -177,162 +115,224 @@ export default function AdminDashboardPage() {
       }
     };
     load();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [user, profile]);
 
   if (!profile || profile.role !== "admin") return null;
 
   if (loading) {
     return (
-      <div className="card">
-        <p style={{ color: "var(--text-muted)" }}>Cargando panel...</p>
+      <div className="admin-inicio">
+        <div className="card" style={{ margin: 0 }}>
+          <p style={{ color: "var(--text-muted)", margin: 0 }}>Cargando panel…</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
-      <div className="card">
-        <h2 style={{ marginTop: 0 }}>Inicio</h2>
-        <p style={{ color: "var(--text-muted)", fontSize: "0.875rem", marginBottom: "1.25rem" }}>
-          Resumen rápido de tu gestión. Usa el menú o los enlaces para ir a cada sección.
-        </p>
-        {error && <p className="error-msg">{error}</p>}
-
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))",
-            gap: "1rem",
-            marginBottom: "1.5rem",
-          }}
-          role="list"
-        >
-          <div className="card" style={{ padding: "1rem", margin: 0 }} role="listitem">
-            <span style={{ fontSize: "0.875rem", color: "var(--text-muted)", display: "block", marginBottom: "0.25rem" }}>Rutas</span>
-            <span style={{ fontSize: "1.5rem", fontWeight: 700, color: "var(--text)" }}>{stats.rutas}</span>
-          </div>
-          <div className="card" style={{ padding: "1rem", margin: 0 }} role="listitem">
-            <span style={{ fontSize: "0.875rem", color: "var(--text-muted)", display: "block", marginBottom: "0.25rem" }}>Empleados</span>
-            <span style={{ fontSize: "1.5rem", fontWeight: 700, color: "var(--text)" }}>{stats.empleados}</span>
-          </div>
-          <div className="card" style={{ padding: "1rem", margin: 0 }} role="listitem">
-            <span style={{ fontSize: "0.875rem", color: "var(--text-muted)", display: "block", marginBottom: "0.25rem" }}>Clientes</span>
-            <span style={{ fontSize: "1.5rem", fontWeight: 700, color: "var(--text)" }}>{stats.clientes}</span>
-          </div>
-          <div className="card" style={{ padding: "1rem", margin: 0 }} role="listitem">
-            <span style={{ fontSize: "0.875rem", color: "var(--text-muted)", display: "block", marginBottom: "0.25rem" }}>Préstamos activos</span>
-            <span style={{ fontSize: "1.5rem", fontWeight: 700, color: "var(--text)" }}>{stats.prestamosActivos}</span>
-          </div>
-          <div className="card" style={{ padding: "1rem", margin: 0 }} role="listitem">
-            <span style={{ fontSize: "0.875rem", color: "var(--text-muted)", display: "block", marginBottom: "0.25rem" }}>Morosos</span>
-            <span style={{ fontSize: "1.5rem", fontWeight: 700, color: stats.morosos > 0 ? "#dc2626" : "var(--text)" }}>{stats.morosos}</span>
-          </div>
-          <div className="card" style={{ padding: "1rem", margin: 0 }} role="listitem">
-            <span style={{ fontSize: "0.875rem", color: "var(--text-muted)", display: "block", marginBottom: "0.25rem" }}>Gastos registrados</span>
-            <span style={{ fontSize: "1.5rem", fontWeight: 700, color: "var(--text)" }}>{stats.gastosRegistrados}</span>
-          </div>
+    <div className="admin-inicio admin-inicio--fill">
+      <header className="admin-inicio-head">
+        <div>
+          <h1 className="admin-inicio-title">Bienvenido ({nombreBienvenida})</h1>
+          <p className="admin-inicio-date">{fechaTitulo}</p>
         </div>
+      </header>
 
-        <div
-          className="card"
-          style={{
-            padding: "1rem 1.25rem",
-            marginBottom: "1.5rem",
-            borderColor: "var(--card-border)",
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
-            gap: "1rem",
-            alignItems: "start",
-          }}
-        >
-          <div>
-            <span
-              style={{
-                fontSize: "0.75rem",
-                color: "var(--text-muted)",
-                textTransform: "uppercase",
-                letterSpacing: "0.04em",
-                display: "block",
-                marginBottom: "0.35rem",
-              }}
-            >
-              Base
-            </span>
-            <span style={{ fontSize: "1.35rem", fontWeight: 700, color: "var(--text)" }} aria-live="polite">
-              {formatMoneda(cajaAdmin)}
-            </span>
+      {error ? (
+        <p className="error-msg" role="alert">
+          {error}
+        </p>
+      ) : null}
+
+      <div className="admin-inicio-body">
+        <section className="admin-inicio-block" aria-labelledby="admin-op-dia">
+          <h2 id="admin-op-dia" className="admin-inicio-section-label">
+            Operación del día
+          </h2>
+          <div className="admin-inicio-grid-4">
+            <div className="admin-inicio-metric">
+              <div className="admin-inicio-metric-main">
+                <span className="admin-inicio-metric-label">Rutas activas</span>
+                <span className="admin-inicio-metric-value">{stats.rutasActivas}</span>
+                <span className="admin-inicio-metric-sub">
+                  de {stats.rutasProgramadas} programada{stats.rutasProgramadas === 1 ? "" : "s"}
+                </span>
+              </div>
+              <span className="admin-inicio-metric-icon admin-inicio-metric-icon--purple" aria-hidden>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+                  <circle cx="12" cy="10" r="3" />
+                </svg>
+              </span>
+            </div>
+            <div className="admin-inicio-metric">
+              <div className="admin-inicio-metric-main">
+                <span className="admin-inicio-metric-label">Préstamos activos</span>
+                <span className="admin-inicio-metric-value">{stats.prestamosActivos}</span>
+                <span className="admin-inicio-metric-sub">en cobro</span>
+              </div>
+              <span className="admin-inicio-metric-icon admin-inicio-metric-icon--orange" aria-hidden>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <rect x="2" y="5" width="20" height="14" rx="2" />
+                  <line x1="2" y1="10" x2="22" y2="10" />
+                </svg>
+              </span>
+            </div>
+            <div className="admin-inicio-metric">
+              <div className="admin-inicio-metric-main">
+                <span className="admin-inicio-metric-label">Clientes</span>
+                <span className="admin-inicio-metric-value">{stats.clientes}</span>
+                <span className="admin-inicio-metric-sub">en cartera</span>
+              </div>
+              <span className="admin-inicio-metric-icon admin-inicio-metric-icon--violet" aria-hidden>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                  <circle cx="9" cy="7" r="4" />
+                  <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                  <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                </svg>
+              </span>
+            </div>
+            <div className="admin-inicio-metric">
+              <div className="admin-inicio-metric-main">
+                <span className="admin-inicio-metric-label">Morosos</span>
+                <span className="admin-inicio-metric-value">{stats.morosos}</span>
+                <span className="admin-inicio-metric-sub">
+                  {stats.morosos === 0 ? "sin atrasos" : "requieren seguimiento"}
+                </span>
+              </div>
+              <span className="admin-inicio-metric-icon admin-inicio-metric-icon--red" aria-hidden>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                  <line x1="12" y1="9" x2="12" y2="13" />
+                  <line x1="12" y1="17" x2="12.01" y2="17" />
+                </svg>
+              </span>
+            </div>
           </div>
-          <div>
-            <span
-              style={{
-                fontSize: "0.75rem",
-                color: "var(--text-muted)",
-                textTransform: "uppercase",
-                letterSpacing: "0.04em",
-                display: "block",
-                marginBottom: "0.35rem",
-              }}
-            >
-              Capital
-            </span>
-            <span style={{ fontSize: "1.35rem", fontWeight: 700, color: "var(--text)" }} aria-live="polite">
-              {formatMoneda(capitalAdmin)}
-            </span>
+        </section>
+
+        <section className="admin-inicio-block" aria-labelledby="admin-fin">
+          <h2 id="admin-fin" className="admin-inicio-section-label">
+            Posición financiera
+          </h2>
+          <div className="admin-inicio-grid-3">
+            <div className="admin-inicio-finance">
+              <div className="admin-inicio-finance-label">Base de capital</div>
+              <div className="admin-inicio-finance-value">{formatMoneda(cajaAdmin)}</div>
+              <p className="admin-inicio-finance-sub">Capital inicial</p>
+            </div>
+            <div className="admin-inicio-finance">
+              <div className="admin-inicio-finance-label">Capital actual</div>
+              <div className="admin-inicio-finance-value">{formatMoneda(capitalAdmin)}</div>
+            </div>
+            <div className="admin-inicio-finance">
+              <div className="admin-inicio-finance-label">Gastos registrados</div>
+              <div className="admin-inicio-finance-value">{stats.gastosRegistrados}</div>
+              <p className="admin-inicio-finance-sub">operativos este período</p>
+              <Link href="/dashboard/admin/gastos" className="admin-inicio-link-btn admin-inicio-link-btn--detail">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                  <polyline points="14 2 14 8 20 8" />
+                </svg>
+                revisar detalle
+              </Link>
+            </div>
           </div>
-          <div style={{ alignSelf: "center", justifySelf: "end", gridColumn: "1 / -1" }}>
-            <Link
-              href="/dashboard/admin/gestion-financiera"
-              style={{
-                fontSize: "0.875rem",
-                color: "var(--text-muted)",
-                textDecoration: "underline",
-                textUnderlineOffset: "2px",
-              }}
-            >
-              Ver gestión financiera
+        </section>
+
+        <section className="admin-inicio-block" aria-labelledby="admin-rutas-fin">
+          <div className="admin-inicio-rutas-head">
+            <h2 id="admin-rutas-fin" className="admin-inicio-section-label">
+              Rutas
+            </h2>
+            <Link href="/dashboard/admin/gestion-financiera" className="admin-inicio-rutas-link">
+              Gestión financiera
             </Link>
           </div>
-        </div>
-
-        <h3 style={{ marginTop: 0, marginBottom: "0.75rem" }}>Accesos rápidos</h3>
-        <ul
-          style={{
-            listStyle: "none",
-            margin: 0,
-            padding: 0,
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
-            gap: "0.5rem",
-          }}
-        >
-          {QUICK_LINKS.map((item) => (
-            <li key={item.href}>
-              <Link
-                href={item.href}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "0.75rem",
-                  padding: "0.75rem 1rem",
-                  borderRadius: "10px",
-                  background: "var(--card-bg)",
-                  border: "1px solid var(--card-border)",
-                  color: "var(--text)",
-                  textDecoration: "none",
-                  fontWeight: 500,
-                  transition: "background 0.15s, border-color 0.15s",
-                }}
-                className="admin-quick-link"
-              >
-                <span style={{ display: "flex", color: "#dc2626" }}>
-                  <QuickLinkIcon name={item.icon} />
-                </span>
-                {item.label}
-              </Link>
-            </li>
-          ))}
-        </ul>
+          {rutasOrdenadas.length === 0 ? (
+            <p className="admin-inicio-rutas-empty">No hay rutas registradas.</p>
+          ) : (
+            <div className="admin-inicio-rutas">
+              {rutasOrdenadas.map((r) => {
+                const g = r.ganancias ?? 0;
+                return (
+                  <article key={r.rutaId} className="admin-inicio-ruta-card">
+                    <header className="admin-inicio-ruta-card-head">
+                      <h3 className="admin-inicio-ruta-title">{r.nombre || "Sin nombre"}</h3>
+                      {r.ubicacion ? (
+                        <p className="admin-inicio-ruta-meta">{r.ubicacion}</p>
+                      ) : null}
+                    </header>
+                    <div className="admin-inicio-ruta-stats">
+                      <div className="admin-inicio-ruta-stat">
+                        <span className="admin-inicio-ruta-stat-icon admin-inicio-metric-icon--purple" aria-hidden>
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <rect x="2" y="7" width="20" height="14" rx="2" ry="2" />
+                            <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
+                          </svg>
+                        </span>
+                        <div className="admin-inicio-ruta-stat-body">
+                          <span className="admin-inicio-ruta-stat-label">Base</span>
+                          <span className="admin-inicio-ruta-stat-value">{formatMoneda(r.cajaRuta ?? 0)}</span>
+                          <span className="admin-inicio-ruta-stat-hint">caja en ruta</span>
+                        </div>
+                      </div>
+                      <div className="admin-inicio-ruta-stat">
+                        <span className="admin-inicio-ruta-stat-icon admin-inicio-metric-icon--violet" aria-hidden>
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+                          </svg>
+                        </span>
+                        <div className="admin-inicio-ruta-stat-body">
+                          <span className="admin-inicio-ruta-stat-label">Capital</span>
+                          <span className="admin-inicio-ruta-stat-value">{formatMoneda(r.capitalRuta ?? 0)}</span>
+                          <span className="admin-inicio-ruta-stat-hint">total ruta</span>
+                        </div>
+                      </div>
+                      <div className="admin-inicio-ruta-stat">
+                        <span className="admin-inicio-ruta-stat-icon admin-inicio-metric-icon--orange" aria-hidden>
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <circle cx="12" cy="12" r="10" />
+                            <line x1="12" y1="8" x2="12" y2="16" />
+                            <line x1="8" y1="12" x2="16" y2="12" />
+                          </svg>
+                        </span>
+                        <div className="admin-inicio-ruta-stat-body">
+                          <span className="admin-inicio-ruta-stat-label">Inversiones</span>
+                          <span className="admin-inicio-ruta-stat-value">{formatMoneda(r.inversion ?? 0)}</span>
+                          <span className="admin-inicio-ruta-stat-hint">acumulado</span>
+                        </div>
+                      </div>
+                      <div className="admin-inicio-ruta-stat">
+                        <span className="admin-inicio-ruta-stat-icon admin-inicio-metric-icon--green" aria-hidden>
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <polyline points="23 6 13.5 15.5 8.5 10.5 1 18" />
+                            <polyline points="17 6 23 6 23 12" />
+                          </svg>
+                        </span>
+                        <div className="admin-inicio-ruta-stat-body">
+                          <span className="admin-inicio-ruta-stat-label">Ganancias</span>
+                          <span
+                            className={`admin-inicio-ruta-stat-value ${
+                              g < 0 ? "admin-inicio-ruta-stat-value--neg" : g > 0 ? "admin-inicio-ruta-stat-value--pos" : ""
+                            }`}
+                          >
+                            {formatMoneda(g)}
+                          </span>
+                          <span className="admin-inicio-ruta-stat-hint">registradas</span>
+                        </div>
+                      </div>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          )}
+        </section>
       </div>
     </div>
   );

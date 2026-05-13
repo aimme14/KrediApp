@@ -34,8 +34,12 @@ const USERS_COLLECTION = "users";
 
 /** Evita pantalla infinita si Firestore no responde al leer el perfil. */
 const PROFILE_FETCH_TIMEOUT_MS = 15_000;
+/** Si Auth no emite estado (p. ej. IndexedDB bloqueado), destrabar la UI. */
+const AUTH_INIT_FAILSAFE_MS = 45_000;
 const PROFILE_TIMEOUT_MESSAGE =
   "La conexión tardó demasiado al cargar tu perfil. Comprueba tu internet, desactiva VPN o bloqueadores y recarga la página.";
+const AUTH_INIT_TIMEOUT_MESSAGE =
+  "No se pudo iniciar la sesión a tiempo. Recarga la página, prueba otro navegador o desactiva extensiones que bloqueen almacenamiento.";
 
 function profileFetchTimeoutError(): Error {
   const e = new Error("AUTH_PROFILE_TIMEOUT");
@@ -75,11 +79,16 @@ function getAuthErrorMessage(e: unknown): string {
 interface AuthState {
   user: User | null;
   profile: UserProfile | null;
-  loading: boolean;
+  /** Hasta que Firebase Auth emita el primer estado (sesión activa o no). */
+  authInitializing: boolean;
+  /** Lectura del perfil en Firestore tras tener sesión. */
+  profileLoading: boolean;
   error: string | null;
 }
 
 interface AuthContextValue extends AuthState {
+  /** true mientras no se puede usar el panel (auth o perfil pendientes). */
+  loading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   reauthWithPassword: (password: string) => Promise<void>;
@@ -202,20 +211,48 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<AuthState>({
     user: null,
     profile: null,
-    loading: true,
+    authInitializing: true,
+    profileLoading: false,
     error: null,
   });
 
   useEffect(() => {
     if (!auth) {
-      setState((s) => ({ ...s, loading: false }));
+      setState((s) => ({ ...s, authInitializing: false, profileLoading: false }));
       return;
     }
+    const failsafeId = window.setTimeout(() => {
+      setState((s) => {
+        if (!s.authInitializing) return s;
+        return {
+          user: null,
+          profile: null,
+          authInitializing: false,
+          profileLoading: false,
+          error: AUTH_INIT_TIMEOUT_MESSAGE,
+        };
+      });
+    }, AUTH_INIT_FAILSAFE_MS);
+
     const unsub = onAuthStateChanged(auth, async (user) => {
+      window.clearTimeout(failsafeId);
       if (!user) {
-        setState({ user: null, profile: null, loading: false, error: null });
+        setState({
+          user: null,
+          profile: null,
+          authInitializing: false,
+          profileLoading: false,
+          error: null,
+        });
         return;
       }
+      setState((s) => ({
+        ...s,
+        user,
+        authInitializing: false,
+        profileLoading: true,
+        error: null,
+      }));
       try {
         const profile = await new Promise<UserProfile | null>((resolve, reject) => {
           let settled = false;
@@ -238,7 +275,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               reject(err instanceof Error ? err : new Error(String(err)));
             });
         });
-        setState((s) => ({ ...s, user, profile, loading: false, error: null }));
+        setState((s) => ({
+          ...s,
+          user,
+          profile,
+          profileLoading: false,
+          error: null,
+        }));
         try {
           const idToken = await user.getIdToken();
           await fetch("/api/users/me/sync-claims", {
@@ -259,12 +302,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           ...s,
           user,
           profile: null,
-          loading: false,
+          profileLoading: false,
           error: message,
         }));
       }
     });
-    return () => unsub();
+    return () => {
+      window.clearTimeout(failsafeId);
+      unsub();
+    };
   }, []);
 
   /** Escucha cambios en el documento del usuario (p. ej. enabled) sin polling. */
@@ -346,7 +392,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = async () => {
     if (auth) await firebaseSignOut(auth);
-    setState({ user: null, profile: null, loading: false, error: null });
+    setState({
+      user: null,
+      profile: null,
+      authInitializing: false,
+      profileLoading: false,
+      error: null,
+    });
   };
 
   /** Re-autentica al usuario actual con su contraseña (p. ej. tras bloqueo por inactividad). */
@@ -366,8 +418,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [state.profile]
   );
 
+  const loading = state.authInitializing || state.profileLoading;
+
   const value: AuthContextValue = {
     ...state,
+    loading,
     signIn,
     signOut,
     reauthWithPassword,

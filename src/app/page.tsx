@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import LoginForm from "@/components/LoginForm";
 import ThemeToggle from "@/components/ThemeToggle";
@@ -18,6 +19,7 @@ function LoginFormSignOut() {
 
 export default function HomePage() {
   const { user, profile, loading, isEnabled, error } = useAuth();
+  const router = useRouter();
   const [showSlowHint, setShowSlowHint] = useState(false);
 
   useEffect(() => {
@@ -36,13 +38,12 @@ export default function HomePage() {
     if (loading) return;
     if (user && profile) {
       if (!isEnabled()) {
-        window.location.href = "/deshabilitado";
+        router.replace("/deshabilitado");
         return;
       }
-      window.location.href = "/dashboard";
-      return;
+      router.replace("/dashboard");
     }
-  }, [user, profile, loading, isEnabled]);
+  }, [user, profile, loading, isEnabled, router]);
 
   if (loading) {
     return (

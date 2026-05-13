@@ -14,6 +14,7 @@ import {
 } from "@/lib/empresa-api";
 import { formatMontoEnteroInput } from "@/lib/monto-input-es";
 import { formatoFechaGastoColombia } from "@/lib/colombia-day-bounds";
+import { MiniChart } from "@/components/admin/MiniChart";
 
 function formatMoneda(value: number): string {
   const hasDecimals = Math.round(value * 100) % 100 !== 0;
@@ -622,30 +623,5 @@ export default function GestionFinancieraPage() {
         </div>
       )}
     </>
-  );
-}
-
-function MiniChart({ points }: { points: number[] }) {
-  if (points.length === 0) return null;
-  const max = Math.max(...points, 1);
-  const min = Math.min(...points, 0);
-  const range = max - min || 1;
-  const w = 200;
-  const h = 64;
-  const padding = 4;
-  const xs = points.map((_, i) => padding + (i / Math.max(points.length - 1, 1)) * (w - 2 * padding));
-  const ys = points.map((v) => h - padding - ((v - min) / range) * (h - 2 * padding));
-  const pathD = xs.map((x, i) => `${i === 0 ? "M" : "L"} ${x} ${ys[i]}`).join(" ");
-  return (
-    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} className="gf-mini-chart-svg">
-      <path
-        d={pathD}
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
   );
 }

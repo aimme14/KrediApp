@@ -20,13 +20,15 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { user, profile, loading, isEnabled } = useAuth();
+  const { user, profile, loading, authInitializing, profileLoading, error, isEnabled } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
   const [headerLeftSlot, setHeaderLeftSlot] = useState<ReactNode>(null);
   const [empresa, setEmpresa] = useState<EmpresaProfile | null>(null);
 
   const isGastosPage = pathname?.includes("/gastos") ?? false;
+  /** Panel admin: sin tope de 720px para usar todo el ancho del navegador */
+  const isAdminFluid = pathname?.startsWith("/dashboard/admin") ?? false;
   const isJefe = profile?.role === "jefe";
   const isTrabajador = profile?.role === "trabajador";
   const isAdmin = profile?.role === "admin";
@@ -55,9 +57,17 @@ export default function DashboardLayout({
   }, [empresaDocId]);
 
   if (loading) {
+    const msg = authInitializing
+      ? "Conectando con tu cuenta…"
+      : profileLoading
+        ? "Cargando tu perfil desde el servidor…"
+        : "Cargando…";
     return (
       <div className="container" style={{ paddingTop: "4rem", textAlign: "center" }}>
-        <p>Cargando...</p>
+        <p>{msg}</p>
+        <p style={{ color: "var(--text-muted)", fontSize: "0.875rem", marginTop: "1rem", maxWidth: "28rem", marginInline: "auto" }}>
+          Tras iniciar sesión, la primera carga puede tardar unos segundos. Si supera un minuto, revisa tu conexión o recarga la página.
+        </p>
       </div>
     );
   }
@@ -72,8 +82,11 @@ export default function DashboardLayout({
 
   if (!profile) {
     return (
-      <div className="container" style={{ paddingTop: "4rem", textAlign: "center" }}>
+      <div className="container" style={{ paddingTop: "4rem", textAlign: "center", maxWidth: "24rem", marginInline: "auto" }}>
         <p>Comprobando tu cuenta…</p>
+        {error?.trim() ? (
+          <p style={{ color: "var(--danger, #c94a4a)", marginTop: "1rem", fontSize: "0.9rem" }}>{error}</p>
+        ) : null}
       </div>
     );
   }
@@ -88,7 +101,9 @@ export default function DashboardLayout({
       <GastoFcmCampanitaProvider>
         <AdminFcmForegroundListener />
         <DashboardHeaderProvider value={setHeaderLeftSlot}>
-          <div className={`container container-dashboard${isGastosPage ? " dashboard-page-gastos" : ""}`}>
+          <div
+            className={`container container-dashboard${isGastosPage ? " dashboard-page-gastos" : ""}${isAdminFluid ? " container-dashboard--fluid" : ""}`}
+          >
             <header className="dashboard-header">
               <div className="header-left">
                 {headerLeftSlot}

@@ -94,6 +94,20 @@ button {
   max-width: 960px;
 }
 
+/* Panel administrador: aprovechar todo el ancho (sidebar + contenido) */
+.container.container-dashboard.container-dashboard--fluid {
+  max-width: none;
+  width: 100%;
+  margin-left: 0;
+  margin-right: 0;
+  padding-left: clamp(0.75rem, 2.2vw, 2rem);
+  padding-right: clamp(0.75rem, 2.2vw, 2rem);
+}
+
+.container.container-dashboard.container-dashboard--fluid.dashboard-page-gastos {
+  max-width: none;
+}
+
 @media (max-width: 768px) {
   .container {
     padding: 1rem;
@@ -1394,6 +1408,47 @@ th {
   min-width: 0;
 }
 
+/* Marca krediapp (solo la inserta el layout admin vía slot) */
+.dashboard-header-krediapp {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-right: 0.1rem;
+  padding: 0.12rem 0.4rem 0.12rem 0.12rem;
+  border-radius: 10px;
+  text-decoration: none;
+  color: var(--text);
+  flex-shrink: 0;
+  transition: background 0.15s;
+}
+
+.dashboard-header-krediapp:hover {
+  background: var(--btn-secondary-hover);
+}
+
+.dashboard-header-krediapp-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--admin-sidebar-accent, #a78bfa) 22%, transparent);
+  color: var(--admin-sidebar-accent, #a78bfa);
+}
+
+.dashboard-header-krediapp-text {
+  font-weight: 700;
+  font-size: 0.95rem;
+  letter-spacing: -0.02em;
+}
+
+@media (max-width: 520px) {
+  .dashboard-header-krediapp-text {
+    display: none;
+  }
+}
+
 .dashboard-header .header-right {
   display: flex;
   align-items: center;
@@ -2227,6 +2282,599 @@ th {
 
 .jefe-main {
   padding-bottom: 2rem;
+}
+
+/* ——— Panel administrador: sidebar fija (escritorio) + drawer (móvil) ——— */
+.admin-shell {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  gap: 1.5rem;
+  min-height: calc(100dvh - 6.25rem);
+}
+
+.admin-sidebar {
+  --admin-sidebar-accent: #a78bfa;
+  --admin-sidebar-accent-dim: rgba(167, 139, 250, 0.22);
+  --admin-sidebar-surface: color-mix(in srgb, var(--card-bg) 88%, #1e1035 12%);
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 100;
+  width: min(280px, 88vw);
+  max-width: 280px;
+  height: 100%;
+  max-height: 100dvh;
+  background: var(--admin-sidebar-surface);
+  border-right: 1px solid color-mix(in srgb, var(--card-border) 70%, #4c1d95 30%);
+  border-radius: 0 18px 18px 0;
+  box-shadow: 6px 0 28px rgba(0, 0, 0, 0.2);
+  transform: translateX(-102%);
+  transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.admin-sidebar-open {
+  transform: translateX(0);
+}
+
+.admin-sidebar-inner {
+  flex: 1;
+  min-height: 0;
+  padding: 1.1rem 0 1.25rem;
+  padding-top: max(1.1rem, env(safe-area-inset-top));
+  padding-bottom: max(1.25rem, env(safe-area-inset-bottom));
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+}
+
+.admin-nav-section {
+  margin-top: 0.85rem;
+}
+
+.admin-nav-section:first-of-type {
+  margin-top: 0.15rem;
+}
+
+.admin-nav-heading {
+  display: block;
+  padding: 0.35rem 1.15rem 0.45rem;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  opacity: 0.85;
+}
+
+.admin-nav-link {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.65rem 1rem 0.65rem 1.15rem;
+  margin: 0 0.45rem;
+  border-radius: 12px;
+  color: var(--text);
+  text-decoration: none;
+  font-weight: 500;
+  font-size: 0.9rem;
+  transition: background 0.15s, color 0.15s;
+  border: none;
+  width: calc(100% - 0.9rem);
+  text-align: left;
+  background: transparent;
+  cursor: pointer;
+}
+
+.admin-nav-link:hover {
+  background: color-mix(in srgb, var(--admin-sidebar-accent) 12%, transparent);
+}
+
+.admin-nav-link-active {
+  background: var(--admin-sidebar-accent-dim);
+  color: var(--admin-sidebar-accent);
+}
+
+.admin-nav-icon-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--text-muted) 10%, transparent);
+  color: var(--text-muted);
+}
+
+.admin-nav-link-active .admin-nav-icon-wrap {
+  background: color-mix(in srgb, var(--admin-sidebar-accent) 28%, transparent);
+  color: var(--admin-sidebar-accent);
+}
+
+.admin-nav-label {
+  flex: 1;
+  min-width: 0;
+}
+
+.admin-nav-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.35rem;
+  height: 1.35rem;
+  padding: 0 0.35rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  background: color-mix(in srgb, #f97316 35%, var(--card-bg));
+  color: var(--text);
+  border: 1px solid color-mix(in srgb, #f97316 55%, transparent);
+}
+
+.admin-shell-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 99;
+  background: rgba(0, 0, 0, 0.45);
+  border: none;
+  cursor: pointer;
+  padding: 0;
+}
+
+.admin-shell-main {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  width: 100%;
+  padding-bottom: 2rem;
+  display: flex;
+  flex-direction: column;
+}
+
+@media (min-width: 901px) {
+  .admin-sidebar {
+    position: sticky;
+    top: 0.5rem;
+    align-self: stretch;
+    min-height: calc(100dvh - 6.25rem);
+    max-height: none;
+    transform: none !important;
+    border-radius: 16px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+    flex-shrink: 0;
+  }
+
+  .admin-shell-backdrop {
+    display: none !important;
+  }
+
+  .admin-shell-hamburger {
+    display: none !important;
+  }
+
+  .admin-shell-main {
+    padding-bottom: 2.5rem;
+  }
+}
+
+/* Inicio admin: secciones apiladas, tarjetas con icono (maqueta panel) */
+.admin-inicio {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.admin-inicio--fill {
+  flex: 1;
+  min-height: 0;
+  padding-bottom: 0.5rem;
+}
+
+.admin-inicio-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+  min-height: 0;
+}
+
+.admin-inicio-block {
+  min-width: 0;
+}
+
+.admin-inicio--fill .admin-inicio-metric {
+  padding: 0.75rem 0.85rem;
+}
+
+.admin-inicio--fill .admin-inicio-finance {
+  padding: 0.75rem 0.9rem;
+}
+
+.admin-inicio--fill .admin-inicio-metric-value {
+  font-size: 1.35rem;
+}
+
+.admin-inicio--fill .admin-inicio-finance-value {
+  font-size: 1.2rem;
+}
+
+.admin-inicio-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.admin-inicio-title {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text);
+}
+
+.admin-inicio-date {
+  margin: 0.1rem 0 0;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.admin-inicio-section-label {
+  margin: 0 0 0.5rem;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.admin-inicio-grid-4 {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.65rem;
+}
+
+@media (max-width: 960px) {
+  .admin-inicio-grid-4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 520px) {
+  .admin-inicio-grid-4 {
+    grid-template-columns: 1fr;
+  }
+}
+
+.admin-inicio-metric {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.6rem;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 12px;
+  padding: 0.55rem 0.65rem;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04) inset;
+}
+
+[data-theme="dark"] .admin-inicio-metric,
+[data-theme="dark"] .admin-inicio-finance {
+  background: color-mix(in srgb, var(--card-bg) 92%, #6366f1 8%);
+  border-color: color-mix(in srgb, var(--card-border) 85%, #4c1d95 15%);
+}
+
+.admin-inicio-metric-main {
+  min-width: 0;
+  flex: 1;
+}
+
+.admin-inicio-metric-icon {
+  flex-shrink: 0;
+  width: 2.35rem;
+  height: 2.35rem;
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fafafa;
+}
+
+.admin-inicio-metric-icon--purple {
+  background: linear-gradient(145deg, #6366f1 0%, #4338ca 100%);
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.35);
+}
+
+.admin-inicio-metric-icon--violet {
+  background: linear-gradient(145deg, #8b5cf6 0%, #6d28d9 100%);
+  box-shadow: 0 2px 8px rgba(139, 92, 246, 0.35);
+}
+
+.admin-inicio-metric-icon--orange {
+  background: linear-gradient(145deg, #fb923c 0%, #c2410c 100%);
+  box-shadow: 0 2px 8px rgba(251, 146, 60, 0.35);
+}
+
+.admin-inicio-metric-icon--red {
+  background: linear-gradient(145deg, #f87171 0%, #b91c1c 100%);
+  box-shadow: 0 2px 8px rgba(248, 113, 113, 0.3);
+}
+
+.admin-inicio-metric-icon--green {
+  background: linear-gradient(145deg, #4ade80 0%, #15803d 100%);
+  box-shadow: 0 2px 8px rgba(74, 222, 128, 0.3);
+}
+
+.admin-inicio-metric-label {
+  display: block;
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 0.2rem;
+  line-height: 1.2;
+}
+
+.admin-inicio-metric-value {
+  font-size: 1.2rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: var(--text);
+  line-height: 1.05;
+}
+
+.admin-inicio-metric-sub {
+  display: block;
+  margin-top: 0.2rem;
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  line-height: 1.25;
+}
+
+.admin-inicio-grid-3 {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.65rem;
+}
+
+@media (max-width: 900px) {
+  .admin-inicio-grid-3 {
+    grid-template-columns: 1fr;
+  }
+}
+
+.admin-inicio-finance {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 12px;
+  padding: 0.55rem 0.65rem;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04) inset;
+  display: flex;
+  flex-direction: column;
+  min-height: 5.5rem;
+}
+
+.admin-inicio-finance-label {
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 0.2rem;
+}
+
+.admin-inicio-finance-value {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: var(--text);
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+}
+
+.admin-inicio-finance-sub {
+  margin-top: 0.2rem;
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  line-height: 1.25;
+}
+
+.admin-inicio-link-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: auto;
+  padding: 0;
+  border: none;
+  background: none;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--admin-sidebar-accent, #a78bfa);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.admin-inicio-link-btn--detail {
+  color: #fb923c;
+}
+
+.admin-inicio-link-btn--detail:hover {
+  color: #fdba74;
+}
+
+a.admin-inicio-link-btn {
+  text-decoration: underline;
+}
+
+/* Inicio admin: bloque por ruta (base, capital, inversiones, ganancias) */
+.admin-inicio-rutas-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.15rem;
+}
+
+.admin-inicio-rutas-head .admin-inicio-section-label {
+  margin-bottom: 0;
+}
+
+.admin-inicio-rutas-link {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--link);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.admin-inicio-rutas-link:hover {
+  text-decoration: underline;
+}
+
+.admin-inicio-rutas-empty {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.admin-inicio-rutas {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.admin-inicio-ruta-card {
+  margin: 0;
+  padding: 0.9rem 1rem;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 12px;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04) inset;
+}
+
+[data-theme="dark"] .admin-inicio-ruta-card {
+  background: color-mix(in srgb, var(--card-bg) 92%, #6366f1 8%);
+  border-color: color-mix(in srgb, var(--card-border) 85%, #4c1d95 15%);
+}
+
+.admin-inicio-ruta-card-head {
+  margin-bottom: 0.75rem;
+}
+
+.admin-inicio-ruta-title {
+  margin: 0;
+  font-size: 1.02rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text);
+  line-height: 1.2;
+}
+
+.admin-inicio-ruta-meta {
+  margin: 0.2rem 0 0;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  line-height: 1.3;
+}
+
+.admin-inicio-ruta-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.6rem;
+  align-items: stretch;
+}
+
+@media (max-width: 960px) {
+  .admin-inicio-ruta-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 520px) {
+  .admin-inicio-ruta-stats {
+    grid-template-columns: 1fr;
+  }
+}
+
+.admin-inicio-ruta-stat {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 0.55rem;
+  min-width: 0;
+  padding: 0.6rem 0.65rem;
+  background: var(--input-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+}
+
+.admin-inicio-ruta-stat-icon {
+  flex-shrink: 0;
+  width: 2.05rem;
+  height: 2.05rem;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fafafa;
+}
+
+.admin-inicio-ruta-stat-body {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.admin-inicio-ruta-stat-label {
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  line-height: 1.2;
+}
+
+.admin-inicio-ruta-stat-value {
+  margin-top: 0.2rem;
+  font-size: 0.92rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--text);
+  line-height: 1.15;
+  word-break: break-word;
+  width: 100%;
+}
+
+.admin-inicio-ruta-stat-value--pos {
+  color: #86efac;
+}
+
+.admin-inicio-ruta-stat-value--neg {
+  color: #fda4af;
+}
+
+[data-theme="light"] .admin-inicio-ruta-stat-value--pos {
+  color: #15803d;
+}
+
+[data-theme="light"] .admin-inicio-ruta-stat-value--neg {
+  color: #b91c1c;
+}
+
+.admin-inicio-ruta-stat-hint {
+  margin-top: 0.15rem;
+  font-size: 0.62rem;
+  color: var(--text-muted);
+  line-height: 1.2;
 }
 
 /* Barra de navegación inferior (trabajador) — solo en móvil */
