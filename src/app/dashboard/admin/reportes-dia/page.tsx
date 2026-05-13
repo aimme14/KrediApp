@@ -468,7 +468,7 @@ export default function ReportesDiaPage() {
                     <li>Base asignada hoy: {formatMonto(previewSnapshot.totalBaseAsignadaDia)}</li>
                     <li>Gastos del día: {formatMonto(previewSnapshot.totalGastosDia)}</li>
                     <li>
-                      Préstamos desde tu caja:{" "}
+                      Préstamos:{" "}
                       {formatMonto(previewSnapshot.totalPrestamosDesembolsoDia ?? 0)}
                     </li>
                     <li>

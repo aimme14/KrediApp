@@ -10,7 +10,6 @@ import {
 } from "@/lib/monto-input-es";
 import { uploadImage, IMAGE_ACCEPT, getImageAccept } from "@/lib/storage";
 import {
-  fechaDiaCalendarioDesdeISO,
   fechaDiaColombiaHoy,
   formatoFechaGastoColombia,
 } from "@/lib/colombia-day-bounds";
@@ -145,12 +144,6 @@ export default function GastosTrabajadorPage() {
     const timeB = new Date(b.fecha ?? 0).getTime();
     return timeB - timeA;
   });
-
-  const isHoy = (fechaIso: string | number | null | undefined) =>
-    fechaDiaCalendarioDesdeISO(
-      fechaIso !== null && fechaIso !== undefined ? String(fechaIso) : null
-    ) === fechaDiaColombiaHoy();
-  const totalDelDia = gastosOrdenados.filter((g) => isHoy(g.fecha)).reduce((sum, g) => sum + (g.monto ?? 0), 0);
 
   const loadGastos = useCallback(async () => {
     if (!user) return;
@@ -438,15 +431,9 @@ export default function GastosTrabajadorPage() {
         <div className="card-header-row gastos-card-header">
           <h3 style={{ marginTop: 0 }}>Historial de gastos</h3>
           <div className="gastos-header-actions">
-            {!loading && gastos.length > 0 && (
-              <div className="gastos-total-box" aria-live="polite">
-                <span className="gastos-total-label">Total del día</span>
-                <span className="gastos-total-value">{formatMoneda(totalDelDia)}</span>
-              </div>
-            )}
             <button
               type="button"
-              className="btn btn-primary"
+              className="btn btn-primary gastos-btn-nuevo"
               onClick={() => setShowForm((v) => !v)}
               aria-label={showForm ? "Cerrar formulario" : "Nuevo gasto"}
               title={showForm ? "Cerrar" : "Nuevo gasto"}

@@ -209,7 +209,7 @@ export default function CajaDelDiaPage() {
                     valor={formatMonto(data.tuCajaDelDia ?? tuCajaDelDiaDesdeTotales(data))}
                   />
                   <TarjetaResumen
-                    etiqueta={`Total cobrado en la ruta (${data.fechaDia})`}
+                    etiqueta={`Total cobrado (${data.fechaDia})`}
                     valor={formatMonto(data.totalCobrosLista)}
                   />
                   <TarjetaResumen
@@ -217,7 +217,7 @@ export default function CajaDelDiaPage() {
                     valor={formatMonto(data.totalGastosDia)}
                   />
                   <TarjetaResumen
-                    etiqueta={`Préstamos desde tu caja (${data.fechaDia})`}
+                    etiqueta={`Préstamos (${data.fechaDia})`}
                     valor={formatMonto(data.totalPrestamosDesembolsoDia ?? 0)}
                   />
                   <TarjetaResumen
@@ -227,22 +227,11 @@ export default function CajaDelDiaPage() {
                 </div>
 
                 <h3 style={{ fontSize: "1.05rem", marginBottom: "0.5rem" }}>
-                  Préstamos otorgados (tu caja)
+                  Préstamos
                 </h3>
-                <p
-                  style={{
-                    marginBottom: "0.5rem",
-                    fontSize: "0.8125rem",
-                    color: "var(--text-muted)",
-                    lineHeight: 1.45,
-                  }}
-                >
-                  Dinero desembolsado al crear préstamos con tu base (no aplica si el admin cargó el préstamo a
-                  la caja de la ruta).
-                </p>
                 {(data.prestamosDesembolsoDelDia ?? []).length === 0 ? (
                   <p style={{ color: "var(--text-muted)", marginBottom: "1.25rem" }}>
-                    No hay préstamos desde tu caja para esta fecha.
+                    No hay préstamos para esta fecha.
                   </p>
                 ) : (
                   <div className="table-wrap table-wrap-caja-dia" style={{ marginBottom: "1.25rem" }}>
@@ -407,7 +396,6 @@ export default function CajaDelDiaPage() {
               lineHeight: 1.45,
             }}
           >
-            Visitas donde registraste «No pagó» en Cobrar (misma fecha y tu usuario).
           </p>
           {(data.noPagos ?? []).length === 0 ? (
             <p style={{ color: "var(--text-muted)" }}>
