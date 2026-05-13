@@ -3508,6 +3508,20 @@ th {
   min-height: 5.5rem;
 }
 
+.admin-inicio-finance-head {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.admin-inicio-finance-main {
+  min-width: 0;
+  flex: 1;
+}
+
 .admin-inicio-finance-label {
   font-size: 0.58rem;
   font-weight: 700;

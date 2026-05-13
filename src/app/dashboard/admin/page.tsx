@@ -9,7 +9,6 @@ import {
   listRutas,
   listClientes,
   listPrestamos,
-  listGastos,
   type ResumenRutaItem,
 } from "@/lib/empresa-api";
 
@@ -37,7 +36,6 @@ type Stats = {
   clientes: number;
   prestamosActivos: number;
   morosos: number;
-  gastosRegistrados: number;
 };
 
 export default function AdminDashboardPage() {
@@ -50,7 +48,6 @@ export default function AdminDashboardPage() {
     clientes: 0,
     prestamosActivos: 0,
     morosos: 0,
-    gastosRegistrados: 0,
   });
   const [cajaAdmin, setCajaAdmin] = useState(0);
   const [capitalAdmin, setCapitalAdmin] = useState(0);
@@ -76,6 +73,11 @@ export default function AdminDashboardPage() {
     );
   }, [rutasResumen]);
 
+  /** Misma magnitud que la tarjeta "Ganancias" de cada ruta (`getResumenEconomico`). */
+  const gananciasTotalesRegistradas = useMemo(() => {
+    return rutasResumen.reduce((sum, r) => sum + (r.ganancias ?? 0), 0);
+  }, [rutasResumen]);
+
   useEffect(() => {
     if (!user || !profile || profile.role !== "admin") return;
     let cancelled = false;
@@ -83,16 +85,14 @@ export default function AdminDashboardPage() {
     const load = async () => {
       try {
         const token = await user.getIdToken();
-        const [rutas, clientes, prestamos, clientesMorosos, gastos, caja, resumen] =
-          await Promise.all([
-            listRutas(token),
-            listClientes(token),
-            listPrestamos(token),
-            listClientes(token, undefined, { moroso: true }),
-            listGastos(token),
-            getCajaAdmin(token),
-            getResumenEconomico(token),
-          ]);
+        const [rutas, clientes, prestamos, clientesMorosos, caja, resumen] = await Promise.all([
+          listRutas(token),
+          listClientes(token),
+          listPrestamos(token),
+          listClientes(token, undefined, { moroso: true }),
+          getCajaAdmin(token),
+          getResumenEconomico(token),
+        ]);
         if (cancelled) return;
         const activos = prestamos.filter((p) => p.estado !== "pagado");
         const programadas = rutas.length;
@@ -103,7 +103,6 @@ export default function AdminDashboardPage() {
           clientes: clientes.length,
           prestamosActivos: activos.length,
           morosos: clientesMorosos.length,
-          gastosRegistrados: gastos.length,
         });
         setCajaAdmin(caja);
         setCapitalAdmin(resumen.capitalAdmin ?? 0);
@@ -136,7 +135,7 @@ export default function AdminDashboardPage() {
     <div className="admin-inicio admin-inicio--fill">
       <header className="admin-inicio-head">
         <div>
-          <h1 className="admin-inicio-title">Bienvenido ({nombreBienvenida})</h1>
+          <h1 className="admin-inicio-title">Bienvenido {nombreBienvenida}</h1>
           <p className="admin-inicio-date">{fechaTitulo}</p>
         </div>
       </header>
@@ -223,23 +222,35 @@ export default function AdminDashboardPage() {
             <div className="admin-inicio-finance">
               <div className="admin-inicio-finance-label">Base de capital</div>
               <div className="admin-inicio-finance-value">{formatMoneda(cajaAdmin)}</div>
-              <p className="admin-inicio-finance-sub">Capital inicial</p>
+              <p className="admin-inicio-finance-sub"></p>
             </div>
             <div className="admin-inicio-finance">
               <div className="admin-inicio-finance-label">Capital actual</div>
               <div className="admin-inicio-finance-value">{formatMoneda(capitalAdmin)}</div>
             </div>
             <div className="admin-inicio-finance">
-              <div className="admin-inicio-finance-label">Gastos registrados</div>
-              <div className="admin-inicio-finance-value">{stats.gastosRegistrados}</div>
-              <p className="admin-inicio-finance-sub">operativos este período</p>
-              <Link href="/dashboard/admin/gastos" className="admin-inicio-link-btn admin-inicio-link-btn--detail">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                  <polyline points="14 2 14 8 20 8" />
-                </svg>
-                revisar detalle
-              </Link>
+              <div className="admin-inicio-finance-head">
+                <div className="admin-inicio-finance-main">
+                  <div className="admin-inicio-finance-label">Ganancias</div>
+                  <div
+                    className={`admin-inicio-finance-value ${
+                      gananciasTotalesRegistradas < 0
+                        ? "admin-inicio-ruta-stat-value--neg"
+                        : gananciasTotalesRegistradas > 0
+                          ? "admin-inicio-ruta-stat-value--pos"
+                          : ""
+                    }`}
+                  >
+                    {formatMoneda(gananciasTotalesRegistradas)}
+                  </div>
+                </div>
+                <span className="admin-inicio-metric-icon admin-inicio-metric-icon--green" aria-hidden>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <polyline points="23 6 13.5 15.5 8.5 10.5 1 18" />
+                    <polyline points="17 6 23 6 23 12" />
+                  </svg>
+                </span>
+              </div>
             </div>
           </div>
         </section>
