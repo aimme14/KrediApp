@@ -35,32 +35,37 @@ export interface AdminFinanciero {
   ultimaActualizacion: Timestamp;
 }
 
-// ── Cierre mensual ───────────────────
-/** Snapshot por ruta en un cierre. */
-export interface CierreRutaSnapshot {
+// ── Periodo contable admin (apertura / cierre, no ligado a calendario) ───────
+
+/** Snapshot por ruta en apertura o cierre de periodo (sin desglose empleado en UI). */
+export interface PeriodoContableRutaSnapshot {
   rutaId: string;
   nombre: string;
   cajaRuta: number;
-  cajasEmpleados: number;
   inversiones: number;
   ganancias: number;
   perdidas: number;
   gastos: number;
+  capitalRuta: number;
   utilidad: number;
-  capitalTotal: number;
 }
 
-/** Documento empresas/{empresaId}/cierresMensuales/{periodo}. periodo = "YYYY-MM" */
-export interface CierreMensual {
-  periodo: string;
-  fechaCierre: Timestamp;
-  rutas: CierreRutaSnapshot[];
-  cajaEmpresa?: number;
-  gastosEmpresa?: number;
-  capitalEmpresa?: number;
-  /** Suma de capitalAdmin de todos los administradores */
-  capitalAsignadoAdmins?: number;
-  utilidadGlobal?: number;
+/** Documento empresas/{empresaId}/periodosAdmin/{id} */
+export interface PeriodoContableAdmin {
+  adminId: string;
+  estado: "abierto" | "cerrado";
+  fechaApertura: Timestamp;
+  fechaCierre?: Timestamp | null;
+  abiertoPorUid: string;
+  cerradoPorUid?: string | null;
+  apertura: {
+    admin: { cajaAdmin: number; capitalAdmin: number };
+    rutas: PeriodoContableRutaSnapshot[];
+  };
+  cierre?: {
+    admin: { cajaAdmin: number; capitalAdmin: number };
+    rutas: PeriodoContableRutaSnapshot[];
+  } | null;
 }
 
 // ── Ruta ──────────────────────────────

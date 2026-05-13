@@ -53,8 +53,8 @@ export const CAPITAL_BRANCH_DOC_ID = "root";
 /** Subcolección de snapshots de capital por ruta (bajo capital/root). */
 export const CAPITAL_RUTAS_SUBCOLLECTION = "rutas";
 
-/** Subcolección de cierres mensuales: empresas/{empresaId}/cierresMensuales/{periodo} */
-export const CIERRES_MENSUALES_SUBCOLLECTION = "cierresMensuales";
+/** Periodos contables por admin (apertura/cierre): empresas/{empresaId}/periodosAdmin/{id} */
+export const PERIODOS_ADMIN_SUBCOLLECTION = "periodosAdmin";
 
 /**
  * Historial de traspasos caja admin → caja ruta.

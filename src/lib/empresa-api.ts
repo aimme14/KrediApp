@@ -960,66 +960,108 @@ export async function setClienteMoroso(
   if (!res.ok) throw new Error(data.error ?? "Error al actualizar cliente");
 }
 
-// ── Cierres mensuales ───────────────────────────────────────────────────────
+// ── Periodos contables (admin: apertura / cierre) ───────────────────────────
 
-export type CierreRutaSnapshot = {
+export type PeriodoAdminSnapshotAdmin = {
+  cajaAdmin: number;
+  capitalAdmin: number;
+};
+
+export type PeriodoAdminSnapshotRuta = {
   rutaId: string;
   nombre: string;
   cajaRuta: number;
-  cajasEmpleados: number;
   inversiones: number;
   ganancias: number;
   perdidas: number;
   gastos: number;
+  capitalRuta: number;
   utilidad: number;
-  capitalTotal: number;
 };
 
-export type CierreMensualItem = {
-  periodo: string;
+export type PeriodoAdminSnapshot = {
+  admin: PeriodoAdminSnapshotAdmin;
+  rutas: PeriodoAdminSnapshotRuta[];
+};
+
+export type PeriodoAdminListaItem = {
+  id: string;
+  estado: "abierto" | "cerrado";
+  fechaApertura: string | null;
   fechaCierre: string | null;
-  utilidadGlobal?: number;
-  rutasCount?: number;
+  abiertoPorUid: string;
+  cerradoPorUid: string | null;
 };
 
-export type CierreMensualDetalle = {
-  periodo: string;
-  fechaCierre: string | null;
-  rutas: CierreRutaSnapshot[];
-  cajaEmpresa?: number;
-  gastosEmpresa?: number;
-  capitalEmpresa?: number;
-  capitalAsignadoAdmins?: number;
-  utilidadGlobal?: number;
+export type PeriodoAdminDetalle = PeriodoAdminListaItem & {
+  apertura: PeriodoAdminSnapshot | null;
+  cierre: PeriodoAdminSnapshot | null;
 };
 
-export async function getCierresMensuales(token: string): Promise<CierreMensualItem[]> {
-  const res = await fetchWithAuth("/api/empresa/cierres", token);
+export async function listPeriodosAdmin(token: string): Promise<PeriodoAdminListaItem[]> {
+  const res = await fetchWithAuth("/api/empresa/periodos-admin", token);
   const data = await res.json();
-  if (!res.ok) throw new Error(data.error ?? "Error al cargar cierres");
-  return data.cierres ?? [];
+  if (!res.ok) throw new Error(data.error ?? "Error al cargar periodos");
+  return data.periodos ?? [];
 }
 
-export async function getCierreMensual(
-  token: string,
-  periodo: string
-): Promise<CierreMensualDetalle> {
-  const res = await fetchWithAuth(`/api/empresa/cierres?periodo=${encodeURIComponent(periodo)}`, token);
+export async function getPeriodoAdmin(token: string, periodoId: string): Promise<PeriodoAdminDetalle> {
+  const res = await fetchWithAuth(`/api/empresa/periodos-admin/${encodeURIComponent(periodoId)}`, token);
   const data = await res.json();
-  if (!res.ok) throw new Error(data.error ?? "Error al cargar cierre");
-  return data;
+  if (!res.ok) throw new Error(data.error ?? "Error al cargar periodo");
+  return data as PeriodoAdminDetalle;
 }
 
-export async function crearCierreMensual(
-  token: string,
-  periodo?: string
-): Promise<{ periodo: string; fechaCierre: string; utilidadGlobal: number; rutasCount: number }> {
-  const res = await fetchWithAuth("/api/empresa/cierres", token, {
+export async function abrirPeriodoAdmin(
+  token: string
+): Promise<{ id: string; estado: string; fechaApertura: string | null; apertura: PeriodoAdminSnapshot }> {
+  const res = await fetchWithAuth("/api/empresa/periodos-admin/abrir", token, {
     method: "POST",
-    body: JSON.stringify(periodo ? { periodo } : {}),
     headers: { "Content-Type": "application/json" },
+    body: "{}",
   });
   const data = await res.json();
-  if (!res.ok) throw new Error(data.error ?? "Error al crear cierre");
+  if (!res.ok) throw new Error(data.error ?? "Error al abrir periodo");
   return data;
+}
+
+export async function cerrarPeriodoAdmin(
+  token: string
+): Promise<{
+  id: string;
+  estado: string;
+  fechaApertura: string | null;
+  fechaCierre: string | null;
+  apertura: PeriodoAdminSnapshot;
+  cierre: PeriodoAdminSnapshot;
+}> {
+  const res = await fetchWithAuth("/api/empresa/periodos-admin/cerrar", token, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: "{}",
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error ?? "Error al cerrar periodo");
+  return data;
+}
+
+/** Descarga el PDF comparativo (apertura | cierre). Solo periodos ya cerrados; si no, la API responde 400. */
+export async function downloadPeriodoAdminPdf(token: string, periodoId: string, filename?: string): Promise<void> {
+  const res = await fetch(`/api/empresa/periodos-admin/${encodeURIComponent(periodoId)}/pdf`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: "application/pdf",
+    },
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error((data as { error?: string }).error ?? "Error al generar PDF");
+  }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename ?? `periodo-admin-${periodoId}.pdf`;
+  a.click();
+  URL.revokeObjectURL(url);
 }

@@ -1,186 +1,210 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useAuth } from "@/context/AuthContext";
 import {
-  getResumenEconomico,
-  getCierresMensuales,
-  getCierreMensual,
-  crearCierreMensual,
-  type ResumenRutaItem,
-  type CierreMensualItem,
-  type CierreMensualDetalle,
+  listPeriodosAdmin,
+  getPeriodoAdmin,
+  abrirPeriodoAdmin,
+  cerrarPeriodoAdmin,
+  downloadPeriodoAdminPdf,
+  type PeriodoAdminListaItem,
+  type PeriodoAdminDetalle,
+  type PeriodoAdminSnapshot,
+  type PeriodoAdminSnapshotRuta,
 } from "@/lib/empresa-api";
+
+function mergeRutaIds(ap: PeriodoAdminSnapshot | null, ci: PeriodoAdminSnapshot | null): string[] {
+  const ids = new Set<string>();
+  if (ap) for (const r of ap.rutas) ids.add(r.rutaId);
+  if (ci) for (const r of ci.rutas) ids.add(r.rutaId);
+  const mapA = ap ? new Map(ap.rutas.map((r) => [r.rutaId, r])) : new Map<string, PeriodoAdminSnapshotRuta>();
+  const mapC = ci ? new Map(ci.rutas.map((r) => [r.rutaId, r])) : new Map<string, PeriodoAdminSnapshotRuta>();
+  return Array.from(ids).sort((a, b) => {
+    const na = mapA.get(a)?.nombre ?? mapC.get(a)?.nombre ?? a;
+    const nb = mapA.get(b)?.nombre ?? mapC.get(b)?.nombre ?? b;
+    return na.localeCompare(nb, "es");
+  });
+}
+
+function fmt(n: number) {
+  return n.toLocaleString("es-CO", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
 
 export default function ResumenPage() {
   const { user, profile } = useAuth();
-  const [rutas, setRutas] = useState<ResumenRutaItem[]>([]);
-  const [utilidadGlobal, setUtilidadGlobal] = useState(0);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [cierres, setCierres] = useState<CierreMensualItem[]>([]);
-  const [cierresLoading, setCierresLoading] = useState(false);
-  const [cierreDetalle, setCierreDetalle] = useState<CierreMensualDetalle | null>(null);
-  const [creandoCierre, setCreandoCierre] = useState(false);
+  const [periodos, setPeriodos] = useState<PeriodoAdminListaItem[]>([]);
+  const [periodosLoading, setPeriodosLoading] = useState(false);
+  const [abriendo, setAbriendo] = useState(false);
+  const [cerrando, setCerrando] = useState(false);
+  const [detalle, setDetalle] = useState<PeriodoAdminDetalle | null>(null);
+  const [detalleLoading, setDetalleLoading] = useState(false);
+  const [pdfLoadingId, setPdfLoadingId] = useState<string | null>(null);
 
-  const loadResumen = useCallback(() => {
+  const loadPeriodos = useCallback(() => {
     if (!user) return;
-    setLoading(true);
+    setPeriodosLoading(true);
+    user.getIdToken().then((token) => {
+      listPeriodosAdmin(token)
+        .then(setPeriodos)
+        .catch(() => setPeriodos([]))
+        .finally(() => setPeriodosLoading(false));
+    });
+  }, [user]);
+
+  useEffect(() => {
+    loadPeriodos();
+  }, [loadPeriodos]);
+
+  const hayAbierto = useMemo(() => periodos.some((p) => p.estado === "abierto"), [periodos]);
+
+  const handleAbrir = () => {
+    if (!user) return;
+    setAbriendo(true);
     setError(null);
     user.getIdToken().then((token) => {
-      getResumenEconomico(token)
-        .then((res) => {
-          setRutas(res.rutas);
-          setUtilidadGlobal(res.utilidadGlobal);
-        })
-        .catch((e) => setError(e instanceof Error ? e.message : "Error al cargar resumen"))
-        .finally(() => setLoading(false));
-    });
-  }, [user]);
-
-  const loadCierres = useCallback(() => {
-    if (!user) return;
-    setCierresLoading(true);
-    user.getIdToken().then((token) => {
-      getCierresMensuales(token)
-        .then(setCierres)
-        .catch(() => setCierres([]))
-        .finally(() => setCierresLoading(false));
-    });
-  }, [user]);
-
-  useEffect(() => {
-    loadResumen();
-  }, [loadResumen]);
-
-  useEffect(() => {
-    loadCierres();
-  }, [loadCierres]);
-
-  const handleCrearCierre = () => {
-    if (!user) return;
-    setCreandoCierre(true);
-    user.getIdToken().then((token) => {
-      crearCierreMensual(token)
+      abrirPeriodoAdmin(token)
         .then(() => {
-          loadCierres();
-          loadResumen();
+          loadPeriodos();
         })
-        .catch((e) => setError(e instanceof Error ? e.message : "Error al crear cierre"))
-        .finally(() => setCreandoCierre(false));
+        .catch((e) => setError(e instanceof Error ? e.message : "Error al abrir periodo"))
+        .finally(() => setAbriendo(false));
     });
   };
 
-  const handleVerCierre = (periodo: string) => {
+  const handleCerrar = () => {
     if (!user) return;
+    setCerrando(true);
+    setError(null);
     user.getIdToken().then((token) => {
-      getCierreMensual(token, periodo).then(setCierreDetalle);
+      cerrarPeriodoAdmin(token)
+        .then(() => {
+          loadPeriodos();
+          setDetalle(null);
+        })
+        .catch((e) => setError(e instanceof Error ? e.message : "Error al cerrar periodo"))
+        .finally(() => setCerrando(false));
+    });
+  };
+
+  const handleVerDetalle = (id: string) => {
+    if (!user) return;
+    setDetalleLoading(true);
+    user.getIdToken().then((token) => {
+      getPeriodoAdmin(token, id)
+        .then(setDetalle)
+        .catch((e) => setError(e instanceof Error ? e.message : "Error al cargar detalle"))
+        .finally(() => setDetalleLoading(false));
+    });
+  };
+
+  const handlePdf = (id: string) => {
+    if (!user) return;
+    setPdfLoadingId(id);
+    setError(null);
+    user.getIdToken().then((token) => {
+      downloadPeriodoAdminPdf(token, id)
+        .catch((e) => setError(e instanceof Error ? e.message : "Error al descargar PDF"))
+        .finally(() => setPdfLoadingId(null));
     });
   };
 
   if (!profile || profile.role !== "admin") return null;
 
+  const ap = detalle?.apertura ?? null;
+  const ci = detalle?.cierre ?? null;
+  const rutaIdsComparar = detalle ? mergeRutaIds(ap, ci) : [];
+
   return (
     <>
-      <div className="card">
-        <h2 style={{ marginTop: 0 }}>Resumen Económico</h2>
-        <p style={{ color: "var(--text-muted)", fontSize: "0.875rem", marginBottom: "1.25rem" }}>
-          Tabla por ruta: ingreso, egreso, gastos, salidas, inversión, ganancias (bolsa) y utilidad.
+      {error && (
+        <p className="error-msg" style={{ marginBottom: "1rem" }}>
+          {error}
         </p>
-        {!loading && rutas.length > 0 && (
-          <p style={{ fontWeight: 600, marginBottom: "1rem" }}>
-            Utilidad global: {utilidadGlobal.toLocaleString("es-CO", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+      )}
+
+      <div className="card">
+        <h3 style={{ marginTop: 0 }}>Periodos contables</h3>
+        <p style={{ color: "var(--text-muted)", fontSize: "0.875rem", marginBottom: "1rem" }}>
+          Abre un periodo para guardar una foto de tu caja, capital y rutas. Al cerrar, se guarda otra foto: dos columnas
+          (apertura y cierre) para comparar. Mientras está abierto, usa &quot;Ver / comparar&quot; para ver los datos; el PDF
+          solo se ofrece una vez cerrado el periodo. No está ligado al calendario.
+        </p>
+
+        {hayAbierto && (
+          <p style={{ marginBottom: "1rem", fontWeight: 600, color: "var(--accent, #5b21b6)" }}>
+            Tienes un periodo abierto. Ciérralo cuando quieras congelar el cierre y poder abrir uno nuevo.
           </p>
         )}
 
-        {error && <p className="error-msg">{error}</p>}
-
-        {loading ? (
-          <p>Cargando resumen...</p>
-        ) : rutas.length === 0 ? (
-          <p style={{ color: "var(--text-muted)" }}>No hay rutas. Crea rutas en la sección Rutas para ver el resumen.</p>
-        ) : (
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Ruta</th>
-                  <th>Ubicación</th>
-                  <th className="col-num">Ingreso</th>
-                  <th className="col-num">Egreso</th>
-                  <th className="col-num">Gastos</th>
-                  <th className="col-num">Salidas</th>
-                  <th className="col-num">Inversión</th>
-                  <th className="col-num">Ganancias</th>
-                  <th className="col-num">Utilidad</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rutas.map((r) => (
-                  <tr key={r.rutaId}>
-                    <td>{r.nombre}</td>
-                    <td>{r.ubicacion || "—"}</td>
-                    <td className="col-num">{r.ingreso.toFixed(2)}</td>
-                    <td className="col-num">{r.egreso.toFixed(2)}</td>
-                    <td className="col-num">{r.gastos.toFixed(2)}</td>
-                    <td className="col-num">{r.salidas.toFixed(2)}</td>
-                    <td className="col-num">{r.inversion.toFixed(2)}</td>
-                    <td className="col-num">{r.ganancias.toFixed(2)}</td>
-                    <td className="col-num">{r.utilidad.toFixed(2)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-
-      <div className="card" style={{ marginTop: "1.5rem" }}>
-        <h3 style={{ marginTop: 0 }}>Cierres mensuales</h3>
-        <p style={{ color: "var(--text-muted)", fontSize: "0.875rem", marginBottom: "1rem" }}>
-          Guarda una foto del estado por ruta al cierre del mes. Utilidad global y detalle por ruta.
-        </p>
-        <div style={{ marginBottom: "1rem" }}>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", marginBottom: "1rem" }}>
           <button
             type="button"
             className="btn btn-primary"
-            onClick={handleCrearCierre}
-            disabled={creandoCierre || cierresLoading}
+            onClick={handleAbrir}
+            disabled={abriendo || cerrando || periodosLoading || hayAbierto}
           >
-            {creandoCierre ? "Creando cierre..." : "Cerrar mes actual"}
+            {abriendo ? "Abriendo..." : "Abrir periodo"}
+          </button>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={handleCerrar}
+            disabled={abriendo || cerrando || periodosLoading || !hayAbierto}
+          >
+            {cerrando ? "Cerrando..." : "Cerrar periodo"}
           </button>
         </div>
-        {cierresLoading ? (
-          <p>Cargando cierres...</p>
-        ) : cierres.length === 0 ? (
-          <p style={{ color: "var(--text-muted)" }}>No hay cierres. Usa &quot;Cerrar mes actual&quot; para generar uno.</p>
+
+        {periodosLoading ? (
+          <p>Cargando periodos...</p>
+        ) : periodos.length === 0 ? (
+          <p style={{ color: "var(--text-muted)" }}>No hay periodos. Usa &quot;Abrir periodo&quot; para empezar.</p>
         ) : (
           <div className="table-wrap">
             <table>
               <thead>
                 <tr>
-                  <th>Periodo</th>
-                  <th>Fecha cierre</th>
-                  <th className="col-num">Utilidad global</th>
+                  <th>Id</th>
+                  <th>Estado</th>
+                  <th>Apertura</th>
+                  <th>Cierre</th>
                   <th></th>
                 </tr>
               </thead>
               <tbody>
-                {cierres.map((c) => (
-                  <tr key={c.periodo}>
-                    <td>{c.periodo}</td>
-                    <td>{c.fechaCierre ? new Date(c.fechaCierre).toLocaleDateString("es-CO") : "—"}</td>
-                    <td className="col-num">{(c.utilidadGlobal ?? 0).toFixed(2)}</td>
-                    <td>
+                {periodos.map((p) => (
+                  <tr key={p.id}>
+                    <td style={{ fontSize: "0.8rem", wordBreak: "break-all" }}>{p.id}</td>
+                    <td>{p.estado === "abierto" ? "Abierto" : "Cerrado"}</td>
+                    <td>{p.fechaApertura ? new Date(p.fechaApertura).toLocaleString("es-CO") : "—"}</td>
+                    <td>{p.fechaCierre ? new Date(p.fechaCierre).toLocaleString("es-CO") : "—"}</td>
+                    <td style={{ whiteSpace: "nowrap" }}>
                       <button
                         type="button"
                         className="btn btn-secondary"
-                        style={{ padding: "0.25rem 0.5rem", fontSize: "0.875rem" }}
-                        onClick={() => handleVerCierre(c.periodo)}
+                        style={{ padding: "0.25rem 0.5rem", fontSize: "0.875rem", marginRight: "0.35rem" }}
+                        onClick={() => handleVerDetalle(p.id)}
                       >
-                        Ver detalle
+                        Ver / comparar
                       </button>
+                      {p.estado === "cerrado" ? (
+                        <button
+                          type="button"
+                          className="btn btn-secondary"
+                          style={{ padding: "0.25rem 0.5rem", fontSize: "0.875rem" }}
+                          onClick={() => handlePdf(p.id)}
+                          disabled={pdfLoadingId === p.id}
+                        >
+                          {pdfLoadingId === p.id ? "PDF..." : "PDF"}
+                        </button>
+                      ) : (
+                        <span style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginLeft: "0.25rem" }}>
+                          PDF al cerrar
+                        </span>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -190,66 +214,112 @@ export default function ResumenPage() {
         )}
       </div>
 
-      {cierreDetalle && (
+      {(detalle || detalleLoading) && (
         <div
           className="card"
           style={{ marginTop: "1rem", position: "relative" }}
           role="dialog"
-          aria-label="Detalle del cierre"
+          aria-label="Comparación de periodo"
         >
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
-            <h3 style={{ margin: 0 }}>
-              Cierre {cierreDetalle.periodo}
-              {cierreDetalle.fechaCierre && (
-                <span style={{ fontWeight: "normal", color: "var(--text-muted)", fontSize: "0.9rem" }}>
-                  {" "}
-                  — {new Date(cierreDetalle.fechaCierre).toLocaleDateString("es-CO")}
-                </span>
-              )}
-            </h3>
-            <button
-              type="button"
-              className="btn btn-secondary"
-              onClick={() => setCierreDetalle(null)}
-            >
+            <h3 style={{ margin: 0 }}>Comparación apertura / cierre</h3>
+            <button type="button" className="btn btn-secondary" onClick={() => setDetalle(null)} disabled={detalleLoading}>
               Cerrar
             </button>
           </div>
-          {typeof cierreDetalle.utilidadGlobal === "number" && (
-            <p style={{ fontWeight: 600, marginBottom: "1rem" }}>
-              Utilidad global: {cierreDetalle.utilidadGlobal.toLocaleString("es-CO", { minimumFractionDigits: 2 })}
-            </p>
+          {detalleLoading ? (
+            <p>Cargando...</p>
+          ) : detalle && ap ? (
+            <>
+              <p style={{ fontSize: "0.85rem", color: "var(--text-muted)", marginBottom: "0.75rem" }}>
+                Periodo <code>{detalle.id}</code>
+                {detalle.estado === "abierto" ? " — aún sin cierre (columna cierre con guiones)." : null}
+              </p>
+              <p style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>
+                Abierto por {detalle.abiertoPorUid}
+                {detalle.cerradoPorUid ? ` · Cerrado por ${detalle.cerradoPorUid}` : ""}
+              </p>
+
+              <h4 style={{ marginTop: "1rem", marginBottom: "0.5rem" }}>Administrador</h4>
+              <div className="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Concepto</th>
+                      <th className="col-num">Apertura</th>
+                      <th className="col-num">Cierre</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>Caja admin</td>
+                      <td className="col-num">{fmt(ap.admin.cajaAdmin)}</td>
+                      <td className="col-num">{ci ? fmt(ci.admin.cajaAdmin) : "—"}</td>
+                    </tr>
+                    <tr>
+                      <td>Capital admin</td>
+                      <td className="col-num">{fmt(ap.admin.capitalAdmin)}</td>
+                      <td className="col-num">{ci ? fmt(ci.admin.capitalAdmin) : "—"}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <h4 style={{ marginTop: "1.25rem", marginBottom: "0.5rem" }}>Rutas</h4>
+              {rutaIdsComparar.map((rid) => {
+                const ra = ap.rutas.find((r) => r.rutaId === rid);
+                const rc = ci?.rutas.find((r) => r.rutaId === rid);
+                const nombre = ra?.nombre ?? rc?.nombre ?? rid;
+                const z = (x: typeof ra) => ({
+                  cajaRuta: x?.cajaRuta ?? 0,
+                  inversiones: x?.inversiones ?? 0,
+                  ganancias: x?.ganancias ?? 0,
+                  perdidas: x?.perdidas ?? 0,
+                  gastos: x?.gastos ?? 0,
+                  capitalRuta: x?.capitalRuta ?? 0,
+                  utilidad: x?.utilidad ?? 0,
+                });
+                const a = z(ra);
+                const c = ci ? z(rc) : null;
+                const rows: [string, number, number | null][] = [
+                  ["Base ruta (caja)", a.cajaRuta, c?.cajaRuta ?? null],
+                  ["Inversiones", a.inversiones, c?.inversiones ?? null],
+                  ["Ganancias", a.ganancias, c?.ganancias ?? null],
+                  ["Pérdidas", a.perdidas, c?.perdidas ?? null],
+                  ["Gastos (ruta)", a.gastos, c?.gastos ?? null],
+                  ["Capital ruta", a.capitalRuta, c?.capitalRuta ?? null],
+                  ["Utilidad", a.utilidad, c?.utilidad ?? null],
+                ];
+                return (
+                  <div key={rid} style={{ marginBottom: "1.25rem" }}>
+                    <p style={{ fontWeight: 600, marginBottom: "0.35rem" }}>{nombre}</p>
+                    <div className="table-wrap">
+                      <table>
+                        <thead>
+                          <tr>
+                            <th>Concepto</th>
+                            <th className="col-num">Apertura</th>
+                            <th className="col-num">Cierre</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {rows.map(([label, av, cv]) => (
+                            <tr key={label}>
+                              <td>{label}</td>
+                              <td className="col-num">{fmt(av)}</td>
+                              <td className="col-num">{cv === null ? "—" : fmt(cv)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                );
+              })}
+            </>
+          ) : (
+            <p style={{ color: "var(--text-muted)" }}>Sin datos.</p>
           )}
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Ruta</th>
-                  <th className="col-num">Base ruta</th>
-                  <th className="col-num">Bases empleados</th>
-                  <th className="col-num">Inversiones</th>
-                  <th className="col-num">Ganancias</th>
-                  <th className="col-num">Pérdidas</th>
-                  <th className="col-num">Gastos</th>
-                  <th className="col-num">Utilidad</th>
-                </tr>
-              </thead>
-              <tbody>
-                {cierreDetalle.rutas.map((r) => (
-                  <tr key={r.rutaId}>
-                    <td>{r.nombre}</td>
-                    <td className="col-num">{r.cajaRuta.toFixed(2)}</td>
-                    <td className="col-num">{r.cajasEmpleados.toFixed(2)}</td>
-                    <td className="col-num">{r.inversiones.toFixed(2)}</td>
-                    <td className="col-num">{r.ganancias.toFixed(2)}</td>
-                    <td className="col-num">{r.perdidas.toFixed(2)}</td>
-                    <td className="col-num">{r.gastos.toFixed(2)}</td>
-                    <td className="col-num">{r.utilidad.toFixed(2)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
         </div>
       )}
     </>

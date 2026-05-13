@@ -60,7 +60,7 @@ export async function GET(request: NextRequest) {
     };
   });
 
-  const rutas: ResumenRutaItem[] = rutasSnap.docs.map((d) => {
+  let rutas: ResumenRutaItem[] = rutasSnap.docs.map((d) => {
     const data = d.data();
     const rutaId = d.id;
     const nombre = data.nombre ?? "";
@@ -112,6 +112,10 @@ export async function GET(request: NextRequest) {
       capitalRuta: Math.round(capitalRuta * 100) / 100,
     };
   });
+
+  if (apiUser.role === "admin") {
+    rutas = rutas.filter((r) => r.adminId === apiUser.uid);
+  }
 
   const utilidadGlobal = rutas.reduce((sum, r) => sum + r.utilidad, 0);
 

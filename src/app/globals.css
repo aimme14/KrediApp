@@ -208,6 +208,24 @@ button {
   background: var(--btn-secondary-hover);
 }
 
+.btn:disabled,
+.btn[disabled] {
+  cursor: not-allowed;
+  pointer-events: none;
+  opacity: 0.48;
+}
+
+.btn-primary:disabled,
+.btn-primary[disabled] {
+  background: #a78bfa;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.btn-secondary:disabled,
+.btn-secondary[disabled] {
+  color: var(--text-muted);
+}
+
 .btn-danger {
   background: #b91c1c;
   color: #fff;
