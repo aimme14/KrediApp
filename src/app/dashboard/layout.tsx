@@ -27,8 +27,10 @@ export default function DashboardLayout({
   const [empresa, setEmpresa] = useState<EmpresaProfile | null>(null);
 
   const isGastosPage = pathname?.includes("/gastos") ?? false;
-  /** Panel admin: sin tope de 720px para usar todo el ancho del navegador */
-  const isAdminFluid = pathname?.startsWith("/dashboard/admin") ?? false;
+  /** Jefe y admin: sin tope de 720px para usar todo el ancho del navegador */
+  const isDashboardShellFluid =
+    (pathname?.startsWith("/dashboard/admin") ?? false) ||
+    (pathname?.startsWith("/dashboard/jefe") ?? false);
   const isJefe = profile?.role === "jefe";
   const isTrabajador = profile?.role === "trabajador";
   const isAdmin = profile?.role === "admin";
@@ -102,7 +104,7 @@ export default function DashboardLayout({
         <AdminFcmForegroundListener />
         <DashboardHeaderProvider value={setHeaderLeftSlot}>
           <div
-            className={`container container-dashboard${isGastosPage ? " dashboard-page-gastos" : ""}${isAdminFluid ? " container-dashboard--fluid" : ""}`}
+            className={`container container-dashboard${isGastosPage ? " dashboard-page-gastos" : ""}${isDashboardShellFluid ? " container-dashboard--fluid" : ""}`}
           >
             <header className="dashboard-header">
               <div className="header-left">

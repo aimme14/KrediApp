@@ -11,7 +11,6 @@ const NAV_ITEMS = [
   { href: "/dashboard/jefe/empresa", label: "Perfil de la empresa", icon: "building" },
   { href: "/dashboard/jefe/administradores", label: "Administradores", icon: "users" },
   { href: "/dashboard/jefe/gastos", label: "Gastos operativos", icon: "expense" },
-  { href: "/dashboard/jefe/gestion-financiera", label: "Gestión financiera", icon: "wallet" },
   { href: "/dashboard/jefe/permisos", label: "Permisos", icon: "lock" },
 ] as const;
 
@@ -44,14 +43,6 @@ function NavIcon({ name }: { name: string }) {
         <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
           <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
           <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-        </svg>
-      );
-    case "wallet":
-      return (
-        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-          <path d="M21 12V7H5a2 2 0 0 1 0-4h14v4" />
-          <path d="M3 5v14a2 2 0 0 0 2 2h16v-5" />
-          <path d="M18 12a2 2 0 0 0 0 4h4v-4Z" />
         </svg>
       );
     case "expense":
