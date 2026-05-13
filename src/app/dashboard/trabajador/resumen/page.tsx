@@ -181,10 +181,6 @@ export default function ResumenDelDiaPage() {
             <h2 id="resumen-entrega-title" className="gf-modal-title">
               Solicitar entrega del reporte
             </h2>
-            <p className="gf-modal-desc">
-              Se enviará una solicitud a tu administrador. Cuando confirme que recibió el efectivo, todo el dinero de tu caja
-              pasará a la caja de la ruta. Si no confirma, el dinero permanece en tu caja.
-            </p>
             <label htmlFor="resumen-entrega-comentario" className="gf-modal-label">
               Comentario <span style={{ fontWeight: 400, color: "var(--text-muted)" }}>(opcional)</span>
             </label>
