@@ -6,14 +6,11 @@ import {
   getCajaAdmin,
   getResumenEconomico,
   invertirEnCajaRuta,
-  listGastos,
   listInversionesCajaRuta,
-  type GastoItem,
   type InversionCajaRutaItem,
   type ResumenRutaItem,
 } from "@/lib/empresa-api";
 import { formatMontoEnteroInput } from "@/lib/monto-input-es";
-import { formatoFechaGastoColombia } from "@/lib/colombia-day-bounds";
 import { MiniChart } from "@/components/admin/MiniChart";
 
 function formatMoneda(value: number): string {
@@ -44,8 +41,6 @@ function formatFechaCorta(iso: string | null): string {
   return new Date(iso).toLocaleString("es-CO", { dateStyle: "short", timeStyle: "short" });
 }
 
-type SeccionAdmin = "capital" | "caja" | "gastos";
-
 function parseMontoInvertir(value: string): { num: number; valid: boolean } {
   const raw = value.replace(/\s/g, "").replace(/\./g, "").replace(",", ".");
   const num = Number(raw);
@@ -60,11 +55,8 @@ export default function GestionFinancieraPage() {
   const [error, setError] = useState<string | null>(null);
 
   const [cajaAdmin, setCajaAdmin] = useState(0);
-  const [capitalAdmin, setCapitalAdmin] = useState(0);
   const [rutas, setRutas] = useState<ResumenRutaItem[]>([]);
-  const [gastos, setGastos] = useState<GastoItem[]>([]);
   const [lastLoadedAt, setLastLoadedAt] = useState<string | null>(null);
-  const [seccionActiva, setSeccionActiva] = useState<SeccionAdmin>("capital");
 
   const [invertirRutaId, setInvertirRutaId] = useState("");
   const [invertirMonto, setInvertirMonto] = useState("");
@@ -80,15 +72,9 @@ export default function GestionFinancieraPage() {
     setError(null);
     try {
       const token = await user.getIdToken();
-      const [caja, resumen, listaGastos] = await Promise.all([
-        getCajaAdmin(token),
-        getResumenEconomico(token),
-        listGastos(token),
-      ]);
+      const [caja, resumen] = await Promise.all([getCajaAdmin(token), getResumenEconomico(token)]);
       setCajaAdmin(caja);
-      setCapitalAdmin(resumen.capitalAdmin ?? 0);
       setRutas(resumen.rutas ?? []);
-      setGastos(listaGastos ?? []);
       try {
         const listaInversiones = await listInversionesCajaRuta(token);
         setInversiones(listaInversiones ?? []);
@@ -107,15 +93,13 @@ export default function GestionFinancieraPage() {
     load();
   }, [load]);
 
-  const totalGastos = useMemo(() => rutas.reduce((sum, r) => sum + (r.gastos ?? 0), 0), [rutas]);
-
   const rutasPropias = useMemo(
     () => (user ? rutas.filter((r) => r.adminId === user.uid) : []),
     [rutas, user]
   );
 
-  const sumaCapitalRutas = useMemo(
-    () => rutasPropias.reduce((sum, r) => sum + (r.capitalRuta ?? 0), 0),
+  const sumaBaseRutasPropias = useMemo(
+    () => rutasPropias.reduce((sum, r) => sum + (r.cajaRuta ?? 0), 0),
     [rutasPropias]
   );
 
@@ -152,23 +136,7 @@ export default function GestionFinancieraPage() {
     }
   };
 
-  const rutaNombrePorId = useMemo(() => {
-    const m = new Map<string, string>();
-    for (const r of rutas) m.set(r.rutaId, r.nombre);
-    return m;
-  }, [rutas]);
-
-  const chartPointsCapital =
-    capitalAdmin > 0 ? [capitalAdmin * 0.98, capitalAdmin] : [0, 0];
   const chartPointsCaja = cajaAdmin > 0 ? [cajaAdmin * 0.98, cajaAdmin] : [0, 0];
-
-  const gastosOrdenados = useMemo(() => {
-    return [...gastos].sort((a, b) => {
-      const fa = a.fecha ? new Date(a.fecha).getTime() : 0;
-      const fb = b.fecha ? new Date(b.fecha).getTime() : 0;
-      return fb - fa;
-    });
-  }, [gastos]);
 
   if (!profile || profile.role !== "admin") return null;
 
@@ -177,7 +145,8 @@ export default function GestionFinancieraPage() {
       <div className="card">
         <h2 style={{ marginTop: 0 }}>Gestión financiera</h2>
         <p style={{ color: "var(--text-muted)", fontSize: "0.875rem", marginBottom: "1.25rem" }}>
-          Base del administrador, capital y total de gastos por ruta.
+          Base del administrador e inversiones en la base de cada ruta. El capital y el detalle de gastos
+          operativos están en Inicio y en Gastos operativos del menú.
         </p>
 
         {error && <p className="error-msg">{error}</p>}
@@ -194,24 +163,10 @@ export default function GestionFinancieraPage() {
                 marginBottom: "1.25rem",
               }}
             >
-              <div className="card" style={{ padding: "1rem", margin: 0, flex: "1 1 220px" }}>
+              <div className="card" style={{ padding: "1rem", margin: 0, flex: "1 1 220px", maxWidth: "320px" }}>
                 <div style={{ fontSize: "0.875rem", color: "var(--text-muted)" }}>Base admin</div>
                 <div style={{ fontSize: "1.5rem", fontWeight: 800, color: "var(--text)", marginTop: "0.25rem" }}>
                   {formatMoneda(cajaAdmin)}
-                </div>
-              </div>
-
-              <div className="card" style={{ padding: "1rem", margin: 0, flex: "1 1 220px" }}>
-                <div style={{ fontSize: "0.875rem", color: "var(--text-muted)" }}>Capital</div>
-                <div style={{ fontSize: "1.5rem", fontWeight: 800, color: "var(--text)", marginTop: "0.25rem" }}>
-                  {formatMoneda(capitalAdmin)}
-                </div>
-              </div>
-
-              <div className="card" style={{ padding: "1rem", margin: 0, flex: "1 1 220px" }}>
-                <div style={{ fontSize: "0.875rem", color: "var(--text-muted)" }}>Total gastos</div>
-                <div style={{ fontSize: "1.5rem", fontWeight: 800, color: "var(--text)", marginTop: "0.25rem" }}>
-                  {formatMoneda(totalGastos)}
                 </div>
               </div>
             </div>
@@ -224,10 +179,8 @@ export default function GestionFinancieraPage() {
                   <thead>
                     <tr>
                       <th>Ruta</th>
-                      <th className="col-num">Capital</th>
                       <th className="col-num">Base</th>
                       <th className="col-num">Inversiones</th>
-                      <th className="col-num">Gastos</th>
                       <th className="col-num">Pérdidas</th>
                     </tr>
                   </thead>
@@ -235,10 +188,8 @@ export default function GestionFinancieraPage() {
                     {rutas.map((r) => (
                       <tr key={r.rutaId}>
                         <td>{r.nombre}</td>
-                        <td className="col-num">{formatMoneda(r.capitalRuta ?? 0)}</td>
                         <td className="col-num">{formatMoneda(r.cajaRuta ?? 0)}</td>
                         <td className="col-num">{formatMoneda(r.inversion ?? 0)}</td>
-                        <td className="col-num">{formatMoneda(r.gastos ?? 0)}</td>
                         <td className="col-num">{formatMoneda(r.perdidas ?? 0)}</td>
                       </tr>
                     ))}
@@ -252,125 +203,7 @@ export default function GestionFinancieraPage() {
 
       {!loading && (
         <div className="gestion-financiera-page" style={{ marginTop: "1.5rem" }}>
-          <nav className="gf-tabs" role="tablist" aria-label="Detalle financiero del administrador">
-            <button
-              type="button"
-              role="tab"
-              aria-selected={seccionActiva === "capital"}
-              aria-controls="gf-admin-panel-capital"
-              id="gf-admin-tab-capital"
-              className={`gf-tab ${seccionActiva === "capital" ? "gf-tab-active" : ""}`}
-              onClick={() => setSeccionActiva("capital")}
-            >
-              <span className="gf-tab-icon" aria-hidden>
-                💰
-              </span>
-              Capital
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={seccionActiva === "caja"}
-              aria-controls="gf-admin-panel-caja"
-              id="gf-admin-tab-caja"
-              className={`gf-tab ${seccionActiva === "caja" ? "gf-tab-active" : ""}`}
-              onClick={() => setSeccionActiva("caja")}
-            >
-              <span className="gf-tab-icon" aria-hidden>
-                🏦
-              </span>
-              Base
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={seccionActiva === "gastos"}
-              aria-controls="gf-admin-panel-gastos"
-              id="gf-admin-tab-gastos"
-              className={`gf-tab ${seccionActiva === "gastos" ? "gf-tab-active" : ""}`}
-              onClick={() => setSeccionActiva("gastos")}
-            >
-              <span className="gf-tab-icon" aria-hidden>
-                📋
-              </span>
-              Gastos
-            </button>
-          </nav>
-
-          <div
-            id="gf-admin-panel-capital"
-            role="tabpanel"
-            aria-labelledby="gf-admin-tab-capital"
-            hidden={seccionActiva !== "capital"}
-            className="gf-panel"
-          >
-            <div className="gf-capital-card card">
-              <div className="gf-capital-card-header">
-                <div className="gf-capital-card-title-wrap">
-                  <span className="gf-capital-icon" aria-hidden>
-                    🏢
-                  </span>
-                  <h2 className="gf-capital-card-title">Capital del administrador</h2>
-                </div>
-                <span className="gf-capital-badge-privado">🔒 Privado</span>
-              </div>
-              <p className="gf-capital-card-desc">
-                Solo tú ves estos montos. El capital total incluye tu base, el capital asignado a rutas y
-                descuenta los gastos registrados (generales y por ruta).
-              </p>
-
-              <div className="gf-capital-display">
-                <span className="gf-capital-label">CAPITAL TOTAL</span>
-                <span className="gf-capital-monto" aria-live="polite">
-                  ${formatMonto(capitalAdmin)}
-                </span>
-                <div className="gf-capital-desglose gf-capital-desglose-dos">
-                  <span>Base admin: {formatMonto(cajaAdmin)}</span>
-                  <span>Σ capital rutas: {formatMonto(sumaCapitalRutas)}</span>
-                </div>
-                <div className="gf-capital-indicators">
-                  <span className="gf-capital-indicator">
-                    <span className="gf-capital-indicator-icon" aria-hidden>
-                      🕐
-                    </span>
-                    Datos actualizados: {lastLoadedAt ? formatFechaHora(lastLoadedAt) : "—"}
-                  </span>
-                  <span className="gf-capital-tendencia gf-tendencia-estable">
-                    <span className="gf-capital-indicator-icon" aria-hidden>
-                      📊
-                    </span>
-                    Tendencia: Estable
-                  </span>
-                </div>
-                <div className="gf-mini-chart" role="img" aria-label="Referencia de capital">
-                  <MiniChart points={chartPointsCapital} />
-                </div>
-              </div>
-            </div>
-
-            <div className="gf-historial-card card">
-              <div className="gf-historial-header">
-                <h2 className="gf-historial-title">
-                  <span className="gf-historial-icon" aria-hidden>
-                    🕐
-                  </span>
-                  HISTORIAL DE CAMBIOS
-                </h2>
-              </div>
-              <p className="gf-historial-empty">
-                El historial detallado de ajustes de capital está en la vista del jefe. Aquí ves el
-                capital calculado en tiempo real.
-              </p>
-            </div>
-          </div>
-
-          <div
-            id="gf-admin-panel-caja"
-            role="tabpanel"
-            aria-labelledby="gf-admin-tab-caja"
-            hidden={seccionActiva !== "caja"}
-            className="gf-panel"
-          >
+          <div className="gf-panel" aria-label="Base del administrador">
             <div className="gf-capital-card card">
               <div className="gf-capital-card-header">
                 <div className="gf-capital-card-title-wrap">
@@ -392,8 +225,8 @@ export default function GestionFinancieraPage() {
                   ${formatMonto(cajaAdmin)}
                 </span>
                 <div className="gf-capital-desglose gf-capital-desglose-dos">
-                  <span>Capital admin: {formatMonto(capitalAdmin)}</span>
-                  <span>Σ capital rutas: {formatMonto(sumaCapitalRutas)}</span>
+                  <span>Σ base en tus rutas: {formatMonto(sumaBaseRutasPropias)}</span>
+                  <span>Rutas asignadas: {rutasPropias.length}</span>
                 </div>
                 <div className="gf-capital-indicators">
                   <span className="gf-capital-indicator">
@@ -425,7 +258,7 @@ export default function GestionFinancieraPage() {
               </div>
               <p className="gf-salidas-desc">
                 Transfiere dinero desde tu base de administrador hacia la <strong>base de la ruta</strong>{" "}
-                (liquidez disponible en esa ruta). El capital total de la ruta aumenta en el mismo monto.
+                (liquidez disponible en esa ruta).
               </p>
               <p style={{ marginBottom: "1rem", fontWeight: 600 }}>Tu base disponible: {formatMonto(cajaAdmin)}</p>
 
@@ -524,96 +357,6 @@ export default function GestionFinancieraPage() {
                           <td>{inv.invertidoPorNombre || inv.invertidoPorUid}</td>
                         </tr>
                       ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div
-            id="gf-admin-panel-gastos"
-            role="tabpanel"
-            aria-labelledby="gf-admin-tab-gastos"
-            hidden={seccionActiva !== "gastos"}
-            className="gf-panel"
-          >
-            <div className="gf-capital-card card">
-              <div className="gf-capital-card-header">
-                <div className="gf-capital-card-title-wrap">
-                  <span className="gf-capital-icon" aria-hidden>
-                    📋
-                  </span>
-                  <h2 className="gf-capital-card-title">Gastos operativos</h2>
-                </div>
-                <span className="gf-capital-badge-privado">🔒 Privado</span>
-              </div>
-              <p className="gf-capital-card-desc">
-                Total acumulado en rutas (incluye impacto de gastos de equipo). El historial lista tus gastos
-                y los registrados por tus trabajadores. Para registrar un gasto como admin, usa Gastos en el menú.
-              </p>
-
-              <div className="gf-capital-display">
-                <span className="gf-capital-label">TOTAL GASTOS</span>
-                <span className="gf-capital-monto" aria-live="polite">
-                  ${formatMonto(totalGastos)}
-                </span>
-              </div>
-            </div>
-
-            <div className="gf-historial-card card">
-              <div className="gf-historial-header">
-                <h2 className="gf-historial-title">
-                  <span className="gf-historial-icon" aria-hidden>
-                    🕐
-                  </span>
-                  REGISTROS RECIENTES
-                </h2>
-              </div>
-              {gastosOrdenados.length === 0 ? (
-                <p className="gf-historial-empty">No hay gastos registrados.</p>
-              ) : (
-                <div className="table-wrap">
-                  <table>
-                    <thead>
-                      <tr>
-                        <th className="col-num">Monto</th>
-                        <th>Fecha</th>
-                        <th>Motivo</th>
-                        <th>Quién lo realizó</th>
-                        <th>Ruta</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {gastosOrdenados.map((g, i) => {
-                        const rutaLabel =
-                          (g.alcance ?? "").trim() === "empleado"
-                            ? g.rutaId?.trim()
-                              ? rutaNombrePorId.get(g.rutaId) ?? `Ruta ${g.rutaId.slice(0, 8)}…`
-                              : "Trabajador"
-                            : g.rutaId?.trim()
-                              ? rutaNombrePorId.get(g.rutaId) ?? `Ruta ${g.rutaId.slice(0, 8)}…`
-                              : "Gasto general";
-                        const quien =
-                          (g.creadoPorNombre && String(g.creadoPorNombre).trim()) ||
-                          (g.creadoPor === user?.uid
-                            ? profile?.displayName?.trim() ||
-                              profile?.email ||
-                              user?.email ||
-                              "Tú"
-                            : (g.creadoPor && String(g.creadoPor)) || "—");
-                        const motivoText = g.descripcion?.trim() || "—";
-                        const motivo = g.tipo ? `${motivoText} (${g.tipo})` : motivoText;
-                        return (
-                          <tr key={`${g.rol}-${g.id}-${g.alcance ?? i}`}>
-                            <td className="col-num">{formatMoneda(g.monto)}</td>
-                            <td>{formatoFechaGastoColombia(g.fecha ?? null)}</td>
-                            <td>{motivo}</td>
-                            <td>{quien}</td>
-                            <td>{rutaLabel}</td>
-                          </tr>
-                        );
-                      })}
                     </tbody>
                   </table>
                 </div>

@@ -22,6 +22,92 @@ function formatMonto(value: number): string {
   })}`;
 }
 
+type KpiVariant = "patrimonio" | "base" | "inversiones" | "ganancias";
+
+function RutasKpiIcon({ variant }: { variant: KpiVariant }) {
+  const cls = `rutas-admin-kpi-icon rutas-admin-kpi-icon--${variant}`;
+  const stroke = { fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
+  switch (variant) {
+    case "patrimonio":
+      return (
+        <span className={cls} aria-hidden>
+          <svg width="15" height="15" viewBox="0 0 24 24" {...stroke}>
+            <polygon points="12 2 2 7 12 12 22 7 12 2" />
+            <polyline points="2 17 12 22 22 17" />
+            <polyline points="2 12 12 17 22 12" />
+          </svg>
+        </span>
+      );
+    case "base":
+      return (
+        <span className={cls} aria-hidden>
+          <svg width="15" height="15" viewBox="0 0 24 24" {...stroke}>
+            <rect x="2" y="7" width="20" height="14" rx="2" ry="2" />
+            <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
+          </svg>
+        </span>
+      );
+    case "inversiones":
+      return (
+        <span className={cls} aria-hidden>
+          <svg width="15" height="15" viewBox="0 0 24 24" {...stroke}>
+            <circle cx="12" cy="12" r="10" />
+            <line x1="12" y1="8" x2="12" y2="16" />
+            <line x1="8" y1="12" x2="16" y2="12" />
+          </svg>
+        </span>
+      );
+    case "ganancias":
+      return (
+        <span className={cls} aria-hidden>
+          <svg width="15" height="15" viewBox="0 0 24 24" {...stroke}>
+            <polyline points="23 6 13.5 15.5 8.5 10.5 1 18" />
+            <polyline points="17 6 23 6 23 12" />
+          </svg>
+        </span>
+      );
+    default:
+      return null;
+  }
+}
+
+const RUTA_KPI_ITEMS: {
+  key: string;
+  label: string;
+  field: "capitalTotal" | "cajaRuta" | "inversiones" | "ganancias";
+  variant: KpiVariant;
+  title: string;
+}[] = [
+  {
+    key: "patrimonio",
+    label: "Patrimonio total",
+    field: "capitalTotal",
+    variant: "patrimonio",
+    title: "Patrimonio total (base ruta + bases empleados + inversiones − pérdidas)",
+  },
+  {
+    key: "base",
+    label: "Base",
+    field: "cajaRuta",
+    variant: "base",
+    title: "Efectivo en la ruta disponible para prestar o mover",
+  },
+  {
+    key: "inversiones",
+    label: "Inversiones",
+    field: "inversiones",
+    variant: "inversiones",
+    title: "Capital colocado en préstamos activos",
+  },
+  {
+    key: "ganancias",
+    label: "Ganancias",
+    field: "ganancias",
+    variant: "ganancias",
+    title: "Intereses acumulados por cobros",
+  },
+];
+
 export default function RutasPage() {
   const { user, profile } = useAuth();
   const [rutas, setRutas] = useState<RutaItem[]>([]);
@@ -109,30 +195,26 @@ export default function RutasPage() {
   if (!profile || profile.role !== "admin") return null;
 
   return (
-    <div className="card">
-      <h2 style={{ marginTop: 0 }}>Rutas</h2>
-      <p style={{ color: "var(--text-muted)", fontSize: "0.875rem", marginBottom: "0.5rem" }}>
-        Crea rutas con nombre y ubicación. Al desplegar una ruta verás los clientes con su información y estado financiero.
+    <div className="card rutas-admin-page">
+      <h2 className="rutas-admin-page-title">Rutas</h2>
+      <p className="rutas-admin-intro">
+        Creá rutas con nombre y ubicación. Al desplegar una ruta verás los clientes con su información y estado financiero.
       </p>
-      <p style={{ color: "var(--text-muted)", fontSize: "0.8125rem", marginBottom: "1.25rem", lineHeight: 1.45 }}>
+      <p className="rutas-admin-gloss">
         <strong>Patrimonio total</strong> es todo el capital de la ruta. <strong>Base de la ruta</strong> es el efectivo disponible para operar.
         Los préstamos salen de la base y suman en <strong>Inversiones</strong>; al cobrar, el dinero vuelve a la base y el interés acumula en{" "}
         <strong>Ganancias</strong>.
       </p>
 
-      <div style={{ marginBottom: "1.25rem" }}>
-        <button
-          type="button"
-          className="btn btn-primary"
-          onClick={() => setShowForm((v) => !v)}
-        >
+      <div className="rutas-admin-toolbar">
+        <button type="button" className="btn btn-primary" onClick={() => setShowForm((v) => !v)}>
           {showForm ? "Cancelar" : "Nueva ruta"}
         </button>
       </div>
 
       {showForm && (
-        <div className="card" style={{ marginBottom: "1.25rem" }}>
-          <h3 style={{ marginTop: 0 }}>Nueva ruta</h3>
+        <div className="card rutas-admin-form-card">
+          <h3>Nueva ruta</h3>
           <form onSubmit={handleSubmit}>
             <div className="form-group">
               <label>Nombre</label>
@@ -164,203 +246,147 @@ export default function RutasPage() {
       {!showForm && error && <p className="error-msg">{error}</p>}
 
       {loading ? (
-        <p>Cargando rutas...</p>
+        <p className="rutas-admin-loading">Cargando rutas…</p>
       ) : rutas.length === 0 ? (
-        <p style={{ color: "var(--text-muted)" }}>No hay rutas. Crea una con el botón &quot;Nueva ruta&quot;.</p>
+        <p className="rutas-admin-muted">No hay rutas. Creá una con el botón «Nueva ruta».</p>
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-          {rutas.map((ruta) => (
-            <div key={ruta.id} className="card" style={{ padding: "1rem" }}>
-              <button
-                type="button"
-                onClick={() => setExpandedRutaId((id) => (id === ruta.id ? null : ruta.id))}
-                style={{
-                  width: "100%",
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  background: "none",
-                  border: "none",
-                  cursor: "pointer",
-                  padding: 0,
-                  fontSize: "1rem",
-                  color: "var(--text)",
-                  textAlign: "left",
-                }}
-              >
-                <span style={{ display: "flex", alignItems: "center", gap: "0.75rem", flex: 1, minWidth: 0 }}>
-                  {ruta.codigo && (
-                    <code
-                      className="user-code ruta-code"
-                      title="RT = Ruta, primer número = Admin, segundo = N° Ruta"
-                    >
-                      {ruta.codigo}
-                    </code>
-                  )}
-                  <span style={{ fontWeight: 600 }}>{ruta.nombre}</span>
-                </span>
-                <span style={{ color: "var(--text-muted)", fontSize: "0.875rem" }}>
-                  {ruta.ubicacion || "—"}
-                </span>
-                <span aria-hidden>{expandedRutaId === ruta.id ? "▼" : "▶"}</span>
-              </button>
+        <div className="rutas-admin-list">
+          {rutas.map((ruta) => {
+            const expanded = expandedRutaId === ruta.id;
+            return (
+              <div key={ruta.id} className="card rutas-admin-ruta-card">
+                <button
+                  type="button"
+                  className="rutas-admin-ruta-head-btn"
+                  onClick={() => setExpandedRutaId((id) => (id === ruta.id ? null : ruta.id))}
+                >
+                  <span className="rutas-admin-ruta-head-main">
+                    {ruta.codigo && (
+                      <code className="user-code ruta-code" title="RT = Ruta, primer número = Admin, segundo = N° Ruta">
+                        {ruta.codigo}
+                      </code>
+                    )}
+                    <span className="rutas-admin-ruta-nombre">{ruta.nombre}</span>
+                  </span>
+                  <span className="rutas-admin-ruta-head-meta">
+                    {ruta.ubicacion ? <span className="rutas-admin-ruta-ubic">{ruta.ubicacion}</span> : null}
+                    <span className={`rutas-admin-ruta-chevron${expanded ? " rutas-admin-ruta-chevron--open" : ""}`} aria-hidden>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="9 18 15 12 9 6" />
+                      </svg>
+                    </span>
+                  </span>
+                </button>
 
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(auto-fill, minmax(128px, 1fr))",
-                  gap: "0.65rem",
-                  marginTop: "0.75rem",
-                }}
-                aria-label="Resumen financiero de la ruta"
-              >
-                {(
-                  [
-                    { label: "Patrimonio total", value: ruta.capitalTotal ?? 0, title: "Patrimonio total (base ruta + bases empleados + inversiones − pérdidas)" },
-                    { label: "Base", value: ruta.cajaRuta ?? 0, title: "Efectivo en la ruta disponible para prestar o mover" },
-                    { label: "Inversiones", value: ruta.inversiones ?? 0, title: "Capital colocado en préstamos activos" },
-                    { label: "Ganancias", value: ruta.ganancias ?? 0, title: "Intereses acumulados por cobros" },
-                  ] as const
-                ).map((item) => (
-                  <div
-                    key={item.label}
-                    className="card"
-                    title={item.title}
-                    style={{
-                      padding: "0.65rem 0.85rem",
-                      margin: 0,
-                      background: "var(--card-bg)",
-                      border: "1px solid var(--card-border)",
-                    }}
+                <div className="rutas-admin-kpi-grid" aria-label="Resumen financiero de la ruta">
+                  {RUTA_KPI_ITEMS.map((item) => {
+                    const raw = ruta[item.field];
+                    const num = typeof raw === "number" ? raw : 0;
+                    return (
+                      <div key={item.key} className="rutas-admin-kpi" title={item.title}>
+                        <div className="rutas-admin-kpi-body">
+                          <span className="rutas-admin-kpi-label">{item.label}</span>
+                          <span className="rutas-admin-kpi-value">{formatMonto(num)}</span>
+                        </div>
+                        <RutasKpiIcon variant={item.variant} />
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="rutas-admin-op-row">
+                  <span className="rutas-admin-op-label">
+                    Operación del día{" "}
+                    <span className="rutas-admin-op-label-sub">(trabajadores)</span>
+                  </span>
+                  <span
+                    className={`rutas-admin-op-badge ${
+                      ruta.rutaOperativa !== false ? "rutas-admin-op-badge--open" : "rutas-admin-op-badge--closed"
+                    }`}
                   >
-                    <span
-                      style={{
-                        fontSize: "0.7rem",
-                        color: "var(--text-muted)",
-                        textTransform: "uppercase",
-                        letterSpacing: "0.03em",
-                        display: "block",
-                        marginBottom: "0.25rem",
-                        lineHeight: 1.2,
+                    {ruta.rutaOperativa !== false ? "Abierta" : "Cerrada"}
+                  </span>
+                  <div className="rutas-admin-op-btns">
+                    <button
+                      type="button"
+                      className="btn btn-primary rutas-admin-op-btn"
+                      disabled={operativaSavingId === ruta.id || ruta.rutaOperativa !== false}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        void handleRutaOperativa(ruta.id, true);
                       }}
                     >
-                      {item.label}
-                    </span>
-                    <span style={{ fontSize: "1.05rem", fontWeight: 700, color: "var(--text)" }}>
-                      {formatMonto(typeof item.value === "number" ? item.value : 0)}
-                    </span>
+                      {operativaSavingId === ruta.id ? "…" : "Abrir ruta"}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn rutas-admin-op-btn rutas-admin-btn-outline"
+                      disabled={operativaSavingId === ruta.id || ruta.rutaOperativa === false}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        void handleRutaOperativa(ruta.id, false);
+                      }}
+                    >
+                      {operativaSavingId === ruta.id ? "…" : "Cerrar ruta"}
+                    </button>
                   </div>
-                ))}
-              </div>
-
-              <div
-                style={{
-                  marginTop: "0.85rem",
-                  paddingTop: "0.85rem",
-                  borderTop: "1px solid var(--card-border)",
-                  display: "flex",
-                  flexWrap: "wrap",
-                  alignItems: "center",
-                  gap: "0.65rem",
-                }}
-              >
-                <span style={{ fontSize: "0.8125rem", fontWeight: 600, color: "var(--text-muted)" }}>
-                  Operación del día (trabajadores):
-                </span>
-                <span
-                  style={{
-                    fontSize: "0.8125rem",
-                    fontWeight: 700,
-                    padding: "0.2rem 0.55rem",
-                    borderRadius: "6px",
-                    background: ruta.rutaOperativa !== false ? "var(--success-bg, #f0fdf4)" : "rgba(248, 113, 113, 0.15)",
-                    color: ruta.rutaOperativa !== false ? "var(--success-fg, #166534)" : "#b91c1c",
-                  }}
-                >
-                  {ruta.rutaOperativa !== false ? "Abierta" : "Cerrada"}
-                </span>
-                <button
-                  type="button"
-                  className="btn btn-primary"
-                  style={{ padding: "0.35rem 0.75rem", fontSize: "0.875rem" }}
-                  disabled={operativaSavingId === ruta.id || ruta.rutaOperativa !== false}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    void handleRutaOperativa(ruta.id, true);
-                  }}
-                >
-                  {operativaSavingId === ruta.id ? "…" : "Abrir ruta"}
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  style={{ padding: "0.35rem 0.75rem", fontSize: "0.875rem" }}
-                  disabled={operativaSavingId === ruta.id || ruta.rutaOperativa === false}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    void handleRutaOperativa(ruta.id, false);
-                  }}
-                >
-                  {operativaSavingId === ruta.id ? "…" : "Cerrar ruta"}
-                </button>
-              </div>
-
-              {expandedRutaId === ruta.id && (
-                <div style={{ marginTop: "1rem", paddingTop: "1rem", borderTop: "1px solid var(--border)" }}>
-                  <h4 style={{ margin: "0 0 0.5rem 0" }}>Clientes de esta ruta</h4>
-                  {!clientesByRuta[ruta.id] ? (
-                    <p style={{ color: "var(--text-muted)", fontSize: "0.875rem" }}>Cargando...</p>
-                  ) : clientesByRuta[ruta.id].length === 0 ? (
-                    <p style={{ color: "var(--text-muted)", fontSize: "0.875rem" }}>No hay clientes en esta ruta.</p>
-                  ) : (
-                    <div className="table-wrap" style={{ marginTop: "0.5rem" }}>
-                      <table>
-                        <thead>
-                          <tr>
-                            <th>Código</th>
-                            <th>Nombre</th>
-                            <th>Ubicación</th>
-                            <th>Dirección</th>
-                            <th>Teléfono</th>
-                            <th>Cédula</th>
-                            <th>Estado financiero</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {clientesByRuta[ruta.id].map((c) => {
-                            const prestamo = getPrestamoForCliente(ruta.id, c.id);
-                            return (
-                              <tr key={c.id}>
-                                <td title={c.codigo ?? undefined}>
-                                  {formatClienteCodigoCorto(c.codigo)}
-                                </td>
-                                <td>{c.nombre}</td>
-                                <td>{c.ubicacion || "—"}</td>
-                                <td>{c.direccion || "—"}</td>
-                                <td>{c.telefono || "—"}</td>
-                                <td>{c.cedula || "—"}</td>
-                                <td>
-                                  {prestamo ? (
-                                    <span>
-                                      Préstamo {prestamo.estado} · Saldo: {prestamo.saldoPendiente.toFixed(2)}
-                                    </span>
-                                  ) : c.prestamo_activo ? (
-                                    <span>Préstamo activo</span>
-                                  ) : (
-                                    <span style={{ color: "var(--text-muted)" }}>Sin préstamo activo</span>
-                                  )}
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
                 </div>
-              )}
-            </div>
-          ))}
+
+                {expanded && (
+                  <div className="rutas-admin-clientes-panel">
+                    <h4 className="rutas-admin-clientes-title">Clientes de esta ruta</h4>
+                    {!clientesByRuta[ruta.id] ? (
+                      <p className="rutas-admin-muted">Cargando…</p>
+                    ) : clientesByRuta[ruta.id].length === 0 ? (
+                      <p className="rutas-admin-muted">No hay clientes en esta ruta.</p>
+                    ) : (
+                      <div className="table-wrap rutas-admin-clientes-table-wrap">
+                        <table>
+                          <thead>
+                            <tr>
+                              <th>Código</th>
+                              <th>Nombre</th>
+                              <th>Ubicación</th>
+                              <th>Dirección</th>
+                              <th>Teléfono</th>
+                              <th>Cédula</th>
+                              <th>Estado financiero</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {clientesByRuta[ruta.id].map((c) => {
+                              const prestamo = getPrestamoForCliente(ruta.id, c.id);
+                              return (
+                                <tr key={c.id}>
+                                  <td title={c.codigo ?? undefined}>{formatClienteCodigoCorto(c.codigo)}</td>
+                                  <td>{c.nombre}</td>
+                                  <td>{c.ubicacion || "—"}</td>
+                                  <td>{c.direccion || "—"}</td>
+                                  <td>{c.telefono || "—"}</td>
+                                  <td>{c.cedula || "—"}</td>
+                                  <td>
+                                    {prestamo ? (
+                                      <span>
+                                        Préstamo {prestamo.estado} · Saldo: {prestamo.saldoPendiente.toFixed(2)}
+                                      </span>
+                                    ) : c.prestamo_activo ? (
+                                      <span>Préstamo activo</span>
+                                    ) : (
+                                      <span style={{ color: "var(--text-muted)" }}>Sin préstamo activo</span>
+                                    )}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
     </div>

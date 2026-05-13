@@ -18,32 +18,53 @@ function formatMonto(value: number): string {
   })}`;
 }
 
+function initialsFromNombre(nombre: string): string {
+  const parts = nombre.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "?";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
 export default function RutaDelDiaPage() {
   const { user, profile } = useAuth();
   const [rutaDelDia, setRutaDelDia] = useState<RutaDelDiaItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [montosAsignar, setMontosAsignar] = useState<Record<string, string>>({});
   const [asignandoKey, setAsignandoKey] = useState<string | null>(null);
 
-  const loadRutaDelDia = useCallback(async () => {
-    if (!user) return;
-    setLoading(true);
-    setError(null);
-    try {
-      const token = await user.getIdToken();
-      const data = await getRutaDelDia(token);
-      setRutaDelDia(data);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Error al cargar ruta del día");
-    } finally {
-      setLoading(false);
-    }
-  }, [user]);
+  const loadRutaDelDia = useCallback(
+    async (opts?: { silent?: boolean }) => {
+      if (!user) return;
+      const silent = opts?.silent === true;
+      if (!silent) {
+        setLoading(true);
+        setError(null);
+      }
+      try {
+        const token = await user.getIdToken();
+        const data = await getRutaDelDia(token);
+        setRutaDelDia(data);
+        if (silent) setError(null);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Error al cargar ruta del día");
+      } finally {
+        if (!silent) setLoading(false);
+      }
+    },
+    [user]
+  );
 
   useEffect(() => {
     loadRutaDelDia();
   }, [loadRutaDelDia]);
+
+  useEffect(() => {
+    if (!successMsg) return;
+    const t = setTimeout(() => setSuccessMsg(null), 4200);
+    return () => clearTimeout(t);
+  }, [successMsg]);
 
   const asignarKey = (rutaId: string, empleadoUid: string) => `${rutaId}:${empleadoUid}`;
 
@@ -54,15 +75,18 @@ export default function RutaDelDiaPage() {
     const monto = parseMontoEnteroFormatted(raw);
     if (!Number.isFinite(monto) || monto <= 0) {
       setError("Ingresa un monto válido mayor a cero");
+      setSuccessMsg(null);
       return;
     }
     setError(null);
+    setSuccessMsg(null);
     setAsignandoKey(key);
     try {
       const token = await user.getIdToken();
       await asignarBaseEmpleadoDesdeRuta(token, rutaId, { empleadoUid, monto });
       setMontosAsignar((prev) => ({ ...prev, [key]: "" }));
-      await loadRutaDelDia();
+      setSuccessMsg("Base asignada correctamente a la caja del trabajador.");
+      await loadRutaDelDia({ silent: true });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al asignar");
     } finally {
@@ -73,110 +97,117 @@ export default function RutaDelDiaPage() {
   if (!profile || profile.role !== "admin") return null;
 
   return (
-    <div className="card">
-      <h2 style={{ marginTop: 0 }}>Ruta del día</h2>
-      {error && <p className="error-msg">{error}</p>}
-      {loading ? (
-        <p style={{ color: "var(--text-muted)" }}>Cargando…</p>
-      ) : rutaDelDia.length === 0 ? (
-        <p style={{ color: "var(--text-muted)" }}>
-          No tenés rutas creadas todavía.{" "}
-          <Link href="/dashboard/admin/rutas" style={{ color: "var(--accent, #c94a4a)" }}>
-            Creá una en Rutas
-          </Link>
-          .
+    <div className="ruta-dia-page card">
+      <header className="ruta-dia-head">
+        <h2 className="ruta-dia-title">Ruta del día</h2>
+        <p className="ruta-dia-subtitle">
+          Repartí efectivo desde la <strong>caja de la ruta</strong> hacia la caja de cada trabajador asignado.
         </p>
+      </header>
+
+      {successMsg ? (
+        <p className="ruta-dia-success" role="status">
+          {successMsg}
+        </p>
+      ) : null}
+      {error ? (
+        <p className="error-msg" role="alert">
+          {error}
+        </p>
+      ) : null}
+
+      {loading ? (
+        <div className="ruta-dia-skeleton" aria-busy="true" aria-label="Cargando rutas">
+          <div className="ruta-dia-skeleton-card" />
+          <div className="ruta-dia-skeleton-rows">
+            <div className="ruta-dia-skeleton-row" />
+            <div className="ruta-dia-skeleton-row" />
+          </div>
+        </div>
+      ) : rutaDelDia.length === 0 ? (
+        <div className="ruta-dia-empty">
+          <span className="ruta-dia-empty-icon" aria-hidden>
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+              <circle cx="12" cy="10" r="3" />
+            </svg>
+          </span>
+          <p className="ruta-dia-empty-title">No hay rutas todavía</p>
+          <p className="ruta-dia-empty-text">
+            Creá al menos una ruta para verla aquí y asignar base a tus trabajadores.
+          </p>
+          <Link href="/dashboard/admin/rutas" className="btn btn-primary ruta-dia-empty-link">
+            Ir a Rutas
+          </Link>
+        </div>
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+        <div className="ruta-dia-rutas">
           {rutaDelDia.map((r) => (
-            <div
-              key={r.id}
-              className="card"
-              style={{
-                padding: "1rem",
-                margin: 0,
-                background: "var(--card-bg)",
-                border: "1px solid var(--card-border)",
-              }}
-            >
-              <div style={{ display: "flex", flexWrap: "wrap", alignItems: "baseline", gap: "0.5rem 1rem", marginBottom: "0.75rem" }}>
-                {r.codigo && (
+            <article key={r.id} className="ruta-dia-ruta-card">
+              <div className="ruta-dia-ruta-head">
+                {r.codigo ? (
                   <code className="user-code ruta-code" title="Código de ruta">
                     {r.codigo}
                   </code>
-                )}
-                <span style={{ fontWeight: 600 }}>{r.nombre}</span>
-                {r.ubicacion ? (
-                  <span style={{ color: "var(--text-muted)", fontSize: "0.875rem" }}>{r.ubicacion}</span>
                 ) : null}
-              </div>
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))",
-                  gap: "0.65rem",
-                  marginBottom: r.empleados.length ? "1rem" : 0,
-                }}
-              >
-                <div
-                  className="card"
-                    title="Efectivo en la ruta disponible para asignar a la caja del trabajador"
-                  style={{
-                    padding: "0.65rem 0.85rem",
-                    margin: 0,
-                    background: "var(--card-bg)",
-                    border: "1px solid var(--card-border)",
-                  }}
-                >
-                  <span
-                    style={{
-                      fontSize: "0.7rem",
-                      color: "var(--text-muted)",
-                      textTransform: "uppercase",
-                      letterSpacing: "0.03em",
-                      display: "block",
-                      marginBottom: "0.25rem",
-                    }}
-                  >
-                    Caja de la ruta
-                  </span>
-                  <span style={{ fontSize: "1.05rem", fontWeight: 700 }}>{formatMonto(r.cajaRuta)}</span>
+                <div className="ruta-dia-ruta-titles">
+                  <h3 className="ruta-dia-ruta-nombre">{r.nombre}</h3>
+                  {r.ubicacion ? <p className="ruta-dia-ruta-ubic">{r.ubicacion}</p> : null}
                 </div>
               </div>
+
+              <div className="ruta-dia-caja-wrap">
+                <div
+                  className="ruta-dia-caja-metric"
+                  title="Efectivo en la ruta disponible para asignar a la caja del trabajador"
+                >
+                  <div className="ruta-dia-caja-main">
+                    <span className="ruta-dia-caja-label">Caja de la ruta</span>
+                    <span className="ruta-dia-caja-value">{formatMonto(r.cajaRuta)}</span>
+                  </div>
+                  <span className="admin-inicio-metric-icon admin-inicio-metric-icon--purple" aria-hidden>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <rect x="2" y="7" width="20" height="14" rx="2" ry="2" />
+                      <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
+                    </svg>
+                  </span>
+                </div>
+                {r.cajaRuta <= 0 ? (
+                  <p className="ruta-dia-caja-hint">No hay saldo en la caja de esta ruta para asignar.</p>
+                ) : null}
+              </div>
+
               {r.empleados.length === 0 ? (
-                <p style={{ fontSize: "0.875rem", color: "var(--text-muted)", margin: 0 }}>
+                <p className="ruta-dia-no-emp">
                   Asigná un trabajador a esta ruta desde{" "}
-                  <Link href="/dashboard/admin/empleado" style={{ color: "var(--accent, #c94a4a)" }}>
+                  <Link href="/dashboard/admin/empleado" className="ruta-dia-inline-link">
                     Empleado
                   </Link>{" "}
                   para poder entregarle base.
                 </p>
               ) : (
-                <div style={{ display: "flex", flexDirection: "column", gap: "0.85rem" }}>
+                <div className="ruta-dia-empleados">
+                  <p className="ruta-dia-empleados-label">Trabajadores en la ruta</p>
                   {r.empleados.map((emp) => {
                     const key = asignarKey(r.id, emp.uid);
                     const busy = asignandoKey === key;
                     return (
-                      <div
-                        key={emp.uid}
-                        style={{
-                          display: "flex",
-                          flexWrap: "wrap",
-                          alignItems: "flex-end",
-                          gap: "0.75rem",
-                          padding: "0.75rem",
-                          borderRadius: "8px",
-                          background: "rgba(0,0,0,0.04)",
-                        }}
-                      >
-                        <div style={{ flex: "1 1 160px", fontWeight: 600, fontSize: "0.9375rem" }}>
-                          {emp.nombre}
+                      <div key={emp.uid} className="ruta-dia-emp-row">
+                        <div className="ruta-dia-emp-id">
+                          <span className="ruta-dia-emp-avatar" aria-hidden>
+                            {initialsFromNombre(emp.nombre)}
+                          </span>
+                          <span className="ruta-dia-emp-nombre">{emp.nombre}</span>
                         </div>
-                        <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "0.5rem" }}>
-                          <label style={{ display: "flex", flexDirection: "column", gap: "0.25rem", fontSize: "0.8rem" }}>
-                            Monto
+                        <div className="ruta-dia-emp-panel">
+                          <div className="ruta-dia-emp-monto-block">
+                            <label className="ruta-dia-emp-label" htmlFor={`monto-${key}`}>
+                              Monto
+                            </label>
                             <input
+                              id={`monto-${key}`}
                               type="text"
+                              className="ruta-dia-emp-input"
                               inputMode="decimal"
                               placeholder="Ej: 150000"
                               value={montosAsignar[key] ?? ""}
@@ -187,16 +218,15 @@ export default function RutaDelDiaPage() {
                                   [key]: formatMontoEnteroInput(e.target.value),
                                 }))
                               }
-                              style={{ minWidth: "120px" }}
                             />
-                          </label>
+                          </div>
                           <button
                             type="button"
-                            className="btn btn-primary"
+                            className="btn btn-primary ruta-dia-emp-btn"
                             disabled={busy || r.cajaRuta <= 0}
                             onClick={() => handleAsignarBase(r.id, emp.uid)}
                           >
-                            {busy ? "Asignando…" : "Asignar a la caja del trabajador"}
+                            {busy ? "Asignando…" : "Asignar a caja del trabajador"}
                           </button>
                         </div>
                       </div>
@@ -204,7 +234,7 @@ export default function RutaDelDiaPage() {
                   })}
                 </div>
               )}
-            </div>
+            </article>
           ))}
         </div>
       )}

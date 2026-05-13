@@ -16,7 +16,7 @@ const NAV_ITEMS = [
 ] as const;
 
 function NavIcon({ name }: { name: string }) {
-  const size = 22;
+  const size = 18;
   switch (name) {
     case "home":
       return (

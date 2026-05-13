@@ -264,7 +264,7 @@ export default function PrestamoPage() {
   if (!profile || profile.role !== "admin") return null;
 
   return (
-    <div className="card">
+    <div className="card prestamo-admin-page">
       {showCreateForm && (
       <form onSubmit={handleSubmit} className="card" style={{ marginBottom: "1.25rem" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "0.75rem", marginBottom: "0.5rem" }}>
@@ -552,89 +552,99 @@ export default function PrestamoPage() {
       {!showCreateForm && (
       <>
         {!loading && (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))", gap: "0.5rem", marginBottom: "1rem" }}>
-            <div style={{ padding: "0.5rem 0.65rem", backgroundColor: "var(--card-bg)", border: "1px solid var(--card-border)", borderRadius: "var(--radius)", display: "flex", flexDirection: "column", alignItems: "center", gap: "0.2rem" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", justifyContent: "center" }} aria-hidden>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: "var(--text)", flexShrink: 0 }}>
-                  <circle cx="12" cy="12" r="10" /><path d="M10 8l4 4-4 4" />
-                </svg>
-                <span style={{ fontSize: "1.125rem", fontWeight: 700, color: "var(--text)", lineHeight: 1 }}>{resumenPrestamos.activos}</span>
+          <div className="prestamo-admin-resumen">
+            <div className="prestamo-admin-kpi">
+              <div className="prestamo-admin-kpi-body">
+                <span className="prestamo-admin-kpi-label">Activos</span>
+                <span className="prestamo-admin-kpi-value">{resumenPrestamos.activos}</span>
               </div>
-              <span style={{ fontSize: "0.7rem", color: "var(--text-muted)", lineHeight: 1 }}>Activos</span>
+              <span className="prestamo-admin-kpi-icon prestamo-admin-kpi-icon--activo" aria-hidden>
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10" />
+                  <polyline points="12 6 12 12 16 14" />
+                </svg>
+              </span>
             </div>
-            <div style={{ padding: "0.5rem 0.65rem", backgroundColor: "var(--card-bg)", border: "1px solid var(--card-border)", borderRadius: "var(--radius)", display: "flex", flexDirection: "column", alignItems: "center", gap: "0.2rem" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", justifyContent: "center" }} aria-hidden>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: "var(--error, #ef4444)", flexShrink: 0 }}>
-                  <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
-                </svg>
-                <span style={{ fontSize: "1.125rem", fontWeight: 700, color: "var(--error, #ef4444)", lineHeight: 1 }}>{resumenPrestamos.mora}</span>
+            <div className="prestamo-admin-kpi">
+              <div className="prestamo-admin-kpi-body">
+                <span className="prestamo-admin-kpi-label">En mora</span>
+                <span
+                  className={`prestamo-admin-kpi-value${resumenPrestamos.mora > 0 ? " prestamo-admin-kpi-value--mora" : ""}`}
+                >
+                  {resumenPrestamos.mora}
+                </span>
               </div>
-              <span style={{ fontSize: "0.7rem", color: "var(--text-muted)", lineHeight: 1 }}>En mora</span>
+              <span className="prestamo-admin-kpi-icon prestamo-admin-kpi-icon--mora" aria-hidden>
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                  <line x1="12" y1="9" x2="12" y2="13" />
+                  <line x1="12" y1="17" x2="12.01" y2="17" />
+                </svg>
+              </span>
             </div>
-            <div style={{ padding: "0.5rem 0.65rem", backgroundColor: "var(--card-bg)", border: "1px solid var(--card-border)", borderRadius: "var(--radius)", display: "flex", flexDirection: "column", alignItems: "center", gap: "0.2rem" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", justifyContent: "center" }} aria-hidden>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: "var(--text)", flexShrink: 0 }}>
-                  <path d="M22 11.08V12a10 10 0 11-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" />
-                </svg>
-                <span style={{ fontSize: "1.125rem", fontWeight: 700, color: "var(--text)", lineHeight: 1 }}>{resumenPrestamos.pagados}</span>
+            <div className="prestamo-admin-kpi">
+              <div className="prestamo-admin-kpi-body">
+                <span className="prestamo-admin-kpi-label">Pagados</span>
+                <span className="prestamo-admin-kpi-value">{resumenPrestamos.pagados}</span>
               </div>
-              <span style={{ fontSize: "0.7rem", color: "var(--text-muted)", lineHeight: 1 }}>Pagados</span>
+              <span className="prestamo-admin-kpi-icon prestamo-admin-kpi-icon--pagado" aria-hidden>
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M22 11.08V12a10 10 0 11-5.93-9.14" />
+                  <polyline points="22 4 12 14.01 9 11.01" />
+                </svg>
+              </span>
             </div>
-            <div style={{ padding: "0.5rem 0.65rem", backgroundColor: "var(--card-bg)", border: "1px solid var(--card-border)", borderRadius: "var(--radius)", display: "flex", flexDirection: "column", alignItems: "center", gap: "0.2rem" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", justifyContent: "center" }} aria-hidden>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: "var(--text)", flexShrink: 0 }}>
-                  <line x1="12" y1="1" x2="12" y2="23" /><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" />
-                </svg>
-                <span style={{ fontSize: "0.9375rem", fontWeight: 700, color: "var(--text)", lineHeight: 1 }}>{formatMoneda(resumenPrestamos.saldoPorCobrar)}</span>
+            <div className="prestamo-admin-kpi">
+              <div className="prestamo-admin-kpi-body">
+                <span className="prestamo-admin-kpi-label">Saldo por cobrar</span>
+                <span className="prestamo-admin-kpi-value prestamo-admin-kpi-value--saldo">
+                  $ {formatMoneda(resumenPrestamos.saldoPorCobrar)}
+                </span>
               </div>
-              <span style={{ fontSize: "0.7rem", color: "var(--text-muted)", lineHeight: 1 }}>Saldo por cobrar</span>
+              <span className="prestamo-admin-kpi-icon prestamo-admin-kpi-icon--saldo" aria-hidden>
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="12" y1="1" x2="12" y2="23" />
+                  <path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" />
+                </svg>
+              </span>
             </div>
           </div>
         )}
-        <div className="card">
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "0.75rem", marginBottom: "0.75rem" }}>
-          <h3 style={{ margin: 0 }}>Historial de préstamos</h3>
+        <div className="card prestamo-admin-hist-card">
+        <div className="prestamo-admin-hist-head">
+          <h3 className="prestamo-admin-hist-title">Historial de préstamos</h3>
           <button
             type="button"
-            className="btn btn-primary"
+            className="prestamo-admin-add-btn"
             onClick={() => setShowCreateForm(true)}
             aria-label="Crear nuevo préstamo"
             title="Crear nuevo préstamo"
-            style={{ padding: "0.4rem 0.65rem", minWidth: "auto", lineHeight: 1 }}
           >
             +
           </button>
         </div>
         {loading ? (
-          <p>Cargando...</p>
+          <p className="prestamo-admin-loading">Cargando…</p>
         ) : prestamos.length === 0 ? (
-          <p style={{ color: "var(--text-muted)" }}>No hay préstamos en el historial.</p>
+          <p className="prestamo-admin-empty">No hay préstamos en el historial.</p>
         ) : (
           <>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: "0.35rem", marginBottom: "0.75rem" }} role="tablist" aria-label="Filtrar por estado">
+            <div className="prestamo-admin-tabs" role="tablist" aria-label="Filtrar por estado">
               {(["todos", "activo", "mora", "pagado"] as const).map((est) => (
                 <button
                   key={est}
                   type="button"
                   role="tab"
                   aria-selected={filtroEstado === est}
+                  className={`prestamo-admin-tab${filtroEstado === est ? " prestamo-admin-tab--active" : ""}`}
                   onClick={() => setFiltroEstado(est)}
-                  style={{
-                    padding: "0.35rem 0.65rem",
-                    fontSize: "0.8125rem",
-                    border: "1px solid var(--card-border)",
-                    borderRadius: "var(--radius)",
-                    background: filtroEstado === est ? "var(--link)" : "var(--card-bg)",
-                    color: filtroEstado === est ? "#fff" : "var(--text)",
-                    cursor: "pointer",
-                  }}
                 >
                   {est === "todos" ? "Todos" : est === "activo" ? "Activos" : est === "mora" ? "En mora" : "Pagados"}
                 </button>
               ))}
             </div>
-            <div className="table-wrap table-historial-wrap" style={{ width: "100%", overflow: "visible" }}>
-            <table className="table-historial" style={{ width: "100%", tableLayout: "fixed", minWidth: "100%" }}>
+            <div className="table-wrap table-historial-wrap prestamo-admin-hist-table-wrap">
+            <table className="table-historial">
               <thead>
                 <tr>
                   <th aria-label="Expandir historial" />
@@ -686,14 +696,19 @@ export default function PrestamoPage() {
                         <td className="col-num">{formatMoneda(principal.totalAPagar)}</td>
                         <td className="col-num">{formatMoneda(principal.saldoPendiente)}</td>
                         <td className="col-num" title="Cuotas pagadas / total">{pagadas} / {principal.numeroCuotas}</td>
-                        <td>{principal.estado}</td>
+                        <td>
+                          <span
+                            className={`prestamo-admin-estado${principal.estado === "activo" || principal.estado === "mora" || principal.estado === "pagado" ? ` prestamo-admin-estado--${principal.estado}` : ""}`}
+                          >
+                            {principal.estado}
+                          </span>
+                        </td>
                         <td>{principal.modalidad}</td>
                         <td>
                           {(principal.estado === "activo" || principal.estado === "mora") && (
                             <Link
                               href={`/dashboard/admin/cobrar?clienteId=${grupo.clienteId}&prestamoId=${principal.id}`}
-                              className="btn btn-primary"
-                              style={{ padding: "0.3rem 0.5rem", fontSize: "0.8125rem", minWidth: "auto" }}
+                              className="btn btn-primary prestamo-admin-cobro-btn"
                             >
                               Registrar cobro
                             </Link>
@@ -702,7 +717,7 @@ export default function PrestamoPage() {
                       </tr>
                       {tieneMas && expandido && (
                         <tr id={`historial-cliente-${grupo.clienteId}`} aria-labelledby={`btn-expand-${grupo.clienteId}`}>
-                          <td colSpan={10} style={{ padding: "0.5rem 0.75rem", backgroundColor: "var(--bg)", borderBottom: "1px solid var(--table-border)", verticalAlign: "top" }}>
+                          <td colSpan={10} className="prestamo-admin-expand-panel">
                             <div className="historial-prestamos-list" style={{ fontSize: "0.8125rem", color: "var(--text-muted)" }}>
                               <span style={{ fontWeight: 600, color: "var(--text)", marginBottom: "0.35rem", display: "block" }}>Otros préstamos</span>
                               <ul>
@@ -710,7 +725,10 @@ export default function PrestamoPage() {
                                     <li key={p.id} style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
                                       {formatMoneda(p.monto)} · {p.estado} · {p.numeroCuotas} cuotas
                                       {(p.estado === "activo" || p.estado === "mora") && (
-                                        <Link href={`/dashboard/admin/cobrar?clienteId=${grupo.clienteId}&prestamoId=${p.id}`} className="btn btn-primary" style={{ padding: "0.2rem 0.4rem", fontSize: "0.75rem", minWidth: "auto" }}>
+                                        <Link
+                                          href={`/dashboard/admin/cobrar?clienteId=${grupo.clienteId}&prestamoId=${p.id}`}
+                                          className="btn btn-primary prestamo-admin-cobro-btn prestamo-admin-cobro-btn--sm"
+                                        >
                                           Registrar cobro
                                         </Link>
                                       )}
@@ -728,7 +746,7 @@ export default function PrestamoPage() {
             </table>
           </div>
           {prestamosFiltrados.length === 0 && (
-            <p style={{ color: "var(--text-muted)", fontSize: "0.875rem", marginTop: "0.5rem" }}>
+            <p className="prestamo-admin-filtro-vacio">
               No hay préstamos en el historial con estado «{filtroEstado === "todos" ? "todos" : filtroEstado === "activo" ? "activos" : filtroEstado === "mora" ? "en mora" : "pagados"}».
             </p>
           )}

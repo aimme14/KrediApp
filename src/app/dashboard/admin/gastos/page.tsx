@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, type ReactNode } from "react";
 import { useAuth } from "@/context/AuthContext";
 import {
   listGastos,
@@ -313,24 +313,44 @@ export default function GastosPage() {
 
   if (!profile || profile.role !== "admin") return null;
 
-  function etiquetaAlcance(g: GastoItem): string {
+  function renderAlcance(g: GastoItem): ReactNode {
     const a = (g.alcance ?? "").trim();
     if (a === "empleado") {
       const r = g.rutaId ? rutas.find((x) => x.id === g.rutaId) : undefined;
-      return r ? `Trabajador · ${r.nombre}` : "Trabajador";
+      return (
+        <span className="gastos-admin-alcance">
+          <span className="gastos-admin-alcance-line">Trabajador</span>
+          {r ? <span className="gastos-admin-alcance-sub">{r.nombre}</span> : null}
+        </span>
+      );
     }
     if (a === "ruta") {
-      const r = rutas.find((r) => r.id === g.rutaId);
-      return r ? `Ruta: ${r.nombre}` : "Ruta";
+      const r = rutas.find((x) => x.id === g.rutaId);
+      return (
+        <span className="gastos-admin-alcance">
+          <span className="gastos-admin-alcance-line">Ruta</span>
+          {r ? <span className="gastos-admin-alcance-sub">{r.nombre}</span> : null}
+        </span>
+      );
     }
-    if (a === "admin") return "Administrador";
-    return g.rutaId ? "Ruta (hist.)" : "Administrador";
+    if (a === "admin") {
+      return (
+        <span className="gastos-admin-alcance">
+          <span className="gastos-admin-alcance-line">Administrador</span>
+        </span>
+      );
+    }
+    return (
+      <span className="gastos-admin-alcance">
+        <span className="gastos-admin-alcance-line">{g.rutaId ? "Ruta (hist.)" : "Administrador"}</span>
+      </span>
+    );
   }
 
   return (
-    <div className="card">
-      <h2 style={{ marginTop: 0 }}>Gastos operativos</h2>
-      <p style={{ color: "var(--text-muted)", marginTop: "-0.25rem", marginBottom: "1rem" }}>
+    <div className="card gastos-admin-page">
+      <h2 className="gastos-admin-title">Gastos operativos</h2>
+      <p className="gastos-admin-intro">
         Tus gastos (administrador o ruta) se descuentan de tu base. El historial incluye también los gastos operativos registrados por tus trabajadores (desde su base).
       </p>
 
@@ -537,28 +557,26 @@ export default function GastosPage() {
       {!showForm && error && <p className="error-msg">{error}</p>}
 
       {!showForm && (
-      <div className="card">
-        <div className="card-header-row gastos-card-header">
+      <div className="card gastos-admin-historial-card">
+        <div className="gastos-admin-hist-top">
           <div>
-            <h3 style={{ marginTop: 0 }}>Historial de gastos</h3>
+            <h3 className="gastos-admin-hist-title">Historial de gastos</h3>
             {!loading && gastos.length > 0 && (
-              <p className="gastos-registros-msg">
+              <p className="gastos-registros-msg gastos-admin-hist-meta">
                 {gastosOrdenados.length} registro{gastosOrdenados.length !== 1 ? "s" : ""} encontrado{gastosOrdenados.length !== 1 ? "s" : ""}
               </p>
             )}
           </div>
-          <div className="gastos-header-actions">
-            <button
-              type="button"
-              className="btn btn-primary"
-              onClick={() => setShowForm((v) => !v)}
-              aria-label={showForm ? "Cerrar formulario" : "Agregar gasto"}
-              title={showForm ? "Cerrar" : "Agregar gasto"}
-            >
-              {showForm ? <CloseIcon /> : <PlusIcon />}
-              {!showForm && <span className="gastos-btn-agregar-text">Agregar gasto</span>}
-            </button>
-          </div>
+          <button
+            type="button"
+            className="btn btn-primary gastos-admin-add-btn"
+            onClick={() => setShowForm(true)}
+            aria-label="Agregar gasto"
+            title="Agregar gasto"
+          >
+            <PlusIcon />
+            <span className="gastos-btn-agregar-text">Agregar gasto</span>
+          </button>
         </div>
         {loading ? (
           <p className="gastos-loading-msg">Cargando...</p>
@@ -566,45 +584,54 @@ export default function GastosPage() {
           <p className="gastos-empty-msg">No hay gastos registrados.</p>
         ) : (
           <>
-            <div className="gastos-buscador-wrap">
-              <input
-                id="gastos-buscador"
-                type="search"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Buscar por nombre, tipo, monto o fecha..."
-                aria-label="Buscar en historial de gastos"
-              />
-              {searchQuery.trim() && (
-                <p className="gastos-resultados-msg">
+            <div className="gastos-admin-toolbar">
+              <div className="gastos-admin-search-field">
+                <span className="gastos-admin-search-icon" aria-hidden>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="11" cy="11" r="8" />
+                    <path d="m21 21-4.3-4.3" />
+                  </svg>
+                </span>
+                <input
+                  id="gastos-buscador"
+                  className="gastos-admin-search-input"
+                  type="search"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Buscar por nombre, tipo, monto o fecha..."
+                  aria-label="Buscar en historial de gastos"
+                />
+              </div>
+              {searchQuery.trim() ? (
+                <p className="gastos-resultados-msg gastos-admin-search-hint">
                   {gastosOrdenados.length} resultado{gastosOrdenados.length !== 1 ? "s" : ""}
                 </p>
-              )}
+              ) : null}
             </div>
             {gastosOrdenados.length === 0 ? (
               <p className="gastos-empty-msg">No hay gastos que coincidan con la búsqueda.</p>
             ) : (
             <>
-            <div className="table-wrap gastos-table-wrap">
-              <table className="gastos-table">
+            <div className="table-wrap gastos-table-wrap gastos-admin-table-wrap">
+              <table className="gastos-table gastos-admin-table">
                 <thead>
                   <tr>
                     <th className="gastos-col-nombre">Nombre</th>
                     <th className="gastos-col-fecha">Fecha</th>
                     <th className="gastos-col-tipo">Tipo</th>
-                    <th>Ámbito</th>
+                    <th className="gastos-col-alcance">Ámbito</th>
                     <th className="gastos-col-monto">Monto</th>
                     <th className="gastos-col-evidencia">Evidencia</th>
-                    <th>Motivo</th>
+                    <th className="gastos-col-motivo">Motivo</th>
                   </tr>
                 </thead>
                 <tbody>
                   {gastosOrdenados.map((g) => (
                   <tr key={`${g.rol}-${g.id}`}>
-                    <td className="gastos-col-nombre" title={g.creadoPorNombre ?? undefined}>{g.creadoPorNombre ?? "—"}</td>
+                    <td className="gastos-col-nombre" title={g.creadoPorNombre ?? undefined}>{g.creadoPorNombre ?? <span className="gastos-admin-dash" title="Sin nombre">—</span>}</td>
                     <td className="gastos-col-fecha">{formatoFechaGastoColombia(g.fecha ?? null)}</td>
                     <td className="gastos-col-tipo">{tipoLabel(g.tipo ?? "")}</td>
-                    <td>{etiquetaAlcance(g)}</td>
+                    <td className="gastos-col-alcance">{renderAlcance(g)}</td>
                     <td className="gastos-col-monto">{formatMoneda(g.monto ?? 0)}</td>
                     <td className="gastos-col-evidencia">
                       {g.evidencia ? (
@@ -612,20 +639,22 @@ export default function GastosPage() {
                           Ver comprobante
                         </a>
                       ) : (
-                        "—"
+                        <span className="gastos-admin-dash" title="Sin comprobante">—</span>
                       )}
                     </td>
-                    <td>
+                    <td className="gastos-col-motivo">
                       {g.descripcion ? (
                         <button
                           type="button"
-                          className="gastos-ver-motivo-btn"
+                          className="gastos-ver-motivo-btn gastos-admin-ver-motivo-btn"
                           onClick={() => setMotivoOverlay(g.descripcion)}
                           aria-label="Ver motivo completo del gasto"
                         >
                           Ver motivo
                         </button>
-                      ) : "—"}
+                      ) : (
+                        <span className="gastos-admin-dash" title="Sin motivo">—</span>
+                      )}
                     </td>
                   </tr>
                   ))}
