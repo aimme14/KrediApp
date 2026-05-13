@@ -226,7 +226,7 @@ export default function RutaDelDiaPage() {
         <div className="ruta-dia-caja-inner">
           <div className="ruta-dia-caja-text">
             <h3 id="ruta-dia-caja-heading" className="ruta-dia-caja-title">
-              Tu caja del día
+              caja 
             </h3>
             {cajaDelDiaResumen?.fechaDia ? (
               <p className="ruta-dia-caja-desc">{cajaDelDiaResumen.fechaDia}</p>
