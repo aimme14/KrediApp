@@ -41,6 +41,10 @@ function etiquetaTipoFlujo(tipo: string | undefined): string {
 const TOAST_DURATION = 3000;
 const BUTTON_SUCCESS_DURATION = 2000;
 
+type InversionPendiente =
+  | { tipo: "empresa"; monto: number }
+  | { tipo: "admin"; monto: number; adminUid: string; adminNombre: string };
+
 function formatMonto(value: number): string {
   return new Intl.NumberFormat("es-CO", {
     style: "decimal",
@@ -193,14 +197,18 @@ export default function JefeGestionFinancieraPanel({
   const [seccionActiva, setSeccionActiva] = useState<"capital" | "caja">("capital");
   const [tipoLiquidezBase, setTipoLiquidezBase] = useState<"entrada" | "inversion_caja_admin">("entrada");
   const [invertirMonto, setInvertirMonto] = useState("");
-  const [invertirSaving, setInvertirSaving] = useState(false);
   const [invertirError, setInvertirError] = useState<string | null>(null);
   const [adminsEmpresa, setAdminsEmpresa] = useState<UserProfile[]>([]);
   const [adminsEmpresaLoading, setAdminsEmpresaLoading] = useState(false);
   const [transferAdminUid, setTransferAdminUid] = useState("");
   const [transferMonto, setTransferMonto] = useState("");
-  const [transferSaving, setTransferSaving] = useState(false);
   const [transferError, setTransferError] = useState<string | null>(null);
+
+  const [modalInversionAbierto, setModalInversionAbierto] = useState(false);
+  const [inversionPendiente, setInversionPendiente] = useState<InversionPendiente | null>(null);
+  const [inversionMontoConfirm, setInversionMontoConfirm] = useState("");
+  const [inversionModalError, setInversionModalError] = useState<string | null>(null);
+  const [inversionConfirmSaving, setInversionConfirmSaving] = useState(false);
 
   const loadCapital = useCallback(async () => {
     if (!user || !profile || profile.role !== "jefe") return;
@@ -240,13 +248,26 @@ export default function JefeGestionFinancieraPanel({
   }, [profile, seccionActiva]);
 
   useEffect(() => {
-    if (!modalAbierto) return;
+    if (!modalAbierto && !modalInversionAbierto) return;
     const onEscape = (e: KeyboardEvent) => {
-      if (e.key === "Escape") handleCerrarModal();
+      if (e.key !== "Escape") return;
+      if (modalInversionAbierto) {
+        if (inversionConfirmSaving) return;
+        setModalInversionAbierto(false);
+        setInversionPendiente(null);
+        setInversionMontoConfirm("");
+        setInversionModalError(null);
+      } else if (modalAbierto) {
+        setModalAbierto(false);
+        setCajaObjetivoPendiente(null);
+        setPasswordValue("");
+        setPasswordConfirmValue("");
+        setPasswordError(null);
+      }
     };
     document.addEventListener("keydown", onEscape);
     return () => document.removeEventListener("keydown", onEscape);
-  }, [modalAbierto]);
+  }, [modalAbierto, modalInversionAbierto, inversionConfirmSaving]);
 
   const { num: num1, valid: valid1 } = parseMontoInput(inputValue);
   const { num: num2, valid: valid2 } = parseMontoInput(inputValueConfirm);
@@ -351,7 +372,15 @@ export default function JefeGestionFinancieraPanel({
     }
   };
 
-  const handleInvertirCaja = async (e: React.FormEvent) => {
+  const handleCerrarModalInversion = () => {
+    if (inversionConfirmSaving) return;
+    setModalInversionAbierto(false);
+    setInversionPendiente(null);
+    setInversionMontoConfirm("");
+    setInversionModalError(null);
+  };
+
+  const handleInvertirCaja = (e: React.FormEvent) => {
     e.preventDefault();
     if (!user || !profile || profile.role !== "jefe") return;
     const { num, valid } = parseMontoInput(invertirMonto);
@@ -360,25 +389,13 @@ export default function JefeGestionFinancieraPanel({
       return;
     }
     setInvertirError(null);
-    setInvertirSaving(true);
-    try {
-      const token = await user.getIdToken();
-      const data = await invertirCajaJefe(token, { monto: num });
-      setCapitalState((prev) => (prev ? { ...prev, ...data } : null));
-      setInvertirMonto("");
-      setToast({
-        tipo: "aumento",
-        mensaje: "Inversión en empresa registrada.",
-      });
-      setTimeout(() => setToast(null), TOAST_DURATION);
-    } catch (err) {
-      setInvertirError(err instanceof Error ? err.message : "Error al invertir");
-    } finally {
-      setInvertirSaving(false);
-    }
+    setInversionPendiente({ tipo: "empresa", monto: num });
+    setInversionMontoConfirm("");
+    setInversionModalError(null);
+    setModalInversionAbierto(true);
   };
 
-  const handleTransferirBaseAdmin = async (e: React.FormEvent) => {
+  const handleTransferirBaseAdmin = (e: React.FormEvent) => {
     e.preventDefault();
     if (!user || !profile || profile.role !== "jefe") return;
     if (!transferAdminUid.trim()) {
@@ -395,27 +412,70 @@ export default function JefeGestionFinancieraPanel({
       setTransferError("El monto supera la caja disponible de la empresa.");
       return;
     }
+    const admin = adminsEmpresa.find((a) => a.uid === transferAdminUid.trim());
+    const adminNombre =
+      admin?.displayName?.trim() || admin?.email || transferAdminUid.trim();
     setTransferError(null);
-    setTransferSaving(true);
+    setInversionPendiente({
+      tipo: "admin",
+      monto: num,
+      adminUid: transferAdminUid.trim(),
+      adminNombre,
+    });
+    setInversionMontoConfirm("");
+    setInversionModalError(null);
+    setModalInversionAbierto(true);
+  };
+
+  const handleConfirmarInversion = async () => {
+    if (!user || !profile || profile.role !== "jefe" || !inversionPendiente) return;
+    const { num: numConfirm, valid: validConfirm } = parseMontoInput(inversionMontoConfirm);
+    if (!validConfirm) {
+      setInversionModalError(
+        inversionMontoConfirm.trim() === ""
+          ? "Repite el monto para confirmar."
+          : "El monto debe ser mayor a 0 y coincidir con la operación."
+      );
+      return;
+    }
+    if (numConfirm !== inversionPendiente.monto) {
+      setInversionModalError("El monto repetido no coincide con el de la inversión.");
+      return;
+    }
+    setInversionModalError(null);
+    setInversionConfirmSaving(true);
     try {
       const token = await user.getIdToken();
-      const data = await transferirBaseEmpresaAAdmin(token, {
-        adminUid: transferAdminUid.trim(),
-        monto: num,
-      });
-      setCapitalState((prev) => (prev ? { ...prev, ...data } : null));
-      setTransferMonto("");
-      setToast({
-        tipo: "aumento",
-        mensaje: "Inversión a caja de administrador registrada.",
-      });
+      if (inversionPendiente.tipo === "empresa") {
+        const data = await invertirCajaJefe(token, { monto: inversionPendiente.monto });
+        setCapitalState((prev) => (prev ? { ...prev, ...data } : null));
+        setInvertirMonto("");
+        setToast({
+          tipo: "aumento",
+          mensaje: "Inversión en empresa registrada.",
+        });
+      } else {
+        const data = await transferirBaseEmpresaAAdmin(token, {
+          adminUid: inversionPendiente.adminUid,
+          monto: inversionPendiente.monto,
+        });
+        setCapitalState((prev) => (prev ? { ...prev, ...data } : null));
+        setTransferMonto("");
+        setToast({
+          tipo: "aumento",
+          mensaje: "Inversión a caja de administrador registrada.",
+        });
+      }
       setTimeout(() => setToast(null), TOAST_DURATION);
+      setModalInversionAbierto(false);
+      setInversionPendiente(null);
+      setInversionMontoConfirm("");
+      setInversionModalError(null);
     } catch (err) {
-      setTransferError(
-        err instanceof Error ? err.message : "Error al registrar la inversión"
-      );
+      const msg = err instanceof Error ? err.message : "Error al registrar la operación";
+      setInversionModalError(msg);
     } finally {
-      setTransferSaving(false);
+      setInversionConfirmSaving(false);
     }
   };
 
@@ -635,7 +695,7 @@ export default function JefeGestionFinancieraPanel({
                         }}
                         placeholder="Ej. 500000"
                         className={`gf-capital-input ${invertirError ? "gf-capital-input-error" : ""}`}
-                        disabled={invertirSaving}
+                        disabled={modalInversionAbierto || inversionConfirmSaving}
                       />
                     </div>
                     {invertirError && (
@@ -643,8 +703,13 @@ export default function JefeGestionFinancieraPanel({
                         {invertirError}
                       </p>
                     )}
-                    <button type="submit" className="gf-btn-actualizar" disabled={invertirSaving} style={{ marginTop: "0.75rem" }}>
-                      {invertirSaving ? "Aplicando…" : "Registrar inversión en empresa"}
+                    <button
+                      type="submit"
+                      className="gf-btn-actualizar"
+                      disabled={modalInversionAbierto || inversionConfirmSaving}
+                      style={{ marginTop: "0.75rem" }}
+                    >
+                      Registrar inversión en empresa
                     </button>
                   </form>
                 ) : (
@@ -664,7 +729,7 @@ export default function JefeGestionFinancieraPanel({
                         setTransferAdminUid(e.target.value);
                         setTransferError(null);
                       }}
-                      disabled={transferSaving || adminsEmpresaLoading}
+                      disabled={modalInversionAbierto || inversionConfirmSaving || adminsEmpresaLoading}
                     >
                       <option value="">
                         {adminsEmpresaLoading ? "Cargando…" : adminsEmpresa.length === 0 ? "Sin administradores" : "Selecciona…"}
@@ -691,7 +756,7 @@ export default function JefeGestionFinancieraPanel({
                         }}
                         placeholder="Ej. 200000"
                         className={`gf-capital-input ${transferError ? "gf-capital-input-error" : ""}`}
-                        disabled={transferSaving}
+                        disabled={modalInversionAbierto || inversionConfirmSaving}
                       />
                     </div>
                     {transferError && (
@@ -702,10 +767,15 @@ export default function JefeGestionFinancieraPanel({
                     <button
                       type="submit"
                       className="gf-btn-actualizar"
-                      disabled={transferSaving || !transferAdminUid || adminsEmpresa.length === 0}
+                      disabled={
+                        modalInversionAbierto ||
+                        inversionConfirmSaving ||
+                        !transferAdminUid ||
+                        adminsEmpresa.length === 0
+                      }
                       style={{ marginTop: "0.75rem" }}
                     >
-                      {transferSaving ? "Aplicando…" : "Registrar inversión"}
+                      Registrar inversión
                     </button>
                   </form>
                 )}
@@ -908,6 +978,84 @@ export default function JefeGestionFinancieraPanel({
                   </>
                 ) : (
                   "Confirmar"
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {modalInversionAbierto && inversionPendiente != null && (
+        <div className="gf-modal-backdrop" onClick={handleCerrarModalInversion} aria-hidden>
+          <div
+            className="gf-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="gf-modal-inversion-title"
+            aria-describedby="gf-modal-inversion-desc"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 id="gf-modal-inversion-title" className="gf-modal-title">
+              {inversionPendiente.tipo === "empresa"
+                ? "Confirmar inversión en empresa"
+                : "Confirmar inversión a administrador"}
+            </h2>
+            <p id="gf-modal-inversion-desc" className="gf-modal-desc">
+              {inversionPendiente.tipo === "empresa" ? (
+                <>
+                  Vas a registrar una <strong>entrada de liquidez</strong> por{" "}
+                  <strong className="gf-modal-monto">${formatMonto(inversionPendiente.monto)}</strong>. Aumentarán la
+                  caja de la empresa y el capital total. Para confirmar, <strong>repite el mismo monto</strong> abajo.
+                </>
+              ) : (
+                <>
+                  Vas a transferir{" "}
+                  <strong className="gf-modal-monto">${formatMonto(inversionPendiente.monto)}</strong> desde la caja de
+                  la empresa hacia <strong>{inversionPendiente.adminNombre}</strong>. El capital total no cambia. Para
+                  confirmar, <strong>repite el mismo monto</strong> abajo.
+                </>
+              )}
+            </p>
+            <label htmlFor="gf-modal-inversion-monto-confirm" className="gf-modal-label">
+              Repite el monto
+            </label>
+            <input
+              id="gf-modal-inversion-monto-confirm"
+              type="text"
+              inputMode="decimal"
+              value={inversionMontoConfirm}
+              onChange={(e) => {
+                setInversionMontoConfirm(formatMontoEnteroInput(e.target.value));
+                setInversionModalError(null);
+              }}
+              className={`gf-modal-input${inversionModalError ? " gf-capital-input-error" : ""}`}
+              disabled={inversionConfirmSaving}
+              aria-invalid={!!inversionModalError}
+              aria-describedby={inversionModalError ? "gf-modal-inversion-error" : undefined}
+              autoComplete="off"
+            />
+            {inversionModalError && (
+              <p id="gf-modal-inversion-error" className="gf-capital-input-msg-error" role="alert">
+                {inversionModalError}
+              </p>
+            )}
+            <div className="gf-modal-actions">
+              <button type="button" className="btn btn-secondary" onClick={handleCerrarModalInversion} disabled={inversionConfirmSaving}>
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={handleConfirmarInversion}
+                disabled={inversionConfirmSaving}
+              >
+                {inversionConfirmSaving ? (
+                  <>
+                    <span className="gf-btn-spinner" aria-hidden />
+                    Registrando…
+                  </>
+                ) : (
+                  "Confirmar inversión"
                 )}
               </button>
             </div>
