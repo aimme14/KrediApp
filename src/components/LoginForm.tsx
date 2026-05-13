@@ -2,6 +2,8 @@
 
 import { useState, useRef, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
+import styles from "@/components/login/loginForm.module.css";
+import { IconEye, IconEyeOff, IconLock, IconLogin, IconMail } from "@/components/login/loginIcons";
 
 export default function LoginForm() {
   const [email, setEmail] = useState("");
@@ -31,62 +33,82 @@ export default function LoginForm() {
   };
 
   return (
-    <form onSubmit={handleSubmit}>
-      <div className="form-group">
-        <label htmlFor="email">Correo</label>
-        <input
-          id="email"
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
-          autoComplete="email"
-          disabled={isSubmitting}
-          aria-describedby={error ? "login-error" : undefined}
-        />
+    <form className={styles.form} onSubmit={handleSubmit}>
+      <header className={styles.formHeader}>
+        <h2 id="login-heading" className={styles.formTitle}>
+          Bienvenido de nuevo
+        </h2>
+        <p className={styles.formSub}>Ingresa tus credenciales para continuar</p>
+      </header>
+
+      <div className={styles.field}>
+        <label className={styles.label} htmlFor="email">
+          Correo electrónico
+        </label>
+        <div className={styles.inputWrap}>
+          <span className={styles.inputIcon}>
+            <IconMail />
+          </span>
+          <input
+            id="email"
+            className={styles.input}
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            autoComplete="email"
+            disabled={isSubmitting}
+            placeholder="admin@krediapp.com"
+            aria-invalid={error ? true : undefined}
+            aria-describedby={error ? "login-error" : undefined}
+          />
+        </div>
       </div>
-      <div className="form-group">
-        <label htmlFor="password">Contraseña</label>
-        <div className="password-input-wrap">
+
+      <div className={styles.field}>
+        <label className={styles.label} htmlFor="password">
+          Contraseña
+        </label>
+        <div className={styles.inputWrap}>
+          <span className={styles.inputIcon}>
+            <IconLock />
+          </span>
           <input
             id="password"
+            className={`${styles.input} ${styles.inputWithEye}`}
             type={showPassword ? "text" : "password"}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
             autoComplete="current-password"
             disabled={isSubmitting}
+            placeholder="••••••••"
+            aria-invalid={error ? true : undefined}
             aria-describedby={error ? "login-error" : undefined}
           />
           <button
             type="button"
-            className="btn-password-toggle"
+            className={styles.eyeBox}
             onClick={() => setShowPassword((v) => !v)}
-            title={showPassword ? "Ocultar contraseña" : "Ver contraseña"}
-            aria-label={showPassword ? "Ocultar contraseña" : "Ver contraseña"}
+            title={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+            aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
             disabled={isSubmitting}
           >
-            {showPassword ? "Ocultar" : "Ver"}
+            {showPassword ? <IconEyeOff /> : <IconEye />}
           </button>
         </div>
       </div>
-      {error && (
-        <p
-          id="login-error"
-          ref={errorRef}
-          className="error-msg"
-          role="alert"
-          tabIndex={-1}
-        >
+
+      {error ? (
+        <p id="login-error" ref={errorRef} className={styles.error} role="alert" tabIndex={-1}>
           {error}
         </p>
-      )}
-      <button
-        type="submit"
-        className="btn btn-primary"
-        style={{ width: "100%", marginTop: "0.5rem" }}
-        disabled={isSubmitting}
-      >
+      ) : null}
+
+      <button type="submit" className={styles.submit} disabled={isSubmitting}>
+        <span className={styles.submitIcon}>
+          <IconLogin />
+        </span>
         {isSubmitting ? "Iniciando sesión…" : "Iniciar sesión"}
       </button>
     </form>

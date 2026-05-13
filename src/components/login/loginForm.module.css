@@ -1,0 +1,238 @@
+/* Formulario login: base oscuro; claro vía html[data-theme="light"] al final. */
+
+.form {
+  width: 100%;
+}
+
+.formHeader {
+  margin-bottom: 28px;
+}
+
+.formTitle {
+  font-size: 1.375rem;
+  font-weight: 600;
+  color: #fafafa;
+  margin: 0 0 6px;
+  letter-spacing: -0.02em;
+}
+
+.formSub {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: rgba(244, 244, 245, 0.45);
+}
+
+.field {
+  margin-bottom: 20px;
+}
+
+.label {
+  display: block;
+  font-size: 10px;
+  font-weight: 600;
+  color: rgba(244, 244, 245, 0.42);
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.inputWrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.inputIcon {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: rgba(244, 244, 245, 0.28);
+  pointer-events: none;
+  display: flex;
+}
+
+.input {
+  width: 100%;
+  height: 46px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  padding: 0 16px 0 44px;
+  font-size: 0.875rem;
+  color: #fafafa;
+  background: #222226;
+  outline: none;
+  font-family: inherit;
+  transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+}
+
+.inputWithEye {
+  padding-right: 52px;
+}
+
+.input::placeholder {
+  color: rgba(244, 244, 245, 0.28);
+}
+
+.input:hover:not(:disabled) {
+  border-color: rgba(255, 255, 255, 0.14);
+}
+
+.input:focus {
+  border-color: rgba(167, 139, 250, 0.55);
+  background: #26262b;
+  box-shadow: 0 0 0 3px rgba(124, 99, 255, 0.18);
+}
+
+.input:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.eyeBox {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  padding: 0;
+  width: 36px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(244, 244, 245, 0.4);
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s, border-color 0.15s;
+}
+
+.eyeBox:hover:not(:disabled) {
+  color: #c4b5fd;
+  background: rgba(124, 99, 255, 0.12);
+  border-color: rgba(167, 139, 250, 0.25);
+}
+
+.eyeBox:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.error {
+  margin: 0 0 18px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  color: #fecaca;
+  background: rgba(127, 29, 29, 0.35);
+  border: 1px solid rgba(248, 113, 113, 0.25);
+}
+
+.submit {
+  width: 100%;
+  min-height: 46px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.03);
+  color: #fafafa;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  letter-spacing: -0.01em;
+  transition: background 0.15s, border-color 0.15s, transform 0.08s;
+}
+
+.submit:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.24);
+}
+
+.submit:active:not(:disabled) {
+  transform: scale(0.99);
+}
+
+.submit:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.submitIcon {
+  display: flex;
+  color: rgba(250, 250, 250, 0.85);
+}
+
+:global(html[data-theme="light"]) .formTitle {
+  color: #0f0a1e;
+}
+
+:global(html[data-theme="light"]) .formSub {
+  color: #64748b;
+}
+
+:global(html[data-theme="light"]) .label {
+  color: #71717a;
+}
+
+:global(html[data-theme="light"]) .inputIcon {
+  color: #a1a1aa;
+}
+
+:global(html[data-theme="light"]) .input {
+  border-color: #e8e4f0;
+  background: #faf9fd;
+  color: #1a1035;
+}
+
+:global(html[data-theme="light"]) .input::placeholder {
+  color: #c4bdd8;
+}
+
+:global(html[data-theme="light"]) .input:hover:not(:disabled) {
+  border-color: #ddd8eb;
+}
+
+:global(html[data-theme="light"]) .input:focus {
+  border-color: #7c63ff;
+  background: #ffffff;
+  box-shadow: 0 0 0 3px rgba(124, 99, 255, 0.15);
+}
+
+:global(html[data-theme="light"]) .eyeBox {
+  border-color: #e8e4f0;
+  background: #ffffff;
+  color: #a1a1aa;
+}
+
+:global(html[data-theme="light"]) .eyeBox:hover:not(:disabled) {
+  color: #6d28d9;
+  background: #f5f3ff;
+  border-color: #c4b5fd;
+}
+
+:global(html[data-theme="light"]) .error {
+  color: #991b1b;
+  background: #fef2f2;
+  border-color: #fecaca;
+}
+
+:global(html[data-theme="light"]) .submit {
+  border-color: #d4d4d8;
+  background: #ffffff;
+  color: #18181b;
+}
+
+:global(html[data-theme="light"]) .submit:hover:not(:disabled) {
+  background: #fafafa;
+  border-color: #a1a1aa;
+}
+
+:global(html[data-theme="light"]) .submitIcon {
+  color: #27272a;
+}

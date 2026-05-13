@@ -4,12 +4,13 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import LoginForm from "@/components/LoginForm";
 import ThemeToggle from "@/components/ThemeToggle";
-import Logo from "@/components/Logo";
+import LoginShell, { LoginBackdrop } from "@/components/login/LoginShell";
+import shellStyles from "@/components/login/loginShell.module.css";
 
 function LoginFormSignOut() {
   const { signOut } = useAuth();
   return (
-    <button type="button" className="btn btn-secondary" onClick={() => signOut()} style={{ width: "100%" }}>
+    <button type="button" className={shellStyles.outlineBtn} onClick={() => void signOut()}>
       Cerrar sesión
     </button>
   );
@@ -45,72 +46,54 @@ export default function HomePage() {
 
   if (loading) {
     return (
-      <div className="container" style={{ paddingTop: "4rem", textAlign: "center", position: "relative" }}>
-        <div style={{ position: "absolute", top: "1rem", right: "1.5rem" }}>
+      <LoginBackdrop>
+        <div className={shellStyles.themeCorner}>
           <ThemeToggle />
         </div>
-        <p>Cargando...</p>
-        {showSlowHint ? (
-          <p style={{ color: "var(--text-muted)", maxWidth: 420, margin: "1rem auto 0", fontSize: "0.9rem" }}>
-            Si esto tarda mucho, comprueba tu conexión, desactiva bloqueadores o recarga la página.
-          </p>
-        ) : null}
-      </div>
+        <div className={shellStyles.backdropInner}>
+          <p>Cargando…</p>
+          {showSlowHint ? (
+            <p className={shellStyles.backdropHint}>
+              Si esto tarda mucho, comprueba tu conexión, desactiva bloqueadores o recarga la página.
+            </p>
+          ) : null}
+        </div>
+      </LoginBackdrop>
     );
   }
 
   if (user && profile) {
     return (
-      <div className="container" style={{ paddingTop: "4rem", textAlign: "center", position: "relative" }}>
-        <div style={{ position: "absolute", top: "1rem", right: "1.5rem" }}>
+      <LoginBackdrop>
+        <div className={shellStyles.themeCorner}>
           <ThemeToggle />
         </div>
-        <p>Redirigiendo al panel...</p>
-      </div>
+        <div className={shellStyles.backdropInner}>
+          <p>Redirigiendo al panel…</p>
+        </div>
+      </LoginBackdrop>
     );
   }
 
-  // Usuario autenticado pero sin perfil en Firestore (no puede entrar al panel)
   if (user && !profile) {
     return (
-      <div className="container" style={{ paddingTop: "4rem", position: "relative" }}>
-        <div style={{ position: "absolute", top: "1rem", right: "1.5rem" }}>
-          <ThemeToggle />
-        </div>
-        <div className="card" style={{ maxWidth: 400, margin: "0 auto" }}>
-          <div className="page-title" style={{ display: "flex", justifyContent: "center", marginBottom: "1rem" }}>
-          <Logo variant="page" priority />
-        </div>
-        <p className="error-msg" style={{ marginBottom: "1rem" }}>
-            {error?.trim()
-              ? error
-              : "Tu cuenta no tiene un perfil asignado en la aplicación. Contacta al Super Administrador o al responsable para que te den de alta."}
-          </p>
-          <LoginFormSignOut />
-        </div>
-      </div>
+      <LoginShell>
+        <h2 id="login-heading" className={shellStyles.panelTitle}>
+          Perfil no disponible
+        </h2>
+        <p className={error?.trim() ? shellStyles.panelAlert : shellStyles.panelSub}>
+          {error?.trim()
+            ? error
+            : "Tu cuenta no tiene un perfil asignado en la aplicación. Contacta al Super Administrador o al responsable para que te den de alta."}
+        </p>
+        <LoginFormSignOut />
+      </LoginShell>
     );
   }
 
   return (
-    <div className="container" style={{ paddingTop: "4rem", position: "relative" }}>
-      <div style={{ position: "absolute", top: "1rem", right: "1.5rem" }}>
-        <ThemeToggle />
-      </div>
-      <div className="card" style={{ maxWidth: 400, margin: "0 auto" }}>
-        <div className="page-title" style={{ display: "flex", justifyContent: "center", marginBottom: "1rem" }}>
-          <Logo variant="page" priority />
-        </div>
-        {error?.trim() ? (
-          <p className="error-msg" style={{ marginBottom: "1rem" }}>
-            {error}
-          </p>
-        ) : null}
-        <p style={{ color: "var(--text-muted)", marginBottom: "1.5rem" }}>
-          Inicia sesión con tu cuenta
-        </p>
-        <LoginForm />
-      </div>
-    </div>
+    <LoginShell>
+      <LoginForm />
+    </LoginShell>
   );
 }

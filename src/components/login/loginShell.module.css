@@ -1,0 +1,350 @@
+/* Pantalla de login: base = oscuro; claro vía html[data-theme="light"] (ver final del archivo). */
+.backdrop {
+  position: relative;
+  min-height: 100dvh;
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(16px, 3vw, 32px);
+}
+
+.themeCorner {
+  position: absolute;
+  top: 1rem;
+  right: 1.25rem;
+  z-index: 2;
+}
+
+.backdropInner {
+  text-align: center;
+  max-width: 28rem;
+}
+
+.backdropHint {
+  margin-top: 1rem;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+.shell {
+  display: flex;
+  width: 100%;
+  max-width: 920px;
+  min-height: min(560px, 100dvh - 48px);
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.5);
+  background: #141218;
+}
+
+.left {
+  flex: 1.12;
+  min-width: 0;
+  background: linear-gradient(165deg, #1a1035 0%, #12082a 55%, #0f0622 100%);
+  padding: clamp(28px, 4vw, 48px) clamp(24px, 3vw, 40px);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2rem;
+  position: relative;
+  overflow: hidden;
+}
+
+.left::before {
+  content: "";
+  position: absolute;
+  top: -72px;
+  left: -64px;
+  width: 280px;
+  height: 280px;
+  border-radius: 50%;
+  background: rgba(124, 99, 255, 0.2);
+  pointer-events: none;
+}
+
+.left::after {
+  content: "";
+  position: absolute;
+  bottom: -48px;
+  right: -56px;
+  width: 240px;
+  height: 240px;
+  border-radius: 50%;
+  background: rgba(164, 143, 255, 0.1);
+  pointer-events: none;
+}
+
+.bubble {
+  position: absolute;
+  top: 42%;
+  right: -20%;
+  width: 180px;
+  height: 180px;
+  border-radius: 50%;
+  background: rgba(124, 99, 255, 0.08);
+  pointer-events: none;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  position: relative;
+  z-index: 1;
+}
+
+.brandIcon {
+  width: 40px;
+  height: 40px;
+  background: linear-gradient(145deg, #8b73ff 0%, #6a52ee 100%);
+  border-radius: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  box-shadow: 0 8px 24px rgba(106, 82, 238, 0.35);
+}
+
+.brandName {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #fff;
+  letter-spacing: -0.02em;
+  text-transform: lowercase;
+}
+
+.copy {
+  position: relative;
+  z-index: 1;
+}
+
+.tagline {
+  font-size: clamp(1.35rem, 2.8vw, 1.75rem);
+  font-weight: 600;
+  color: #fff;
+  line-height: 1.28;
+  margin: 0 0 14px;
+  letter-spacing: -0.03em;
+}
+
+.taglineAccent {
+  color: #c4b5fd;
+}
+
+.sub {
+  margin: 0;
+  font-size: 0.875rem;
+  line-height: 1.65;
+  color: rgba(255, 255, 255, 0.52);
+  max-width: 280px;
+}
+
+.right {
+  flex: 1;
+  min-width: 0;
+  background: #1a1a1e;
+  padding: clamp(28px, 4vw, 48px) clamp(24px, 3vw, 40px);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  position: relative;
+}
+
+.rightHeader {
+  position: absolute;
+  top: clamp(16px, 2.5vw, 22px);
+  right: clamp(16px, 2.5vw, 22px);
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.themeSlot {
+  display: flex;
+  align-items: center;
+}
+
+.themeSlot :global(.theme-toggle) {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+}
+
+.menuBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+  color: rgba(255, 255, 255, 0.45);
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s, border-color 0.15s;
+}
+
+.menuBtn:hover {
+  color: rgba(255, 255, 255, 0.75);
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.rightBody {
+  width: 100%;
+  max-width: 360px;
+  margin: 0 auto;
+  padding-top: 8px;
+}
+
+.outlineBtn {
+  width: 100%;
+  min-height: 46px;
+  padding: 0 16px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: transparent;
+  color: #f4f4f5;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.outlineBtn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.22);
+}
+
+.outlineBtn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.panelTitle {
+  margin: 0 0 12px;
+  font-size: 1.375rem;
+  font-weight: 600;
+  color: #fafafa;
+  letter-spacing: -0.02em;
+}
+
+.panelSub {
+  margin: 0 0 1.5rem;
+  font-size: 0.875rem;
+  line-height: 1.55;
+  color: rgba(244, 244, 245, 0.52);
+}
+
+.panelAlert {
+  margin: 0 0 1.5rem;
+  font-size: 0.875rem;
+  line-height: 1.55;
+  color: #fecaca;
+}
+
+@media (max-width: 840px) {
+  .shell {
+    flex-direction: column;
+    max-width: 440px;
+    min-height: unset;
+  }
+
+  .left {
+    flex: unset;
+    padding-bottom: 32px;
+  }
+
+  .sub {
+    max-width: none;
+  }
+
+  .right {
+    flex: unset;
+    padding-top: 36px;
+    padding-bottom: 40px;
+  }
+
+  .rightBody {
+    max-width: none;
+  }
+}
+
+/* ─── Tema claro (sincronizado con ThemeContext → data-theme en <html>) ─── */
+:global(html[data-theme="light"]) .shell {
+  background: #ffffff;
+  box-shadow: 0 8px 40px rgba(26, 16, 53, 0.08), 0 0 0 1px rgba(26, 16, 53, 0.06);
+}
+
+:global(html[data-theme="light"]) .left {
+  background: linear-gradient(165deg, #f3f0ff 0%, #ebe7ff 45%, #e4dcff 100%);
+}
+
+:global(html[data-theme="light"]) .left::before {
+  background: rgba(124, 99, 255, 0.22);
+}
+
+:global(html[data-theme="light"]) .left::after {
+  background: rgba(124, 99, 255, 0.14);
+}
+
+:global(html[data-theme="light"]) .bubble {
+  background: rgba(124, 99, 255, 0.1);
+}
+
+:global(html[data-theme="light"]) .brandName,
+:global(html[data-theme="light"]) .tagline {
+  color: #1a1035;
+}
+
+:global(html[data-theme="light"]) .taglineAccent {
+  color: #6d28d9;
+}
+
+:global(html[data-theme="light"]) .sub {
+  color: rgba(26, 16, 53, 0.62);
+}
+
+:global(html[data-theme="light"]) .right {
+  background: #fafafc;
+}
+
+:global(html[data-theme="light"]) .menuBtn {
+  border-color: #e8e4f0;
+  background: #ffffff;
+  color: #71717a;
+}
+
+:global(html[data-theme="light"]) .menuBtn:hover {
+  color: #3f3f46;
+  background: #f4f4f5;
+  border-color: #d4d4d8;
+}
+
+:global(html[data-theme="light"]) .outlineBtn {
+  border-color: #d4d4d8;
+  color: #18181b;
+}
+
+:global(html[data-theme="light"]) .outlineBtn:hover:not(:disabled) {
+  background: #f4f4f5;
+  border-color: #a1a1aa;
+}
+
+:global(html[data-theme="light"]) .panelTitle {
+  color: #0f0a1e;
+}
+
+:global(html[data-theme="light"]) .panelSub {
+  color: #64748b;
+}
+
+:global(html[data-theme="light"]) .panelAlert {
+  color: #b91c1c;
+}
