@@ -15,6 +15,7 @@ import {
   type PagoItem,
 } from "@/lib/empresa-api";
 import { uploadImage, getImageAccept } from "@/lib/storage";
+import { getEmpresa } from "@/lib/empresa";
 import type { MotivoNoPago, MotivoPerdida } from "@/types/finanzas";
 import {
   sanitizeMontoDecimalCOP,
@@ -177,6 +178,12 @@ function CobrarClientePageContent() {
   const shareMenuRef = useRef<HTMLDivElement>(null);
   const idempotencyKeyRef = useRef<string | null>(null);
 
+  /** Nombre de la empresa en el pie del comprobante (evita mostrar la marca genérica). */
+  const [empresaComprobanteMeta, setEmpresaComprobanteMeta] = useState<{
+    nombre: string | null;
+    listo: boolean;
+  }>({ nombre: null, listo: false });
+
   const [showNoPago, setShowNoPago] = useState(false);
   const [motivoNoPago, setMotivoNoPago] = useState<MotivoNoPago | "">("");
   const [notaNoPago, setNotaNoPago] = useState("");
@@ -237,6 +244,32 @@ function CobrarClientePageContent() {
     });
     return () => { cancelled = true; };
   }, [user, prestamoId]);
+
+  useEffect(() => {
+    if (!profile?.empresaId) {
+      setEmpresaComprobanteMeta({ nombre: null, listo: true });
+      return;
+    }
+    let cancelled = false;
+    setEmpresaComprobanteMeta({ nombre: null, listo: false });
+    void getEmpresa(profile.empresaId)
+      .then((e) => {
+        if (!cancelled) {
+          setEmpresaComprobanteMeta({
+            nombre: e?.nombre?.trim() || null,
+            listo: true,
+          });
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setEmpresaComprobanteMeta({ nombre: null, listo: true });
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [profile?.empresaId]);
 
   useEffect(() => {
     if (!showCamera) return;
@@ -352,7 +385,7 @@ function CobrarClientePageContent() {
   }, [generarComprobanteLocal]);
 
   useEffect(() => {
-    if (!confirmado || !prestamo || comprobanteDisplayUrl) return;
+    if (!confirmado || !prestamo || comprobanteDisplayUrl || !empresaComprobanteMeta.listo) return;
     const el = comprobanteRef.current;
     if (!el) return;
     let cancelled = false;
@@ -370,7 +403,7 @@ function CobrarClientePageContent() {
       cancelled = true;
       clearTimeout(t);
     };
-  }, [confirmado, prestamo?.id, comprobanteDisplayUrl, generarComprobanteLocal]);
+  }, [confirmado, prestamo?.id, comprobanteDisplayUrl, generarComprobanteLocal, empresaComprobanteMeta.listo]);
 
   const descargarComprobanteDesdeDOM = useCallback(async () => {
     const blobCached = comprobanteBlobRef.current;
@@ -571,8 +604,9 @@ function CobrarClientePageContent() {
       comprobanteEstadoMsg =
         "Imagen solo en este dispositivo: compártela ahora; al volver a la ruta no quedará guardada.";
     }
+    const marcaComprobante = empresaComprobanteMeta.nombre?.trim() || "Empresa";
     const textoComprobanteWa =
-      `Comprobante KrediApp — ${cliente.nombre}\n` +
+      `Comprobante ${marcaComprobante} — ${cliente.nombre}\n` +
       `Monto pagado: ${formatCurrency(montoAplicar)}\n` +
       `Saldo restante: ${formatCurrency(saldoTrasCobro)}\n` +
       `${new Date().toLocaleString("es-CO")}`;
@@ -671,7 +705,7 @@ function CobrarClientePageContent() {
                   </div>
                   <div className="voucher-footer">
                     <p className="voucher-fecha">{new Date().toLocaleString("es-CO", { dateStyle: "long", timeStyle: "short" })}</p>
-                    <p className="voucher-brand">KrediApp · Comprobante válido</p>
+                    <p className="voucher-brand">{marcaComprobante} · Comprobante válido</p>
                   </div>
                 </div>
             </div>

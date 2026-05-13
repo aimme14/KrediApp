@@ -3139,7 +3139,7 @@ th {
 }
 
 .trabajador-dashboard .jefe-drawer-icon[data-nav="route"] {
-  background: rgba(6, 182, 212, 0.14);
+  background: rgba(245, 158, 11, 0.16);
 }
 
 .trabajador-dashboard .jefe-drawer-icon[data-nav="wallet"] {
@@ -3180,8 +3180,8 @@ th {
 }
 
 .trabajador-dashboard .jefe-drawer-link.jefe-drawer-link-active[data-nav="route"] {
-  background: rgba(6, 182, 212, 0.12);
-  color: #0e7490;
+  background: rgba(245, 158, 11, 0.12);
+  color: #b45309;
 }
 
 .trabajador-dashboard .jefe-drawer-link.jefe-drawer-link-active[data-nav="wallet"] {
@@ -3224,7 +3224,7 @@ th {
 }
 
 .trabajador-dashboard .jefe-drawer-link-active .jefe-drawer-icon[data-nav="route"] {
-  background: rgba(6, 182, 212, 0.22);
+  background: rgba(245, 158, 11, 0.22);
 }
 
 .trabajador-dashboard .jefe-drawer-link-active .jefe-drawer-icon[data-nav="wallet"] {
@@ -5966,7 +5966,7 @@ a.admin-inicio-link-btn {
 }
 
 .trabajador-inicio-card-icon[data-quick="route"] {
-  background: rgba(6, 182, 212, 0.14);
+  background: rgba(245, 158, 11, 0.14);
 }
 
 .trabajador-inicio-card-icon[data-quick="chart"] {

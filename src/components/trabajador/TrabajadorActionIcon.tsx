@@ -25,29 +25,13 @@ export function TrabajadorActionIcon({ name, size = 22 }: { name: string; size?:
     case "route":
       return (
         <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden>
-          <path
-            d="M3 19.5C7 14.5 11.5 12 16 8.5"
-            stroke="#99f6e4"
-            strokeWidth="3"
-            strokeLinecap="round"
-            fill="none"
-          />
-          <path
-            d="M3 19.5C7 14.5 11.5 12 16 8.5"
-            stroke="#0e7490"
-            strokeWidth="1.65"
-            strokeLinecap="round"
-            fill="none"
-          />
-          <circle cx="3" cy="19.5" r="2.2" fill="#2dd4bf" stroke="#0f766e" strokeWidth="1.15" />
-          <path
-            d="M16.5 3.75a2.65 2.65 0 0 1 2.65 2.65c0 1.95-2.65 4.85-2.65 4.85s-2.65-2.9-2.65-4.85a2.65 2.65 0 0 1 2.65-2.65z"
-            fill="#ecfeff"
-            stroke="#0e7490"
-            strokeWidth="1.35"
-            strokeLinejoin="round"
-          />
-          <circle cx="16.5" cy="6.4" r="0.95" fill="#0e7490" />
+          <ellipse cx="12" cy="17.25" rx="7" ry="2.15" fill="#92400e" opacity="0.35" />
+          <circle cx="12" cy="14.5" r="6.25" fill="#fcd34d" stroke="#b45309" strokeWidth="1.35" />
+          <circle cx="12" cy="14.5" r="4.35" fill="#fef08a" stroke="#ca8a04" strokeWidth="1" />
+          <circle cx="12" cy="14.5" r="2.85" fill="none" stroke="#a16207" strokeWidth="0.85" opacity="0.85" />
+          <circle cx="12" cy="9.25" r="6.25" fill="#fde047" stroke="#ca8a04" strokeWidth="1.35" />
+          <circle cx="12" cy="9.25" r="4.35" fill="#fef9c3" stroke="#eab308" strokeWidth="1" />
+          <circle cx="12" cy="9.25" r="2.85" fill="none" stroke="#a16207" strokeWidth="0.85" opacity="0.85" />
         </svg>
       );
 
