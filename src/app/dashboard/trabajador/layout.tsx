@@ -7,6 +7,7 @@ import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { TrabajadorRutaProvider, useTrabajadorRuta } from "@/context/TrabajadorRutaContext";
 import { TrabajadorListaProvider } from "@/context/TrabajadorListaContext";
+import { TrabajadorCajaDiaProvider } from "@/context/TrabajadorCajaDiaContext";
 import { TrabajadorActionIcon } from "@/components/trabajador/TrabajadorActionIcon";
 
 const NAV_ITEMS = [
@@ -24,7 +25,7 @@ const NAV_ITEMS = [
 const BOTTOM_NAV_ITEMS = [
   { href: "/dashboard/trabajador", label: "Inicio", icon: "home" as const },
   { href: "/dashboard/trabajador/ruta", label: "Ruta", icon: "route" as const },
-  { href: "/dashboard/trabajador/resumen", label: "Entrega", icon: "chart" as const },
+  { href: "/dashboard/trabajador/caja-del-dia", label: "Caja del día", icon: "wallet" as const },
   { type: "menu" as const, label: "Más", icon: "menu" as const },
 ];
 
@@ -145,6 +146,7 @@ export default function TrabajadorLayout({ children }: { children: React.ReactNo
   return (
     <TrabajadorRutaProvider>
       <TrabajadorListaProvider>
+        <TrabajadorCajaDiaProvider>
         <div className="jefe-wrapper trabajador-dashboard trabajador-dashboard-has-bottom-nav">
           <aside className={`jefe-drawer ${menuOpen ? "jefe-drawer-open" : ""}`} aria-hidden={!menuOpen}>
             <div className="jefe-drawer-inner">
@@ -173,6 +175,7 @@ export default function TrabajadorLayout({ children }: { children: React.ReactNo
           </main>
           {bottomNavHostReady ? createPortal(bottomNav, document.body) : bottomNav}
         </div>
+        </TrabajadorCajaDiaProvider>
       </TrabajadorListaProvider>
     </TrabajadorRutaProvider>
   );

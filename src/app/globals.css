@@ -939,6 +939,66 @@ td {
   margin-top: 0.75rem;
 }
 
+/* Préstamos trabajador: tabla simple código + cliente + monto */
+.table-wrap.table-historial-wrap.prestamo-historial-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  max-width: 100%;
+}
+.prestamo-historial-scroll .prestamo-historial-simple {
+  table-layout: fixed;
+  width: 100%;
+  min-width: 0;
+}
+.prestamo-historial-scroll .prestamo-historial-simple th:nth-child(1),
+.prestamo-historial-scroll .prestamo-historial-simple td:nth-child(1) {
+  width: 22%;
+  text-align: center;
+}
+.prestamo-historial-scroll .prestamo-historial-simple th:nth-child(2),
+.prestamo-historial-scroll .prestamo-historial-simple td:nth-child(2) {
+  width: 53%;
+  text-align: left;
+}
+.prestamo-historial-scroll .prestamo-historial-simple td.prestamo-histo-simple-nombre,
+.prestamo-historial-economico-simple td.prestamo-histo-simple-nombre {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.prestamo-historial-economico-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  max-width: 100%;
+}
+.prestamo-historial-economico-table {
+  width: 100%;
+  min-width: 0;
+  table-layout: fixed;
+  font-size: 0.8125rem;
+}
+.prestamo-historial-economico-simple th:nth-child(1),
+.prestamo-historial-economico-simple td:nth-child(1) {
+  width: 22%;
+  text-align: center;
+}
+.prestamo-historial-economico-simple th:nth-child(2),
+.prestamo-historial-economico-simple td:nth-child(2) {
+  width: 53%;
+  text-align: left;
+}
+.prestamo-historial-economico-table th,
+.prestamo-historial-economico-table td {
+  padding: 0.35rem 0.45rem;
+  vertical-align: middle;
+  border-bottom: 1px solid var(--table-border);
+}
+.prestamo-historial-economico-table th {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
 @media (max-width: 768px) {
   .table-historial th,
   .table-historial td {
@@ -1432,9 +1492,9 @@ td {
   font-size: 0.8125rem;
 }
 
-/* Columna del botón expandir: ancho fijo y centrado para alinear todas las filas */
-.table-historial thead tr th:first-child,
-.table-historial tbody tr td:first-child {
+/* Columna del botón expandir (tablas historial con primer control +/-) */
+.table-historial:not(.prestamo-historial-simple) thead tr th:first-child,
+.table-historial:not(.prestamo-historial-simple) tbody tr td:first-child {
   width: 2.25rem;
   min-width: 2.25rem;
   max-width: 2.25rem;
@@ -6043,7 +6103,60 @@ a.admin-inicio-link-btn {
 }
 
 .trabajador-inicio-header {
-  margin-bottom: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.trabajador-inicio-caja-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.35rem;
+  padding: 0.85rem 1rem;
+  margin-bottom: 0.85rem;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 11px;
+  color: inherit;
+  text-decoration: none;
+  transition: background 0.2s, border-color 0.2s, transform 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.trabajador-inicio-caja-card:hover {
+  background: var(--btn-secondary-hover);
+  border-color: rgba(220, 38, 38, 0.22);
+}
+
+.trabajador-inicio-caja-card:active {
+  transform: scale(0.99);
+}
+
+.trabajador-inicio-caja-label {
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  line-height: 1.3;
+}
+
+.trabajador-inicio-caja-valor {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.2;
+}
+
+.trabajador-inicio-caja-valor-muted {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+@media (min-width: 480px) {
+  .trabajador-inicio-caja-valor {
+    font-size: 1.45rem;
+  }
 }
 
 .trabajador-inicio-title {
@@ -6055,7 +6168,7 @@ a.admin-inicio-link-btn {
 }
 
 .trabajador-inicio-subtitle {
-  margin: 0;
+  margin: 0 0 0.65rem 0;
   font-size: 0.8125rem;
   color: var(--text-muted);
 }
@@ -6124,6 +6237,10 @@ a.admin-inicio-link-btn {
 
 .trabajador-inicio-card-icon[data-quick="route"] {
   background: rgba(245, 158, 11, 0.14);
+}
+
+.trabajador-inicio-card-icon[data-quick="wallet"] {
+  background: rgba(234, 179, 8, 0.16);
 }
 
 .trabajador-inicio-card-icon[data-quick="chart"] {

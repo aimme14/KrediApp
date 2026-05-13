@@ -3,10 +3,12 @@
 import Link from "next/link";
 
 import { TrabajadorActionIcon } from "@/components/trabajador/TrabajadorActionIcon";
+import { TrabajadorInicioCajaDelDia } from "@/components/trabajador/TrabajadorInicioCajaDelDia";
 import { useAuth } from "@/context/AuthContext";
 
 const QUICK_ACTIONS = [
   { href: "/dashboard/trabajador/ruta", label: "Ruta del día", icon: "route", desc: "Ver y gestionar tu ruta" },
+  { href: "/dashboard/trabajador/caja-del-dia", label: "Caja del día", icon: "wallet", desc: "Ver cobros, gastos y resumen del día" },
   { href: "/dashboard/trabajador/resumen", label: "Entrega de reporte", icon: "chart", desc: "Solicitud de entrega al administrador" },
   { href: "/dashboard/trabajador/cliente", label: "Cliente", icon: "client", desc: "Gestión de clientes" },
   { href: "/dashboard/trabajador/prestamo", label: "Préstamos", icon: "loan", desc: "Registrar y ver préstamos" },
@@ -24,8 +26,11 @@ export default function TrabajadorInicioPage() {
     <div className="trabajador-inicio">
       <header className="trabajador-inicio-header">
         <h1 className="trabajador-inicio-title">Hola, {displayName}</h1>
-        <p className="trabajador-inicio-subtitle">Acceso rápido a tus funciones</p>
       </header>
+
+      <TrabajadorInicioCajaDelDia />
+
+      <p className="trabajador-inicio-subtitle">Acceso rápido a tus funciones</p>
 
       <nav className="trabajador-inicio-grid" aria-label="Accesos rápidos">
         {QUICK_ACTIONS.map((item) => (

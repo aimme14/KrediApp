@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo, Fragment } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useTrabajadorLista } from "@/context/TrabajadorListaContext";
 import {
@@ -38,15 +38,6 @@ function formatMoneda(n: number): string {
   return decTrim ? `${conPuntos},${decTrim}` : conPuntos;
 }
 
-/** Cuotas ya pagadas (a partir de saldo y total). Para mostrar como "X / total". */
-function cuotasPagadas(totalAPagar: number, numeroCuotas: number, saldoPendiente: number): number {
-  if (totalAPagar <= 0 || numeroCuotas <= 0) return 0;
-  if (saldoPendiente <= 0) return numeroCuotas;
-  const cuotaUnit = totalAPagar / numeroCuotas;
-  const pagado = totalAPagar - saldoPendiente;
-  return Math.min(numeroCuotas, Math.round(pagado / cuotaUnit));
-}
-
 const ESTADO_ORDEN: Record<string, number> = { activo: 0, mora: 1, pagado: 2 };
 
 function ordenarPrestamosParaPrincipal(prestamos: PrestamoItem[]): PrestamoItem[] {
@@ -59,8 +50,6 @@ function ordenarPrestamosParaPrincipal(prestamos: PrestamoItem[]): PrestamoItem[
     return tb - ta;
   });
 }
-
-type GrupoClientePrestamos = { clienteId: string; prestamos: PrestamoItem[] };
 
 /** Fecha actual en formato dd/mm/aaaa */
 function hoyDDMMAAAA(): string {
@@ -169,59 +158,15 @@ export default function PrestamoTrabajadorPage() {
   const cuotaPorPago = totalAPagar > 0 && nCuotasVal >= 1 ? totalAPagar / nCuotasVal : 0;
   const requiereConfirmarMonto = !isNaN(montoNum) && montoNum >= MONTO_CONFIRMAR_ALTO;
 
-  const resumenPrestamos = useMemo(() => {
-    const activos = prestamos.filter((p) => p.estado === "activo");
-    const mora = prestamos.filter((p) => p.estado === "mora");
-    const pagados = prestamos.filter((p) => p.estado === "pagado");
-    const saldoPorCobrar = prestamos
-      .filter((p) => p.estado !== "pagado")
-      .reduce((s, p) => s + p.saldoPendiente, 0);
-    return {
-      activos: activos.length,
-      mora: mora.length,
-      pagados: pagados.length,
-      saldoPorCobrar,
-    };
-  }, [prestamos]);
-
   const prestamosFiltrados = useMemo(() => {
     if (filtroEstado === "todos") return prestamos;
     return prestamos.filter((p) => p.estado === filtroEstado);
   }, [prestamos, filtroEstado]);
 
-  const gruposPorCliente = useMemo((): GrupoClientePrestamos[] => {
-    const byCliente = new Map<string, PrestamoItem[]>();
-    for (const p of prestamosFiltrados) {
-      const list = byCliente.get(p.clienteId) ?? [];
-      list.push(p);
-      byCliente.set(p.clienteId, list);
-    }
-    const grupos: GrupoClientePrestamos[] = [];
-    byCliente.forEach((lista, clienteId) => {
-      grupos.push({ clienteId, prestamos: ordenarPrestamosParaPrincipal(lista) });
-    });
-    grupos.sort((a, b) => {
-      const pa = a.prestamos[0];
-      const pb = b.prestamos[0];
-      const oa = ESTADO_ORDEN[pa.estado] ?? 2;
-      const ob = ESTADO_ORDEN[pb.estado] ?? 2;
-      if (oa !== ob) return oa - ob;
-      const ta = new Date(pa.fechaInicio || 0).getTime();
-      const tb = new Date(pb.fechaInicio || 0).getTime();
-      return tb - ta;
-    });
-    return grupos.slice(0, 20);
-  }, [prestamosFiltrados]);
-
-  const [clientesExpandidos, setClientesExpandidos] = useState<Set<string>>(() => new Set());
-  const toggleExpandirCliente = useCallback((clienteId: string) => {
-    setClientesExpandidos((prev) => {
-      const next = new Set(prev);
-      if (next.has(clienteId)) next.delete(clienteId);
-      else next.add(clienteId);
-      return next;
-    });
-  }, []);
+  const prestamosHistorialOrdenados = useMemo(
+    () => ordenarPrestamosParaPrincipal([...prestamosFiltrados]),
+    [prestamosFiltrados]
+  );
 
   const prestamosDelCliente = useMemo(
     () => (clienteId ? prestamos.filter((p) => p.clienteId === clienteId) : []),
@@ -318,25 +263,29 @@ export default function PrestamoTrabajadorPage() {
               ) : prestamosDelCliente.length === 0 ? (
                 <p style={{ color: "var(--text-muted)", fontSize: "0.875rem", margin: "0.5rem 0 0" }}>Este cliente no tiene préstamos anteriores.</p>
               ) : (
-                <div className="table-wrap" style={{ marginTop: "0.5rem" }}>
-                  <table>
+                <div className="table-wrap prestamo-historial-economico-wrap" style={{ marginTop: "0.5rem" }}>
+                  <table className="prestamo-historial-economico-table prestamo-historial-economico-simple">
                     <thead>
                       <tr>
+                        <th>Código</th>
+                        <th>Cliente</th>
                         <th className="col-num">Monto</th>
-                        <th className="col-num">Total a pagar</th>
-                        <th className="col-num">Saldo</th>
-                        <th>Estado</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {prestamosDelCliente.map((p) => (
-                        <tr key={p.id}>
-                          <td className="col-num">{formatMoneda(p.monto)}</td>
-                          <td className="col-num">{formatMoneda(p.totalAPagar)}</td>
-                          <td className="col-num">{formatMoneda(p.saldoPendiente)}</td>
-                          <td>{p.estado}</td>
-                        </tr>
-                      ))}
+                      {prestamosDelCliente.map((p) => {
+                        const cl = clientePorId[p.clienteId];
+                        const num = cl ? clienteNumFromCodigo(cl.codigo) : null;
+                        const codigoDisplay = num ? `#${num}` : "—";
+                        const nombre = cl?.nombre ?? p.clienteId;
+                        return (
+                          <tr key={p.id}>
+                            <td>{codigoDisplay}</td>
+                            <td className="prestamo-histo-simple-nombre">{nombre}</td>
+                            <td className="col-num">{formatMoneda(p.monto)}</td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -493,46 +442,6 @@ export default function PrestamoTrabajadorPage() {
 
       {!showCreateForm && (
       <>
-        {!loading && (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))", gap: "0.5rem", marginBottom: "1rem" }}>
-            <div style={{ padding: "0.5rem 0.65rem", backgroundColor: "var(--card-bg)", border: "1px solid var(--card-border)", borderRadius: "var(--radius)", display: "flex", flexDirection: "column", alignItems: "center", gap: "0.2rem" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", justifyContent: "center" }} aria-hidden>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: "var(--text)", flexShrink: 0 }}>
-                  <circle cx="12" cy="12" r="10" /><path d="M10 8l4 4-4 4" />
-                </svg>
-                <span style={{ fontSize: "1.125rem", fontWeight: 700, color: "var(--text)", lineHeight: 1 }}>{resumenPrestamos.activos}</span>
-              </div>
-              <span style={{ fontSize: "0.7rem", color: "var(--text-muted)", lineHeight: 1 }}>Activos</span>
-            </div>
-            <div style={{ padding: "0.5rem 0.65rem", backgroundColor: "var(--card-bg)", border: "1px solid var(--card-border)", borderRadius: "var(--radius)", display: "flex", flexDirection: "column", alignItems: "center", gap: "0.2rem" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", justifyContent: "center" }} aria-hidden>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: "var(--error, #ef4444)", flexShrink: 0 }}>
-                  <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
-                </svg>
-                <span style={{ fontSize: "1.125rem", fontWeight: 700, color: "var(--error, #ef4444)", lineHeight: 1 }}>{resumenPrestamos.mora}</span>
-              </div>
-              <span style={{ fontSize: "0.7rem", color: "var(--text-muted)", lineHeight: 1 }}>En mora</span>
-            </div>
-            <div style={{ padding: "0.5rem 0.65rem", backgroundColor: "var(--card-bg)", border: "1px solid var(--card-border)", borderRadius: "var(--radius)", display: "flex", flexDirection: "column", alignItems: "center", gap: "0.2rem" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", justifyContent: "center" }} aria-hidden>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: "var(--text)", flexShrink: 0 }}>
-                  <path d="M22 11.08V12a10 10 0 11-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" />
-                </svg>
-                <span style={{ fontSize: "1.125rem", fontWeight: 700, color: "var(--text)", lineHeight: 1 }}>{resumenPrestamos.pagados}</span>
-              </div>
-              <span style={{ fontSize: "0.7rem", color: "var(--text-muted)", lineHeight: 1 }}>Pagados</span>
-            </div>
-            <div style={{ padding: "0.5rem 0.65rem", backgroundColor: "var(--card-bg)", border: "1px solid var(--card-border)", borderRadius: "var(--radius)", display: "flex", flexDirection: "column", alignItems: "center", gap: "0.2rem" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", justifyContent: "center" }} aria-hidden>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: "var(--text)", flexShrink: 0 }}>
-                  <line x1="12" y1="1" x2="12" y2="23" /><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" />
-                </svg>
-                <span style={{ fontSize: "0.9375rem", fontWeight: 700, color: "var(--text)", lineHeight: 1 }}>{formatMoneda(resumenPrestamos.saldoPorCobrar)}</span>
-              </div>
-              <span style={{ fontSize: "0.7rem", color: "var(--text-muted)", lineHeight: 1 }}>Saldo por cobrar</span>
-            </div>
-          </div>
-        )}
         <div className="card">
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "0.75rem", marginBottom: "0.75rem" }}>
           <h3 style={{ margin: 0 }}>Historial de préstamos</h3>
@@ -542,7 +451,7 @@ export default function PrestamoTrabajadorPage() {
             onClick={() => setShowCreateForm(true)}
             aria-label="Crear nuevo préstamo"
             title="Crear nuevo préstamo"
-            style={{ padding: "0.4rem 0.65rem", minWidth: "auto", lineHeight: 1 }}
+            style={{ padding: "0.4rem 0.65rem", minWidth: "auto", lineHeight: 1, flexShrink: 0 }}
           >
             +
           </button>
@@ -575,81 +484,32 @@ export default function PrestamoTrabajadorPage() {
                 </button>
               ))}
             </div>
-            <div className="table-wrap table-historial-wrap" style={{ width: "100%", overflow: "visible" }}>
-            <table className="table-historial" style={{ width: "100%", tableLayout: "fixed", minWidth: "100%" }}>
-              <thead>
-                <tr>
-                  <th aria-label="Expandir historial" />
-                  <th>Código</th>
-                  <th>Cliente</th>
-                  <th className="col-num">Monto</th>
-                  <th className="col-num">Total a pagar</th>
-                  <th className="col-num">Saldo</th>
-                  <th className="col-num">Cuotas</th>
-                  <th>Estado</th>
-                </tr>
-              </thead>
-              <tbody>
-                {gruposPorCliente.map((grupo) => {
-                  const principal = grupo.prestamos[0];
-                  const cl = clientePorId[grupo.clienteId];
-                  const nombre = cl?.nombre ?? grupo.clienteId;
-                  const num = cl ? clienteNumFromCodigo(cl.codigo) : "";
-                  const codigoDisplay = num ? "#" + num : "—";
-                  const pagadas = cuotasPagadas(principal.totalAPagar, principal.numeroCuotas, principal.saldoPendiente);
-                  const tieneMas = grupo.prestamos.length > 1;
-                  const expandido = clientesExpandidos.has(grupo.clienteId);
-                  const otros = grupo.prestamos.slice(1);
-                  return (
-                    <Fragment key={grupo.clienteId}>
-                      <tr>
-                        <td>
-                          {tieneMas ? (
-                            <button
-                              type="button"
-                              className="btn-expand-historial"
-                              onClick={() => toggleExpandirCliente(grupo.clienteId)}
-                              aria-expanded={expandido}
-                              aria-controls={`historial-cliente-${grupo.clienteId}`}
-                              id={`btn-expand-${grupo.clienteId}`}
-                              title={expandido ? "Ocultar otros préstamos" : `Ver ${otros.length} préstamo(s) más`}
-                            >
-                              {expandido ? "−" : `+${otros.length}`}
-                            </button>
-                          ) : (
-                            <span aria-hidden style={{ display: "inline-block", width: "1.5rem", minHeight: "1.25rem" }} />
-                          )}
-                        </td>
+            <div className="table-wrap table-historial-wrap prestamo-historial-scroll">
+              <table className="table-historial prestamo-historial-simple">
+                <thead>
+                  <tr>
+                    <th>Código</th>
+                    <th>Cliente</th>
+                    <th className="col-num">Monto</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {prestamosHistorialOrdenados.map((p) => {
+                    const cl = clientePorId[p.clienteId];
+                    const num = cl ? clienteNumFromCodigo(cl.codigo) : null;
+                    const codigoDisplay = num ? `#${num}` : "—";
+                    const nombre = cl?.nombre ?? p.clienteId;
+                    return (
+                      <tr key={p.id}>
                         <td>{codigoDisplay}</td>
-                        <td>{nombre}</td>
-                        <td className="col-num">{formatMoneda(principal.monto)}</td>
-                        <td className="col-num">{formatMoneda(principal.totalAPagar)}</td>
-                        <td className="col-num">{formatMoneda(principal.saldoPendiente)}</td>
-                        <td className="col-num" title="Cuotas pagadas / total">{pagadas} / {principal.numeroCuotas}</td>
-                        <td>{principal.estado}</td>
+                        <td className="prestamo-histo-simple-nombre">{nombre}</td>
+                        <td className="col-num">{formatMoneda(p.monto)}</td>
                       </tr>
-                      {tieneMas && expandido && (
-                        <tr id={`historial-cliente-${grupo.clienteId}`} aria-labelledby={`btn-expand-${grupo.clienteId}`}>
-                          <td colSpan={8} style={{ padding: "0.5rem 0.75rem", backgroundColor: "var(--bg)", borderBottom: "1px solid var(--table-border)", verticalAlign: "top" }}>
-                            <div className="historial-prestamos-list" style={{ fontSize: "0.8125rem", color: "var(--text-muted)" }}>
-                              <span style={{ fontWeight: 600, color: "var(--text)", marginBottom: "0.35rem", display: "block" }}>Otros préstamos</span>
-                              <ul>
-                                {otros.map((p) => (
-                                    <li key={p.id}>
-                                      {formatMoneda(p.monto)} · {p.estado} · {p.numeroCuotas} cuotas
-                                    </li>
-                                  ))}
-                              </ul>
-                            </div>
-                          </td>
-                        </tr>
-                      )}
-                    </Fragment>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           {prestamosFiltrados.length === 0 && (
             <p style={{ color: "var(--text-muted)", fontSize: "0.875rem", marginTop: "0.5rem" }}>
               No hay préstamos con estado «{filtroEstado === "todos" ? "todos" : filtroEstado === "activo" ? "activos" : filtroEstado === "mora" ? "en mora" : "pagados"}».

@@ -1,17 +1,14 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
-import {
-  getCobrosDelDiaEmpleado,
-  type CobrosDelDiaEmpleadoResponse,
-  type CobroDiaItem,
-  type NoPagoDiaItem,
-  type PrestamoDesembolsoDiaItem,
+import { useTrabajadorCajaDia } from "@/context/TrabajadorCajaDiaContext";
+import type {
+  CobroDiaItem,
+  NoPagoDiaItem,
+  PrestamoDesembolsoDiaItem,
 } from "@/lib/empresa-api";
-import { fechaDiaColombiaHoy } from "@/lib/colombia-day-bounds";
 import { formatoCuotasRestanteTotal } from "@/lib/cuotas-display";
 import { tuCajaDelDiaDesdeTotales } from "@/lib/tu-caja-del-dia";
 
@@ -97,38 +94,8 @@ function TarjetaResumen(props: { etiqueta: ReactNode; valor: string }) {
 }
 
 export default function CajaDelDiaPage() {
-  const { user, profile } = useAuth();
-  const [fecha] = useState(() => fechaDiaColombiaHoy());
-  const [data, setData] = useState<CobrosDelDiaEmpleadoResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const load = useCallback(async () => {
-    if (!user) {
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
-    setError(null);
-    try {
-      const token = await user.getIdToken();
-      const res = await getCobrosDelDiaEmpleado(token, fecha);
-      setData(res);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Error al cargar");
-      setData(null);
-    } finally {
-      setLoading(false);
-    }
-  }, [user, fecha]);
-
-  useEffect(() => {
-    if (!user) {
-      setLoading(false);
-      return;
-    }
-    void load();
-  }, [load]);
+  const { profile } = useAuth();
+  const { fechaDia, data, loading, error } = useTrabajadorCajaDia();
 
   if (!profile || profile.role !== "trabajador") return null;
 
@@ -166,7 +133,7 @@ export default function CajaDelDiaPage() {
             userSelect: "none",
           }}
         >
-          {formatFechaDia(fecha)}
+          {formatFechaDia(data?.fechaDia ?? fechaDia)}
         </div>
       </div>
 
