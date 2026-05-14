@@ -60,6 +60,21 @@ body {
   transition: background 0.2s, color 0.2s;
 }
 
+/* Login en móvil: una sola pantalla sin scroll; el fondo aplica safe-area (loginShell). */
+@media (max-width: 840px) {
+  html[data-krediapp-login] {
+    height: 100dvh;
+    height: 100svh;
+    overflow: hidden;
+  }
+
+  html[data-krediapp-login] body {
+    min-height: 100%;
+    padding: 0;
+    overflow: hidden;
+  }
+}
+
 a {
   color: var(--link);
   text-decoration: none;

@@ -236,3 +236,40 @@
 :global(html[data-theme="light"]) .submitIcon {
   color: #27272a;
 }
+
+@media (max-width: 840px) {
+  .form {
+    min-height: 0;
+  }
+
+  .formHeader {
+    margin-bottom: 16px;
+  }
+
+  .formTitle {
+    font-size: 1.25rem;
+  }
+
+  .field {
+    margin-bottom: 14px;
+  }
+
+  .error {
+    margin: 0 0 12px;
+    padding: 10px 12px;
+  }
+}
+
+@media (max-width: 840px) and (max-height: 620px) {
+  .formHeader {
+    margin-bottom: 12px;
+  }
+
+  .field {
+    margin-bottom: 10px;
+  }
+
+  .input {
+    height: 44px;
+  }
+}

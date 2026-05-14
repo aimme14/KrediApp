@@ -23,6 +23,21 @@ export default function HomePage() {
   const [showSlowHint, setShowSlowHint] = useState(false);
 
   useEffect(() => {
+    const root = document.documentElement;
+    const mq = window.matchMedia("(max-width: 840px)");
+    const apply = () => {
+      if (mq.matches) root.setAttribute("data-krediapp-login", "");
+      else root.removeAttribute("data-krediapp-login");
+    };
+    apply();
+    mq.addEventListener("change", apply);
+    return () => {
+      mq.removeEventListener("change", apply);
+      root.removeAttribute("data-krediapp-login");
+    };
+  }, []);
+
+  useEffect(() => {
     if (!loading) {
       setShowSlowHint(false);
       return;
