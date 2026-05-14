@@ -1,5 +1,3 @@
-import type { ReactNode } from "react";
-
 export type AdminNavIconName =
   | "home"
   | "ruta-dia"
@@ -12,7 +10,8 @@ export type AdminNavIconName =
   | "wallet"
   | "chart"
   | "alert"
-  | "lock";
+  | "lock"
+  | "more";
 
 export type AdminNavItem = {
   href: string;
@@ -22,47 +21,24 @@ export type AdminNavItem = {
   morosoBadge?: boolean;
 };
 
-export type AdminNavSection = {
-  heading: string;
-  items: AdminNavItem[];
-};
-
-export const ADMIN_NAV_SECTIONS: AdminNavSection[] = [
+export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
+  { href: "/dashboard/admin", label: "Inicio", icon: "home" },
+  { href: "/dashboard/admin/ruta-del-dia", label: "Ruta del día", icon: "ruta-dia" },
+  { href: "/dashboard/admin/prestamo", label: "Crear préstamo", icon: "loan" },
+  { href: "/dashboard/admin/reportes-dia", label: "Reportes del día", icon: "report" },
+  { href: "/dashboard/admin/cliente", label: "Clientes", icon: "client" },
+  { href: "/dashboard/admin/empleado", label: "Empleados", icon: "user" },
+  { href: "/dashboard/admin/rutas", label: "Rutas", icon: "route" },
+  { href: "/dashboard/admin/gastos", label: "Gastos operativos", icon: "expense" },
+  { href: "/dashboard/admin/gestion-financiera", label: "Inversiones", icon: "wallet" },
+  { href: "/dashboard/admin/resumen", label: "Resumen económico", icon: "chart" },
   {
-    heading: "Principal",
-    items: [
-      { href: "/dashboard/admin", label: "Inicio", icon: "home" },
-      { href: "/dashboard/admin/ruta-del-dia", label: "Ruta del día", icon: "ruta-dia" },
-      { href: "/dashboard/admin/prestamo", label: "Crear préstamo", icon: "loan" },
-      { href: "/dashboard/admin/reportes-dia", label: "Reportes del día", icon: "report" },
-    ],
+    href: "/dashboard/admin/cliente-moroso",
+    label: "Clientes morosos",
+    icon: "alert",
+    morosoBadge: true,
   },
-  {
-    heading: "Gestión",
-    items: [
-      { href: "/dashboard/admin/cliente", label: "Clientes", icon: "client" },
-      { href: "/dashboard/admin/empleado", label: "Empleados", icon: "user" },
-      { href: "/dashboard/admin/rutas", label: "Rutas", icon: "route" },
-      { href: "/dashboard/admin/gastos", label: "Gastos operativos", icon: "expense" },
-    ],
-  },
-  {
-    heading: "Finanzas",
-    items: [
-      { href: "/dashboard/admin/gestion-financiera", label: "Inversiones", icon: "wallet" },
-      { href: "/dashboard/admin/resumen", label: "Resumen económico", icon: "chart" },
-      {
-        href: "/dashboard/admin/cliente-moroso",
-        label: "Clientes morosos",
-        icon: "alert",
-        morosoBadge: true,
-      },
-    ],
-  },
-  {
-    heading: "Sistema",
-    items: [{ href: "/dashboard/admin/permisos", label: "Permisos", icon: "lock" }],
-  },
+  { href: "/dashboard/admin/permisos", label: "Permisos", icon: "lock" },
 ];
 
 export function AdminNavIcon({ name }: { name: AdminNavIconName }) {
@@ -164,6 +140,14 @@ export function AdminNavIcon({ name }: { name: AdminNavIconName }) {
           <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
           <line x1="12" y1="9" x2="12" y2="13" />
           <line x1="12" y1="17" x2="12.01" y2="17" />
+        </svg>
+      );
+    case "more":
+      return (
+        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+          <circle cx="12" cy="5" r="1" fill="currentColor" stroke="none" />
+          <circle cx="12" cy="12" r="1" fill="currentColor" stroke="none" />
+          <circle cx="12" cy="19" r="1" fill="currentColor" stroke="none" />
         </svg>
       );
     default:

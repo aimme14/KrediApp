@@ -3767,25 +3767,6 @@ th {
   overscroll-behavior-y: contain;
 }
 
-.admin-nav-section {
-  margin-top: 0.68rem;
-}
-
-.admin-nav-section:first-of-type {
-  margin-top: 0.12rem;
-}
-
-.admin-nav-heading {
-  display: block;
-  padding: 0.28rem 0.92rem 0.36rem;
-  font-size: 0.6rem;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-  opacity: 0.85;
-}
-
 .admin-nav-link {
   display: flex;
   align-items: center;
@@ -3871,6 +3852,94 @@ th {
   flex-direction: column;
 }
 
+.admin-mobile-tabbar {
+  display: none;
+}
+
+@media (max-width: 900px) {
+  .admin-shell-main {
+    padding-bottom: calc(2rem + 3.35rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  .admin-mobile-tabbar {
+    display: flex;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 98;
+    align-items: stretch;
+    justify-content: space-around;
+    gap: 0;
+    padding: 0.35rem 0.2rem calc(0.35rem + env(safe-area-inset-bottom, 0px));
+    background: color-mix(in srgb, var(--card-bg) 92%, #1e1035 8%);
+    border-top: 1px solid color-mix(in srgb, var(--card-border) 75%, #4c1d95 25%);
+    box-shadow: 0 -6px 24px rgba(0, 0, 0, 0.12);
+  }
+
+  .admin-mobile-tabbar-item {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.15rem;
+    padding: 0.2rem 0.15rem;
+    margin: 0;
+    border: none;
+    border-radius: 10px;
+    background: transparent;
+    color: var(--text-muted);
+    text-decoration: none;
+    font: inherit;
+    font-size: 0.58rem;
+    font-weight: 600;
+    line-height: 1.15;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition: background 0.15s, color 0.15s;
+  }
+
+  .admin-mobile-tabbar-item:active {
+    background: color-mix(in srgb, var(--admin-sidebar-accent) 14%, transparent);
+  }
+
+  .admin-mobile-tabbar-item-active {
+    color: var(--admin-sidebar-accent);
+  }
+
+  .admin-mobile-tabbar-item-active .admin-mobile-tabbar-icon-wrap {
+    background: color-mix(in srgb, var(--admin-sidebar-accent) 26%, transparent);
+    color: var(--admin-sidebar-accent);
+  }
+
+  .admin-mobile-tabbar-icon-wrap {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.1rem;
+    height: 2.1rem;
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--text-muted) 10%, transparent);
+    color: inherit;
+  }
+
+  .admin-mobile-tabbar-label {
+    max-width: 100%;
+    overflow: hidden;
+    line-height: 1.1;
+    max-height: 2.35em;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    padding: 0 0.1rem;
+    text-align: center;
+    hyphens: auto;
+    overflow-wrap: break-word;
+  }
+}
+
 @media (min-width: 901px) {
   .admin-sidebar {
     position: sticky;
@@ -3894,6 +3963,10 @@ th {
 
   .admin-shell-main {
     padding-bottom: 2.5rem;
+  }
+
+  .admin-mobile-tabbar {
+    display: none !important;
   }
 }
 

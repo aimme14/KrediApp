@@ -8,7 +8,7 @@ import { useDashboardHeaderSlot } from "@/context/DashboardHeaderContext";
 import { AdminFcmRegistration } from "@/components/AdminFcmRegistration";
 import { TrabajadorListaProvider } from "@/context/TrabajadorListaContext";
 import { listClientes } from "@/lib/empresa-api";
-import { ADMIN_NAV_SECTIONS, AdminNavIcon } from "@/components/admin/adminNavConfig";
+import { ADMIN_NAV_ITEMS, AdminNavIcon } from "@/components/admin/adminNavConfig";
 
 function adminNavItemActive(pathname: string, href: string): boolean {
   if (href === "/dashboard/admin") return pathname === "/dashboard/admin";
@@ -117,31 +117,26 @@ export default function AdminLayout({
           aria-label="Navegación del administrador"
         >
           <div className="admin-sidebar-inner">
-            {ADMIN_NAV_SECTIONS.map((section) => (
-              <div key={section.heading} className="admin-nav-section">
-                <span className="admin-nav-heading">{section.heading}</span>
-                {section.items.map((item) => {
-                  const active = adminNavItemActive(pathname, item.href);
-                  const badge = item.morosoBadge ? (
-                    <span className="admin-nav-badge">{morososCount > 99 ? "99+" : morososCount}</span>
-                  ) : null;
-                  return (
-                    <Link
-                      key={item.href}
-                      href={item.href}
-                      className={`admin-nav-link ${active ? "admin-nav-link-active" : ""}`}
-                      onClick={closeMenu}
-                    >
-                      <span className="admin-nav-icon-wrap">
-                        <AdminNavIcon name={item.icon} />
-                      </span>
-                      <span className="admin-nav-label">{item.label}</span>
-                      {badge}
-                    </Link>
-                  );
-                })}
-              </div>
-            ))}
+            {ADMIN_NAV_ITEMS.map((item) => {
+              const active = adminNavItemActive(pathname, item.href);
+              const badge = item.morosoBadge ? (
+                <span className="admin-nav-badge">{morososCount > 99 ? "99+" : morososCount}</span>
+              ) : null;
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={`admin-nav-link ${active ? "admin-nav-link-active" : ""}`}
+                  onClick={closeMenu}
+                >
+                  <span className="admin-nav-icon-wrap">
+                    <AdminNavIcon name={item.icon} />
+                  </span>
+                  <span className="admin-nav-label">{item.label}</span>
+                  {badge}
+                </Link>
+              );
+            })}
           </div>
         </aside>
 
@@ -150,6 +145,51 @@ export default function AdminLayout({
         )}
 
         <main className="admin-shell-main">{children}</main>
+
+        <nav className="admin-mobile-tabbar" aria-label="Accesos rápidos">
+          <Link
+            href="/dashboard/admin"
+            className={`admin-mobile-tabbar-item${adminNavItemActive(pathname, "/dashboard/admin") ? " admin-mobile-tabbar-item-active" : ""}`}
+            onClick={closeMenu}
+          >
+            <span className="admin-mobile-tabbar-icon-wrap">
+              <AdminNavIcon name="home" />
+            </span>
+            <span className="admin-mobile-tabbar-label">Inicio</span>
+          </Link>
+          <Link
+            href="/dashboard/admin/rutas"
+            className={`admin-mobile-tabbar-item${adminNavItemActive(pathname, "/dashboard/admin/rutas") ? " admin-mobile-tabbar-item-active" : ""}`}
+            onClick={closeMenu}
+          >
+            <span className="admin-mobile-tabbar-icon-wrap">
+              <AdminNavIcon name="route" />
+            </span>
+            <span className="admin-mobile-tabbar-label">Rutas</span>
+          </Link>
+          <Link
+            href="/dashboard/admin/ruta-del-dia"
+            className={`admin-mobile-tabbar-item${adminNavItemActive(pathname, "/dashboard/admin/ruta-del-dia") ? " admin-mobile-tabbar-item-active" : ""}`}
+            onClick={closeMenu}
+          >
+            <span className="admin-mobile-tabbar-icon-wrap">
+              <AdminNavIcon name="ruta-dia" />
+            </span>
+            <span className="admin-mobile-tabbar-label">Ruta del día</span>
+          </Link>
+          <button
+            type="button"
+            className={`admin-mobile-tabbar-item${menuOpen ? " admin-mobile-tabbar-item-active" : ""}`}
+            onClick={() => setMenuOpen((o) => !o)}
+            aria-expanded={menuOpen}
+            aria-label={menuOpen ? "Cerrar menú lateral" : "Abrir menú lateral"}
+          >
+            <span className="admin-mobile-tabbar-icon-wrap">
+              <AdminNavIcon name="more" />
+            </span>
+            <span className="admin-mobile-tabbar-label">Más</span>
+          </button>
+        </nav>
       </div>
     </TrabajadorListaProvider>
   );
