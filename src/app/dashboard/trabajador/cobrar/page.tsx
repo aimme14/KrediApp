@@ -23,13 +23,21 @@ import {
   interiorDecimalCOPToNumber,
 } from "@/lib/monto-input-es";
 
+/** Escala de captura: mínimo 2× para nitidez en móviles; tope para no disparar memoria ni el límite de subida. */
+function getComprobanteCaptureScale(): number {
+  if (typeof window === "undefined") return 2;
+  const dpr = window.devicePixelRatio || 1;
+  return Math.min(2.5, Math.max(2, dpr));
+}
+
 /** Carga html2canvas solo en el cliente (evita fallos de bundle/SSR y reduce el JS inicial). */
 async function captureElementToCanvas(el: HTMLElement) {
   const { default: html2canvas } = await import("html2canvas");
   return html2canvas(el, {
-    scale: 1,
+    scale: getComprobanteCaptureScale(),
     backgroundColor: "#ffffff",
     logging: false,
+    useCORS: true,
   });
 }
 
