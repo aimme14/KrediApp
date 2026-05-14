@@ -8261,6 +8261,16 @@ a.admin-inicio-link-btn {
 .compartir-icono-mail { color: var(--text); }
 .compartir-dropdown-iconos .compartir-opcion { padding: 0.6rem 1rem; }
 
+/* Trabajador — Crear préstamo + Confirmo: margen solo en pantalla ancha; en móvil alinea al envolver */
+.prestamo-nuevo-actions .prestamo-nuevo-confirm-label {
+  margin-left: 10%;
+}
+@media (max-width: 540px) {
+  .prestamo-nuevo-actions .prestamo-nuevo-confirm-label {
+    margin-left: 0;
+  }
+}
+
 @media print {
   .cobrar-confirmacion-actions,
   .cobrar-back { display: none !important; }

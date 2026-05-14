@@ -394,6 +394,7 @@ export default function PrestamoTrabajadorPage() {
           <p className="error-msg">{error ?? listaError}</p>
         )}
         <div
+          className="prestamo-nuevo-actions"
           style={{
             display: "flex",
             flexDirection: "row",
@@ -414,13 +415,13 @@ export default function PrestamoTrabajadorPage() {
           </button>
           {requiereConfirmarMonto && (
             <label
+              className="prestamo-nuevo-confirm-label"
               style={{
                 display: "inline-flex",
                 alignItems: "center",
                 gap: "0.65rem",
                 cursor: "pointer",
                 margin: 0,
-                marginLeft: "20%",
                 flexShrink: 0,
                 lineHeight: 1.2,
               }}
