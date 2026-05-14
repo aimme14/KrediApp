@@ -677,7 +677,7 @@ export default function JefeGestionFinancieraPanel({
                 {tipoLiquidezBase === "entrada" ? (
                   <form onSubmit={handleInvertirCaja} className="gf-invertir-caja">
                     <p className="gf-capital-form-hint" style={{ marginBottom: "0.75rem" }}>
-                      Registra una inversión en la empresa: entra dinero nuevo, sube la caja de la empresa y el capital total.
+                      
                     </p>
                     <label htmlFor="gf-invertir-monto" className="gf-capital-form-label">
                       MONTO
@@ -715,7 +715,7 @@ export default function JefeGestionFinancieraPanel({
                 ) : (
                   <form onSubmit={handleTransferirBaseAdmin} className="gf-inversion-caja-admin-form">
                     <p className="gf-capital-form-hint" style={{ marginBottom: "0.75rem" }}>
-                      Invierte desde la caja de la empresa hacia la caja de un administrador. El capital total no cambia: baja el saldo en caja del jefe y sube la caja del administrador.
+                
                     </p>
                     <label htmlFor="gf-transfer-admin" className="gf-capital-form-label">
                       ADMINISTRADOR
