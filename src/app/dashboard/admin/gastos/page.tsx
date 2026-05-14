@@ -351,7 +351,7 @@ export default function GastosPage() {
     <div className="card gastos-admin-page">
       <h2 className="gastos-admin-title">Gastos operativos</h2>
       <p className="gastos-admin-intro">
-        Tus gastos (administrador o ruta) se descuentan de tu base. El historial incluye también los gastos operativos registrados por tus trabajadores (desde su base).
+      
       </p>
 
       {showForm && (
@@ -386,7 +386,7 @@ export default function GastosPage() {
 
             <div className="form-group">
               <span className="gastos-tipo-label">Tipo de gasto <span className="form-required" aria-hidden>*</span></span>
-              <div className="gastos-tipo-buttons" role="group" aria-label="Tipo de gasto">
+              <div className="gastos-tipo-buttons gastos-tipo-buttons-tipos" role="group" aria-label="Tipo de gasto">
                 {TIPOS.map((t) => (
                   <button
                     key={t.value}
@@ -405,7 +405,7 @@ export default function GastosPage() {
 
             <div className="form-group">
               <span className="gastos-tipo-label">Ámbito del gasto <span className="form-required" aria-hidden>*</span></span>
-              <div className="gastos-tipo-buttons" role="group" aria-label="Ámbito del gasto">
+              <div className="gastos-tipo-buttons gastos-tipo-buttons-alcance" role="group" aria-label="Ámbito del gasto">
                 <button
                   type="button"
                   className={`gastos-tipo-btn ${alcanceGasto === "admin" ? "gastos-tipo-btn-active" : ""}`}
@@ -448,12 +448,13 @@ export default function GastosPage() {
 
             <div className="form-group">
               <label htmlFor="gastos-motivo">Motivo <span className="form-required" aria-hidden>*</span></label>
-              <input
+              <textarea
                 id="gastos-motivo"
-                type="text"
+                className="gastos-admin-motivo-field"
                 value={motivo}
                 onChange={(e) => setMotivo(e.target.value)}
                 required
+                rows={1}
                 placeholder="Descripción del gasto (ej. factura de combustible)"
                 aria-required="true"
               />
