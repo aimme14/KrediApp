@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useTrabajadorLista } from "@/context/TrabajadorListaContext";
 import {
@@ -51,14 +51,6 @@ function ordenarPrestamosParaPrincipal(prestamos: PrestamoItem[]): PrestamoItem[
   });
 }
 
-/** Fecha actual en formato dd/mm/aaaa */
-function hoyDDMMAAAA(): string {
-  const d = new Date();
-  const day = String(d.getDate()).padStart(2, "0");
-  const month = String(d.getMonth() + 1).padStart(2, "0");
-  return `${day}/${month}/${d.getFullYear()}`;
-}
-
 export default function PrestamoTrabajadorPage() {
   const { user, profile } = useAuth();
   const {
@@ -78,11 +70,6 @@ export default function PrestamoTrabajadorPage() {
   const [creating, setCreating] = useState(false);
   const [confirmarMontoAlto, setConfirmarMontoAlto] = useState(false);
   const [filtroEstado, setFiltroEstado] = useState<"todos" | "activo" | "mora" | "pagado">("todos");
-  const [historialEconomicoColapsado, setHistorialEconomicoColapsado] = useState(true);
-
-  useEffect(() => {
-    setHistorialEconomicoColapsado(true);
-  }, [clienteId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -168,11 +155,6 @@ export default function PrestamoTrabajadorPage() {
     [prestamosFiltrados]
   );
 
-  const prestamosDelCliente = useMemo(
-    () => (clienteId ? prestamos.filter((p) => p.clienteId === clienteId) : []),
-    [prestamos, clienteId]
-  );
-
   if (!profile || profile.role !== "trabajador") return null;
 
   return (
@@ -192,203 +174,197 @@ export default function PrestamoTrabajadorPage() {
             ×
           </button>
         </div>
-        <div className="form-group">
-          <label>Cliente</label>
-          <select
-            value={clienteId}
-            onChange={(e) => setClienteId(e.target.value)}
-            required
-            style={{ width: "100%", padding: "0.5rem" }}
-            aria-label="Seleccionar cliente"
-          >
-            <option value="">Seleccionar cliente</option>
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "row",
+            flexWrap: "nowrap",
+            gap: "1rem",
+            alignItems: "flex-start",
+            marginBottom: "1rem",
+          }}
+        >
+          <div className="form-group" style={{ flex: "2 1 0", minWidth: 0, marginBottom: 0 }}>
+            <label>Cliente</label>
+            <select
+              value={clienteId}
+              onChange={(e) => setClienteId(e.target.value)}
+              required
+              style={{ width: "100%", padding: "0.5rem" }}
+              aria-label="Seleccionar cliente"
+            >
+              <option value="">Seleccionar cliente</option>
             {clientesSinPrestamo.map((c) => {
               const num = clienteNumFromCodigo(c.codigo);
               const codigoPart = num ? `#${num} · ` : "";
-              const cedulaPart = c.cedula ? ` · ${c.cedula}` : "";
               return (
                 <option key={c.id} value={c.id}>
-                  {codigoPart}{c.nombre}{cedulaPart}
+                  {codigoPart}{c.nombre}
                 </option>
               );
             })}
-            {clientesSinPrestamo.length === 0 && clientes.length > 0 && (
-              <option value="" disabled>Todos los clientes tienen préstamo activo o son morosos</option>
-            )}
-          </select>
-          {clienteSeleccionado && (
-            <p style={{ fontSize: "0.875rem", color: "var(--text-muted)", marginTop: "0.5rem", marginBottom: 0 }}>
-              Cliente seleccionado:{" "}
-              {clienteNumFromCodigo(clienteSeleccionado.codigo) && (
-                <span className="cliente-code">#{clienteNumFromCodigo(clienteSeleccionado.codigo)}</span>
+              {clientesSinPrestamo.length === 0 && clientes.length > 0 && (
+                <option value="" disabled>Todos los clientes tienen préstamo activo o son morosos</option>
               )}
-              {clienteNumFromCodigo(clienteSeleccionado.codigo) && " · "}
-              <strong>{clienteSeleccionado.nombre}</strong>
-              {clienteSeleccionado.cedula && <> · Céd. {clienteSeleccionado.cedula}</>}
-            </p>
-          )}
-        </div>
-
-        {clienteId && (
-          <div className="form-group" style={{ marginBottom: "1.25rem", border: "1px solid var(--card-border)", borderRadius: "var(--radius)", overflow: "hidden" }}>
-            <button
-              type="button"
-              onClick={() => setHistorialEconomicoColapsado((v) => !v)}
-              style={{
-                width: "100%",
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                gap: "0.5rem",
-                padding: "0.5rem 0.75rem",
-                background: "var(--card-bg)",
-                border: "none",
-                color: "var(--text)",
-                fontSize: "1rem",
-                cursor: "pointer",
-                textAlign: "left",
-              }}
-              aria-expanded={!historialEconomicoColapsado}
-              aria-controls="historial-economico-content"
-              id="historial-economico-toggle"
-            >
-              <span style={{ fontWeight: 600 }}>Historial económico</span>
-              <span style={{ fontSize: "0.875rem", color: "var(--text-muted)" }} aria-hidden>
-                {historialEconomicoColapsado ? "Expandir ▼" : "Colapsar ▲"}
-              </span>
-            </button>
-            <div id="historial-economico-content" role="region" aria-labelledby="historial-economico-toggle" style={{ display: historialEconomicoColapsado ? "none" : "block", padding: "0 0.75rem 0.75rem" }}>
-              {loading ? (
-                <p style={{ color: "var(--text-muted)", fontSize: "0.875rem", margin: "0.5rem 0 0" }}>Cargando...</p>
-              ) : prestamosDelCliente.length === 0 ? (
-                <p style={{ color: "var(--text-muted)", fontSize: "0.875rem", margin: "0.5rem 0 0" }}>Este cliente no tiene préstamos anteriores.</p>
-              ) : (
-                <div className="table-wrap prestamo-historial-economico-wrap" style={{ marginTop: "0.5rem" }}>
-                  <table className="prestamo-historial-economico-table prestamo-historial-economico-simple">
-                    <thead>
-                      <tr>
-                        <th>Código</th>
-                        <th>Cliente</th>
-                        <th className="col-num">Monto</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {prestamosDelCliente.map((p) => {
-                        const cl = clientePorId[p.clienteId];
-                        const num = cl ? clienteNumFromCodigo(cl.codigo) : null;
-                        const codigoDisplay = num ? `#${num}` : "—";
-                        const nombre = cl?.nombre ?? p.clienteId;
-                        return (
-                          <tr key={p.id}>
-                            <td>{codigoDisplay}</td>
-                            <td className="prestamo-histo-simple-nombre">{nombre}</td>
-                            <td className="col-num">{formatMoneda(p.monto)}</td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-            {historialEconomicoColapsado && !loading && (
-              <p style={{ padding: "0 0.75rem 0.75rem", margin: 0, fontSize: "0.875rem", color: "var(--text-muted)" }}>
-                {prestamosDelCliente.length === 0 ? "Sin préstamos anteriores" : `${prestamosDelCliente.length} préstamo${prestamosDelCliente.length !== 1 ? "s" : ""} registrado${prestamosDelCliente.length !== 1 ? "s" : ""}. Haz clic en «Expandir» para ver el detalle.`}
-              </p>
-            )}
+            </select>
           </div>
+          <div className="form-group" style={{ flex: "0 0 11rem", minWidth: 0, marginBottom: 0 }}>
+            <label>Frecuencia de pago</label>
+            <select
+              value={modalidad}
+              onChange={(e) => setModalidad(e.target.value as "diario" | "semanal" | "mensual")}
+              style={{ width: "100%", padding: "0.5rem" }}
+              aria-label="Frecuencia de pago"
+            >
+              {MODALIDADES.map((m) => (
+                <option key={m.value} value={m.value}>
+                  {m.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+        {clienteSeleccionado && (
+          <p
+            style={{
+              fontSize: "0.875rem",
+              color: "var(--text-muted)",
+              marginTop: "0.5rem",
+              marginBottom: "1rem",
+              display: "flex",
+              flexDirection: "row",
+              flexWrap: "nowrap",
+              alignItems: "center",
+              gap: "0.35rem",
+              minWidth: 0,
+              lineHeight: 1.35,
+            }}
+          >
+            <span style={{ flexShrink: 0 }}>Cliente:</span>
+            {clienteNumFromCodigo(clienteSeleccionado.codigo) && (
+              <span className="cliente-code" style={{ flexShrink: 0 }}>
+                #{clienteNumFromCodigo(clienteSeleccionado.codigo)}
+              </span>
+            )}
+            {clienteNumFromCodigo(clienteSeleccionado.codigo) && (
+              <span style={{ flexShrink: 0 }} aria-hidden>
+                ·
+              </span>
+            )}
+            <strong
+              style={{
+                minWidth: 0,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+              title={clienteSeleccionado.nombre}
+            >
+              {clienteSeleccionado.nombre}
+            </strong>
+          </p>
         )}
 
-        <div className="form-group">
-          <label>Fecha del préstamo</label>
-          <input
-            type="text"
-            readOnly
-            value={hoyDDMMAAAA()}
-            aria-label="Fecha del préstamo (día actual)"
-            style={{ backgroundColor: "var(--bg)", cursor: "default", maxWidth: "10rem" }}
-          />
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "row",
+            flexWrap: "nowrap",
+            gap: "1rem",
+            alignItems: "flex-start",
+            marginBottom: "1rem",
+          }}
+        >
+          <div className="form-group" style={{ flex: "1 1 0", minWidth: 0, marginBottom: 0 }}>
+            <label>Número de cuotas</label>
+            <input
+              type="number"
+              inputMode="numeric"
+              min={1}
+              max={CUOTAS_MAX}
+              value={numeroCuotas}
+              onChange={(e) => {
+                const v = e.target.value.replace(/\D/g, "");
+                if (v === "" || /^\d+$/.test(v)) setNumeroCuotas(v);
+              }}
+              onKeyDown={(e) => {
+                const k = e.key;
+                if (k === "e" || k === "E" || k === "+" || k === "-" || k === "." || k === ",") e.preventDefault();
+              }}
+              placeholder="Ej: 12"
+              required
+              aria-label="Número de cuotas"
+              style={{ width: "100%" }}
+            />
+            <p style={{ color: "var(--text-muted)", fontSize: "0.75rem", marginTop: "0.25rem", marginBottom: 0 }}>
+            </p>
+          </div>
+          <div className="form-group" style={{ flex: "1 1 0", minWidth: 0, marginBottom: 0 }}>
+            <label>Interés (%)</label>
+            <input
+              type="text"
+              inputMode="decimal"
+              value={interes}
+              onChange={(e) => {
+                const v = e.target.value.replace(",", ".");
+                if (v === "" || /^\d*\.?\d*$/.test(v)) setInteres(v);
+              }}
+              onKeyDown={(e) => {
+                const k = e.key;
+                if (k === "e" || k === "E" || k === "+" || k === "-") e.preventDefault();
+              }}
+              placeholder="Ej: 10"
+              aria-label="Interés en porcentaje"
+              style={{ width: "100%" }}
+            />
+            <p style={{ color: "var(--text-muted)", fontSize: "0.75rem", marginTop: "0.25rem", marginBottom: 0 }}>
+
+            </p>
+          </div>
         </div>
-        <div className="form-group">
-          <label>Frecuencia de pago</label>
-          <select value={modalidad} onChange={(e) => setModalidad(e.target.value as "diario" | "semanal" | "mensual")} style={{ width: "100%", padding: "0.5rem" }}>
-            {MODALIDADES.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
-          </select>
-        </div>
-        <div className="form-group">
-          <label>Número de cuotas</label>
-          <input
-            type="number"
-            inputMode="numeric"
-            min={1}
-            max={CUOTAS_MAX}
-            value={numeroCuotas}
-            onChange={(e) => {
-              const v = e.target.value.replace(/\D/g, "");
-              if (v === "" || /^\d+$/.test(v)) setNumeroCuotas(v);
-            }}
-            onKeyDown={(e) => {
-              const k = e.key;
-              if (k === "e" || k === "E" || k === "+" || k === "-" || k === "." || k === ",") e.preventDefault();
-            }}
-            placeholder="Ej: 12 (según frecuencia: 12 pagos)"
-            required
-            aria-label="Número de cuotas"
-          />
-          <p style={{ color: "var(--text-muted)", fontSize: "0.75rem", marginTop: "0.25rem", marginBottom: 0 }}>
-            Número de pagos según la frecuencia elegida (diario, semanal o mensual).
-          </p>
-        </div>
-        <div className="form-group">
-          <label>Interés (%)</label>
-          <input
-            type="text"
-            inputMode="decimal"
-            value={interes}
-            onChange={(e) => {
-              const v = e.target.value.replace(",", ".");
-              if (v === "" || /^\d*\.?\d*$/.test(v)) setInteres(v);
-            }}
-            onKeyDown={(e) => {
-              const k = e.key;
-              if (k === "e" || k === "E" || k === "+" || k === "-") e.preventDefault();
-            }}
-            placeholder="Ej: 10 (porcentaje aplicado al monto)"
-            aria-label="Interés en porcentaje"
-          />
-        </div>
-        <div className="form-group">
-          <label>Cantidad a prestar</label>
-          <input
-            type="text"
-            inputMode="decimal"
-            value={monto ? formatMontoDecimalCOPDisplay(monto) : ""}
-            onChange={(e) => setMonto(sanitizeMontoDecimalCOP(e.target.value))}
-            required
-            placeholder="0,00"
-          />
-        </div>
-        <div className="form-group">
-          <label>Cuota</label>
-          <input
-            type="text"
-            readOnly
-            value={
-              (() => {
-                const montoNum = interiorDecimalCOPToNumber(monto);
-                const nCuotas = parseInt(numeroCuotas, 10);
-                const iVal = parseInteresPct(interes);
-                if (isNaN(montoNum) || montoNum <= 0 || !nCuotas || nCuotas < 1) return "—";
-                const total = montoNum * (1 + iVal / 100);
-                return formatMoneda(total / nCuotas);
-              })()
-            }
-            aria-label="Cuota (calculada)"
-            style={{ backgroundColor: "var(--bg)", cursor: "default" }}
-          />
-          <p style={{ color: "var(--text-muted)", fontSize: "0.75rem", marginTop: "0.25rem", marginBottom: 0 }}>
-            (Cantidad a prestar × (1 + interés %) ÷ número de cuotas)
-          </p>
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "row",
+            flexWrap: "nowrap",
+            gap: "1rem",
+            alignItems: "flex-start",
+            marginBottom: "1rem",
+          }}
+        >
+          <div className="form-group" style={{ flex: "1 1 0", minWidth: 0, marginBottom: 0 }}>
+            <label>Cantidad a prestar</label>
+            <input
+              type="text"
+              inputMode="decimal"
+              value={monto ? formatMontoDecimalCOPDisplay(monto) : ""}
+              onChange={(e) => setMonto(sanitizeMontoDecimalCOP(e.target.value))}
+              required
+              placeholder="0,00"
+              style={{ width: "100%" }}
+            />
+          </div>
+          <div className="form-group" style={{ flex: "1 1 0", minWidth: 0, marginBottom: 0 }}>
+            <label>Cuota</label>
+            <input
+              type="text"
+              readOnly
+              value={
+                (() => {
+                  const montoNum = interiorDecimalCOPToNumber(monto);
+                  const nCuotas = parseInt(numeroCuotas, 10);
+                  const iVal = parseInteresPct(interes);
+                  if (isNaN(montoNum) || montoNum <= 0 || !nCuotas || nCuotas < 1) return "—";
+                  const total = montoNum * (1 + iVal / 100);
+                  return formatMoneda(total / nCuotas);
+                })()
+              }
+              aria-label="Cuota (calculada)"
+              style={{ width: "100%", backgroundColor: "var(--bg)", cursor: "default" }}
+            />
+            <p style={{ color: "var(--text-muted)", fontSize: "0.75rem", marginTop: "0.25rem", marginBottom: 0 }}>
+            </p>
+          </div>
         </div>
 
         {totalAPagar > 0 && (
@@ -410,33 +386,63 @@ export default function PrestamoTrabajadorPage() {
               <li>Cuota por pago: <strong>{formatMoneda(cuotaPorPago)}</strong></li>
             </ul>
             <p style={{ margin: "0.75rem 0 0", fontSize: "0.8rem", color: "var(--text-muted)", lineHeight: 1.5 }}>
-              Al crear el préstamo, el monto a prestar sale de tu caja y pasa a inversiones de la ruta.
-              Al cobrar, lo que corresponde a capital vuelve a tu caja desde inversiones; el interés
-              suma a tu caja como ganancia (no sale de inversiones).
             </p>
-          </div>
-        )}
-
-        {requiereConfirmarMonto && (
-          <div className="form-group">
-            <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", cursor: "pointer" }}>
-              <input
-                type="checkbox"
-                checked={confirmarMontoAlto}
-                onChange={(e) => setConfirmarMontoAlto(e.target.checked)}
-                aria-label="Confirmar préstamo de monto alto"
-              />
-              <span>Confirmo la creación de un préstamo por <strong>{formatMoneda(montoNum)}</strong></span>
-            </label>
           </div>
         )}
 
         {(error || listaError) && (
           <p className="error-msg">{error ?? listaError}</p>
         )}
-        <button type="submit" className="btn btn-primary" disabled={creating}>
-          {creating ? "Creando..." : "Crear préstamo"}
-        </button>
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "row",
+            flexWrap: "wrap",
+            alignItems: "center",
+            gap: "1rem",
+            justifyContent: "flex-start",
+            width: "100%",
+          }}
+        >
+          <button
+            type="submit"
+            className="btn btn-primary"
+            disabled={creating}
+            style={{ flexShrink: 0 }}
+          >
+            {creating ? "Creando..." : "Crear préstamo"}
+          </button>
+          {requiereConfirmarMonto && (
+            <label
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "0.65rem",
+                cursor: "pointer",
+                margin: 0,
+                marginLeft: "20%",
+                flexShrink: 0,
+                lineHeight: 1.2,
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={confirmarMontoAlto}
+                onChange={(e) => setConfirmarMontoAlto(e.target.checked)}
+                aria-label={`Confirmo creación de préstamo por ${formatMoneda(montoNum)}`}
+                style={{
+                  flexShrink: 0,
+                  cursor: "pointer",
+                  margin: "0 0.2rem",
+                  transform: "scale(1.5)",
+                  transformOrigin: "center",
+                  accentColor: "var(--link, #6366f1)",
+                }}
+              />
+              <span style={{ fontSize: "1.05rem" }}>Confirmo</span>
+            </label>
+          )}
+        </div>
       </form>
       )}
 

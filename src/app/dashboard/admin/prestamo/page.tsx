@@ -328,7 +328,7 @@ export default function PrestamoPage() {
           </select>
           {clienteSeleccionado && (
             <p style={{ fontSize: "0.875rem", color: "var(--text-muted)", marginTop: "0.5rem", marginBottom: 0 }}>
-              Cliente seleccionado:{" "}
+              Cliente:{" "}
               {clienteNumFromCodigo(clienteSeleccionado.codigo) && (
                 <span className="cliente-code">#{clienteNumFromCodigo(clienteSeleccionado.codigo)}</span>
               )}
@@ -537,7 +537,7 @@ export default function PrestamoPage() {
                 onChange={(e) => setConfirmarMontoAlto(e.target.checked)}
                 aria-label="Confirmar préstamo de monto alto"
               />
-              <span>Confirmo la creación de un préstamo por <strong>{formatMoneda(montoNum)}</strong></span>
+              <span>Confirmo el préstamo<strong>{formatMoneda(montoNum)}</strong></span>
             </label>
           </div>
         )}
