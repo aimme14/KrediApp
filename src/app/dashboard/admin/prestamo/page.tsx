@@ -203,15 +203,9 @@ export default function PrestamoPage() {
   const resumenPrestamos = useMemo(() => {
     const activos = prestamos.filter((p) => p.estado === "activo");
     const mora = prestamos.filter((p) => p.estado === "mora");
-    const pagados = prestamos.filter((p) => p.estado === "pagado");
-    const saldoPorCobrar = prestamos
-      .filter((p) => p.estado !== "pagado")
-      .reduce((s, p) => s + p.saldoPendiente, 0);
     return {
       activos: activos.length,
       mora: mora.length,
-      pagados: pagados.length,
-      saldoPorCobrar,
     };
   }, [prestamos]);
 
@@ -579,32 +573,6 @@ export default function PrestamoPage() {
                   <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
                   <line x1="12" y1="9" x2="12" y2="13" />
                   <line x1="12" y1="17" x2="12.01" y2="17" />
-                </svg>
-              </span>
-            </div>
-            <div className="prestamo-admin-kpi">
-              <div className="prestamo-admin-kpi-body">
-                <span className="prestamo-admin-kpi-label">Pagados</span>
-                <span className="prestamo-admin-kpi-value">{resumenPrestamos.pagados}</span>
-              </div>
-              <span className="prestamo-admin-kpi-icon prestamo-admin-kpi-icon--pagado" aria-hidden>
-                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M22 11.08V12a10 10 0 11-5.93-9.14" />
-                  <polyline points="22 4 12 14.01 9 11.01" />
-                </svg>
-              </span>
-            </div>
-            <div className="prestamo-admin-kpi">
-              <div className="prestamo-admin-kpi-body">
-                <span className="prestamo-admin-kpi-label">Saldo por cobrar</span>
-                <span className="prestamo-admin-kpi-value prestamo-admin-kpi-value--saldo">
-                  $ {formatMoneda(resumenPrestamos.saldoPorCobrar)}
-                </span>
-              </div>
-              <span className="prestamo-admin-kpi-icon prestamo-admin-kpi-icon--saldo" aria-hidden>
-                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="12" y1="1" x2="12" y2="23" />
-                  <path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" />
                 </svg>
               </span>
             </div>

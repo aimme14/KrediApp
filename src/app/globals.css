@@ -1545,15 +1545,9 @@ td {
 
 .prestamo-admin-resumen {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.65rem;
   margin-bottom: 1.1rem;
-}
-
-@media (max-width: 720px) {
-  .prestamo-admin-resumen {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
 }
 
 @media (max-width: 400px) {
@@ -1610,10 +1604,6 @@ td {
   color: #f87171;
 }
 
-.prestamo-admin-kpi-value--saldo {
-  font-size: 1.05rem;
-}
-
 .prestamo-admin-kpi-icon {
   flex-shrink: 0;
   width: 2.1rem;
@@ -1633,16 +1623,6 @@ td {
 .prestamo-admin-kpi-icon--mora {
   background: linear-gradient(145deg, #f87171 0%, #b91c1c 100%);
   box-shadow: 0 2px 8px rgba(248, 113, 113, 0.3);
-}
-
-.prestamo-admin-kpi-icon--pagado {
-  background: linear-gradient(145deg, #4ade80 0%, #15803d 100%);
-  box-shadow: 0 2px 8px rgba(74, 222, 128, 0.3);
-}
-
-.prestamo-admin-kpi-icon--saldo {
-  background: linear-gradient(145deg, #8b5cf6 0%, #6d28d9 100%);
-  box-shadow: 0 2px 8px rgba(139, 92, 246, 0.35);
 }
 
 .prestamo-admin-hist-card {
