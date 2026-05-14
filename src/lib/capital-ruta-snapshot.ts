@@ -2,7 +2,7 @@
  * Snapshots de capital por ruta bajo empresas/{empresaId}/capital/root/rutas/{rutaId}
  */
 
-import type { Firestore } from "firebase-admin/firestore";
+import type { Firestore, QuerySnapshot } from "firebase-admin/firestore";
 import {
   EMPRESAS_COLLECTION,
   RUTAS_SUBCOLLECTION,
@@ -95,13 +95,17 @@ export async function upsertCapitalRutaSnapshot(
 /** Sincroniza todos los snapshots de ruta desde empresas/{id}/rutas. */
 export async function syncAllCapitalRutaSnapshots(
   db: Firestore,
-  empresaId: string
+  empresaId: string,
+  /** Si ya tienes el snap de rutas (p. ej. desde persist), evita un segundo `.get()`. */
+  rutasSnapExterno?: QuerySnapshot
 ): Promise<void> {
-  const rutasSnap = await db
-    .collection(EMPRESAS_COLLECTION)
-    .doc(empresaId)
-    .collection(RUTAS_SUBCOLLECTION)
-    .get();
+  const rutasSnap =
+    rutasSnapExterno ??
+    (await db
+      .collection(EMPRESAS_COLLECTION)
+      .doc(empresaId)
+      .collection(RUTAS_SUBCOLLECTION)
+      .get());
   if (rutasSnap.empty) return;
   await ensureCapitalBranchDoc(db, empresaId);
   const batch = db.batch();

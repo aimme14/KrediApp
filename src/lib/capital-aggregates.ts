@@ -173,7 +173,7 @@ export async function sumaCajasEmpleadosRutas(
 
 /**
  * Persiste documentos agregados cajaAdmin y cajaEmpleado y sincroniza snapshots de rutas.
- * Una sola lectura de `rutas` para capital admin y suma de cajas empleado.
+ * Una sola lectura de `rutas` para capital admin, suma de cajas empleado y snapshots por ruta.
  */
 export async function persistAggregatedCapitalDocs(
   db: Firestore,
@@ -208,5 +208,5 @@ export async function persistAggregatedCapitalDocs(
     ),
   ]);
 
-  await syncAllCapitalRutaSnapshots(db, empresaId);
+  await syncAllCapitalRutaSnapshots(db, empresaId, rutasSnap);
 }
