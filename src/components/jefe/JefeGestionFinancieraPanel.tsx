@@ -510,7 +510,7 @@ export default function JefeGestionFinancieraPanel({
           <span className="gf-kpi-emoji" aria-hidden>💰</span>
           <span className="gf-kpi-value">{formatMonto(monto)}</span>
           <span className="gf-kpi-label">CAPITAL</span>
-          <span className="gf-kpi-sub">Total empresa</span>
+          <span className="gf-kpi-sub"></span>
           {historial.length > 0 && (
             <span className={`gf-kpi-badge ${tendencia === "subiendo" ? "gf-kpi-up" : tendencia === "bajando" ? "gf-kpi-down" : "gf-kpi-neutral"}`}>
               {tendencia === "subiendo" ? "↑" : tendencia === "bajando" ? "↓" : "→"} {tendencia === "estable" ? "Estable" : ""}
@@ -521,7 +521,7 @@ export default function JefeGestionFinancieraPanel({
           <span className="gf-kpi-emoji" aria-hidden>🏦</span>
           <span className="gf-kpi-value">{formatMonto(cajaEmpresa)}</span>
           <span className="gf-kpi-label">CAJA DE LA EMPRESA</span>
-          <span className="gf-kpi-sub">Liquidez en caja</span>
+          <span className="gf-kpi-sub"></span>
         </div>
       </div>
 
@@ -617,7 +617,7 @@ export default function JefeGestionFinancieraPanel({
             <span className="gf-capital-badge-privado">🔒 Privado</span>
           </div>
           <p className="gf-capital-card-desc">
-            Solo visible y editable por el jefe. El capital total se calcula como caja de la empresa + Σ capital administradores.
+        
           </p>
 
           {loading ? (
