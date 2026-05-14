@@ -1546,13 +1546,28 @@ td {
 .prestamo-admin-resumen {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.65rem;
-  margin-bottom: 1.1rem;
+  gap: 0.52rem;
+  margin-bottom: 0.88rem;
 }
 
-@media (max-width: 400px) {
+@media (max-width: 480px) {
   .prestamo-admin-resumen {
-    grid-template-columns: 1fr;
+    gap: 0.4rem;
+  }
+  .prestamo-admin-kpi {
+    padding: 0.48rem 0.44rem;
+    gap: 0.28rem;
+  }
+  .prestamo-admin-kpi-value {
+    font-size: 0.84rem;
+  }
+  .prestamo-admin-kpi-icon {
+    width: 1.48rem;
+    height: 1.48rem;
+  }
+  .prestamo-admin-kpi-icon svg {
+    width: 12px;
+    height: 12px;
   }
 }
 
@@ -1561,9 +1576,9 @@ td {
   flex-direction: row;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 0.5rem;
-  padding: 0.7rem 0.8rem;
-  border-radius: 12px;
+  gap: 0.4rem;
+  padding: 0.56rem 0.64rem;
+  border-radius: 10px;
   border: 1px solid var(--card-border);
   background: var(--card-bg);
   box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04) inset;
@@ -1580,11 +1595,11 @@ td {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 0.15rem;
+  gap: 0.12rem;
 }
 
 .prestamo-admin-kpi-label {
-  font-size: 0.62rem;
+  font-size: 0.5rem;
   font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -1593,7 +1608,7 @@ td {
 }
 
 .prestamo-admin-kpi-value {
-  font-size: 1.2rem;
+  font-size: 0.96rem;
   font-weight: 800;
   letter-spacing: -0.03em;
   color: var(--text);
@@ -1606,23 +1621,28 @@ td {
 
 .prestamo-admin-kpi-icon {
   flex-shrink: 0;
-  width: 2.1rem;
-  height: 2.1rem;
-  border-radius: 9px;
+  width: 1.68rem;
+  height: 1.68rem;
+  border-radius: 7px;
   display: flex;
   align-items: center;
   justify-content: center;
   color: #fafafa;
 }
 
+.prestamo-admin-kpi-icon svg {
+  width: 13.5px;
+  height: 13.5px;
+}
+
 .prestamo-admin-kpi-icon--activo {
   background: linear-gradient(145deg, #6366f1 0%, #4338ca 100%);
-  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.35);
+  box-shadow: 0 2px 6px rgba(99, 102, 241, 0.35);
 }
 
 .prestamo-admin-kpi-icon--mora {
   background: linear-gradient(145deg, #f87171 0%, #b91c1c 100%);
-  box-shadow: 0 2px 8px rgba(248, 113, 113, 0.3);
+  box-shadow: 0 2px 6px rgba(248, 113, 113, 0.3);
 }
 
 .prestamo-admin-hist-card {
@@ -1712,6 +1732,19 @@ td {
   box-shadow: 0 2px 8px rgba(99, 102, 241, 0.35);
 }
 
+.prestamo-trabajador-historial-filtros {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-bottom: 0.75rem;
+}
+
+@media (max-width: 768px) {
+  .prestamo-historial-filtros {
+    display: none !important;
+  }
+}
+
 .prestamo-admin-loading {
   margin: 0;
   color: var(--text-muted);
@@ -1760,6 +1793,65 @@ td {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* Móvil: solo Código, Cliente y Monto prestado (oculta expandir, totales, cobro, etc.) */
+@media (max-width: 768px) {
+  .table-wrap.prestamo-admin-hist-table-wrap {
+    overflow-x: visible;
+  }
+
+  .prestamo-admin-hist-card .table-historial {
+    width: 100%;
+    min-width: 0;
+    table-layout: fixed;
+  }
+
+  .prestamo-admin-hist-card .table-historial thead th:nth-child(1),
+  .prestamo-admin-hist-card .table-historial tbody tr td:nth-child(1):not([colspan]),
+  .prestamo-admin-hist-card .table-historial thead th:nth-child(n + 5),
+  .prestamo-admin-hist-card .table-historial tbody tr td:nth-child(n + 5) {
+    display: none !important;
+  }
+
+  .prestamo-admin-hist-card .table-historial th:nth-child(2),
+  .prestamo-admin-hist-card .table-historial td:nth-child(2) {
+    width: 22%;
+    white-space: nowrap;
+  }
+
+  .prestamo-admin-hist-card .table-historial th:nth-child(4),
+  .prestamo-admin-hist-card .table-historial td:nth-child(4) {
+    width: 30%;
+    white-space: nowrap;
+  }
+
+  .prestamo-admin-hist-card .table-historial td:nth-child(3) {
+    max-width: none;
+    white-space: normal;
+    word-break: break-word;
+    overflow: visible;
+    text-overflow: clip;
+  }
+
+  .prestamo-admin-hist-card .table-historial th:nth-child(2),
+  .prestamo-admin-hist-card .table-historial th:nth-child(3),
+  .prestamo-admin-hist-card .table-historial th:nth-child(4) {
+    font-size: 0.7rem;
+    padding: 0.35rem 0.4rem;
+  }
+
+  .prestamo-admin-hist-card .table-historial tbody tr td:nth-child(2),
+  .prestamo-admin-hist-card .table-historial tbody tr td:nth-child(3),
+  .prestamo-admin-hist-card .table-historial tbody tr td:nth-child(4) {
+    font-size: 0.8125rem;
+    padding: 0.45rem 0.4rem;
+    vertical-align: top;
+  }
+
+  .prestamo-admin-hist-card .table-historial .col-num {
+    text-align: right;
+  }
 }
 
 .prestamo-admin-estado {

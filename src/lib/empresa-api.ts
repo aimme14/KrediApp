@@ -56,6 +56,17 @@ export function formatClienteCodigoCorto(codigo: string | undefined): string {
 }
 
 /**
+ * Solo ruta y número de cliente (sin prefijo CL- ni código de empresa).
+ * Ej: "CL-001-002-045" → "002-045"
+ */
+export function formatClienteCodigoRutaYNumero(codigo: string | undefined): string {
+  if (!codigo || typeof codigo !== "string") return "—";
+  const m = codigo.match(/^CL-\d+-(\d+)-(\d+)$/);
+  if (!m) return codigo;
+  return `${m[1]}-${m[2]}`;
+}
+
+/**
  * Extrae las últimas tres cifras del código de cliente (número dentro de la ruta).
  * Ej: clienteNumFromCodigo("CL-001-002-045") → "045"
  */

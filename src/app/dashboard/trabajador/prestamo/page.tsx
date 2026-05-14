@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useTrabajadorLista } from "@/context/TrabajadorListaContext";
 import {
@@ -70,6 +70,16 @@ export default function PrestamoTrabajadorPage() {
   const [creating, setCreating] = useState(false);
   const [confirmarMontoAlto, setConfirmarMontoAlto] = useState(false);
   const [filtroEstado, setFiltroEstado] = useState<"todos" | "activo" | "mora" | "pagado">("todos");
+
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 768px)");
+    const syncFiltro = () => {
+      if (mq.matches) setFiltroEstado("todos");
+    };
+    syncFiltro();
+    mq.addEventListener("change", syncFiltro);
+    return () => mq.removeEventListener("change", syncFiltro);
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -469,7 +479,7 @@ export default function PrestamoTrabajadorPage() {
           <p style={{ color: "var(--text-muted)" }}>No hay préstamos.</p>
         ) : (
           <>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: "0.35rem", marginBottom: "0.75rem" }} role="tablist" aria-label="Filtrar por estado">
+            <div className="prestamo-historial-filtros prestamo-trabajador-historial-filtros" role="tablist" aria-label="Filtrar por estado">
               {(["todos", "activo", "mora", "pagado"] as const).map((est) => (
                 <button
                   key={est}

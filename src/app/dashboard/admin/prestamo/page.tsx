@@ -8,7 +8,7 @@ import {
   listPrestamos,
   listRutas,
   createPrestamo,
-  clienteNumFromCodigo,
+  formatClienteCodigoRutaYNumero,
   type ClienteItem,
   type PrestamoItem,
   type RutaItem,
@@ -118,6 +118,16 @@ export default function PrestamoPage() {
   useEffect(() => {
     setClienteId("");
   }, [rutaIdForm]);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 768px)");
+    const syncFiltro = () => {
+      if (mq.matches) setFiltroEstado("todos");
+    };
+    syncFiltro();
+    mq.addEventListener("change", syncFiltro);
+    return () => mq.removeEventListener("change", syncFiltro);
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -304,8 +314,7 @@ export default function PrestamoPage() {
           >
             <option value="">{rutaIdForm ? "Seleccionar cliente" : "Primero elige una ruta"}</option>
             {clientesSinPrestamoDeRuta.map((c) => {
-              const num = clienteNumFromCodigo(c.codigo);
-              const codigoPart = num ? `#${num} · ` : "";
+              const codigoPart = c.codigo ? `${formatClienteCodigoRutaYNumero(c.codigo)} · ` : "";
               const cedulaPart = c.cedula ? ` · ${c.cedula}` : "";
               return (
                 <option key={c.id} value={c.id}>
@@ -323,10 +332,10 @@ export default function PrestamoPage() {
           {clienteSeleccionado && (
             <p style={{ fontSize: "0.875rem", color: "var(--text-muted)", marginTop: "0.5rem", marginBottom: 0 }}>
               Cliente:{" "}
-              {clienteNumFromCodigo(clienteSeleccionado.codigo) && (
-                <span className="cliente-code">#{clienteNumFromCodigo(clienteSeleccionado.codigo)}</span>
+              {clienteSeleccionado.codigo && (
+                <span className="cliente-code">{formatClienteCodigoRutaYNumero(clienteSeleccionado.codigo)}</span>
               )}
-              {clienteNumFromCodigo(clienteSeleccionado.codigo) && " · "}
+              {clienteSeleccionado.codigo && " · "}
               <strong>{clienteSeleccionado.nombre}</strong>
               {clienteSeleccionado.cedula && <> · Céd. {clienteSeleccionado.cedula}</>}
             </p>
@@ -597,7 +606,7 @@ export default function PrestamoPage() {
           <p className="prestamo-admin-empty">No hay préstamos en el historial.</p>
         ) : (
           <>
-            <div className="prestamo-admin-tabs" role="tablist" aria-label="Filtrar por estado">
+            <div className="prestamo-admin-tabs prestamo-historial-filtros" role="tablist" aria-label="Filtrar por estado">
               {(["todos", "activo", "mora", "pagado"] as const).map((est) => (
                 <button
                   key={est}
@@ -632,8 +641,7 @@ export default function PrestamoPage() {
                   const principal = grupo.prestamos[0];
                   const cl = clientePorId[grupo.clienteId];
                   const nombre = cl?.nombre ?? grupo.clienteId;
-                  const num = cl ? clienteNumFromCodigo(cl.codigo) : "";
-                  const codigoDisplay = num ? "#" + num : "—";
+                  const codigoDisplay = cl?.codigo ? formatClienteCodigoRutaYNumero(cl.codigo) : "—";
                   const pagadas = cuotasPagadas(principal.totalAPagar, principal.numeroCuotas, principal.saldoPendiente);
                   const tieneMas = grupo.prestamos.length > 1;
                   const expandido = clientesExpandidos.has(grupo.clienteId);
