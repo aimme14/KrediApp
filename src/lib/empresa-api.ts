@@ -363,6 +363,8 @@ export type CobroDiaItem = {
   /** Estimado con cuotas iguales. */
   cuotasFaltantes: number;
   numeroCuotas: number;
+  /** URL de evidencia (transferencia); vacío si no hay. */
+  evidencia?: string | null;
 };
 
 /** Registros «no pagó» que el trabajador confirmó ese día (ruta del empleado). */
@@ -547,6 +549,8 @@ export async function getCobrosDelDiaEmpleado(
         : 0,
     cuotasFaltantes: typeof row.cuotasFaltantes === "number" ? row.cuotasFaltantes : 0,
     numeroCuotas: typeof row.numeroCuotas === "number" ? row.numeroCuotas : 0,
+    evidencia:
+      typeof row.evidencia === "string" && row.evidencia.trim() ? row.evidencia.trim() : null,
   }));
 
   const gastosRaw = Array.isArray(data.gastosDelDia) ? data.gastosDelDia : [];

@@ -18,6 +18,7 @@ import {
   entregarReporteTrabajadorARuta,
   getPreviewEntregaReporteTrabajador,
 } from "@/lib/entregar-reporte-empleado-admin";
+import { purgeTransferenciaEvidenciasDelCierre } from "@/lib/cierre-dia-evidencia-purge";
 
 export type EstadoSolicitudEntrega = "pendiente" | "aprobada" | "rechazada";
 
@@ -328,13 +329,14 @@ export async function aprobarSolicitudEntregaReporte(
     .collection(REPORTES_DIA_SUBCOLLECTION)
     .doc(reporteDiaId);
 
+  const snapshot = await buildCierreDiaSnapshot(db, {
+    empresaId,
+    empleadoUid,
+    rutaId: result.rutaId,
+    fechaDia,
+  });
+
   try {
-    const snapshot = await buildCierreDiaSnapshot(db, {
-      empresaId,
-      empleadoUid,
-      rutaId: result.rutaId,
-      fechaDia,
-    });
     const rutaNombre =
       typeof sol.rutaNombre === "string" && sol.rutaNombre.trim()
         ? sol.rutaNombre.trim()
@@ -375,6 +377,12 @@ export async function aprobarSolicitudEntregaReporte(
     montoEntregadoEfectivo: result.monto,
     reporteDiaId,
   });
+
+  try {
+    await purgeTransferenciaEvidenciasDelCierre(db, empresaId, snapshot);
+  } catch (e) {
+    console.error("[evidencia-purge] Fallo general:", e);
+  }
 
   return { monto: result.monto, rutaId: result.rutaId, reporteDiaId };
 }

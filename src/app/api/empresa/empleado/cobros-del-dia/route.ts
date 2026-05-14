@@ -17,6 +17,7 @@ export type CobroDiaItemApi = {
   saldoPendientePrestamoActual: number;
   cuotasFaltantes: number;
   numeroCuotas: number;
+  evidencia?: string | null;
 };
 
 /** Visitas sin cobro registradas ese día por este trabajador (`tipo: no_pago`). */

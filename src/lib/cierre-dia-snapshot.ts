@@ -57,6 +57,8 @@ export type CobroDiaSnapshotItem = {
   /** Estimado con cuotas iguales según `totalAPagar` y `numeroCuotas`. */
   cuotasFaltantes: number;
   numeroCuotas: number;
+  /** URL de descarga en Storage (transferencias con foto de evidencia). */
+  evidencia?: string | null;
 };
 
 export type NoPagoDiaSnapshotItem = {
@@ -205,6 +207,7 @@ export async function buildCierreDiaSnapshot(
     monto: number;
     metodoPago: string | null;
     empleadoIdRegistro: string;
+    evidencia: string | null;
   };
 
   type NoPagoRow = {
@@ -266,6 +269,9 @@ export async function buildCierreDiaSnapshot(
               : null;
           const empleadoIdRegistro =
             typeof pd.empleadoId === "string" ? pd.empleadoId.trim() : "";
+          const evidenciaRaw = pd.evidencia;
+          const evidencia =
+            typeof evidenciaRaw === "string" && evidenciaRaw.trim() ? evidenciaRaw.trim() : null;
           pagosRaw.push({
             pagoId: p.id,
             prestamoId: pdoc.id,
@@ -273,6 +279,7 @@ export async function buildCierreDiaSnapshot(
             monto: round2(monto),
             metodoPago: metodo,
             empleadoIdRegistro,
+            evidencia,
           });
         }
       })
@@ -316,6 +323,7 @@ export async function buildCierreDiaSnapshot(
         saldoPendientePrestamoActual: saldoActual,
         cuotasFaltantes: cuotasFalt,
         numeroCuotas: numeroCuotasPrestamo,
+        evidencia: row.evidencia,
       });
     }
   }

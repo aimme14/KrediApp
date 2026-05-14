@@ -765,39 +765,33 @@ export async function buildReporteCierrePdf(
 
   spacer(10);
 
-  // ——— Gastos (izq) + Préstamos (der), pies alineados ———
+  // ——— Gastos (arriba) + Préstamos (abajo), ancho completo ———
   {
-    ensureBottom(280);
-    const gap = 10;
-    const colW = (PAGE_W - 2 * M - gap) / 2;
-    const xL = M;
-    const xR = M + colW + gap;
+    ensureBottom(160);
+    const blockW = PAGE_W - 2 * M;
+    const xBox = M;
     const yStart = y;
 
     const gastos = snapshot.gastosDelDia;
     const prestamosRows = snapshot.prestamosDesembolsoDelDia ?? [];
-    const bodyLinesG = gastos.length === 0 ? 1 : gastos.length;
-    const bodyLinesP = prestamosRows.length === 0 ? 1 : prestamosRows.length;
-    const maxBodyLines = Math.max(bodyLinesG, bodyLinesP);
-    const padGastos = maxBodyLines - bodyLinesG;
-    const padPrestamos = maxBodyLines - bodyLinesP;
 
-    const hrDual = (xBox: number, yy: number) => {
+    const hrDual = (xx: number, ww: number, yy: number) => {
       const lift = 7;
       page.drawLine({
-        start: { x: xBox + 4, y: yy + lift },
-        end: { x: xBox + colW - 4, y: yy + lift },
+        start: { x: xx + 4, y: yy + lift },
+        end: { x: xx + ww - 4, y: yy + lift },
         thickness: 0.35,
         color: COL.rule,
       });
       return yy - 6;
     };
 
-    const drawPrestamosBlock = (startY: number, blankRows: number): number => {
-      let yy = sectionBarDark("Préstamos otorgados", xR, colW, startY);
+    const drawPrestamosBlock = (startY: number): number => {
+      y = startY;
+      let yy = sectionBarDark("Préstamos otorgados", xBox, blockW, startY);
       const innerPad = 2;
-      const px = xR + innerPad + 4;
-      const usable = colW - 12 - 2 * innerPad;
+      const px = xBox + innerPad + 4;
+      const usable = blockW - 12 - 2 * innerPad;
       const gapsP = 3 * COL_GAP;
       const uInner = usable - gapsP;
       const wh = Math.max(68, Math.floor(uInner * 0.28));
@@ -846,7 +840,7 @@ export async function buildReporteCierrePdf(
             : "—";
           tableRow(
             [
-              { text: trunc(p.clienteNombre, 22), x: xPc, w: wc },
+              { text: trunc(p.clienteNombre, 36), x: xPc, w: wc },
               {
                 text: fmtMoney(p.monto),
                 x: xPcap,
@@ -867,10 +861,7 @@ export async function buildReporteCierrePdf(
           rowBudget--;
         }
       }
-      for (let i = 0; i < blankRows; i++) {
-        yy -= TB.lh;
-      }
-      yy = hrDual(xR, yy);
+      yy = hrDual(xBox, blockW, yy);
       tableRow(
         [
           { text: "Total", x: xPc, w: wc, bold: true },
@@ -893,14 +884,16 @@ export async function buildReporteCierrePdf(
         yy
       );
       yy -= TB.lh + 6;
+      y = yy;
       return yy;
     };
 
-    const drawGastosBlock = (startY: number, blankRows: number): number => {
-      let yy = sectionBarDark("Gastos del día", xL, colW, startY);
+    const drawGastosBlock = (startY: number): number => {
+      y = startY;
+      let yy = sectionBarDark("Gastos del día", xBox, blockW, startY);
       const innerPad = 2;
-      const px = xL + innerPad + 4;
-      const usable = colW - 12 - 2 * innerPad;
+      const px = xBox + innerPad + 4;
+      const usable = blockW - 12 - 2 * innerPad;
       const gapsG = 2 * COL_GAP;
       const wMonto = 58;
       const wMot = 66;
@@ -942,7 +935,7 @@ export async function buildReporteCierrePdf(
                 align: "right",
               },
               { text: trunc(g.motivo, 18), x: xGt, w: wMot },
-              { text: trunc(g.descripcion, 48), x: xGd, w: wDesc },
+              { text: trunc(g.descripcion, 72), x: xGd, w: wDesc },
             ],
             yy
           );
@@ -950,10 +943,7 @@ export async function buildReporteCierrePdf(
           rowBudget--;
         }
       }
-      for (let i = 0; i < blankRows; i++) {
-        yy -= TB.lh;
-      }
-      yy = hrDual(xL, yy);
+      yy = hrDual(xBox, blockW, yy);
       tableRow(
         [
           {
@@ -969,12 +959,13 @@ export async function buildReporteCierrePdf(
         yy
       );
       yy -= TB.lh + 6;
+      y = yy;
       return yy;
     };
 
-    const endL = drawGastosBlock(yStart, padGastos);
-    const endR = drawPrestamosBlock(yStart, padPrestamos);
-    y = Math.min(endL, endR);
+    drawGastosBlock(yStart);
+    spacer(8);
+    drawPrestamosBlock(y);
   }
 
   hr();

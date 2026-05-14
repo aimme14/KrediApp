@@ -461,7 +461,7 @@ function CobrarClientePageContent() {
           ? await uploadImage(evidenciaFile, {
               folder: "pagos",
               ownerId: user.uid,
-              filename: "evidencia-1",
+              filename: "auto",
             })
           : "";
       setSubmitStatus("Registrando pago…");

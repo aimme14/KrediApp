@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { useTrabajadorCajaDia } from "@/context/TrabajadorCajaDiaContext";
@@ -72,6 +73,26 @@ function normalizaMetodoPago(metodo: string | null | undefined): string {
     .replace(/[\u0300-\u036f]/g, "");
 }
 
+function IconoOjo(props: { size?: number }) {
+  const s = props.size ?? 18;
+  return (
+    <svg
+      width={s}
+      height={s}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  );
+}
+
 function TarjetaResumen(props: { etiqueta: ReactNode; valor: string }) {
   const { etiqueta, valor } = props;
   return (
@@ -96,6 +117,23 @@ function TarjetaResumen(props: { etiqueta: ReactNode; valor: string }) {
 export default function CajaDelDiaPage() {
   const { profile } = useAuth();
   const { fechaDia, data, loading, error } = useTrabajadorCajaDia();
+  const [evidenciaModalUrl, setEvidenciaModalUrl] = useState<string | null>(null);
+  const evidenciaCerrarRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (!evidenciaModalUrl) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setEvidenciaModalUrl(null);
+    };
+    window.addEventListener("keydown", onKey);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    queueMicrotask(() => evidenciaCerrarRef.current?.focus());
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [evidenciaModalUrl]);
 
   if (!profile || profile.role !== "trabajador") return null;
 
@@ -282,10 +320,7 @@ export default function CajaDelDiaPage() {
                               <th>Hora</th>
                               <th>Cliente</th>
                               <th className="col-num">Pagado</th>
-                              <th className="col-num" title="Cuotas (rest./total)">
-                                <span className="th-compact-long">Cuotas (rest./total)</span>
-                                <span className="th-compact-short">Cuotas</span>
-                              </th>
+                              <th className="col-evidencia">Evidencia</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -294,8 +329,19 @@ export default function CajaDelDiaPage() {
                                 <td>{formatHora(c.fecha)}</td>
                                 <td>{c.clienteNombre}</td>
                                 <td className="col-num">{formatMonto(c.monto)}</td>
-                                <td className="col-num">
-                                  {formatoCuotasRestanteTotal(c.cuotasFaltantes, c.numeroCuotas)}
+                                <td className="col-evidencia caja-dia-evidencia-cell">
+                                  {c.evidencia ? (
+                                    <button
+                                      type="button"
+                                      className="caja-dia-evidencia-btn"
+                                      onClick={() => setEvidenciaModalUrl(c.evidencia!)}
+                                      aria-label={`Ver evidencia del cobro de ${c.clienteNombre}`}
+                                    >
+                                      <IconoOjo />
+                                    </button>
+                                  ) : (
+                                    <span style={{ color: "var(--text-muted)" }}>—</span>
+                                  )}
                                 </td>
                               </tr>
                             ))}
@@ -439,6 +485,43 @@ export default function CajaDelDiaPage() {
         </Link>
         .
       </p>
+
+      {evidenciaModalUrl ? (
+        <div
+          className="caja-dia-evidencia-backdrop"
+          role="presentation"
+          onClick={() => setEvidenciaModalUrl(null)}
+        >
+          <div
+            className="caja-dia-evidencia-dialog card"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="caja-dia-evidencia-titulo"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="caja-dia-evidencia-dialog-head">
+              <h3 id="caja-dia-evidencia-titulo" style={{ margin: 0, fontSize: "1rem" }}>
+                Evidencia del cobro
+              </h3>
+              <button
+                ref={evidenciaCerrarRef}
+                type="button"
+                className="btn-secondary caja-dia-evidencia-cerrar"
+                onClick={() => setEvidenciaModalUrl(null)}
+              >
+                Cerrar
+              </button>
+            </div>
+            <div className="caja-dia-evidencia-img-wrap">
+              <img
+                src={evidenciaModalUrl}
+                alt="Comprobante de transferencia"
+                className="caja-dia-evidencia-img"
+              />
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
