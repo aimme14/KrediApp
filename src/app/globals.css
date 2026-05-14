@@ -703,6 +703,73 @@ button {
   }
 }
 
+/* Admin — Cliente moroso: en móvil solo código, nombre, acción */
+.cliente-moroso-btn-mob {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .table-wrap.cliente-moroso-table-wrap {
+    overflow-x: visible;
+    margin-left: 0;
+    margin-right: 0;
+  }
+
+  .cliente-moroso-clientes-table {
+    width: 100%;
+    min-width: 0;
+    table-layout: fixed;
+  }
+
+  .cliente-moroso-clientes-table thead th:nth-child(2),
+  .cliente-moroso-clientes-table tbody td:nth-child(2),
+  .cliente-moroso-clientes-table thead th:nth-child(4),
+  .cliente-moroso-clientes-table tbody td:nth-child(4),
+  .cliente-moroso-clientes-table thead th:nth-child(5),
+  .cliente-moroso-clientes-table tbody td:nth-child(5) {
+    display: none !important;
+  }
+
+  .cliente-moroso-btn-full {
+    display: none !important;
+  }
+
+  .cliente-moroso-btn-mob {
+    display: inline !important;
+  }
+
+  .cliente-moroso-clientes-table th,
+  .cliente-moroso-clientes-table td {
+    font-size: 0.8125rem;
+    padding: 0.45rem 0.35rem;
+    vertical-align: middle;
+  }
+
+  .cliente-moroso-clientes-table th:nth-child(1),
+  .cliente-moroso-clientes-table td:nth-child(1) {
+    width: 20%;
+    white-space: nowrap;
+  }
+
+  .cliente-moroso-clientes-table th:nth-child(3),
+  .cliente-moroso-clientes-table td:nth-child(3) {
+    width: auto;
+    white-space: normal;
+    word-break: break-word;
+  }
+
+  .cliente-moroso-clientes-table th:nth-child(6),
+  .cliente-moroso-clientes-table td:nth-child(6) {
+    width: 1%;
+    white-space: nowrap;
+  }
+
+  .cliente-moroso-clientes-table td:nth-child(6) .btn {
+    font-size: 0.72rem;
+    padding: 0.35rem 0.4rem;
+  }
+}
+
 /* Caja del día (trabajador): títulos de columna más cortos en móvil */
 .table-wrap-caja-dia .th-compact-short {
   display: none;
