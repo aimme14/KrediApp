@@ -1,5 +1,4 @@
 import type { ReactNode } from "react";
-import Link from "next/link";
 
 export type AdminNavIconName =
   | "home"
@@ -170,24 +169,4 @@ export function AdminNavIcon({ name }: { name: AdminNavIconName }) {
     default:
       return null;
   }
-}
-
-/** Marca krediapp en el encabezado del dashboard (panel admin). */
-export function AdminHeaderBrand(): ReactNode {
-  return (
-    <Link
-      href="/dashboard/admin"
-      className="dashboard-header-krediapp"
-      aria-label="krediapp — Inicio administrador"
-    >
-      <span className="dashboard-header-krediapp-icon" aria-hidden>
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-          <rect x="2" y="5" width="20" height="14" rx="2" />
-          <line x1="2" y1="10" x2="22" y2="10" />
-          <circle cx="7" cy="15" r="1" fill="currentColor" stroke="none" />
-        </svg>
-      </span>
-      <span className="dashboard-header-krediapp-text">krediapp</span>
-    </Link>
-  );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, Fragment } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
@@ -8,11 +8,7 @@ import { useDashboardHeaderSlot } from "@/context/DashboardHeaderContext";
 import { AdminFcmRegistration } from "@/components/AdminFcmRegistration";
 import { TrabajadorListaProvider } from "@/context/TrabajadorListaContext";
 import { listClientes } from "@/lib/empresa-api";
-import {
-  ADMIN_NAV_SECTIONS,
-  AdminHeaderBrand,
-  AdminNavIcon,
-} from "@/components/admin/adminNavConfig";
+import { ADMIN_NAV_SECTIONS, AdminNavIcon } from "@/components/admin/adminNavConfig";
 
 function adminNavItemActive(pathname: string, href: string): boolean {
   if (href === "/dashboard/admin") return pathname === "/dashboard/admin";
@@ -73,20 +69,17 @@ export default function AdminLayout({
   useEffect(() => {
     if (!setHeaderLeftSlot) return;
     setHeaderLeftSlot(
-      <Fragment>
-        <AdminHeaderBrand />
-        <button
-          type="button"
-          className="jefe-hamburger jefe-hamburger-in-header admin-shell-hamburger"
-          onClick={() => setMenuOpen((o) => !o)}
-          aria-expanded={menuOpen}
-          aria-label={menuOpen ? "Cerrar menú" : "Abrir menú"}
-        >
-          <span className="jefe-hamburger-line" />
-          <span className="jefe-hamburger-line" />
-          <span className="jefe-hamburger-line" />
-        </button>
-      </Fragment>
+      <button
+        type="button"
+        className="jefe-hamburger jefe-hamburger-in-header admin-shell-hamburger"
+        onClick={() => setMenuOpen((o) => !o)}
+        aria-expanded={menuOpen}
+        aria-label={menuOpen ? "Cerrar menú" : "Abrir menú"}
+      >
+        <span className="jefe-hamburger-line" />
+        <span className="jefe-hamburger-line" />
+        <span className="jefe-hamburger-line" />
+      </button>
     );
     return () => setHeaderLeftSlot(null);
   }, [setHeaderLeftSlot, menuOpen]);

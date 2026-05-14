@@ -44,15 +44,18 @@ export default function DashboardNotifications() {
   const containerRef = useRef<HTMLDivElement>(null);
 
   const measurePanelMaxWidth = useCallback(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    const r = el.getBoundingClientRect();
+    const root = containerRef.current;
+    if (!root) return;
+    /** Rect del botón: el wrapper puede estar encogido por flex (`min-width:0`) y dar un ancho casi nulo. */
+    const trigger = root.querySelector<HTMLButtonElement>(".dashboard-notifications-trigger");
+    const r = (trigger ?? root).getBoundingClientRect();
     const m = NOTIFICATIONS_PANEL_VIEWPORT_MARGIN_PX;
     const vw = window.visualViewport?.width ?? window.innerWidth;
-    const byTrigger = r.right - m * 2;
-    const byViewport = vw - m * 2;
+    const byViewport = Math.max(0, vw - m * 2);
+    /** Panel anclado a la derecha del wrapper; no debe sobresalir a la izquierda del margen del viewport. */
+    const byTriggerRight = Math.max(0, r.right - m);
     const w = Math.floor(
-      Math.min(NOTIFICATIONS_PANEL_IDEAL_MAX_PX, Math.max(0, byTrigger), Math.max(0, byViewport))
+      Math.min(NOTIFICATIONS_PANEL_IDEAL_MAX_PX, byViewport, byTriggerRight)
     );
     setPanelMaxWidthPx(w > 0 ? w : NOTIFICATIONS_PANEL_FALLBACK_PX);
   }, []);

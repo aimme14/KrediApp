@@ -2354,6 +2354,12 @@ th {
   min-width: 0;
 }
 
+/* Evita que flex encoja el slot de campana/config a casi 0 px (rompía el cálculo del panel de avisos). */
+.dashboard-header .dashboard-notifications,
+.dashboard-header .dashboard-settings {
+  flex-shrink: 0;
+}
+
 /* Logo + nombre de la empresa en el header (jefe) */
 .dashboard-header-empresa {
   display: flex;
@@ -3599,12 +3605,6 @@ th {
 @media (max-width: 960px) {
   .admin-inicio-grid-4 {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-@media (max-width: 520px) {
-  .admin-inicio-grid-4 {
-    grid-template-columns: 1fr;
   }
 }
 
