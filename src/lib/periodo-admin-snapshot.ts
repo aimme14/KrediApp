@@ -49,7 +49,10 @@ export async function buildPeriodoAdminSnapshot(
 ): Promise<PeriodoAdminSnapshot> {
   const empresaRef = db.collection(EMPRESAS_COLLECTION).doc(empresaId);
   const [rutasSnap, userSnap, gastosLista] = await Promise.all([
-    empresaRef.collection(RUTAS_SUBCOLLECTION).get(),
+    empresaRef
+      .collection(RUTAS_SUBCOLLECTION)
+      .where("adminId", "==", adminUid)
+      .get(),
     empresaRef.collection(USUARIOS_SUBCOLLECTION).doc(adminUid).get(),
     listarGastosRutaPorAdmin(db, empresaId, adminUid),
   ]);
@@ -57,12 +60,16 @@ export async function buildPeriodoAdminSnapshot(
   const u = userSnap.data() ?? {};
   const cajaAdmin = typeof u.cajaAdmin === "number" ? u.cajaAdmin : 0;
 
+  const gastosPorRuta = new Map<string, number>();
+  for (const g of gastosLista) {
+    gastosPorRuta.set(g.rutaId, (gastosPorRuta.get(g.rutaId) ?? 0) + g.monto);
+  }
+
   const rutas: PeriodoAdminSnapshotRuta[] = [];
   let sumaCapitalRutas = 0;
 
   for (const d of rutasSnap.docs) {
     const data = d.data();
-    if ((data.adminId as string) !== adminUid) continue;
 
     const rutaId = d.id;
     const nombre = (data.nombre as string) ?? "";
@@ -72,9 +79,7 @@ export async function buildPeriodoAdminSnapshot(
     const ganancias = typeof data.ganancias === "number" ? data.ganancias : 0;
     const perdidas = typeof data.perdidas === "number" ? data.perdidas : 0;
 
-    const gastosRuta = gastosLista
-      .filter((g) => g.rutaId === rutaId)
-      .reduce((sum, g) => sum + g.monto, 0);
+    const gastosRuta = gastosPorRuta.get(rutaId) ?? 0;
 
     const capitalTotalRaw =
       typeof data.capitalTotal === "number" ? data.capitalTotal : undefined;

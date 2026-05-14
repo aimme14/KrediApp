@@ -1,3 +1,4 @@
+import type { DocumentSnapshot } from "firebase-admin/firestore";
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminFirestore } from "@/lib/firebase-admin";
 import { getApiUser } from "@/lib/api-auth";
@@ -39,33 +40,45 @@ export async function GET(request: NextRequest) {
 
   const db = getAdminFirestore();
   const empresaRef = db.collection(EMPRESAS_COLLECTION).doc(apiUser.empresaId);
+  const isAdmin = apiUser.role === "admin";
 
-  const rutasSnap = await empresaRef.collection(RUTAS_SUBCOLLECTION).get();
-  const prestamosSnap = await empresaRef
-    .collection(PRESTAMOS_SUBCOLLECTION)
-    .where("adminId", "==", apiUser.uid)
-    .get();
-  const gastosLista = await listarGastosRutaPorAdmin(
-    db,
-    apiUser.empresaId,
-    apiUser.uid
-  );
+  const [rutasSnap, prestamosSnap, gastosLista, userSnap] = await Promise.all([
+    empresaRef.collection(RUTAS_SUBCOLLECTION).get(),
+    empresaRef
+      .collection(PRESTAMOS_SUBCOLLECTION)
+      .where("adminId", "==", apiUser.uid)
+      .get(),
+    listarGastosRutaPorAdmin(db, apiUser.empresaId, apiUser.uid),
+    isAdmin
+      ? empresaRef.collection(USUARIOS_SUBCOLLECTION).doc(apiUser.uid).get()
+      : Promise.resolve(null as DocumentSnapshot | null),
+  ]);
 
-  const prestamos = prestamosSnap.docs.map((d) => {
+  const prestamosPorRuta = new Map<string, number>();
+  for (const d of prestamosSnap.docs) {
     const data = d.data();
-    return {
-      rutaId: data.rutaId ?? "",
-      totalAPagar: data.totalAPagar ?? 0,
-      saldoPendiente: data.saldoPendiente ?? 0,
-    };
-  });
+    const rutaId = typeof data.rutaId === "string" ? data.rutaId.trim() : "";
+    if (!rutaId) continue;
+    const totalAPagar = typeof data.totalAPagar === "number" ? data.totalAPagar : 0;
+    const saldoPendiente =
+      typeof data.saldoPendiente === "number" ? data.saldoPendiente : 0;
+    const cobrado = totalAPagar - saldoPendiente;
+    prestamosPorRuta.set(rutaId, (prestamosPorRuta.get(rutaId) ?? 0) + cobrado);
+  }
 
-  let rutas: ResumenRutaItem[] = rutasSnap.docs.map((d) => {
+  const gastosPorRuta = new Map<string, number>();
+  for (const g of gastosLista) {
+    gastosPorRuta.set(g.rutaId, (gastosPorRuta.get(g.rutaId) ?? 0) + g.monto);
+  }
+
+  let sumaCapitalRutas = 0;
+  const rutas: ResumenRutaItem[] = [];
+
+  for (const d of rutasSnap.docs) {
     const data = d.data();
     const rutaId = d.id;
-    const nombre = data.nombre ?? "";
-    const ubicacion = data.ubicacion ?? "";
     const adminId = typeof data.adminId === "string" ? data.adminId : "";
+    if (isAdmin && adminId !== apiUser.uid) continue;
 
     const cajaRuta = typeof data.cajaRuta === "number" ? data.cajaRuta : 0;
     const cajasEmpleados = typeof data.cajasEmpleados === "number" ? data.cajasEmpleados : 0;
@@ -73,13 +86,8 @@ export async function GET(request: NextRequest) {
     const ganancias = typeof data.ganancias === "number" ? data.ganancias : 0;
     const perdidas = typeof data.perdidas === "number" ? data.perdidas : 0;
 
-    const ingreso = prestamos
-      .filter((p) => p.rutaId === rutaId)
-      .reduce((sum, p) => sum + (p.totalAPagar - p.saldoPendiente), 0);
-    const gastosRuta = gastosLista
-      .filter((g) => g.rutaId === rutaId)
-      .reduce((sum, g) => sum + g.monto, 0);
-
+    const ingreso = prestamosPorRuta.get(rutaId) ?? 0;
+    const gastosRuta = gastosPorRuta.get(rutaId) ?? 0;
     const utilidad = ganancias - gastosRuta - perdidas;
 
     const capitalTotalRaw =
@@ -93,10 +101,20 @@ export async function GET(request: NextRequest) {
       capitalTotal: capitalTotalRaw,
     });
 
-    return {
+    if (isAdmin) {
+      const capitalParaAdmin =
+        typeof data.capitalTotal === "number"
+          ? data.capitalTotal
+          : (typeof data.cajaRuta === "number" ? data.cajaRuta : 0) +
+            (typeof data.cajasEmpleados === "number" ? data.cajasEmpleados : 0) +
+            (typeof data.inversiones === "number" ? data.inversiones : 0);
+      sumaCapitalRutas += capitalParaAdmin;
+    }
+
+    rutas.push({
       rutaId,
-      nombre,
-      ubicacion,
+      nombre: data.nombre ?? "",
+      ubicacion: data.ubicacion ?? "",
       adminId,
       ingreso: Math.round(ingreso * 100) / 100,
       egreso: 0,
@@ -110,40 +128,17 @@ export async function GET(request: NextRequest) {
       perdidas,
       utilidad: Math.round(utilidad * 100) / 100,
       capitalRuta: Math.round(capitalRuta * 100) / 100,
-    };
-  });
-
-  if (apiUser.role === "admin") {
-    rutas = rutas.filter((r) => r.adminId === apiUser.uid);
+    });
   }
 
   const utilidadGlobal = rutas.reduce((sum, r) => sum + r.utilidad, 0);
 
   let capitalAdmin = 0;
-  if (apiUser.role === "admin") {
-    const userRef = empresaRef.collection(USUARIOS_SUBCOLLECTION).doc(apiUser.uid);
-    const userSnap = await userRef.get();
+  if (isAdmin && userSnap) {
     const u = userSnap.data() ?? {};
     const cajaAdmin = typeof u.cajaAdmin === "number" ? u.cajaAdmin : 0;
-
-    let sumaCapitalRutas = 0;
-    for (const d of rutasSnap.docs) {
-      const data = d.data();
-      if ((data.adminId as string) !== apiUser.uid) continue;
-      const capitalTotal =
-        typeof data.capitalTotal === "number"
-          ? data.capitalTotal
-          : (typeof data.cajaRuta === "number" ? data.cajaRuta : 0) +
-            (typeof data.cajasEmpleados === "number" ? data.cajasEmpleados : 0) +
-            (typeof data.inversiones === "number" ? data.inversiones : 0);
-      sumaCapitalRutas += capitalTotal;
-    }
-
-    capitalAdmin = computeCapitalAdmin({
-      cajaAdmin,
-      sumaCapitalRutas,
-    });
-    capitalAdmin = Math.round(capitalAdmin * 100) / 100;
+    capitalAdmin =
+      Math.round(computeCapitalAdmin({ cajaAdmin, sumaCapitalRutas }) * 100) / 100;
   }
 
   return NextResponse.json({

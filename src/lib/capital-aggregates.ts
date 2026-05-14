@@ -2,7 +2,11 @@
  * Agregados de capital (Admin SDK): admins, gastos y snapshots empresa.
  */
 
-import type { Firestore } from "firebase-admin/firestore";
+import type {
+  Firestore,
+  QueryDocumentSnapshot,
+  QuerySnapshot,
+} from "firebase-admin/firestore";
 import {
   EMPRESAS_COLLECTION,
   USUARIOS_SUBCOLLECTION,
@@ -44,34 +48,12 @@ export function sumarGastosAdminDesdeLista(
   return { gastosAdmin, gastosRuta };
 }
 
-async function listarAdmins(
-  db: Firestore,
-  empresaId: string
-): Promise<string[]> {
-  const snap = await db
-    .collection(EMPRESAS_COLLECTION)
-    .doc(empresaId)
-    .collection(USUARIOS_SUBCOLLECTION)
-    .where("rol", "==", "admin")
-    .get();
-  return snap.docs.map((d) => d.id);
-}
-
-/** Suma capitalRuta (capitalTotal) de todas las rutas de un administrador. */
-async function sumaCapitalRutasPorAdmin(
-  db: Firestore,
-  empresaId: string,
-  adminUid: string
-): Promise<{ suma: number; perdidasAcumuladasRutas: number }> {
-  const rutasSnap = await db
-    .collection(EMPRESAS_COLLECTION)
-    .doc(empresaId)
-    .collection(RUTAS_SUBCOLLECTION)
-    .where("adminId", "==", adminUid)
-    .get();
-  let suma = 0;
+function sumaCapitalYPerdidasDesdeRutasDocs(
+  rutasDocs: QueryDocumentSnapshot[]
+): { sumaCapitalRutas: number; perdidasAcumuladasRutas: number } {
+  let sumaCapitalRutas = 0;
   let perdidasAcumuladasRutas = 0;
-  for (const d of rutasSnap.docs) {
+  for (const d of rutasDocs) {
     const data = d.data();
     const cajaRuta = typeof data.cajaRuta === "number" ? data.cajaRuta : 0;
     const cajasEmpleados =
@@ -87,44 +69,63 @@ async function sumaCapitalRutasPorAdmin(
             inversiones,
             perdidas,
           });
-    suma += capitalTotal;
+    sumaCapitalRutas += capitalTotal;
     perdidasAcumuladasRutas += typeof data.perdidas === "number" ? data.perdidas : 0;
   }
-  return { suma, perdidasAcumuladasRutas };
-}
-
-async function gastosDelAdmin(
-  db: Firestore,
-  empresaId: string,
-  adminUid: string
-): Promise<Array<{ monto?: number; rutaId?: string }>> {
-  return listarGastosParaCapitalAdmin(db, empresaId, adminUid);
+  return { sumaCapitalRutas, perdidasAcumuladasRutas };
 }
 
 /**
  * Calcula el capital de cada administrador y la suma total.
+ * @param rutasSnapOpcional Si se pasa (p. ej. desde persist), evita un segundo `.get()` de rutas.
  */
 export async function computeSumaCapitalAdminsDetalle(
   db: Firestore,
-  empresaId: string
+  empresaId: string,
+  rutasSnapOpcional?: QuerySnapshot
 ): Promise<{ desgloses: CapitalAdminDesglose[]; sumaCapitalAdmins: number }> {
-  const adminUids = await listarAdmins(db, empresaId);
+  const empresaRef = db.collection(EMPRESAS_COLLECTION).doc(empresaId);
+
+  const [adminsSnap, rutasSnap] = await Promise.all([
+    empresaRef.collection(USUARIOS_SUBCOLLECTION).where("rol", "==", "admin").get(),
+    rutasSnapOpcional
+      ? Promise.resolve(rutasSnapOpcional)
+      : empresaRef.collection(RUTAS_SUBCOLLECTION).get(),
+  ]);
+
+  if (adminsSnap.empty) {
+    return { desgloses: [], sumaCapitalAdmins: 0 };
+  }
+
+  const rutasPorAdmin = new Map<string, QueryDocumentSnapshot[]>();
+  for (const d of rutasSnap.docs) {
+    const adminId = typeof d.data().adminId === "string" ? d.data().adminId.trim() : "";
+    if (!adminId) continue;
+    const arr = rutasPorAdmin.get(adminId);
+    if (arr) arr.push(d);
+    else rutasPorAdmin.set(adminId, [d]);
+  }
+
+  const adminUids = adminsSnap.docs.map((d) => d.id);
+  const gastosLists = await Promise.all(
+    adminUids.map((uid) => listarGastosParaCapitalAdmin(db, empresaId, uid))
+  );
+  const gastosPorAdmin = new Map<string, (typeof gastosLists)[number]>();
+  adminUids.forEach((uid, i) => gastosPorAdmin.set(uid, gastosLists[i]));
+
   const desgloses: CapitalAdminDesglose[] = [];
   let sumaCapitalAdmins = 0;
 
-  for (const adminUid of adminUids) {
-    const userRef = db
-      .collection(EMPRESAS_COLLECTION)
-      .doc(empresaId)
-      .collection(USUARIOS_SUBCOLLECTION)
-      .doc(adminUid);
-    const userSnap = await userRef.get();
-    const u = userSnap.data() ?? {};
+  for (const adminDoc of adminsSnap.docs) {
+    const adminUid = adminDoc.id;
+    const u = adminDoc.data() ?? {};
     const cajaAdmin = typeof u.cajaAdmin === "number" ? u.cajaAdmin : 0;
 
-    const { suma: sumaCapitalRutas, perdidasAcumuladasRutas } =
-      await sumaCapitalRutasPorAdmin(db, empresaId, adminUid);
-    const gastosList = await gastosDelAdmin(db, empresaId, adminUid);
+    const rutasAdmin = rutasPorAdmin.get(adminUid) ?? [];
+    const { sumaCapitalRutas, perdidasAcumuladasRutas } =
+      sumaCapitalYPerdidasDesdeRutasDocs(rutasAdmin);
+
+    const gastosList = gastosPorAdmin.get(adminUid) ?? [];
     const { gastosAdmin, gastosRuta } = sumarGastosAdminDesdeLista(gastosList);
 
     const capitalAdmin = computeCapitalAdmin({
@@ -147,6 +148,16 @@ export async function computeSumaCapitalAdminsDetalle(
   return { desgloses, sumaCapitalAdmins };
 }
 
+/** Suma `cajasEmpleados` desde un snapshot de rutas ya leído (sin I/O). */
+export function sumaCajasEmpleadosDesdeRutasSnap(rutasSnap: QuerySnapshot): number {
+  let suma = 0;
+  for (const d of rutasSnap.docs) {
+    const c = d.data().cajasEmpleados;
+    if (typeof c === "number") suma += c;
+  }
+  return suma;
+}
+
 /** Suma de cajasEmpleados en todas las rutas (indicador agregado). */
 export async function sumaCajasEmpleadosRutas(
   db: Firestore,
@@ -157,53 +168,45 @@ export async function sumaCajasEmpleadosRutas(
     .doc(empresaId)
     .collection(RUTAS_SUBCOLLECTION)
     .get();
-  let suma = 0;
-  for (const d of rutasSnap.docs) {
-    const c = d.data().cajasEmpleados;
-    if (typeof c === "number") suma += c;
-  }
-  return suma;
+  return sumaCajasEmpleadosDesdeRutasSnap(rutasSnap);
 }
 
 /**
  * Persiste documentos agregados cajaAdmin y cajaEmpleado y sincroniza snapshots de rutas.
+ * Una sola lectura de `rutas` para capital admin y suma de cajas empleado.
  */
 export async function persistAggregatedCapitalDocs(
   db: Firestore,
   empresaId: string
 ): Promise<void> {
+  const empresaRef = db.collection(EMPRESAS_COLLECTION).doc(empresaId);
+  const rutasSnap = await empresaRef.collection(RUTAS_SUBCOLLECTION).get();
+
   const { sumaCapitalAdmins } = await computeSumaCapitalAdminsDetalle(
     db,
-    empresaId
+    empresaId,
+    rutasSnap
   );
-  const sumaCajasEmpleados = await sumaCajasEmpleadosRutas(db, empresaId);
+  const sumaCajasEmpleados = sumaCajasEmpleadosDesdeRutasSnap(rutasSnap);
   const now = new Date();
+  const capitalRef = empresaRef.collection(CAPITAL_SUBCOLLECTION);
 
-  await db
-    .collection(EMPRESAS_COLLECTION)
-    .doc(empresaId)
-    .collection(CAPITAL_SUBCOLLECTION)
-    .doc(CAPITAL_CAJA_ADMIN_DOC)
-    .set(
+  await Promise.all([
+    capitalRef.doc(CAPITAL_CAJA_ADMIN_DOC).set(
       {
         sumaCapitalAdmins,
         updatedAt: now,
       },
       { merge: true }
-    );
-
-  await db
-    .collection(EMPRESAS_COLLECTION)
-    .doc(empresaId)
-    .collection(CAPITAL_SUBCOLLECTION)
-    .doc(CAPITAL_CAJA_EMPLEADO_DOC)
-    .set(
+    ),
+    capitalRef.doc(CAPITAL_CAJA_EMPLEADO_DOC).set(
       {
         sumaCajasEmpleados,
         updatedAt: now,
       },
       { merge: true }
-    );
+    ),
+  ]);
 
   await syncAllCapitalRutaSnapshots(db, empresaId);
 }

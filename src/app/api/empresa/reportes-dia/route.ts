@@ -31,25 +31,27 @@ export async function GET(request: NextRequest) {
     const db = getAdminFirestore();
     const empresaId = apiUser.empresaId;
 
-    const rutasSnap = await db
-      .collection(EMPRESAS_COLLECTION)
-      .doc(empresaId)
-      .collection(RUTAS_SUBCOLLECTION)
-      .where("adminId", "==", apiUser.uid)
-      .get();
+    const [rutasSnap, repSnap] = await Promise.all([
+      db
+        .collection(EMPRESAS_COLLECTION)
+        .doc(empresaId)
+        .collection(RUTAS_SUBCOLLECTION)
+        .where("adminId", "==", apiUser.uid)
+        .get(),
+      db
+        .collection(EMPRESAS_COLLECTION)
+        .doc(empresaId)
+        .collection(REPORTES_DIA_SUBCOLLECTION)
+        .where("fechaDia", "==", fechaDia)
+        .get(),
+    ]);
+
     const misRutaIds = new Set(rutasSnap.docs.map((d) => d.id));
     const rutaNombre = new Map<string, string>();
     for (const d of rutasSnap.docs) {
       const n = d.data()?.nombre;
       rutaNombre.set(d.id, typeof n === "string" ? n : "");
     }
-
-    const repSnap = await db
-      .collection(EMPRESAS_COLLECTION)
-      .doc(empresaId)
-      .collection(REPORTES_DIA_SUBCOLLECTION)
-      .where("fechaDia", "==", fechaDia)
-      .get();
 
     const items = repSnap.docs
       .map((doc) => {

@@ -4,14 +4,13 @@
  * Parámetros explícitos para reutilizar en preview admin y PDF tras aprobación.
  */
 
-import type { Firestore } from "firebase-admin/firestore";
+import type { DocumentReference, Firestore } from "firebase-admin/firestore";
 import { Timestamp } from "firebase-admin/firestore";
 import {
   ASIGNACIONES_BASE_EMPLEADO_SUBCOLLECTION,
   EMPRESAS_COLLECTION,
   CLIENTES_SUBCOLLECTION,
   GASTOS_EMPLEADO_SUBCOLLECTION,
-  GASTOS_SUBCOLLECTION,
   PAGOS_SUBCOLLECTION,
   PRESTAMOS_SUBCOLLECTION,
   USUARIOS_SUBCOLLECTION,
@@ -184,21 +183,35 @@ export async function buildCierreDiaSnapshot(
   }
 
   const clienteNombre = new Map<string, string>();
-  await Promise.all(
-    Array.from(clienteIds).map(async (cid) => {
-      const cref = db
+  if (clienteIds.size > 0) {
+    const allRefs = Array.from(clienteIds).map((cid) =>
+      db
         .collection(EMPRESAS_COLLECTION)
         .doc(empresaId)
         .collection(CLIENTES_SUBCOLLECTION)
-        .doc(cid);
-      const cs = await cref.get();
-      const n =
-        cs.exists && typeof (cs.data() as Record<string, unknown>)?.nombre === "string"
-          ? String((cs.data() as Record<string, unknown>).nombre).trim()
-          : "";
-      clienteNombre.set(cid, n || "—");
-    })
-  );
+        .doc(cid)
+    );
+
+    const CLIENTE_GETALL_CHUNK = 100;
+    const refChunks: DocumentReference[][] = [];
+    for (let i = 0; i < allRefs.length; i += CLIENTE_GETALL_CHUNK) {
+      refChunks.push(allRefs.slice(i, i + CLIENTE_GETALL_CHUNK));
+    }
+
+    const snapGroups = await Promise.all(
+      refChunks.map((chunk) => db.getAll(...chunk))
+    );
+
+    for (const snaps of snapGroups) {
+      for (const cs of snaps) {
+        const n =
+          cs.exists && typeof (cs.data() as Record<string, unknown>)?.nombre === "string"
+            ? String((cs.data() as Record<string, unknown>).nombre).trim()
+            : "";
+        clienteNombre.set(cs.id, n || "—");
+      }
+    }
+  }
 
   type PagoRow = {
     pagoId: string;
@@ -367,48 +380,34 @@ export async function buildCierreDiaSnapshot(
 
   const totalCobrosLista = round2(cobros.reduce((s, c) => s + c.monto, 0));
 
-  const [legacyG, nuevoG] = await Promise.all([
-    db
-      .collection(EMPRESAS_COLLECTION)
-      .doc(empresaId)
-      .collection(GASTOS_SUBCOLLECTION)
-      .where("empleadoId", "==", empleadoUid)
-      .limit(400)
-      .get(),
-    db
-      .collection(EMPRESAS_COLLECTION)
-      .doc(empresaId)
-      .collection(GASTOS_EMPLEADO_SUBCOLLECTION)
-      .where("empleadoId", "==", empleadoUid)
-      .limit(400)
-      .get(),
-  ]);
+  const gastosSnap = await db
+    .collection(EMPRESAS_COLLECTION)
+    .doc(empresaId)
+    .collection(GASTOS_EMPLEADO_SUBCOLLECTION)
+    .where("empleadoId", "==", empleadoUid)
+    .where("fecha", ">=", startTs)
+    .where("fecha", "<=", endTs)
+    .get();
 
   let totalGastosDia = 0;
   const gastosDetalle: GastoDiaSnapshotItem[] = [];
-  const addGastoDocs = (snap: { docs: Array<{ id: string; data: () => Record<string, unknown> }> }) => {
-    for (const d of snap.docs) {
-      const g = d.data();
-      const f = g.fecha as { toDate?: () => Date } | undefined;
-      const dt = f?.toDate?.();
-      if (!dt) continue;
-      const diaGasto = fechaDiaCalendarioDesdeISO(dt.toISOString());
-      if (diaGasto !== fechaDia) continue;
-      const m = typeof g.monto === "number" ? g.monto : 0;
-      if (m <= 0) continue;
-      totalGastosDia += m;
-      const tipoRaw = typeof g.tipo === "string" ? g.tipo : null;
-      gastosDetalle.push({
-        id: d.id,
-        monto: round2(m),
-        descripcion: typeof g.descripcion === "string" ? g.descripcion : "",
-        fecha: dt.toISOString(),
-        motivo: etiquetaMotivoGastoTipo(tipoRaw),
-      });
-    }
-  };
-  addGastoDocs(legacyG);
-  addGastoDocs(nuevoG);
+  for (const d of gastosSnap.docs) {
+    const g = d.data();
+    const f = g.fecha as { toDate?: () => Date } | undefined;
+    const dt = f?.toDate?.();
+    if (!dt) continue;
+    const m = typeof g.monto === "number" ? g.monto : 0;
+    if (m <= 0) continue;
+    totalGastosDia += m;
+    const tipoRaw = typeof g.tipo === "string" ? g.tipo : null;
+    gastosDetalle.push({
+      id: d.id,
+      monto: round2(m),
+      descripcion: typeof g.descripcion === "string" ? g.descripcion : "",
+      fecha: dt.toISOString(),
+      motivo: etiquetaMotivoGastoTipo(tipoRaw),
+    });
+  }
   totalGastosDia = round2(totalGastosDia);
 
   const asignSnap = await db

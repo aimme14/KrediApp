@@ -6,6 +6,8 @@ import {
   FINANCIAL_MOVEMENTS_SUBCOLLECTION,
 } from "@/lib/empresas-db";
 
+const EXPORT_MAX_ROWS = 10_000;
+
 function toDateStart(value: string): Date | null {
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return null;
@@ -87,7 +89,10 @@ export async function GET(request: NextRequest) {
     .where("createdAt", ">=", start)
     .where("createdAt", "<=", end)
     .orderBy("createdAt", "asc")
+    .limit(EXPORT_MAX_ROWS)
     .get();
+
+  const truncated = snap.docs.length === EXPORT_MAX_ROWS;
 
   const rows = snap.docs.map((doc) => {
     const d = doc.data() as Record<string, unknown>;
@@ -117,6 +122,7 @@ export async function GET(request: NextRequest) {
       mode,
       period: label,
       total: rows.length,
+      truncated,
       rows,
     });
   }
@@ -155,6 +161,8 @@ export async function GET(request: NextRequest) {
       "Content-Type": "text/csv; charset=utf-8",
       "Content-Disposition": `attachment; filename="${filename}"`,
       "Cache-Control": "no-store",
+      "X-Export-Truncated": truncated ? "true" : "false",
+      "X-Export-Row-Count": String(rows.length),
     },
   });
 }

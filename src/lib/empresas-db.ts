@@ -8,7 +8,9 @@ export const RUTAS_SUBCOLLECTION = "rutas";
 export const CLIENTES_SUBCOLLECTION = "clientes";
 export const PRESTAMOS_SUBCOLLECTION = "prestamos";
 export const PAGOS_SUBCOLLECTION = "pagos";
-/** @deprecated Preferir subcolecciones tipadas abajo; se mantiene para lectura de datos históricos. */
+/**
+ * @deprecated Colección legacy `gastos`. La app ya no la lee; conservar solo si aún migras datos en Firestore.
+ */
 export const GASTOS_SUBCOLLECTION = "gastos";
 
 /** Gastos del jefe (descuentan caja empresa). empresas/{empresaId}/gastosEmpresa/{gastoId} */

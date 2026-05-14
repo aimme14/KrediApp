@@ -58,46 +58,55 @@ export async function GET(_request: NextRequest) {
 
   const db = getAdminFirestore();
   const empresaId = apiUser.empresaId;
+  const empresaRef = db.collection(EMPRESAS_COLLECTION).doc(empresaId);
 
-  const rutasSnap = await db
-    .collection(EMPRESAS_COLLECTION)
-    .doc(empresaId)
+  const rutasSnap = await empresaRef
     .collection(RUTAS_SUBCOLLECTION)
     .where("adminId", "==", apiUser.uid)
     .get();
 
-  const rutas = await Promise.all(
+  /** Queries por ruta acotadas, en paralelo (evita leer todos los empleados de la empresa). */
+  const porRuta = await Promise.all(
     rutasSnap.docs.map(async (d) => {
       const data = d.data() as Record<string, unknown>;
-      const cajaRuta = typeof data.cajaRuta === "number" ? data.cajaRuta : 0;
       const desdeDocRuta = idsEmpleadosRuta(data);
       const desdeUsuarios = await uidsEmpleadosPorRutaEnUsuarios(db, empresaId, d.id);
       const empleadoUids = Array.from(new Set([...desdeDocRuta, ...desdeUsuarios]));
-
-      const empleados = await Promise.all(
-        empleadoUids.map(async (uid) => {
-          const authSnap = await db.collection(USERS_COLLECTION).doc(uid).get();
-          const nombre =
-            (authSnap.data()?.displayName as string | undefined)?.trim() ||
-            "Sin nombre";
-
-          return {
-            uid,
-            nombre,
-          };
-        })
-      );
-
-      return {
-        id: d.id,
-        nombre: (data.nombre as string) ?? "",
-        codigo: typeof data.codigo === "string" ? data.codigo : undefined,
-        ubicacion: (data.ubicacion as string) ?? "",
-        cajaRuta: round2(cajaRuta),
-        empleados,
-      };
+      return { id: d.id, data, empleadoUids };
     })
   );
+
+  const todosLosUids = new Set<string>();
+  for (const row of porRuta) {
+    row.empleadoUids.forEach((uid) => todosLosUids.add(uid));
+  }
+
+  const perfiles = new Map<string, string>();
+  await Promise.all(
+    Array.from(todosLosUids).map(async (uid) => {
+      const authSnap = await db.collection(USERS_COLLECTION).doc(uid).get();
+      const nombre =
+        (authSnap.data()?.displayName as string | undefined)?.trim() || "Sin nombre";
+      perfiles.set(uid, nombre);
+    })
+  );
+
+  const rutas = porRuta.map(({ id, data, empleadoUids }) => {
+    const cajaRuta = typeof data.cajaRuta === "number" ? data.cajaRuta : 0;
+    const empleados = empleadoUids.map((uid) => ({
+      uid,
+      nombre: perfiles.get(uid) ?? "Sin nombre",
+    }));
+
+    return {
+      id,
+      nombre: (data.nombre as string) ?? "",
+      codigo: typeof data.codigo === "string" ? data.codigo : undefined,
+      ubicacion: (data.ubicacion as string) ?? "",
+      cajaRuta: round2(cajaRuta),
+      empleados,
+    };
+  });
 
   rutas.sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
 

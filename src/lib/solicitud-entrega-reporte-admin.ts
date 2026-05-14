@@ -78,15 +78,14 @@ async function solicitudPendienteDeEmpleado(
     .doc(empresaId)
     .collection(SOLICITUDES_ENTREGA_REPORTE_SUBCOLLECTION)
     .where("estado", "==", "pendiente")
+    .where("empleadoUid", "==", empleadoUid)
+    .orderBy("creadaEn", "desc")
+    .limit(1)
     .get();
 
-  for (const d of snap.docs) {
-    const x = d.data();
-    if (typeof x.empleadoUid === "string" && x.empleadoUid === empleadoUid) {
-      return { id: d.id, data: x as Record<string, unknown> };
-    }
-  }
-  return null;
+  const d = snap.docs[0];
+  if (!d) return null;
+  return { id: d.id, data: d.data() as Record<string, unknown> };
 }
 
 export async function getMiSolicitudEntregaPendiente(
@@ -153,14 +152,12 @@ export async function listSolicitudesEntregaPendientesAdmin(
     .doc(empresaId)
     .collection(SOLICITUDES_ENTREGA_REPORTE_SUBCOLLECTION)
     .where("estado", "==", "pendiente")
+    .where("adminId", "==", adminUid)
     .get();
 
-  const out: SolicitudEntregaReporteDoc[] = [];
-  for (const d of snap.docs) {
-    const data = d.data() as Record<string, unknown>;
-    if (data.adminId !== adminUid) continue;
-    out.push(mapSolicitud(d.id, data));
-  }
+  const out = snap.docs.map((d) =>
+    mapSolicitud(d.id, d.data() as Record<string, unknown>)
+  );
   out.sort((a, b) => (b.creadaEn?.getTime() ?? 0) - (a.creadaEn?.getTime() ?? 0));
   return out;
 }

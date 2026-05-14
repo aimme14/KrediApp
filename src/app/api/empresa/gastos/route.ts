@@ -4,7 +4,6 @@ import { notifyAdminGastoEmpleado } from "@/lib/fcm-notify-admin";
 import { getApiUser } from "@/lib/api-auth";
 import {
   EMPRESAS_COLLECTION,
-  GASTOS_SUBCOLLECTION,
   GASTOS_EMPRESA_SUBCOLLECTION,
   GASTOS_ADMIN_SUBCOLLECTION,
   GASTOS_EMPLEADO_SUBCOLLECTION,
@@ -83,11 +82,7 @@ export async function GET(request: NextRequest) {
   }
 
   if (apiUser.role === "admin") {
-    const [legacySnap, nuevoSnap, empleadoSnap] = await Promise.all([
-      empresaRef
-        .collection(GASTOS_SUBCOLLECTION)
-        .where("adminId", "==", apiUser.uid)
-        .get(),
+    const [nuevoSnap, empleadoSnap] = await Promise.all([
       empresaRef
         .collection(GASTOS_ADMIN_SUBCOLLECTION)
         .where("adminId", "==", apiUser.uid)
@@ -99,14 +94,6 @@ export async function GET(request: NextRequest) {
     ]);
 
     const list: Array<Record<string, unknown>> = [];
-    legacySnap.docs.forEach((d) => {
-      const data = d.data() as Record<string, unknown>;
-      list.push(
-        mapGastoDoc(d.id, data, {
-          alcance: data.rutaId ? "ruta" : "admin",
-        })
-      );
-    });
     nuevoSnap.docs.forEach((d) => {
       const data = d.data() as Record<string, unknown>;
       list.push(mapGastoDoc(d.id, data));
@@ -120,6 +107,7 @@ export async function GET(request: NextRequest) {
       );
     });
 
+    /** Rellena displayName/email para filas sin `creadoPorNombre` (datos viejos o importados). */
     const sinNombre = list.filter((g) => !(g.creadoPorNombre as string)?.trim());
     if (sinNombre.length > 0) {
       const uids = Array.from(
@@ -161,23 +149,13 @@ export async function GET(request: NextRequest) {
   }
 
   /** empleado */
-  const [legacySnap, nuevoSnap] = await Promise.all([
-    empresaRef
-      .collection(GASTOS_SUBCOLLECTION)
-      .where("empleadoId", "==", apiUser.uid)
-      .get(),
-    empresaRef
-      .collection(GASTOS_EMPLEADO_SUBCOLLECTION)
-      .where("empleadoId", "==", apiUser.uid)
-      .get(),
-  ]);
+  const nuevoSnap = await empresaRef
+    .collection(GASTOS_EMPLEADO_SUBCOLLECTION)
+    .where("empleadoId", "==", apiUser.uid)
+    .get();
 
-  const list: Array<Record<string, unknown>> = [];
-  legacySnap.docs.forEach((d) =>
-    list.push(mapGastoDoc(d.id, d.data() as Record<string, unknown>))
-  );
-  nuevoSnap.docs.forEach((d) =>
-    list.push(mapGastoDoc(d.id, d.data() as Record<string, unknown>))
+  const list: Array<Record<string, unknown>> = nuevoSnap.docs.map((d) =>
+    mapGastoDoc(d.id, d.data() as Record<string, unknown>)
   );
 
   list.sort(

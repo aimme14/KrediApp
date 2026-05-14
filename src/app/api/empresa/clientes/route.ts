@@ -71,8 +71,13 @@ export async function GET(request: NextRequest) {
     });
   } else {
     // Admin/Jefe: clientes con adminId == uid Y además clientes de sus rutas (por si adminId quedó mal en algún cliente)
-    const snapByAdmin = await col.where("adminId", "==", apiUser.uid).get();
-    const rutasSnap = await empresaRef.collection(RUTAS_SUBCOLLECTION).where("adminId", "==", apiUser.uid).get();
+    const [snapByAdmin, rutasSnap] = await Promise.all([
+      col.where("adminId", "==", apiUser.uid).get(),
+      empresaRef
+        .collection(RUTAS_SUBCOLLECTION)
+        .where("adminId", "==", apiUser.uid)
+        .get(),
+    ]);
     const rutaIds = rutasSnap.docs.map((d) => d.id);
     const byId = new Map<string, (typeof list)[0]>();
     /** Convierte valor Firestore (Timestamp o Date) a Date | null */
@@ -102,9 +107,14 @@ export async function GET(request: NextRequest) {
     snapByAdmin.docs.forEach(add);
     if (rutaIds.length > 0) {
       const limitIn = 30;
+      const chunks: string[][] = [];
       for (let i = 0; i < rutaIds.length; i += limitIn) {
-        const chunk = rutaIds.slice(i, i + limitIn);
-        const snapByRuta = await col.where("rutaId", "in", chunk).get();
+        chunks.push(rutaIds.slice(i, i + limitIn));
+      }
+      const chunkSnaps = await Promise.all(
+        chunks.map((chunk) => col.where("rutaId", "in", chunk).get())
+      );
+      for (const snapByRuta of chunkSnaps) {
         snapByRuta.docs.forEach(add);
       }
     }
