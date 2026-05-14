@@ -51,10 +51,24 @@ function isProfileTimeout(e: unknown): boolean {
   return e instanceof Error && e.message === "AUTH_PROFILE_TIMEOUT";
 }
 
-/** Convierte errores de Firebase Auth a mensajes en español genéricos (sin revelar si el email existe). */
-function getAuthErrorMessage(e: unknown): string {
+/** Obtiene código `auth/...` aunque Firebase solo lo ponga dentro de `message`. */
+function firebaseAuthCode(e: unknown): string {
   const err = e as { code?: string; message?: string } | null;
-  const code = err?.code ?? "";
+  if (typeof err?.code === "string" && err.code.startsWith("auth/")) return err.code;
+  const msg = typeof err?.message === "string" ? err.message : "";
+  const m = /\((auth\/[^)]+)\)/.exec(msg);
+  return m ? m[1] : "";
+}
+
+/**
+ * Convierte errores de Firebase Auth a mensajes en español.
+ * `mode: "reauth"` usa textos acordes a verificación de contraseña (p. ej. bloqueo por inactividad).
+ */
+export function getAuthErrorMessage(e: unknown, opts?: { mode?: "signIn" | "reauth" }): string {
+  const err = e as { code?: string; message?: string } | null;
+  const code = firebaseAuthCode(e);
+  const isReauth = opts?.mode === "reauth";
+
   switch (code) {
     case "auth/invalid-email":
       return "El correo no es válido.";
@@ -64,12 +78,15 @@ function getAuthErrorMessage(e: unknown): string {
     case "auth/wrong-password":
     case "auth/invalid-credential":
     case "auth/invalid-login-credentials":
-      return "Correo o contraseña incorrectos.";
+      return isReauth ? "Credenciales incorrectas." : "Correo o contraseña incorrectos.";
     case "auth/too-many-requests":
       return "Demasiados intentos. Espera un momento e inténtalo de nuevo.";
     case "auth/network-request-failed":
       return "Error de conexión. Revisa tu internet e inténtalo de nuevo.";
     default:
+      if (isReauth) {
+        return "No se pudo verificar tu sesión. Inténtalo de nuevo.";
+      }
       return err?.message && typeof err.message === "string" && err.message.length > 0
         ? err.message
         : "Error al iniciar sesión. Inténtalo de nuevo.";

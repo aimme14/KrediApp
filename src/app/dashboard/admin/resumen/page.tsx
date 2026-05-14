@@ -31,6 +31,13 @@ function fmt(n: number) {
   return n.toLocaleString("es-CO", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+/** Periodos guardados antes de incluir `admin.gananciasRutas`: se deriva de las rutas del snapshot. */
+function gananciasRutasAdmin(s: PeriodoAdminSnapshot) {
+  const g = s.admin.gananciasRutas;
+  if (typeof g === "number") return g;
+  return s.rutas.reduce((sum, r) => sum + r.ganancias, 0);
+}
+
 export default function ResumenPage() {
   const { user, profile } = useAuth();
   const [error, setError] = useState<string | null>(null);
@@ -128,9 +135,6 @@ export default function ResumenPage() {
       <div className="card">
         <h3 style={{ marginTop: 0 }}>Periodos contables</h3>
         <p style={{ color: "var(--text-muted)", fontSize: "0.875rem", marginBottom: "1rem" }}>
-          Abre un periodo para guardar una foto de tu caja, capital y rutas. Al cerrar, se guarda otra foto: dos columnas
-          (apertura y cierre) para comparar. Mientras está abierto, usa &quot;Ver / comparar&quot; para ver los datos; el PDF
-          solo se ofrece una vez cerrado el periodo. No está ligado al calendario.
         </p>
 
         {hayAbierto && (
@@ -231,15 +235,6 @@ export default function ResumenPage() {
             <p>Cargando...</p>
           ) : detalle && ap ? (
             <>
-              <p style={{ fontSize: "0.85rem", color: "var(--text-muted)", marginBottom: "0.75rem" }}>
-                Periodo <code>{detalle.id}</code>
-                {detalle.estado === "abierto" ? " — aún sin cierre (columna cierre con guiones)." : null}
-              </p>
-              <p style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>
-                Abierto por {detalle.abiertoPorUid}
-                {detalle.cerradoPorUid ? ` · Cerrado por ${detalle.cerradoPorUid}` : ""}
-              </p>
-
               <h4 style={{ marginTop: "1rem", marginBottom: "0.5rem" }}>Administrador</h4>
               <div className="table-wrap">
                 <table>
@@ -260,6 +255,11 @@ export default function ResumenPage() {
                       <td>Capital admin</td>
                       <td className="col-num">{fmt(ap.admin.capitalAdmin)}</td>
                       <td className="col-num">{ci ? fmt(ci.admin.capitalAdmin) : "—"}</td>
+                    </tr>
+                    <tr>
+                      <td>Ganancias (suma rutas)</td>
+                      <td className="col-num">{fmt(gananciasRutasAdmin(ap))}</td>
+                      <td className="col-num">{ci ? fmt(gananciasRutasAdmin(ci)) : "—"}</td>
                     </tr>
                   </tbody>
                 </table>
