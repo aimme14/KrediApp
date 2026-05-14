@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useMemo } from "react";
+import { useState, useRef, useEffect, useMemo, useLayoutEffect, useCallback } from "react";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { useGastoFcmCampanita } from "@/context/GastoFcmCampanitaContext";
@@ -20,6 +20,11 @@ function BellIcon() {
   );
 }
 
+/** Ancho máximo deseado del panel (más chico que antes para que no invada la pantalla). */
+const NOTIFICATIONS_PANEL_IDEAL_MAX_PX = 288;
+const NOTIFICATIONS_PANEL_FALLBACK_PX = 200;
+const NOTIFICATIONS_PANEL_VIEWPORT_MARGIN_PX = 10;
+
 function formatMonto(value: number): string {
   return `$ ${value.toLocaleString("es-CO", {
     minimumFractionDigits: 0,
@@ -35,7 +40,37 @@ export default function DashboardNotifications() {
     clearBadgeOnly,
   } = useGastoFcmCampanita();
   const [open, setOpen] = useState(false);
+  const [panelMaxWidthPx, setPanelMaxWidthPx] = useState<number | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  const measurePanelMaxWidth = useCallback(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const m = NOTIFICATIONS_PANEL_VIEWPORT_MARGIN_PX;
+    const vw = window.visualViewport?.width ?? window.innerWidth;
+    const byTrigger = r.right - m * 2;
+    const byViewport = vw - m * 2;
+    const w = Math.floor(
+      Math.min(NOTIFICATIONS_PANEL_IDEAL_MAX_PX, Math.max(0, byTrigger), Math.max(0, byViewport))
+    );
+    setPanelMaxWidthPx(w > 0 ? w : NOTIFICATIONS_PANEL_FALLBACK_PX);
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!open) {
+      setPanelMaxWidthPx(null);
+      return;
+    }
+    measurePanelMaxWidth();
+    const onResize = () => measurePanelMaxWidth();
+    window.addEventListener("resize", onResize);
+    window.visualViewport?.addEventListener("resize", onResize);
+    return () => {
+      window.removeEventListener("resize", onResize);
+      window.visualViewport?.removeEventListener("resize", onResize);
+    };
+  }, [open, measurePanelMaxWidth]);
 
   const [pendienteTrabajador, setPendienteTrabajador] =
     useState<SolicitudEntregaReporteApi | null>(null);
@@ -212,6 +247,11 @@ export default function DashboardNotifications() {
           className="dashboard-notifications-panel"
           role="dialog"
           aria-label="Avisos"
+          style={
+            panelMaxWidthPx != null
+              ? { maxWidth: `${panelMaxWidthPx}px` }
+              : undefined
+          }
         >
           <div className="dashboard-notifications-panel-title">Avisos</div>
 
