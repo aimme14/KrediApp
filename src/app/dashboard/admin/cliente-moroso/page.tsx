@@ -2,7 +2,16 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/context/AuthContext";
-import { listClientes, setClienteMoroso, type ClienteItem } from "@/lib/empresa-api";
+import {
+  formatClienteCodigoRutaYNumero,
+  listClientes,
+  setClienteMoroso,
+  type ClienteItem,
+} from "@/lib/empresa-api";
+
+function codigoSinCL(codigo: string | undefined): string {
+  return formatClienteCodigoRutaYNumero(codigo).replace(/^CL-/i, "");
+}
 
 export default function ClienteMorosoPage() {
   const { user, profile } = useAuth();
@@ -64,13 +73,14 @@ export default function ClienteMorosoPage() {
             {morosos.length === 0 ? (
               <p style={{ color: "var(--text-muted)" }}>Ningún cliente marcado como moroso.</p>
             ) : (
-              <div className="table-wrap">
-                <table>
+              <div className="table-wrap cliente-moroso-table-wrap">
+                <table className="cliente-moroso-clientes-table">
                   <thead>
                     <tr>
+                      <th>Código</th>
+                      <th>Teléfono</th>
                       <th>Nombre</th>
                       <th>Ubicación</th>
-                      <th>Teléfono</th>
                       <th>Cédula</th>
                       <th>Acción</th>
                     </tr>
@@ -78,9 +88,10 @@ export default function ClienteMorosoPage() {
                   <tbody>
                     {morosos.map((c) => (
                       <tr key={c.id}>
+                        <td title={c.codigo}>{codigoSinCL(c.codigo)}</td>
+                        <td>{c.telefono || "—"}</td>
                         <td>{c.nombre}</td>
                         <td>{c.ubicacion || "—"}</td>
-                        <td>{c.telefono || "—"}</td>
                         <td>{c.cedula || "—"}</td>
                         <td>
                           <button
@@ -89,7 +100,14 @@ export default function ClienteMorosoPage() {
                             onClick={() => handleToggleMoroso(c)}
                             disabled={togglingId === c.id}
                           >
-                            {togglingId === c.id ? "..." : "Quitar de morosos"}
+                            {togglingId === c.id ? (
+                              "..."
+                            ) : (
+                              <>
+                                <span className="cliente-moroso-btn-full">Quitar de morosos</span>
+                                <span className="cliente-moroso-btn-mob">Quitar</span>
+                              </>
+                            )}
                           </button>
                         </td>
                       </tr>
@@ -105,13 +123,14 @@ export default function ClienteMorosoPage() {
             {noMorosos.length === 0 ? (
               <p style={{ color: "var(--text-muted)" }}>No hay más clientes o todos están marcados como morosos.</p>
             ) : (
-              <div className="table-wrap">
-                <table>
+              <div className="table-wrap cliente-moroso-table-wrap">
+                <table className="cliente-moroso-clientes-table">
                   <thead>
                     <tr>
+                      <th>Código</th>
+                      <th>Teléfono</th>
                       <th>Nombre</th>
                       <th>Ubicación</th>
-                      <th>Teléfono</th>
                       <th>Cédula</th>
                       <th>Acción</th>
                     </tr>
@@ -119,9 +138,10 @@ export default function ClienteMorosoPage() {
                   <tbody>
                     {noMorosos.map((c) => (
                       <tr key={c.id}>
+                        <td title={c.codigo}>{codigoSinCL(c.codigo)}</td>
+                        <td>{c.telefono || "—"}</td>
                         <td>{c.nombre}</td>
                         <td>{c.ubicacion || "—"}</td>
-                        <td>{c.telefono || "—"}</td>
                         <td>{c.cedula || "—"}</td>
                         <td>
                           <button
@@ -130,7 +150,14 @@ export default function ClienteMorosoPage() {
                             onClick={() => handleToggleMoroso(c)}
                             disabled={togglingId === c.id}
                           >
-                            {togglingId === c.id ? "..." : "Marcar como moroso"}
+                            {togglingId === c.id ? (
+                              "..."
+                            ) : (
+                              <>
+                                <span className="cliente-moroso-btn-full">Marcar como moroso</span>
+                                <span className="cliente-moroso-btn-mob">Pasar a morosos</span>
+                              </>
+                            )}
                           </button>
                         </td>
                       </tr>
