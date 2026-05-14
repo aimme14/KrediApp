@@ -980,6 +980,8 @@ export async function setClienteMoroso(
 export type PeriodoAdminSnapshotAdmin = {
   cajaAdmin: number;
   capitalAdmin: number;
+  /** Suma de ganancias de las rutas del admin (snapshot). Opcional en periodos antiguos. */
+  gananciasRutas?: number;
 };
 
 export type PeriodoAdminSnapshotRuta = {

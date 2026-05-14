@@ -36,6 +36,12 @@ export type PeriodoAdminPdfPayload = {
   cierre: PeriodoAdminSnapshot | null;
 };
 
+function gananciasRutasAdmin(s: PeriodoAdminSnapshot): number {
+  const g = s.admin.gananciasRutas;
+  if (typeof g === "number") return g;
+  return s.rutas.reduce((sum, r) => sum + r.ganancias, 0);
+}
+
 function mergeRutas(ap: PeriodoAdminSnapshot, ci: PeriodoAdminSnapshot | null) {
   const ids = new Set<string>();
   for (const r of ap.rutas) ids.add(r.rutaId);
@@ -121,6 +127,11 @@ export async function buildPeriodoAdminPdf(payload: PeriodoAdminPdfPayload): Pro
   line("Administrador", { bold: true, size: 9 });
   row3("Caja admin", payload.apertura.admin.cajaAdmin, payload.cierre?.admin.cajaAdmin ?? null);
   row3("Capital admin", payload.apertura.admin.capitalAdmin, payload.cierre?.admin.capitalAdmin ?? null);
+  row3(
+    "Ganancias (suma rutas)",
+    gananciasRutasAdmin(payload.apertura),
+    payload.cierre ? gananciasRutasAdmin(payload.cierre) : null
+  );
   spacer(8);
 
   line("Rutas (union apertura / cierre)", { bold: true, size: 9 });

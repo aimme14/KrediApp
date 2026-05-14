@@ -198,12 +198,10 @@ export default function RutasPage() {
     <div className="card rutas-admin-page">
       <h2 className="rutas-admin-page-title">Rutas</h2>
       <p className="rutas-admin-intro">
-        Creá rutas con nombre y ubicación. Al desplegar una ruta verás los clientes con su información y estado financiero.
+        
       </p>
       <p className="rutas-admin-gloss">
-        <strong>Patrimonio total</strong> es todo el capital de la ruta. <strong>Base de la ruta</strong> es el efectivo disponible para operar.
-        Los préstamos salen de la base y suman en <strong>Inversiones</strong>; al cobrar, el dinero vuelve a la base y el interés acumula en{" "}
-        <strong>Ganancias</strong>.
+        
       </p>
 
       <div className="rutas-admin-toolbar">

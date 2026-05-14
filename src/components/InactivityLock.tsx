@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
-import { useAuth } from "@/context/AuthContext";
+import { useAuth, getAuthErrorMessage } from "@/context/AuthContext";
 
 /** Minutos de inactividad antes de bloquear la sesión. */
 const INACTIVITY_MINUTES = 15;
@@ -57,8 +57,7 @@ export default function InactivityLock({ children }: { children: React.ReactNode
       setLocked(false);
       setPassword("");
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Contraseña incorrecta. Intenta de nuevo.";
-      setError(msg);
+      setError(getAuthErrorMessage(err, { mode: "reauth" }));
     } finally {
       setIsSubmitting(false);
     }

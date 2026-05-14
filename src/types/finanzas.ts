@@ -59,11 +59,11 @@ export interface PeriodoContableAdmin {
   abiertoPorUid: string;
   cerradoPorUid?: string | null;
   apertura: {
-    admin: { cajaAdmin: number; capitalAdmin: number };
+    admin: { cajaAdmin: number; capitalAdmin: number; gananciasRutas?: number };
     rutas: PeriodoContableRutaSnapshot[];
   };
   cierre?: {
-    admin: { cajaAdmin: number; capitalAdmin: number };
+    admin: { cajaAdmin: number; capitalAdmin: number; gananciasRutas?: number };
     rutas: PeriodoContableRutaSnapshot[];
   } | null;
 }

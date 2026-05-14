@@ -14,6 +14,8 @@ import { computeCapitalAdmin, computeCapitalRutaFromRutaFields } from "@/lib/cap
 export type PeriodoAdminSnapshotAdmin = {
   cajaAdmin: number;
   capitalAdmin: number;
+  /** Suma de `ganancias` de todas las rutas del admin (congelada en apertura/cierre). */
+  gananciasRutas?: number;
 };
 
 export type PeriodoAdminSnapshotRuta = {
@@ -110,6 +112,8 @@ export async function buildPeriodoAdminSnapshot(
 
   rutas.sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
 
+  const gananciasRutas = round2(rutas.reduce((s, r) => s + r.ganancias, 0));
+
   const capitalAdmin = round2(
     computeCapitalAdmin({
       cajaAdmin,
@@ -121,6 +125,7 @@ export async function buildPeriodoAdminSnapshot(
     admin: {
       cajaAdmin: round2(cajaAdmin),
       capitalAdmin,
+      gananciasRutas,
     },
     rutas,
   };

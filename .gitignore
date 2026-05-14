@@ -8,6 +8,7 @@ node_modules
 out
 build
 dist
+*.tsbuildinfo
 
 # Env (no subir claves reales a Git)
 .env
