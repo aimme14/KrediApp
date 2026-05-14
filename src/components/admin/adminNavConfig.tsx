@@ -49,7 +49,7 @@ export const ADMIN_NAV_SECTIONS: AdminNavSection[] = [
   {
     heading: "Finanzas",
     items: [
-      { href: "/dashboard/admin/gestion-financiera", label: "Gestión financiera", icon: "wallet" },
+      { href: "/dashboard/admin/gestion-financiera", label: "Inversiones", icon: "wallet" },
       { href: "/dashboard/admin/resumen", label: "Resumen económico", icon: "chart" },
       {
         href: "/dashboard/admin/cliente-moroso",

@@ -5385,6 +5385,50 @@ a.admin-inicio-link-btn {
   padding: 1rem 1.25rem;
 }
 
+/* «Base del administrador»: ~25% más compacta (solo esta pantalla) */
+.gestion-financiera-page .gf-capital-card--admin-75.card {
+  padding: 0.75rem 0.9375rem;
+  margin-bottom: 0.75rem;
+}
+
+.gestion-financiera-page .gf-capital-card--admin-75 .gf-capital-card-header {
+  margin-bottom: 0.1125rem;
+  gap: 0.2625rem;
+}
+
+.gestion-financiera-page .gf-capital-card--admin-75 .gf-capital-card-title-wrap {
+  gap: 0.2625rem;
+}
+
+.gestion-financiera-page .gf-capital-card--admin-75 .gf-capital-icon {
+  font-size: 0.825rem;
+}
+
+.gestion-financiera-page .gf-capital-card--admin-75 .gf-capital-card-title {
+  font-size: 0.75rem;
+}
+
+.gestion-financiera-page .gf-capital-card--admin-75 .gf-capital-badge-privado {
+  font-size: 0.5625rem;
+  padding: 0.15rem 0.3rem;
+  border-radius: 4.5px;
+}
+
+.gestion-financiera-page .gf-capital-card--admin-75 .gf-capital-display {
+  margin-bottom: 0;
+}
+
+.gestion-financiera-page .gf-capital-card--admin-75 .gf-capital-label {
+  font-size: 0.625rem;
+  margin-bottom: 0.1125rem;
+}
+
+.gestion-financiera-page .gf-capital-card--admin-75 .gf-capital-monto {
+  font-size: 1.6875rem;
+  margin-bottom: 0;
+  line-height: 1.08;
+}
+
 .gf-header {
   position: relative;
   padding: 1rem 0;
@@ -6116,6 +6160,63 @@ a.admin-inicio-link-btn {
   gap: 0.5rem;
   justify-content: flex-end;
   margin-top: 1rem;
+}
+
+/* Modal confirmación inversión admin (sobre chrome móvil) */
+.gf-modal-backdrop--inversion {
+  z-index: 2000;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+.gf-inversion-confirm-resumen {
+  margin: 0 0 1rem 0;
+  padding: 0.85rem 1rem;
+  border-radius: 10px;
+  background: var(--input-bg);
+  border: 1px solid var(--card-border);
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.gf-inversion-confirm-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.12rem;
+}
+
+.gf-inversion-confirm-label {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.gf-inversion-confirm-value {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.25;
+}
+
+.gf-inversion-confirm-value--monto {
+  font-family: var(--font-dm-mono), monospace;
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--link);
+}
+
+@media (max-width: 420px) {
+  .gf-modal-actions--inversion {
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+  .gf-modal-actions--inversion .btn {
+    width: 100%;
+    justify-content: center;
+  }
 }
 
 /* Bloqueo por inactividad (dashboard, todos los roles) */

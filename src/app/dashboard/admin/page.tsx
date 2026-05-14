@@ -261,7 +261,7 @@ export default function AdminDashboardPage() {
               Rutas
             </h2>
             <Link href="/dashboard/admin/gestion-financiera" className="admin-inicio-rutas-link">
-              Gestión financiera
+              Inversiones
             </Link>
           </div>
           {rutasOrdenadas.length === 0 ? (
