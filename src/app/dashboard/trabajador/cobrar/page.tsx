@@ -597,13 +597,6 @@ function CobrarClientePageContent() {
 
   if (confirmado) {
     const prestamoSaldado = saldoTrasCobro === 0;
-    let comprobanteEstadoMsg: string | null = null;
-    if (comprobanteGenerando) {
-      comprobanteEstadoMsg = null;
-    } else if (comprobanteDisplayUrl && !comprobanteError) {
-      comprobanteEstadoMsg =
-        "Imagen solo en este dispositivo: compártela ahora; al volver a la ruta no quedará guardada.";
-    }
     const marcaComprobante = empresaComprobanteMeta.nombre?.trim() || "Empresa";
     const textoComprobanteWa =
       `Comprobante ${marcaComprobante} — ${cliente.nombre}\n` +
@@ -615,18 +608,10 @@ function CobrarClientePageContent() {
     return (
       <div className="card cobrar-card cobrar-confirmacion">
         <h2 className="cobrar-title">Cobro registrado</h2>
-        <p>Se registró el pago de {formatCurrency(montoAplicar)} para {cliente.nombre}.</p>
         {prestamoSaldado && (
           <div className="cobrar-prestamo-saldado" role="status">
             <strong>Préstamo saldado.</strong> Este préstamo quedó pagado en su totalidad.
           </div>
-        )}
-        <div className="cobrar-resumen-post" aria-label="Resumen tras el cobro">
-          <p><strong>Nuevo saldo pendiente:</strong> {formatCurrency(saldoTrasCobro)}</p>
-          <p><strong>Cuotas restantes:</strong> {cuotasRestantesTrasCobro} de {numeroCuotas}</p>
-        </div>
-        {comprobanteEstadoMsg && (
-          <p className="comprobante-estado-msg">{comprobanteEstadoMsg}</p>
         )}
         {comprobanteError && !comprobanteDisplayUrl && (
           <div className="cobrar-comprobante-error" role="alert">
