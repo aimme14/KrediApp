@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useAuth } from "@/context/AuthContext";
+import { useTrabajadorCajaDia } from "@/context/TrabajadorCajaDiaContext";
 import { listGastos, createGasto, type GastoItem } from "@/lib/empresa-api";
 import {
   sanitizeMontoDecimalCOP,
@@ -105,6 +106,7 @@ function CloseIcon() {
 
 export default function GastosTrabajadorPage() {
   const { user, profile } = useAuth();
+  const { refresh: refreshCajaDia } = useTrabajadorCajaDia();
   const [gastos, setGastos] = useState<GastoItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -272,6 +274,7 @@ export default function GastosTrabajadorPage() {
       setEvidenciaPreview(null);
       setShowForm(false);
       await loadGastos();
+      void refreshCajaDia();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al registrar gasto");
     } finally {
