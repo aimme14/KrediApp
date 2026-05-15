@@ -9,7 +9,11 @@ import {
   USUARIOS_SUBCOLLECTION,
 } from "@/lib/empresas-db";
 import { listarGastosRutaPorAdmin } from "@/lib/gastos-totals";
-import { computeCapitalAdmin, computeCapitalRutaFromRutaFields } from "@/lib/capital-formulas";
+import {
+  computeCapitalAdmin,
+  computeCapitalRutaFromRutaFields,
+  computeCapitalRutaParaSumaAdmin,
+} from "@/lib/capital-formulas";
 
 export type ResumenRutaItem = {
   rutaId: string;
@@ -102,13 +106,12 @@ export async function GET(request: NextRequest) {
     });
 
     if (isAdmin) {
-      const capitalParaAdmin =
-        typeof data.capitalTotal === "number"
-          ? data.capitalTotal
-          : (typeof data.cajaRuta === "number" ? data.cajaRuta : 0) +
-            (typeof data.cajasEmpleados === "number" ? data.cajasEmpleados : 0) +
-            (typeof data.inversiones === "number" ? data.inversiones : 0);
-      sumaCapitalRutas += capitalParaAdmin;
+      sumaCapitalRutas += computeCapitalRutaParaSumaAdmin({
+        cajaRuta,
+        cajasEmpleados,
+        inversiones: inversion,
+        capitalTotal: capitalTotalRaw,
+      });
     }
 
     rutas.push({

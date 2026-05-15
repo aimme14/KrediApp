@@ -48,6 +48,20 @@ export function computeCapitalAdmin(params: {
 }
 
 /**
+ * Contribución de una ruta a `sumaCapitalRutas` del admin en GET /api/empresa/resumen:
+ * `capitalTotal` persistido si existe; si no, cajaRuta + cajasEmpleados + inversiones.
+ */
+export function computeCapitalRutaParaSumaAdmin(r: {
+  cajaRuta: number;
+  cajasEmpleados: number;
+  inversiones: number;
+  capitalTotal?: number;
+}): number {
+  if (typeof r.capitalTotal === "number") return roundMoney(r.capitalTotal);
+  return roundMoney(r.cajaRuta + r.cajasEmpleados + r.inversiones);
+}
+
+/**
  * Patrimonio de ruta: cajaRuta + cajasEmpleados + inversiones − perdidas.
  * `ganancias` y `capitalTotal` opcional no alteran el resultado (compatibilidad de llamadas).
  */
