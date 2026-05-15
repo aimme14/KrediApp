@@ -44,6 +44,16 @@ messaging.onBackgroundMessage(function (payload) {
         });
       });
     });
+  } else if (data.type === 'prestamo_empleado') {
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function (clients) {
+      clients.forEach(function (client) {
+        client.postMessage({
+          type: 'KREDI_FCM_PRESTAMO',
+          title: title,
+          body: body,
+        });
+      });
+    });
   }
   return self.registration.showNotification(title, {
     body: body,

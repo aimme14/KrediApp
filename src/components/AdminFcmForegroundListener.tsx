@@ -14,6 +14,7 @@ function kindFromFcmDataType(
 ): OperativoFcmKind | null {
   if (t === "gasto_empleado") return "gasto";
   if (t === "cuota_prestamo") return "cuota";
+  if (t === "prestamo_empleado") return "cuota";
   return null;
 }
 
@@ -65,6 +66,16 @@ export function AdminFcmForegroundListener() {
         bumpOperativoFromFcm(
           "gasto",
           typeof d.title === "string" ? d.title : "Nuevo gasto de un trabajador",
+          typeof d.body === "string" ? d.body : ""
+        );
+        return;
+      }
+      if (d?.type === "KREDI_FCM_PRESTAMO") {
+        bumpOperativoFromFcm(
+          "cuota",
+          typeof d.title === "string"
+            ? d.title
+            : "Nuevo préstamo desembolsado",
           typeof d.body === "string" ? d.body : ""
         );
       }
