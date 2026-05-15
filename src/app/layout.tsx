@@ -9,9 +9,15 @@ const dmMono = DM_Mono({ weight: ["400", "500"], subsets: ["latin"], variable: "
 export const metadata: Metadata = {
   title: "KrediApp - Gestión por roles",
   description: "Aplicación con roles: Super Admin, Jefe, Admin y Trabajador",
+  manifest: "/manifest.json",
   icons: {
-    icon: "/krediapp-icon.png",
-    apple: "/krediapp-icon.png",
+    icon: "/icon-192.png",
+    apple: "/icon-192.png",
+  },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "KrediApp",
   },
 };
 
@@ -21,6 +27,7 @@ export const viewport: Viewport = {
   maximumScale: 5,
   userScalable: true,
   viewportFit: "cover",
+  themeColor: "#1e140f",
 };
 
 /** Script que aplica el tema guardado antes del primer pintado para evitar parpadeo */
