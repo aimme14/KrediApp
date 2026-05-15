@@ -30,6 +30,7 @@ export default function InactivityLock({ children }: { children: React.ReactNode
     events.forEach((ev) => window.addEventListener(ev, onActivity));
 
     const intervalId = setInterval(() => {
+      if (document.visibilityState === "hidden") return;
       if (Date.now() - lastActivityRef.current >= INACTIVITY_MS) {
         setLocked(true);
         setPassword("");

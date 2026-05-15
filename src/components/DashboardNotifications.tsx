@@ -3,7 +3,10 @@
 import { useState, useRef, useEffect, useMemo, useLayoutEffect, useCallback } from "react";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
-import { useGastoFcmCampanita } from "@/context/GastoFcmCampanitaContext";
+import {
+  useGastoFcmCampanita,
+  type OperativoFcmSessionItem,
+} from "@/context/GastoFcmCampanitaContext";
 import {
   getMiSolicitudEntregaReporte,
   getSolicitudesEntregaReportePendientes,
@@ -30,6 +33,138 @@ function formatMonto(value: number): string {
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   })}`;
+}
+
+function NotifAdminPendientes({
+  pendientes,
+  dismissed,
+  onDismiss,
+  onClose,
+}: {
+  pendientes: SolicitudEntregaPendienteAdmin[];
+  dismissed: boolean;
+  onDismiss: () => void;
+  onClose: () => void;
+}) {
+  if (pendientes.length === 0 || dismissed) {
+    return (
+      <p className="dashboard-notifications-empty">No hay solicitudes de entrega pendientes.</p>
+    );
+  }
+  return (
+    <div
+      className="dashboard-notifications-alert dashboard-notifications-alert-info"
+      role="status"
+    >
+      <button
+        type="button"
+        className="dashboard-notifications-close"
+        onClick={onDismiss}
+        aria-label="Cerrar notificación"
+        title="Cerrar"
+      >
+        ×
+      </button>
+      <strong>
+        {pendientes.length === 1
+          ? "1 solicitud de entrega pendiente"
+          : `${pendientes.length} solicitudes de entrega pendientes`}
+      </strong>
+      <p className="dashboard-notifications-alert-text">
+        Hay trabajadores esperando que confirmes que recibiste el efectivo del reporte diario.
+      </p>
+      <div className="dashboard-notifications-admin-inner">
+        {pendientes.slice(0, 8).map((s, idx) => (
+          <div
+            key={s.id}
+            className={`dashboard-notifications-admin-item${idx > 0 ? " dashboard-notifications-admin-item-divider" : ""}`}
+          >
+            <span className="dashboard-notifications-admin-label">Trabajador</span>
+            <span className="dashboard-notifications-admin-name">{s.empleadoNombre}</span>
+            <span className="dashboard-notifications-admin-meta">{s.rutaNombre || "—"}</span>
+          </div>
+        ))}
+      </div>
+      {pendientes.length > 8 && (
+        <p className="dashboard-notifications-admin-extra">
+          … y {pendientes.length - 8} más (ver en reportes del día)
+        </p>
+      )}
+      <Link href="/dashboard/admin/reportes-dia" className="dashboard-notifications-link" onClick={onClose}>
+        Ir a reportes del día
+      </Link>
+    </div>
+  );
+}
+
+function NotifAdminOperativo({
+  lines,
+  dismissed,
+  onDismiss,
+  onClose,
+}: {
+  lines: OperativoFcmSessionItem[];
+  dismissed: boolean;
+  onDismiss: () => void;
+  onClose: () => void;
+}) {
+  if (lines.length === 0 || dismissed) return null;
+  return (
+    <div
+      className="dashboard-notifications-alert dashboard-notifications-alert-warning dashboard-notifications-alert-gasto-fcm"
+      role="status"
+      style={{ marginTop: "0.75rem" }}
+    >
+      <button
+        type="button"
+        className="dashboard-notifications-close"
+        onClick={onDismiss}
+        aria-label="Cerrar notificación"
+        title="Cerrar"
+      >
+        ×
+      </button>
+      <div className="dashboard-notifications-admin-inner">
+        {lines.slice(0, 8).map((row, idx) => (
+          <div
+            key={`${row.kind}-${row.at}-${idx}`}
+            className={`dashboard-notifications-admin-item${idx > 0 ? " dashboard-notifications-admin-item-divider" : ""}`}
+          >
+            <span className="dashboard-notifications-admin-label">{row.title}</span>
+            <span className="dashboard-notifications-admin-name">{row.body}</span>
+            <span className="dashboard-notifications-admin-meta">
+              {new Date(row.at).toLocaleString("es-CO", {
+                day: "2-digit",
+                month: "short",
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
+            </span>
+          </div>
+        ))}
+      </div>
+      {lines.some((l) => l.kind === "gasto") && (
+        <Link
+          href="/dashboard/admin/gastos"
+          className="dashboard-notifications-link"
+          onClick={onClose}
+          style={{ display: "block", marginTop: "0.35rem" }}
+        >
+          Ver gastos operativos
+        </Link>
+      )}
+      {lines.some((l) => l.kind === "cuota") && (
+        <Link
+          href="/dashboard/admin/cobrar"
+          className="dashboard-notifications-link"
+          onClick={onClose}
+          style={{ display: "block", marginTop: "0.35rem" }}
+        >
+          Ir a cobrar / préstamos
+        </Link>
+      )}
+    </div>
+  );
 }
 
 export default function DashboardNotifications() {
@@ -135,6 +270,7 @@ export default function DashboardNotifications() {
     let cancelled = false;
 
     async function load() {
+      if (document.visibilityState === "hidden") return;
       try {
         const token = await firebaseUser.getIdToken();
         if (role === "trabajador") {
@@ -156,9 +292,16 @@ export default function DashboardNotifications() {
 
     void load();
     const id = setInterval(() => void load(), 45_000);
+
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void load();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+
     return () => {
       cancelled = true;
       clearInterval(id);
+      document.removeEventListener("visibilitychange", onVisible);
     };
   }, [user, role]);
 
@@ -322,112 +465,18 @@ export default function DashboardNotifications() {
 
           {role === "admin" && (
             <>
-              {adminPendientes.length > 0 && !dismissedSet.has(adminPendingKey) ? (
-                <div className="dashboard-notifications-alert dashboard-notifications-alert-info" role="status">
-                  <button
-                    type="button"
-                    className="dashboard-notifications-close"
-                    onClick={() => dismissNotification(adminPendingKey)}
-                    aria-label="Cerrar notificación"
-                    title="Cerrar"
-                  >
-                    ×
-                  </button>
-                  <strong>
-                    {adminPendientes.length === 1
-                      ? "1 solicitud de entrega pendiente"
-                      : `${adminPendientes.length} solicitudes de entrega pendientes`}
-                  </strong>
-                  <p className="dashboard-notifications-alert-text">
-                    Hay trabajadores esperando que confirmes que recibiste el efectivo del reporte diario.
-                  </p>
-                  <div className="dashboard-notifications-admin-inner">
-                    {adminPendientes.slice(0, 8).map((s, idx) => (
-                      <div
-                        key={s.id}
-                        className={`dashboard-notifications-admin-item${idx > 0 ? " dashboard-notifications-admin-item-divider" : ""}`}
-                      >
-                        <span className="dashboard-notifications-admin-label">Trabajador</span>
-                        <span className="dashboard-notifications-admin-name">{s.empleadoNombre}</span>
-                        <span className="dashboard-notifications-admin-meta">
-                          {s.rutaNombre || "—"}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                  {adminPendientes.length > 8 && (
-                    <p className="dashboard-notifications-admin-extra">
-                      … y {adminPendientes.length - 8} más (ver en reportes del día)
-                    </p>
-                  )}
-                  <Link
-                    href="/dashboard/admin/reportes-dia"
-                    className="dashboard-notifications-link"
-                    onClick={() => setOpen(false)}
-                  >
-                    Ir a reportes del día
-                  </Link>
-                </div>
-              ) : (
-                <p className="dashboard-notifications-empty">No hay solicitudes de entrega pendientes.</p>
-              )}
-
-              {sessionOperativoLines.length > 0 && !dismissedSet.has(adminOperativoKey) && (
-                <div
-                  className="dashboard-notifications-alert dashboard-notifications-alert-warning dashboard-notifications-alert-gasto-fcm"
-                  role="status"
-                  style={{ marginTop: "0.75rem" }}
-                >
-                  <button
-                    type="button"
-                    className="dashboard-notifications-close"
-                    onClick={() => dismissNotification(adminOperativoKey)}
-                    aria-label="Cerrar notificación"
-                    title="Cerrar"
-                  >
-                    ×
-                  </button>
-                  <div className="dashboard-notifications-admin-inner">
-                    {sessionOperativoLines.slice(0, 8).map((row, idx) => (
-                      <div
-                        key={`${row.kind}-${row.at}-${idx}`}
-                        className={`dashboard-notifications-admin-item${idx > 0 ? " dashboard-notifications-admin-item-divider" : ""}`}
-                      >
-                        <span className="dashboard-notifications-admin-label">{row.title}</span>
-                        <span className="dashboard-notifications-admin-name">{row.body}</span>
-                        <span className="dashboard-notifications-admin-meta">
-                          {new Date(row.at).toLocaleString("es-CO", {
-                            day: "2-digit",
-                            month: "short",
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                  {sessionOperativoLines.some((l) => l.kind === "gasto") && (
-                    <Link
-                      href="/dashboard/admin/gastos"
-                      className="dashboard-notifications-link"
-                      onClick={() => setOpen(false)}
-                      style={{ display: "block", marginTop: "0.35rem" }}
-                    >
-                      Ver gastos operativos
-                    </Link>
-                  )}
-                  {sessionOperativoLines.some((l) => l.kind === "cuota") && (
-                    <Link
-                      href="/dashboard/admin/cobrar"
-                      className="dashboard-notifications-link"
-                      onClick={() => setOpen(false)}
-                      style={{ display: "block", marginTop: "0.35rem" }}
-                    >
-                      Ir a cobrar / préstamos
-                    </Link>
-                  )}
-                </div>
-              )}
+              <NotifAdminPendientes
+                pendientes={adminPendientes}
+                dismissed={dismissedSet.has(adminPendingKey)}
+                onDismiss={() => dismissNotification(adminPendingKey)}
+                onClose={() => setOpen(false)}
+              />
+              <NotifAdminOperativo
+                lines={sessionOperativoLines}
+                dismissed={dismissedSet.has(adminOperativoKey)}
+                onDismiss={() => dismissNotification(adminOperativoKey)}
+                onClose={() => setOpen(false)}
+              />
             </>
           )}
 
