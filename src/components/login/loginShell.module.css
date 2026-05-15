@@ -258,8 +258,11 @@
     height: 100dvh;
     height: 100svh;
     overflow: hidden;
-    padding: max(10px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right))
-      max(10px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+    align-items: center;
+    justify-content: flex-start;
+    padding: max(10px, calc(5dvh + env(safe-area-inset-top, 0px)))
+      max(12px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom))
+      max(12px, env(safe-area-inset-left));
   }
 
   .shell {

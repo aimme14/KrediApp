@@ -6,7 +6,7 @@ import ThemeToggle from "@/components/ThemeToggle";
 
 export default function DeshabilitadoPage() {
   const router = useRouter();
-  const { signOut, profile } = useAuth();
+  const { signOut, profile, loading } = useAuth();
   const esTrabajador = profile?.role === "trabajador";
 
   const handleCerrarSesion = async () => {
@@ -20,26 +20,27 @@ export default function DeshabilitadoPage() {
         <ThemeToggle />
       </div>
       <div className="card" style={{ maxWidth: 400, margin: "0 auto" }}>
-        {esTrabajador ? (
+        {loading ? (
+          <p style={{ color: "var(--text-muted)", margin: 0 }}>Cargando…</p>
+        ) : esTrabajador ? (
           <h1 className="page-title" style={{ marginBottom: 0 }}>
             Horario no laboral
           </h1>
         ) : (
-          <>
-            <h1 className="page-title">Cuenta deshabilitada</h1>
-            <p style={{ color: "var(--text-muted)" }}>
-              Tu cuenta ha sido deshabilitada. Contacta al Super Administrador si crees que es un error.
-            </p>
-          </>
+          <h1 className="page-title" style={{ marginBottom: 0 }}>
+            Acceso no disponible
+          </h1>
         )}
-        <button
-          type="button"
-          className="btn btn-secondary"
-          onClick={handleCerrarSesion}
-          style={esTrabajador ? { marginTop: "1.25rem" } : undefined}
-        >
-          Cerrar sesión
-        </button>
+        {!loading && (
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={handleCerrarSesion}
+            style={{ marginTop: "1.25rem" }}
+          >
+            Cerrar sesión
+          </button>
+        )}
       </div>
     </div>
   );
