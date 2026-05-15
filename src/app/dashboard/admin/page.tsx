@@ -4,7 +4,6 @@ import { useMemo } from "react";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { useAdminDashboard } from "@/context/AdminDashboardContext";
-import { useTrabajadorLista } from "@/context/TrabajadorListaContext";
 
 function formatMoneda(value: number): string {
   const hasDecimals = Math.round(value * 100) % 100 !== 0;
@@ -26,8 +25,17 @@ function formatFechaCabecera(d: Date): string {
 
 export default function AdminDashboardPage() {
   const { user, profile } = useAuth();
-  const { rutas, cajaAdmin, capitalAdmin, gananciasTotales, loading, error } = useAdminDashboard();
-  const { clientes, prestamos, loading: listaLoading } = useTrabajadorLista();
+  const {
+    rutas,
+    cajaAdmin,
+    capitalAdmin,
+    gananciasTotales,
+    totalClientes,
+    totalMorosos,
+    totalPrestamosActivos,
+    loading,
+    error,
+  } = useAdminDashboard();
 
   const fechaTitulo = useMemo(() => formatFechaCabecera(new Date()), []);
 
@@ -43,17 +51,16 @@ export default function AdminDashboardPage() {
     return "Administrador";
   }, [profile, user?.email]);
 
-  const stats = useMemo(() => {
-    const activos = prestamos.filter((p) => p.estado !== "pagado");
-    const morosos = clientes.filter((c) => c.moroso === true);
-    return {
+  const stats = useMemo(
+    () => ({
       rutasProgramadas: rutas.length,
       rutasActivas: rutas.length,
-      clientes: clientes.length,
-      prestamosActivos: activos.length,
-      morosos: morosos.length,
-    };
-  }, [rutas, clientes, prestamos]);
+      clientes: totalClientes,
+      prestamosActivos: totalPrestamosActivos,
+      morosos: totalMorosos,
+    }),
+    [rutas.length, totalClientes, totalPrestamosActivos, totalMorosos]
+  );
 
   const rutasOrdenadas = useMemo(
     () =>
@@ -65,7 +72,7 @@ export default function AdminDashboardPage() {
 
   const gananciasTotalesRegistradas = gananciasTotales;
 
-  const panelLoading = loading || listaLoading;
+  const panelLoading = loading;
 
   if (!profile || profile.role !== "admin") return null;
 

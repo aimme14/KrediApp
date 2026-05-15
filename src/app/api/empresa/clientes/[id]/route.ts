@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
+import { FieldValue } from "firebase-admin/firestore";
 import { getAdminFirestore } from "@/lib/firebase-admin";
 import { getApiUser } from "@/lib/api-auth";
-import { EMPRESAS_COLLECTION, CLIENTES_SUBCOLLECTION } from "@/lib/empresas-db";
+import {
+  EMPRESAS_COLLECTION,
+  CLIENTES_SUBCOLLECTION,
+  USUARIOS_SUBCOLLECTION,
+} from "@/lib/empresas-db";
 
 /** PATCH: marcar o desmarcar cliente como moroso (excluido de ruta, no volver a prestar) */
 export async function PATCH(
@@ -36,6 +41,22 @@ export async function PATCH(
     return NextResponse.json({ error: "No puedes modificar este cliente" }, { status: 403 });
   }
 
-  await ref.update({ moroso });
+  const eraMoroso = snap.data()?.moroso === true;
+
+  await Promise.all([
+    ref.update({ moroso }),
+    eraMoroso !== moroso
+      ? db
+          .collection(EMPRESAS_COLLECTION)
+          .doc(apiUser.empresaId)
+          .collection(USUARIOS_SUBCOLLECTION)
+          .doc(apiUser.uid)
+          .set(
+            { totalMorosos: FieldValue.increment(moroso ? 1 : -1) },
+            { merge: true }
+          )
+      : Promise.resolve(),
+  ]);
+
   return NextResponse.json({ ok: true });
 }

@@ -2,12 +2,11 @@
 
 import { useState, useEffect, useCallback, useRef, type ReactNode } from "react";
 import { useAuth } from "@/context/AuthContext";
+import { useAdminDashboard } from "@/context/AdminDashboardContext";
 import {
   listGastos,
   createGasto,
-  listRutas,
   type GastoItem,
-  type RutaItem,
 } from "@/lib/empresa-api";
 import {
   sanitizeMontoDecimalCOP,
@@ -111,6 +110,7 @@ function CloseIcon() {
 
 export default function GastosPage() {
   const { user, profile } = useAuth();
+  const { rutas } = useAdminDashboard();
   const [gastos, setGastos] = useState<GastoItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -123,7 +123,6 @@ export default function GastosPage() {
   const [creating, setCreating] = useState(false);
   const [motivoOverlay, setMotivoOverlay] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [rutas, setRutas] = useState<RutaItem[]>([]);
   const [alcanceGasto, setAlcanceGasto] = useState<"admin" | "ruta">("admin");
   const [rutaIdGasto, setRutaIdGasto] = useState("");
   const [showCamera, setShowCamera] = useState(false);
@@ -168,19 +167,6 @@ export default function GastosPage() {
   useEffect(() => {
     loadGastos();
   }, [loadGastos]);
-
-  useEffect(() => {
-    if (!user || !profile || profile.role !== "admin") return;
-    (async () => {
-      const token = await user.getIdToken();
-      try {
-        const list = await listRutas(token);
-        setRutas(list);
-      } catch {
-        setRutas([]);
-      }
-    })();
-  }, [user, profile]);
 
   useEffect(() => {
     if (!showCamera) return;

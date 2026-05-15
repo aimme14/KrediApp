@@ -78,13 +78,20 @@ function scheduleFcmCuotaToAdminIfEmpleado(params: {
     typeof params.prestamoFlat.clienteId === "string"
       ? params.prestamoFlat.clienteId.trim()
       : "";
+  const clienteNombreDirecto =
+    typeof params.prestamoFlat.clienteNombre === "string" &&
+    params.prestamoFlat.clienteNombre.trim()
+      ? params.prestamoFlat.clienteNombre.trim()
+      : null;
   void (async () => {
     try {
-      const clienteNombre = await resolveClienteNombre(
-        params.db,
-        params.apiUser.empresaId,
-        clienteId
-      );
+      const clienteNombre =
+        clienteNombreDirecto ??
+        (await resolveClienteNombre(
+          params.db,
+          params.apiUser.empresaId,
+          clienteId
+        ));
       await notifyAdminCuotaPrestamo(getAdminMessaging(), {
         adminUid,
         empresaId: params.apiUser.empresaId,
@@ -439,6 +446,22 @@ export async function POST(
         }
       }
 
+      if (result.saldoPendiente <= 0) {
+        const adminUidPrestamo =
+          typeof data.adminId === "string" ? data.adminId.trim() : "";
+        if (adminUidPrestamo) {
+          void db
+            .collection(EMPRESAS_COLLECTION)
+            .doc(apiUser.empresaId)
+            .collection(USUARIOS_SUBCOLLECTION)
+            .doc(adminUidPrestamo)
+            .set(
+              { totalPrestamosActivos: FieldValue.increment(-1) },
+              { merge: true }
+            );
+        }
+      }
+
       scheduleFcmCuotaToAdminIfEmpleado({
         db,
         apiUser,
@@ -707,6 +730,22 @@ export async function POST(
       }
     } catch (e) {
       console.warn("[ledger] No se pudo registrar movimiento de pago", e);
+    }
+
+    if (result.saldoPendiente <= 0) {
+      const adminUidPrestamo =
+        typeof data.adminId === "string" ? data.adminId.trim() : "";
+      if (adminUidPrestamo) {
+        void db
+          .collection(EMPRESAS_COLLECTION)
+          .doc(apiUser.empresaId)
+          .collection(USUARIOS_SUBCOLLECTION)
+          .doc(adminUidPrestamo)
+          .set(
+            { totalPrestamosActivos: FieldValue.increment(-1) },
+            { merge: true }
+          );
+      }
     }
 
     scheduleFcmCuotaToAdminIfEmpleado({

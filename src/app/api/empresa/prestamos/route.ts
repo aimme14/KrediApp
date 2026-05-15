@@ -36,8 +36,8 @@ export async function GET(request: NextRequest) {
   const col = db.collection(EMPRESAS_COLLECTION).doc(apiUser.empresaId).collection(PRESTAMOS_SUBCOLLECTION);
   const snap =
     apiUser.role === "empleado" && apiUser.rutaId
-      ? await col.where("rutaId", "==", apiUser.rutaId).get()
-      : await col.where("adminId", "==", apiUser.uid).get();
+      ? await col.where("rutaId", "==", apiUser.rutaId).limit(200).get()
+      : await col.where("adminId", "==", apiUser.uid).limit(200).get();
 
   const prestamos = snap.docs.map((d) => {
     const data = d.data();
@@ -239,8 +239,14 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  const clienteNombre =
+    typeof clienteSnap.data()?.nombre === "string"
+      ? (clienteSnap.data()!.nombre as string).trim()
+      : "";
+
   await ref.set({
     clienteId: clienteId.trim(),
+    clienteNombre,
     rutaId: rutaIdPrestamo,
     adminId: adminIdPrestamo,
     empleadoId: empleadoIdPrestamo,
@@ -263,6 +269,16 @@ export async function POST(request: NextRequest) {
         }
       : {}),
   });
+
+  await db
+    .collection(EMPRESAS_COLLECTION)
+    .doc(apiUser.empresaId)
+    .collection(USUARIOS_SUBCOLLECTION)
+    .doc(adminIdPrestamo)
+    .set(
+      { totalPrestamosActivos: FieldValue.increment(1) },
+      { merge: true }
+    );
 
   if (clienteSnap.exists) {
     await clienteRef.update({ prestamo_activo: true });

@@ -148,6 +148,7 @@ export async function buildCierreDiaSnapshot(
     string,
     {
       clienteId: string;
+      nombreDesnormalizado: string | null;
       saldoPendienteActual: number;
       empleadoTitularId: string;
       totalAPagar: number;
@@ -172,17 +173,27 @@ export async function buildCierreDiaSnapshot(
       typeof numeroCuotasRaw === "number" && Number.isFinite(numeroCuotasRaw) && numeroCuotasRaw > 0
         ? Math.floor(numeroCuotasRaw)
         : 0;
+    const nombreDesnormalizado =
+      typeof x.clienteNombre === "string" && x.clienteNombre.trim()
+        ? x.clienteNombre.trim()
+        : null;
     prestamoMeta.set(d.id, {
       clienteId,
+      nombreDesnormalizado,
       saldoPendienteActual: round2(saldo),
       empleadoTitularId,
       totalAPagar: round2(totalAPagar),
       numeroCuotas,
     });
-    if (clienteId) clienteIds.add(clienteId);
+    if (clienteId && !nombreDesnormalizado) clienteIds.add(clienteId);
   }
 
   const clienteNombre = new Map<string, string>();
+  for (const meta of Array.from(prestamoMeta.values())) {
+    if (meta.nombreDesnormalizado && meta.clienteId) {
+      clienteNombre.set(meta.clienteId, meta.nombreDesnormalizado);
+    }
+  }
   if (clienteIds.size > 0) {
     const allRefs = Array.from(clienteIds).map((cid) =>
       db

@@ -40,6 +40,9 @@ export type AdminDashboardContextValue = {
   rutasConEmpleados: AdminRutaConEmpleados[];
   rutasResumen: ResumenRutaItem[];
   cajaAdmin: number;
+  totalClientes: number;
+  totalMorosos: number;
+  totalPrestamosActivos: number;
   capitalAdmin: number;
   gananciasTotales: number;
   loading: boolean;
@@ -57,6 +60,9 @@ export function AdminDashboardProvider({ children }: { children: ReactNode }) {
     () => new Map()
   );
   const [cajaAdmin, setCajaAdmin] = useState(0);
+  const [totalClientes, setTotalClientes] = useState(0);
+  const [totalMorosos, setTotalMorosos] = useState(0);
+  const [totalPrestamosActivos, setTotalPrestamosActivos] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -149,6 +155,49 @@ export function AdminDashboardProvider({ children }: { children: ReactNode }) {
 
     return () => unsub();
   }, [user, profile, refreshCaja]);
+
+  useEffect(() => {
+    if (!db || !user || !profile || profile.role !== "admin" || !profile.empresaId) {
+      setCajaAdmin(0);
+      setTotalClientes(0);
+      setTotalMorosos(0);
+      setTotalPrestamosActivos(0);
+      return;
+    }
+
+    const adminRef = doc(
+      db,
+      EMPRESAS_COLLECTION,
+      profile.empresaId,
+      USUARIOS_SUBCOLLECTION,
+      user.uid
+    );
+
+    const unsub = onSnapshot(
+      adminRef,
+      (snap) => {
+        if (!snap.exists()) {
+          setCajaAdmin(0);
+          setTotalClientes(0);
+          setTotalMorosos(0);
+          setTotalPrestamosActivos(0);
+          return;
+        }
+        const d = snap.data() as Record<string, unknown>;
+        setCajaAdmin(typeof d.cajaAdmin === "number" ? d.cajaAdmin : 0);
+        setTotalClientes(typeof d.totalClientes === "number" ? d.totalClientes : 0);
+        setTotalMorosos(typeof d.totalMorosos === "number" ? d.totalMorosos : 0);
+        setTotalPrestamosActivos(
+          typeof d.totalPrestamosActivos === "number" ? d.totalPrestamosActivos : 0
+        );
+      },
+      (err) => {
+        console.warn("[AdminDashboardContext] Error al suscribirse a usuario admin:", err);
+      }
+    );
+
+    return () => unsub();
+  }, [user, profile]);
 
   useEffect(() => {
     if (!db || !user || !profile || profile.role !== "admin" || !profile.empresaId) {
@@ -250,6 +299,9 @@ export function AdminDashboardProvider({ children }: { children: ReactNode }) {
       rutasConEmpleados,
       rutasResumen,
       cajaAdmin,
+      totalClientes,
+      totalMorosos,
+      totalPrestamosActivos,
       capitalAdmin,
       gananciasTotales,
       loading,
@@ -261,6 +313,9 @@ export function AdminDashboardProvider({ children }: { children: ReactNode }) {
       rutasConEmpleados,
       rutasResumen,
       cajaAdmin,
+      totalClientes,
+      totalMorosos,
+      totalPrestamosActivos,
       capitalAdmin,
       gananciasTotales,
       loading,

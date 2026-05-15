@@ -1,14 +1,16 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useMemo } from "react";
 import { useAuth } from "@/context/AuthContext";
-import { listClientes, createCliente, listRutas, formatClienteCodigoCorto, type ClienteItem, type RutaItem } from "@/lib/empresa-api";
+import { useAdminDashboard } from "@/context/AdminDashboardContext";
+import { useTrabajadorLista } from "@/context/TrabajadorListaContext";
+import { createCliente, formatClienteCodigoCorto } from "@/lib/empresa-api";
 
 export default function ClientePage() {
   const { user, profile } = useAuth();
-  const [clientes, setClientes] = useState<ClienteItem[]>([]);
-  const [rutas, setRutas] = useState<RutaItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { rutas } = useAdminDashboard();
+  const { clientes, refresh: refreshLista } = useTrabajadorLista();
+  const [loading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [nombre, setNombre] = useState("");
@@ -18,26 +20,18 @@ export default function ClientePage() {
   const [cedula, setCedula] = useState("");
   const [rutaId, setRutaId] = useState("");
   const [creating, setCreating] = useState(false);
+  const PAGE_SIZE = 15;
+  const [pagina, setPagina] = useState(1);
 
-  const loadClientes = useCallback(async () => {
-    if (!user) return;
-    const token = await user.getIdToken();
-    listClientes(token)
-      .then(setClientes)
-      .catch((e) => setError(e instanceof Error ? e.message : "Error al cargar clientes"))
-      .finally(() => setLoading(false));
-  }, [user]);
+  const clientesPaginados = useMemo(() => {
+    const sorted = [...clientes].sort(
+      (a, b) => (b.fechaCreacion ? new Date(b.fechaCreacion).getTime() : 0) -
+                (a.fechaCreacion ? new Date(a.fechaCreacion).getTime() : 0)
+    );
+    return sorted.slice(0, pagina * PAGE_SIZE);
+  }, [clientes, pagina]);
 
-  useEffect(() => {
-    loadClientes();
-  }, [loadClientes]);
-
-  useEffect(() => {
-    if (!user) return;
-    user.getIdToken().then((token) => {
-      listRutas(token).then(setRutas).catch(() => {});
-    });
-  }, [user]);
+  const hayMas = clientesPaginados.length < clientes.length;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -65,7 +59,7 @@ export default function ClientePage() {
       setCedula("");
       setRutaId("");
       setShowForm(false);
-      await loadClientes();
+      await refreshLista();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al crear cliente");
     } finally {
@@ -189,7 +183,7 @@ export default function ClientePage() {
                 </tr>
               </thead>
               <tbody>
-                {clientes.map((c) => (
+                {clientesPaginados.map((c) => (
                   <tr key={c.id}>
                     <td title={c.codigo ?? undefined}>
                       {formatClienteCodigoCorto(c.codigo)}
@@ -202,6 +196,19 @@ export default function ClientePage() {
                     <td>{c.moroso ? "Sí (excluido)" : "No"}</td>
                   </tr>
                 ))}
+                {hayMas && (
+                  <tr>
+                    <td colSpan={7} style={{ textAlign: "center", padding: "0.75rem" }}>
+                      <button
+                        type="button"
+                        className="btn btn-secondary"
+                        onClick={() => setPagina((p) => p + 1)}
+                      >
+                        Ver más clientes
+                      </button>
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>

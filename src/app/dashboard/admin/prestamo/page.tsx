@@ -3,15 +3,13 @@
 import { useState, useEffect, useCallback, useMemo, Fragment } from "react";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
+import { useAdminDashboard } from "@/context/AdminDashboardContext";
+import { useTrabajadorLista } from "@/context/TrabajadorListaContext";
 import {
-  listClientes,
-  listPrestamos,
-  listRutas,
   createPrestamo,
   formatClienteCodigoRutaYNumero,
   type ClienteItem,
   type PrestamoItem,
-  type RutaItem,
 } from "@/lib/empresa-api";
 import { formatInteresResumenPct, parseInteresPct } from "@/lib/interes-pct";
 import {
@@ -77,10 +75,14 @@ function hoyDDMMAAAA(): string {
 
 export default function PrestamoPage() {
   const { user, profile } = useAuth();
-  const [clientes, setClientes] = useState<ClienteItem[]>([]);
-  const [rutas, setRutas] = useState<RutaItem[]>([]);
-  const [prestamos, setPrestamos] = useState<PrestamoItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { rutas } = useAdminDashboard();
+  const {
+    clientes,
+    prestamos,
+    loading,
+    error: listaError,
+    refresh,
+  } = useTrabajadorLista();
   const [error, setError] = useState<string | null>(null);
   const [rutaIdForm, setRutaIdForm] = useState("");
   const [clienteId, setClienteId] = useState("");
@@ -97,23 +99,6 @@ export default function PrestamoPage() {
   useEffect(() => {
     setHistorialEconomicoColapsado(true);
   }, [clienteId]);
-
-  const loadData = useCallback(async () => {
-    if (!user) return;
-    const token = await user.getIdToken();
-    Promise.all([listClientes(token), listPrestamos(token), listRutas(token)])
-      .then(([c, p, r]) => {
-        setClientes(c);
-        setPrestamos(p);
-        setRutas(r);
-      })
-      .catch((e) => setError(e instanceof Error ? e.message : "Error al cargar"))
-      .finally(() => setLoading(false));
-  }, [user]);
-
-  useEffect(() => {
-    loadData();
-  }, [loadData]);
 
   useEffect(() => {
     setClienteId("");
@@ -184,7 +169,7 @@ export default function PrestamoPage() {
       setModalidad("mensual");
       setConfirmarMontoAlto(false);
       setShowCreateForm(false);
-      await loadData();
+      await refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al crear préstamo");
     } finally {
@@ -224,7 +209,14 @@ export default function PrestamoPage() {
     return prestamos.filter((p) => p.estado === filtroEstado);
   }, [prestamos, filtroEstado]);
 
-  /** Grupos por cliente: principal = reciente y activo (activo > mora > pagado, luego por fecha). Máximo 20 clientes. */
+  const PAGE_SIZE = 15;
+  const [pagina, setPagina] = useState(1);
+
+  useEffect(() => {
+    setPagina(1);
+  }, [filtroEstado]);
+
+  /** Grupos por cliente: principal = reciente y activo (activo > mora > pagado, luego por fecha). */
   const gruposPorCliente = useMemo((): GrupoClientePrestamos[] => {
     const byCliente = new Map<string, PrestamoItem[]>();
     for (const p of prestamosFiltrados) {
@@ -247,8 +239,14 @@ export default function PrestamoPage() {
       const tb = new Date(pb.fechaInicio || 0).getTime();
       return tb - ta;
     });
-    return grupos.slice(0, 20);
+    return grupos;
   }, [prestamosFiltrados]);
+
+  const gruposPaginados = useMemo(() => {
+    return gruposPorCliente.slice(0, pagina * PAGE_SIZE);
+  }, [gruposPorCliente, pagina]);
+
+  const hayMas = gruposPaginados.length < gruposPorCliente.length;
 
   const [clientesExpandidos, setClientesExpandidos] = useState<Set<string>>(() => new Set());
   const toggleExpandirCliente = useCallback((clienteId: string) => {
@@ -545,7 +543,9 @@ export default function PrestamoPage() {
           </div>
         )}
 
-        {error && <p className="error-msg">{error}</p>}
+        {(error || listaError) && (
+          <p className="error-msg">{error ?? listaError}</p>
+        )}
         <button type="submit" className="btn btn-primary" disabled={creating}>
           {creating ? "Creando..." : "Crear préstamo"}
         </button>
@@ -637,7 +637,7 @@ export default function PrestamoPage() {
                 </tr>
               </thead>
               <tbody>
-                {gruposPorCliente.map((grupo) => {
+                {gruposPaginados.map((grupo) => {
                   const principal = grupo.prestamos[0];
                   const cl = clientePorId[grupo.clienteId];
                   const nombre = cl?.nombre ?? grupo.clienteId;
@@ -721,6 +721,17 @@ export default function PrestamoPage() {
               </tbody>
             </table>
           </div>
+          {hayMas && (
+            <div style={{ textAlign: "center", marginTop: "1rem" }}>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setPagina((p) => p + 1)}
+              >
+                Ver más préstamos
+              </button>
+            </div>
+          )}
           {prestamosFiltrados.length === 0 && (
             <p className="prestamo-admin-filtro-vacio">
               No hay préstamos en el historial con estado «{filtroEstado === "todos" ? "todos" : filtroEstado === "activo" ? "activos" : filtroEstado === "mora" ? "en mora" : "pagados"}».

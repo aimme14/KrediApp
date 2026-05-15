@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
+import { FieldValue } from "firebase-admin/firestore";
 import { getAdminFirestore } from "@/lib/firebase-admin";
 import { getApiUser } from "@/lib/api-auth";
 import {
   EMPRESAS_COLLECTION,
   CLIENTES_SUBCOLLECTION,
   RUTAS_SUBCOLLECTION,
+  USUARIOS_SUBCOLLECTION,
 } from "@/lib/empresas-db";
 
 const COUNTERS_COLLECTION = "counters";
@@ -51,7 +53,7 @@ export async function GET(request: NextRequest) {
   }> = [];
 
   if (apiUser.role === "empleado" && apiUser.rutaId) {
-    const snap = await col.where("rutaId", "==", apiUser.rutaId).get();
+    const snap = await col.where("rutaId", "==", apiUser.rutaId).limit(200).get();
     list = snap.docs.map((d) => {
       const data = d.data();
       return {
@@ -72,7 +74,7 @@ export async function GET(request: NextRequest) {
   } else {
     // Admin/Jefe: clientes con adminId == uid Y además clientes de sus rutas (por si adminId quedó mal en algún cliente)
     const [snapByAdmin, rutasSnap] = await Promise.all([
-      col.where("adminId", "==", apiUser.uid).get(),
+      col.where("adminId", "==", apiUser.uid).limit(200).get(),
       empresaRef
         .collection(RUTAS_SUBCOLLECTION)
         .where("adminId", "==", apiUser.uid)
@@ -112,7 +114,7 @@ export async function GET(request: NextRequest) {
         chunks.push(rutaIds.slice(i, i + limitIn));
       }
       const chunkSnaps = await Promise.all(
-        chunks.map((chunk) => col.where("rutaId", "in", chunk).get())
+        chunks.map((chunk) => col.where("rutaId", "in", chunk).limit(200).get())
       );
       for (const snapByRuta of chunkSnaps) {
         snapByRuta.docs.forEach(add);
@@ -214,6 +216,17 @@ export async function POST(request: NextRequest) {
     fechaCreacion: now,
     codigo,
   });
+
+  const usuarioRef = db
+    .collection(EMPRESAS_COLLECTION)
+    .doc(apiUser.empresaId)
+    .collection(USUARIOS_SUBCOLLECTION)
+    .doc(adminIdFinal);
+
+  await usuarioRef.set(
+    { totalClientes: FieldValue.increment(1) },
+    { merge: true }
+  );
 
   return NextResponse.json({ id: ref.id });
 }
