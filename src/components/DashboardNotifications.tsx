@@ -39,10 +39,12 @@ function NotifAdminPendientes({
   pendientes,
   dismissed,
   onDismiss,
+  onClose,
 }: {
   pendientes: SolicitudEntregaPendienteAdmin[];
   dismissed: boolean;
   onDismiss: () => void;
+  onClose: () => void;
 }) {
   if (pendientes.length === 0 || dismissed) {
     return (
@@ -88,6 +90,13 @@ function NotifAdminPendientes({
           … y {pendientes.length - 8} más (ver en reportes del día)
         </p>
       )}
+      <Link
+        href="/dashboard/admin/reportes-dia"
+        className="dashboard-notifications-link"
+        onClick={onClose}
+      >
+        Ir a reportes del día
+      </Link>
     </div>
   );
 }
@@ -442,6 +451,7 @@ export default function DashboardNotifications() {
                 pendientes={adminPendientes}
                 dismissed={dismissedSet.has(adminPendingKey)}
                 onDismiss={() => dismissNotification(adminPendingKey)}
+                onClose={() => setOpen(false)}
               />
               <NotifAdminOperativo
                 lines={sessionOperativoLines}
