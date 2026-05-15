@@ -7,6 +7,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useDashboardHeaderSlot } from "@/context/DashboardHeaderContext";
 import { AdminFcmRegistration } from "@/components/AdminFcmRegistration";
 import { TrabajadorListaProvider, useTrabajadorLista } from "@/context/TrabajadorListaContext";
+import { TrabajadorCajaDiaProvider } from "@/context/TrabajadorCajaDiaContext";
 import { AdminDashboardProvider } from "@/context/AdminDashboardContext";
 import { ADMIN_NAV_ITEMS, AdminNavIcon } from "@/components/admin/adminNavConfig";
 
@@ -180,9 +181,11 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   return (
     <TrabajadorListaProvider>
-      <AdminDashboardProvider>
-        <AdminLayoutInner>{children}</AdminLayoutInner>
-      </AdminDashboardProvider>
+      <TrabajadorCajaDiaProvider>
+        <AdminDashboardProvider>
+          <AdminLayoutInner>{children}</AdminLayoutInner>
+        </AdminDashboardProvider>
+      </TrabajadorCajaDiaProvider>
     </TrabajadorListaProvider>
   );
 }

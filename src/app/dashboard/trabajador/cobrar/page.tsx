@@ -5,6 +5,7 @@ import { useSearchParams, usePathname } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { useTrabajadorLista } from "@/context/TrabajadorListaContext";
+import { useTrabajadorCajaDia } from "@/context/TrabajadorCajaDiaContext";
 import {
   listPagos,
   registrarPago,
@@ -147,6 +148,7 @@ function CobrarClientePageContent() {
     error: listaError,
     refresh: refreshLista,
   } = useTrabajadorLista();
+  const { refresh: refreshCajaDia } = useTrabajadorCajaDia();
   const searchParams = useSearchParams();
   const pathname = usePathname();
   const clienteId = searchParams.get("clienteId");
@@ -488,6 +490,7 @@ function CobrarClientePageContent() {
       };
       setUltimosPagos((prev) => [nuevoPago, ...prev]);
       await refreshLista();
+      void refreshCajaDia();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al registrar cobro");
     } finally {
@@ -511,6 +514,7 @@ function CobrarClientePageContent() {
       });
       setNoPagoRegistrado(true);
       await refreshLista();
+      void refreshCajaDia();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al registrar no pago");
     } finally {
@@ -541,6 +545,7 @@ function CobrarClientePageContent() {
       });
       setMontoPerdidaConfirmado(montoAplicar);
       await refreshLista();
+      void refreshCajaDia();
       setPrestamo((p) =>
         p
           ? {
