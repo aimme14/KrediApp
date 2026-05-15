@@ -12,8 +12,6 @@ export interface TrabajadorRutaContextValue {
   ruta: RutaFinanciera | null;
   loading: boolean;
   error: string | null;
-  /** Un solo snapshot del doc ruta; false solo si admin cerró (`rutaOperativa === false`). */
-  puedeOperar: boolean;
 }
 
 const TrabajadorRutaContext = createContext<TrabajadorRutaContextValue | null>(null);
@@ -24,7 +22,6 @@ export function TrabajadorRutaProvider({ children }: { children: ReactNode }) {
     ruta: null,
     loading: true,
     error: null,
-    puedeOperar: true,
   });
 
   useEffect(() => {
@@ -33,12 +30,11 @@ export function TrabajadorRutaProvider({ children }: { children: ReactNode }) {
         ruta: null,
         loading: false,
         error: "Firestore no está configurado en el cliente",
-        puedeOperar: true,
       });
       return;
     }
     if (!user || !profile || profile.role !== "trabajador" || !profile.empresaId) {
-      setState({ ruta: null, loading: false, error: null, puedeOperar: true });
+      setState({ ruta: null, loading: false, error: null });
       return;
     }
 
@@ -74,7 +70,6 @@ export function TrabajadorRutaProvider({ children }: { children: ReactNode }) {
               ruta: null,
               loading: false,
               error: "No se encontró una ruta asignada al trabajador",
-              puedeOperar: true,
             });
           }
           return;
@@ -89,7 +84,6 @@ export function TrabajadorRutaProvider({ children }: { children: ReactNode }) {
                 ruta: null,
                 loading: false,
                 error: "Ruta no encontrada",
-                puedeOperar: true,
               });
               return;
             }
@@ -108,9 +102,6 @@ export function TrabajadorRutaProvider({ children }: { children: ReactNode }) {
                     perdidas,
                   });
 
-            const rawOp = data.rutaOperativa;
-            const puedeOperar = rawOp !== false;
-
             setState({
               ruta: {
                 id: snap.id,
@@ -127,11 +118,9 @@ export function TrabajadorRutaProvider({ children }: { children: ReactNode }) {
                 perdidas,
                 fechaCreacion: data.fechaCreacion as RutaFinanciera["fechaCreacion"],
                 ultimaActualizacion: data.ultimaActualizacion as RutaFinanciera["ultimaActualizacion"],
-                rutaOperativa: typeof rawOp === "boolean" ? rawOp : true,
               },
               loading: false,
               error: null,
-              puedeOperar,
             });
           },
           (err) => {
@@ -139,14 +128,13 @@ export function TrabajadorRutaProvider({ children }: { children: ReactNode }) {
               ...s,
               loading: false,
               error: err.message ?? "Error al suscribirse a la ruta",
-              puedeOperar: true,
             }));
           }
         );
       } catch (e) {
         const msg = e instanceof Error ? e.message : "Error al obtener la ruta";
         if (!cancelled) {
-          setState({ ruta: null, loading: false, error: msg, puedeOperar: true });
+          setState({ ruta: null, loading: false, error: msg });
         }
       }
     }

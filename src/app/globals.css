@@ -2495,84 +2495,6 @@ td {
   box-shadow: 0 2px 8px rgba(74, 222, 128, 0.28);
 }
 
-.rutas-admin-op-row {
-  margin-top: 0.9rem;
-  padding-top: 0.9rem;
-  border-top: 1px solid var(--card-border);
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.55rem 0.75rem;
-}
-
-.rutas-admin-op-label {
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-}
-
-.rutas-admin-op-label-sub {
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  text-transform: none;
-  opacity: 0.88;
-}
-
-.rutas-admin-op-badge {
-  font-size: 0.72rem;
-  font-weight: 800;
-  padding: 0.22rem 0.55rem;
-  border-radius: 999px;
-  letter-spacing: 0.02em;
-}
-
-.rutas-admin-op-badge--open {
-  background: color-mix(in srgb, #22c55e 26%, transparent);
-  color: #86efac;
-  border: 1px solid color-mix(in srgb, #22c55e 45%, transparent);
-}
-
-.rutas-admin-op-badge--closed {
-  background: color-mix(in srgb, #f87171 18%, transparent);
-  color: #fecaca;
-  border: 1px solid color-mix(in srgb, #f87171 38%, transparent);
-}
-
-[data-theme="light"] .rutas-admin-op-badge--open {
-  color: #166534;
-}
-[data-theme="light"] .rutas-admin-op-badge--closed {
-  color: #b91c1c;
-}
-
-.rutas-admin-op-btns {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.45rem;
-  margin-left: auto;
-}
-
-.rutas-admin-op-btn {
-  padding: 0.38rem 0.85rem !important;
-  font-size: 0.8rem !important;
-  font-weight: 600 !important;
-  border-radius: 9px !important;
-  min-width: 0 !important;
-}
-
-.rutas-admin-btn-outline {
-  background: transparent !important;
-  border: 1px solid color-mix(in srgb, var(--text-muted) 55%, var(--card-border)) !important;
-  color: var(--text) !important;
-}
-
-.rutas-admin-btn-outline:hover:not(:disabled) {
-  background: var(--input-bg) !important;
-  border-color: var(--text-muted) !important;
-}
-
 .rutas-admin-clientes-panel {
   margin-top: 1rem;
   padding-top: 1rem;
@@ -8089,30 +8011,6 @@ a.admin-inicio-link-btn {
 
 .perfil-empresa-btn-save:hover:not(:disabled) {
   background: var(--perfil-empresa-primary-hover);
-}
-
-/* Trabajador: ruta cerrada por admin */
-.ruta-operativa-cerrada-card {
-  padding: 1.25rem 1.35rem;
-  border: 1px solid var(--card-border);
-  border-radius: 12px;
-}
-.ruta-operativa-cerrada-title {
-  margin: 0 0 0.75rem 0;
-  font-size: 1.25rem;
-  font-weight: 700;
-}
-.ruta-operativa-cerrada-text {
-  margin: 0 0 0.65rem 0;
-  font-size: 0.9375rem;
-  line-height: 1.5;
-  color: var(--text);
-}
-.ruta-operativa-cerrada-hint {
-  margin: 0;
-  font-size: 0.875rem;
-  color: var(--text-muted);
-  line-height: 1.45;
 }
 
 /* ── Ruta del día ───────────────────────────────────────────────────────── */

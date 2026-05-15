@@ -133,7 +133,6 @@ export function AdminDashboardProvider({ children }: { children: ReactNode }) {
             inversiones,
             ganancias,
             capitalTotal,
-            rutaOperativa: typeof data.rutaOperativa === "boolean" ? data.rutaOperativa : true,
             capitalRuta,
           };
         });
