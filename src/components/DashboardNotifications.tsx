@@ -39,12 +39,10 @@ function NotifAdminPendientes({
   pendientes,
   dismissed,
   onDismiss,
-  onClose,
 }: {
   pendientes: SolicitudEntregaPendienteAdmin[];
   dismissed: boolean;
   onDismiss: () => void;
-  onClose: () => void;
 }) {
   if (pendientes.length === 0 || dismissed) {
     return (
@@ -90,9 +88,6 @@ function NotifAdminPendientes({
           … y {pendientes.length - 8} más (ver en reportes del día)
         </p>
       )}
-      <Link href="/dashboard/admin/reportes-dia" className="dashboard-notifications-link" onClick={onClose}>
-        Ir a reportes del día
-      </Link>
     </div>
   );
 }
@@ -101,12 +96,10 @@ function NotifAdminOperativo({
   lines,
   dismissed,
   onDismiss,
-  onClose,
 }: {
   lines: OperativoFcmSessionItem[];
   dismissed: boolean;
   onDismiss: () => void;
-  onClose: () => void;
 }) {
   if (lines.length === 0 || dismissed) return null;
   return (
@@ -143,26 +136,6 @@ function NotifAdminOperativo({
           </div>
         ))}
       </div>
-      {lines.some((l) => l.kind === "gasto") && (
-        <Link
-          href="/dashboard/admin/gastos"
-          className="dashboard-notifications-link"
-          onClick={onClose}
-          style={{ display: "block", marginTop: "0.35rem" }}
-        >
-          Ver gastos operativos
-        </Link>
-      )}
-      {lines.some((l) => l.kind === "cuota") && (
-        <Link
-          href="/dashboard/admin/cobrar"
-          className="dashboard-notifications-link"
-          onClick={onClose}
-          style={{ display: "block", marginTop: "0.35rem" }}
-        >
-          Ir a cobrar / préstamos
-        </Link>
-      )}
     </div>
   );
 }
@@ -469,13 +442,11 @@ export default function DashboardNotifications() {
                 pendientes={adminPendientes}
                 dismissed={dismissedSet.has(adminPendingKey)}
                 onDismiss={() => dismissNotification(adminPendingKey)}
-                onClose={() => setOpen(false)}
               />
               <NotifAdminOperativo
                 lines={sessionOperativoLines}
                 dismissed={dismissedSet.has(adminOperativoKey)}
                 onDismiss={() => dismissNotification(adminOperativoKey)}
-                onClose={() => setOpen(false)}
               />
             </>
           )}
