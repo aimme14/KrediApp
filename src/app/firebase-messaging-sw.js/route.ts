@@ -34,11 +34,6 @@ importScripts(
 firebase.initializeApp(${cfg});
 const messaging = firebase.messaging();
 messaging.onBackgroundMessage(function (payload) {
-  // DEBUG temporal
-  console.log('[SW] payload completo:', JSON.stringify(payload));
-  console.log('[SW] payload.data:', JSON.stringify(payload.data));
-  console.log('[SW] payload.notification:', JSON.stringify(payload.notification));
-
   const data = payload.data || {};
   const title = data.title || payload.notification?.title || 'KrediApp';
   const body = data.body || payload.notification?.body || '';
@@ -48,31 +43,34 @@ messaging.onBackgroundMessage(function (payload) {
       return c.visibilityState === 'visible';
     });
 
-    if (!hasVisibleClient) {
+    if (hasVisibleClient) {
       clients.forEach(function (client) {
-        if (data.type === 'gasto_empleado' || data.type === 'cuota_prestamo') {
-          client.postMessage({
-            type: 'KREDI_FCM_OPERATIVO',
-            kind: data.type === 'cuota_prestamo' ? 'cuota' : 'gasto',
-            title: title,
-            body: body,
-          });
-        } else if (data.type === 'prestamo_empleado') {
-          client.postMessage({
-            type: 'KREDI_FCM_PRESTAMO',
-            title: title,
-            body: body,
-          });
+        if (client.visibilityState === 'visible') {
+          if (data.type === 'gasto_empleado' || data.type === 'cuota_prestamo') {
+            client.postMessage({
+              type: 'KREDI_FCM_OPERATIVO',
+              kind: data.type === 'cuota_prestamo' ? 'cuota' : 'gasto',
+              title: title,
+              body: body,
+            });
+          } else if (data.type === 'prestamo_empleado') {
+            client.postMessage({
+              type: 'KREDI_FCM_PRESTAMO',
+              title: title,
+              body: body,
+            });
+          }
         }
       });
+      return;
     }
-  });
 
-  return self.registration.showNotification(title, {
-    body: body,
-    icon: '/icon-192.png',
-    badge: '/icon-192.png',
-    data: data,
+    return self.registration.showNotification(title, {
+      body: body,
+      icon: '/icon-192.png',
+      badge: '/icon-192.png',
+      data: data,
+    });
   });
 });
 `;
