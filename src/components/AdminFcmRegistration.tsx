@@ -23,6 +23,9 @@ export function AdminFcmRegistration() {
 
     const run = async () => {
       if (lock.current) return;
+
+      await new Promise((r) => setTimeout(r, 1500));
+
       const firebaseApp = app;
       if (!firebaseApp) return;
 
@@ -66,8 +69,12 @@ export function AdminFcmRegistration() {
             });
             if (token) break;
           } catch (e) {
+            const msg = e instanceof Error ? e.message : "";
+            if (msg.includes("IDBDatabase") || msg.includes("database connection")) {
+              await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
+              continue;
+            }
             if (attempt === 2) throw e;
-            await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
           }
         }
 
