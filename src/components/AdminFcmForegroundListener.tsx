@@ -38,6 +38,8 @@ export function AdminFcmForegroundListener() {
         payload.messageId ??
         payload.data?.gastoId ??
         payload.data?.pagoId ??
+        payload.data?.clienteId ??
+        payload.data?.prestamoId ??
         Date.now().toString();
       if (processedIds.has(msgId)) return;
       processedIds.add(msgId);
@@ -63,6 +65,8 @@ export function AdminFcmForegroundListener() {
       (typeof d.messageId === "string" && d.messageId) ||
       (typeof d.gastoId === "string" && d.gastoId) ||
       (typeof d.pagoId === "string" && d.pagoId) ||
+      (typeof d.clienteId === "string" && d.clienteId) ||
+      (typeof d.prestamoId === "string" && d.prestamoId) ||
       null;
 
     const onSwMessage = (event: MessageEvent) => {
