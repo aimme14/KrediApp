@@ -54,6 +54,7 @@ export async function POST(request: NextRequest) {
     topicName = topicGastosAdmin(apiUser.empresaId, apiUser.uid);
     await messaging.subscribeToTopic([token], topicName);
     subscribedTopic = true;
+    console.log("[fcm] subscribeToTopic OK. Topic:", topicName, "token:", token.slice(0, 20) + "...");
   } catch (e) {
     console.warn("[fcm] subscribeToTopic gastos:", e);
   }

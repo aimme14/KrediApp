@@ -21,42 +21,57 @@ export async function GET() {
     appId,
   });
 
-  const script = `importScripts(
+  const script = `self.addEventListener('install', function (event) {
+  self.skipWaiting();
+});
+self.addEventListener('activate', function (event) {
+  event.waitUntil(clients.claim());
+});
+importScripts(
   'https://www.gstatic.com/firebasejs/10.14.0/firebase-app-compat.js',
   'https://www.gstatic.com/firebasejs/10.14.0/firebase-messaging-compat.js'
 );
 firebase.initializeApp(${cfg});
 const messaging = firebase.messaging();
 messaging.onBackgroundMessage(function (payload) {
-  const n = payload.notification || {};
-  const title = n.title || 'KrediApp';
-  const body = n.body || '';
+  // DEBUG temporal
+  console.log('[SW] payload completo:', JSON.stringify(payload));
+  console.log('[SW] payload.data:', JSON.stringify(payload.data));
+  console.log('[SW] payload.notification:', JSON.stringify(payload.notification));
+
   const data = payload.data || {};
-  if (data.type === 'gasto_empleado' || data.type === 'cuota_prestamo') {
-    var operativoKind = data.type === 'cuota_prestamo' ? 'cuota' : 'gasto';
-    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function (clients) {
-      clients.forEach(function (client) {
-        client.postMessage({
-          type: 'KREDI_FCM_OPERATIVO',
-          kind: operativoKind,
-          title: title,
-          body: body,
-        });
-      });
+  const title = data.title || payload.notification?.title || 'KrediApp';
+  const body = data.body || payload.notification?.body || '';
+
+  self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function (clients) {
+    const hasVisibleClient = clients.some(function (c) {
+      return c.visibilityState === 'visible';
     });
-  } else if (data.type === 'prestamo_empleado') {
-    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function (clients) {
+
+    if (!hasVisibleClient) {
       clients.forEach(function (client) {
-        client.postMessage({
-          type: 'KREDI_FCM_PRESTAMO',
-          title: title,
-          body: body,
-        });
+        if (data.type === 'gasto_empleado' || data.type === 'cuota_prestamo') {
+          client.postMessage({
+            type: 'KREDI_FCM_OPERATIVO',
+            kind: data.type === 'cuota_prestamo' ? 'cuota' : 'gasto',
+            title: title,
+            body: body,
+          });
+        } else if (data.type === 'prestamo_empleado') {
+          client.postMessage({
+            type: 'KREDI_FCM_PRESTAMO',
+            title: title,
+            body: body,
+          });
+        }
       });
-    });
-  }
+    }
+  });
+
   return self.registration.showNotification(title, {
     body: body,
+    icon: '/icon-192.png',
+    badge: '/icon-192.png',
     data: data,
   });
 });

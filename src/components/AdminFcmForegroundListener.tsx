@@ -34,9 +34,9 @@ export function AdminFcmForegroundListener() {
       const kind = kindFromFcmDataType(payload.data?.type);
       if (!kind) return;
       const title =
-        payload.notification?.title?.trim() ||
-        (kind === "cuota" ? "Cuota" : "Nuevo gasto de un trabajador");
-      const body = payload.notification?.body?.trim() || "";
+        payload.data?.title?.trim() ||
+        (kind === "cuota" ? "Cuota" : "Nuevo gasto");
+      const body = payload.data?.body?.trim() || "";
       bumpOperativoFromFcm(kind, title, body);
     });
 

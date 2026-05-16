@@ -39,8 +39,9 @@ export async function notifyAdminGastoEmpleado(
   try {
     await messaging.send({
       topic,
-      notification: { title, body },
       data: {
+        title,
+        body,
         type: "gasto_empleado",
         gastoId,
         empresaId,
@@ -82,8 +83,9 @@ export async function notifyAdminPrestamoEmpleado(
   try {
     await messaging.send({
       topic,
-      notification: { title, body },
       data: {
+        title,
+        body,
         type: "prestamo_empleado",
         empresaId,
         prestamoId,
@@ -191,8 +193,9 @@ export async function notifyAdminCuotaPrestamo(
   try {
     await messaging.send({
       topic,
-      notification: { title, body },
       data: {
+        title,
+        body,
         type: "cuota_prestamo",
         empresaId,
         prestamoId,
@@ -202,14 +205,8 @@ export async function notifyAdminCuotaPrestamo(
         click_action: clickPath,
       },
     });
-    if (process.env.NODE_ENV === "development") {
-      console.info("[fcm] Push cuota préstamo enviado al topic:", topic);
-    }
+    console.log("[fcm] Push cuota préstamo ENVIADO. Topic:", topic, "tipo:", tipoRegistro);
   } catch (e) {
-    console.warn(
-      "[fcm] notifyAdminCuotaPrestamo falló (topic / API FCM / credenciales):",
-      topic,
-      e
-    );
+    console.error("[fcm] notifyAdminCuotaPrestamo ERROR:", topic, JSON.stringify(e));
   }
 }
