@@ -15,6 +15,7 @@ function kindFromFcmDataType(
   if (t === "gasto_empleado") return "gasto";
   if (t === "cuota_prestamo") return "cuota";
   if (t === "prestamo_empleado") return "cuota";
+  if (t === "cliente_empleado") return "gasto";
   return null;
 }
 

@@ -46,15 +46,16 @@ messaging.onBackgroundMessage(function (payload) {
     if (hasVisibleClient) {
       clients.forEach(function (client) {
         if (client.visibilityState === 'visible') {
-          if (data.type === 'gasto_empleado' || data.type === 'cuota_prestamo') {
+          if (data.type === 'gasto_empleado' || data.type === 'cuota_prestamo' || data.type === 'cliente_empleado') {
             client.postMessage({
               type: 'KREDI_FCM_OPERATIVO',
               kind: data.type === 'cuota_prestamo' ? 'cuota' : 'gasto',
               title: title,
               body: body,
-              messageId: payload.messageId || data.gastoId || data.pagoId || '',
+              messageId: payload.messageId || data.gastoId || data.pagoId || data.clienteId || '',
               gastoId: data.gastoId || '',
               pagoId: data.pagoId || '',
+              clienteId: data.clienteId || '',
             });
           } else if (data.type === 'prestamo_empleado') {
             client.postMessage({

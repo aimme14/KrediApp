@@ -7,6 +7,7 @@ import {
   CLIENTES_SUBCOLLECTION,
   RUTAS_SUBCOLLECTION,
   USUARIOS_SUBCOLLECTION,
+  USERS_COLLECTION,
 } from "@/lib/empresas-db";
 
 const COUNTERS_COLLECTION = "counters";
@@ -203,6 +204,12 @@ export async function POST(request: NextRequest) {
   });
   const codigo = `CL-${adminNumStr}-${rutaNumStr}-${String(clienteNum).padStart(3, "0")}`;
 
+  const userSnapEmp = await db.collection(USERS_COLLECTION).doc(apiUser.uid).get();
+  const creadoPorNombre =
+    (userSnapEmp.data()?.displayName as string)?.trim() ||
+    (userSnapEmp.data()?.email as string)?.trim() ||
+    apiUser.uid;
+
   await ref.set({
     nombre: nombre.trim(),
     ubicacion: (ubicacion ?? "").trim() || "",
@@ -227,6 +234,25 @@ export async function POST(request: NextRequest) {
     { totalClientes: FieldValue.increment(1) },
     { merge: true }
   );
+
+  const adminUidCliente = adminIdFinal.trim();
+  if (apiUser.role === "empleado" && adminUidCliente) {
+    void (async () => {
+      try {
+        const { getAdminMessaging } = await import("@/lib/firebase-admin");
+        const { notifyAdminClienteEmpleado } = await import("@/lib/fcm-notify-admin");
+        await notifyAdminClienteEmpleado(getAdminMessaging(), {
+          adminUid: adminUidCliente,
+          empresaId: apiUser.empresaId,
+          empleadoNombre: creadoPorNombre ?? apiUser.uid,
+          clienteNombre: nombre.trim(),
+          clienteId: ref.id,
+        });
+      } catch (e) {
+        console.warn("[fcm] notify admin cliente:", e);
+      }
+    })();
+  }
 
   return NextResponse.json({ id: ref.id });
 }

@@ -100,6 +100,42 @@ export async function notifyAdminPrestamoEmpleado(
   }
 }
 
+export type PayloadClienteEmpleadoFcm = {
+  adminUid: string;
+  empresaId: string;
+  empleadoNombre: string;
+  clienteNombre: string;
+  clienteId: string;
+};
+
+export async function notifyAdminClienteEmpleado(
+  messaging: Messaging,
+  payload: PayloadClienteEmpleadoFcm
+): Promise<void> {
+  const { adminUid, empresaId, empleadoNombre, clienteNombre, clienteId } = payload;
+  if (!adminUid.trim() || !empresaId.trim()) return;
+
+  const topic = topicGastosAdmin(empresaId, adminUid);
+  const title = "Nuevo cliente registrado";
+  const body = truncateBody(`${empleadoNombre} · ${clienteNombre}`, 180);
+
+  try {
+    await messaging.send({
+      topic,
+      data: {
+        title,
+        body,
+        type: "cliente_empleado",
+        empresaId,
+        clienteId,
+        click_action: "/dashboard/admin/cliente",
+      },
+    });
+  } catch (e) {
+    console.warn("[fcm] notifyAdminClienteEmpleado falló:", topic, e);
+  }
+}
+
 const LABEL_NO_PAGO: Record<string, string> = {
   sin_fondos: "Sin fondos",
   no_estaba: "No estaba",
