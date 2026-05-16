@@ -247,6 +247,11 @@ export default function DashboardNotifications() {
   }, [storageKey, dismissedKeys]);
 
   useEffect(() => {
+    if (foregroundOperativoBadge === 0) return;
+    setDismissedKeys((prev) => prev.filter((k) => k !== adminOperativoKey));
+  }, [foregroundOperativoBadge, adminOperativoKey]);
+
+  useEffect(() => {
     if (!user || !role) return;
     const firebaseUser = user;
     let cancelled = false;
