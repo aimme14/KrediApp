@@ -57,10 +57,19 @@ export function AdminFcmRegistration() {
         await registration.update();
 
         const messaging = getMessaging(firebaseApp);
-        const token = await getToken(messaging, {
-          vapidKey,
-          serviceWorkerRegistration: registration,
-        });
+        let token = "";
+        for (let attempt = 0; attempt < 3; attempt++) {
+          try {
+            token = await getToken(messaging, {
+              vapidKey,
+              serviceWorkerRegistration: registration,
+            });
+            if (token) break;
+          } catch (e) {
+            if (attempt === 2) throw e;
+            await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
+          }
+        }
 
         if (!token || cancelled) {
           if (!token) console.warn(`${LOG} getToken devolvió vacío (revisa Service Worker y proyecto Firebase).`);

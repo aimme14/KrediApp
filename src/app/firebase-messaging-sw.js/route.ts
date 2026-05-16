@@ -52,12 +52,18 @@ messaging.onBackgroundMessage(function (payload) {
               kind: data.type === 'cuota_prestamo' ? 'cuota' : 'gasto',
               title: title,
               body: body,
+              messageId: payload.messageId || data.gastoId || data.pagoId || '',
+              gastoId: data.gastoId || '',
+              pagoId: data.pagoId || '',
             });
           } else if (data.type === 'prestamo_empleado') {
             client.postMessage({
               type: 'KREDI_FCM_PRESTAMO',
               title: title,
               body: body,
+              messageId: payload.messageId || data.gastoId || data.pagoId || '',
+              gastoId: data.gastoId || '',
+              pagoId: data.pagoId || '',
             });
           }
         }
