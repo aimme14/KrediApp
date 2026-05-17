@@ -40,6 +40,14 @@
         { "fieldPath": "estado", "order": "ASCENDING" },
         { "fieldPath": "adminId", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "periodosAdmin",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "adminId", "order": "ASCENDING" },
+        { "fieldPath": "estado", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

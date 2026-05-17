@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useAuth } from "@/context/AuthContext";
@@ -31,11 +31,34 @@ function fmt(n: number) {
   return n.toLocaleString("es-CO", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-/** Periodos guardados antes de incluir `admin.gananciasRutas`: se deriva de las rutas del snapshot. */
-function gananciasRutasAdmin(s: PeriodoAdminSnapshot) {
-  const g = s.admin.gananciasRutas;
-  if (typeof g === "number") return g;
-  return s.rutas.reduce((sum, r) => sum + r.ganancias, 0);
+function fmtDelta(apertura: number, cierre: number | null): {
+  texto: string;
+  positivo: boolean;
+  neutro: boolean;
+} {
+  if (cierre === null) return { texto: "â€”", positivo: false, neutro: true };
+  const diff = cierre - apertura;
+  const signo = diff > 0 ? "+" : "";
+  return {
+    texto: `${signo}${fmt(diff)}`,
+    positivo: diff > 0,
+    neutro: diff === 0,
+  };
+}
+
+function calcularTotales(rutas: PeriodoAdminSnapshotRuta[]) {
+  return rutas.reduce(
+    (acc, r) => ({
+      cajaRuta: acc.cajaRuta + r.cajaRuta,
+      inversiones: acc.inversiones + r.inversiones,
+      ganancias: acc.ganancias + r.ganancias,
+      perdidas: acc.perdidas + r.perdidas,
+      gastos: acc.gastos + r.gastos,
+      capitalRuta: acc.capitalRuta + r.capitalRuta,
+      utilidad: acc.utilidad + r.utilidad,
+    }),
+    { cajaRuta: 0, inversiones: 0, ganancias: 0, perdidas: 0, gastos: 0, capitalRuta: 0, utilidad: 0 }
+  );
 }
 
 export default function ResumenPage() {
@@ -171,7 +194,7 @@ export default function ResumenPage() {
             <table>
               <thead>
                 <tr>
-                  <th>Id</th>
+                  <th>#</th>
                   <th>Estado</th>
                   <th>Apertura</th>
                   <th>Cierre</th>
@@ -181,10 +204,10 @@ export default function ResumenPage() {
               <tbody>
                 {periodos.map((p) => (
                   <tr key={p.id}>
-                    <td style={{ fontSize: "0.8rem", wordBreak: "break-all" }}>{p.id}</td>
+                    <td>{periodos.length - periodos.indexOf(p)}</td>
                     <td>{p.estado === "abierto" ? "Abierto" : "Cerrado"}</td>
-                    <td>{p.fechaApertura ? new Date(p.fechaApertura).toLocaleString("es-CO") : "—"}</td>
-                    <td>{p.fechaCierre ? new Date(p.fechaCierre).toLocaleString("es-CO") : "—"}</td>
+                    <td>{p.fechaApertura ? new Date(p.fechaApertura).toLocaleString("es-CO") : "-"}</td>
+                    <td>{p.fechaCierre ? new Date(p.fechaCierre).toLocaleString("es-CO") : "Sin cierre"}</td>
                     <td style={{ whiteSpace: "nowrap" }}>
                       <button
                         type="button"
@@ -235,87 +258,108 @@ export default function ResumenPage() {
             <p>Cargando...</p>
           ) : detalle && ap ? (
             <>
-              <h4 style={{ marginTop: "1rem", marginBottom: "0.5rem" }}>Administrador</h4>
+              <h4 style={{ marginTop: "1.25rem", marginBottom: "0.5rem" }}>Rutas</h4>
               <div className="table-wrap">
                 <table>
                   <thead>
                     <tr>
-                      <th>Concepto</th>
-                      <th className="col-num">Apertura</th>
-                      <th className="col-num">Cierre</th>
+                      <th>Ruta</th>
+                      <th className="col-num">Capital apertura</th>
+                      <th className="col-num">Capital cierre</th>
+                      <th className="col-num">Variación</th>
+                      <th className="col-num">Ganancias</th>
+                      <th className="col-num">Gastos</th>
+                      <th className="col-num">Pérdidas</th>
+                      <th className="col-num">Utilidad</th>
                     </tr>
                   </thead>
                   <tbody>
-                    <tr>
-                      <td>Caja admin</td>
-                      <td className="col-num">{fmt(ap.admin.cajaAdmin)}</td>
-                      <td className="col-num">{ci ? fmt(ci.admin.cajaAdmin) : "—"}</td>
-                    </tr>
-                    <tr>
-                      <td>Capital admin</td>
-                      <td className="col-num">{fmt(ap.admin.capitalAdmin)}</td>
-                      <td className="col-num">{ci ? fmt(ci.admin.capitalAdmin) : "—"}</td>
-                    </tr>
-                    <tr>
-                      <td>Ganancias (suma rutas)</td>
-                      <td className="col-num">{fmt(gananciasRutasAdmin(ap))}</td>
-                      <td className="col-num">{ci ? fmt(gananciasRutasAdmin(ci)) : "—"}</td>
-                    </tr>
+                    {rutaIdsComparar.map((rid) => {
+                      const ra = ap.rutas.find((r) => r.rutaId === rid);
+                      const rc = ci?.rutas.find((r) => r.rutaId === rid);
+                      const nombre = ra?.nombre ?? rc?.nombre ?? rid;
+                      const delta = fmtDelta(ra?.capitalRuta ?? 0, rc?.capitalRuta ?? null);
+                      return (
+                        <tr key={rid}>
+                          <td>{nombre}</td>
+                          <td className="col-num">{fmt(ra?.capitalRuta ?? 0)}</td>
+                          <td className="col-num">{rc ? fmt(rc.capitalRuta) : "—"}</td>
+                          <td
+                            className="col-num"
+                            style={{
+                              color: delta.neutro
+                                ? "var(--text-muted)"
+                                : delta.positivo
+                                  ? "var(--success, #16a34a)"
+                                  : "var(--danger, #dc2626)",
+                              fontWeight: 600,
+                            }}
+                          >
+                            {delta.texto}
+                          </td>
+                          <td className="col-num">{fmt(rc?.ganancias ?? ra?.ganancias ?? 0)}</td>
+                          <td className="col-num">{fmt(rc?.gastos ?? ra?.gastos ?? 0)}</td>
+                          <td className="col-num">{fmt(rc?.perdidas ?? ra?.perdidas ?? 0)}</td>
+                          <td
+                            className="col-num"
+                            style={{
+                              fontWeight: 600,
+                              color:
+                                (rc?.utilidad ?? ra?.utilidad ?? 0) >= 0
+                                  ? "var(--success, #16a34a)"
+                                  : "var(--danger, #dc2626)",
+                            }}
+                          >
+                            {fmt(rc?.utilidad ?? ra?.utilidad ?? 0)}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
+                  {rutaIdsComparar.length > 1 &&
+                    (() => {
+                      const totAp = ap ? calcularTotales(ap.rutas) : null;
+                      const totCi = ci ? calcularTotales(ci.rutas) : null;
+                      const deltaTotal = fmtDelta(totAp?.capitalRuta ?? 0, totCi?.capitalRuta ?? null);
+                      return (
+                        <tfoot>
+                          <tr style={{ fontWeight: 700, borderTop: "2px solid var(--border)" }}>
+                            <td>TOTAL</td>
+                            <td className="col-num">{fmt(totAp?.capitalRuta ?? 0)}</td>
+                            <td className="col-num">{totCi ? fmt(totCi.capitalRuta) : "—"}</td>
+                            <td
+                              className="col-num"
+                              style={{
+                                color: deltaTotal.neutro
+                                  ? "var(--text-muted)"
+                                  : deltaTotal.positivo
+                                    ? "var(--success, #16a34a)"
+                                    : "var(--danger, #dc2626)",
+                              }}
+                            >
+                              {deltaTotal.texto}
+                            </td>
+                            <td className="col-num">{fmt(totCi?.ganancias ?? totAp?.ganancias ?? 0)}</td>
+                            <td className="col-num">{fmt(totCi?.gastos ?? totAp?.gastos ?? 0)}</td>
+                            <td className="col-num">{fmt(totCi?.perdidas ?? totAp?.perdidas ?? 0)}</td>
+                            <td
+                              className="col-num"
+                              style={{
+                                fontWeight: 700,
+                                color:
+                                  (totCi?.utilidad ?? totAp?.utilidad ?? 0) >= 0
+                                    ? "var(--success, #16a34a)"
+                                    : "var(--danger, #dc2626)",
+                              }}
+                            >
+                              {fmt(totCi?.utilidad ?? totAp?.utilidad ?? 0)}
+                            </td>
+                          </tr>
+                        </tfoot>
+                      );
+                    })()}
                 </table>
               </div>
-
-              <h4 style={{ marginTop: "1.25rem", marginBottom: "0.5rem" }}>Rutas</h4>
-              {rutaIdsComparar.map((rid) => {
-                const ra = ap.rutas.find((r) => r.rutaId === rid);
-                const rc = ci?.rutas.find((r) => r.rutaId === rid);
-                const nombre = ra?.nombre ?? rc?.nombre ?? rid;
-                const z = (x: typeof ra) => ({
-                  cajaRuta: x?.cajaRuta ?? 0,
-                  inversiones: x?.inversiones ?? 0,
-                  ganancias: x?.ganancias ?? 0,
-                  perdidas: x?.perdidas ?? 0,
-                  gastos: x?.gastos ?? 0,
-                  capitalRuta: x?.capitalRuta ?? 0,
-                  utilidad: x?.utilidad ?? 0,
-                });
-                const a = z(ra);
-                const c = ci ? z(rc) : null;
-                const rows: [string, number, number | null][] = [
-                  ["Base ruta (caja)", a.cajaRuta, c?.cajaRuta ?? null],
-                  ["Inversiones", a.inversiones, c?.inversiones ?? null],
-                  ["Ganancias", a.ganancias, c?.ganancias ?? null],
-                  ["Pérdidas", a.perdidas, c?.perdidas ?? null],
-                  ["Gastos (ruta)", a.gastos, c?.gastos ?? null],
-                  ["Capital ruta", a.capitalRuta, c?.capitalRuta ?? null],
-                  ["Utilidad", a.utilidad, c?.utilidad ?? null],
-                ];
-                return (
-                  <div key={rid} style={{ marginBottom: "1.25rem" }}>
-                    <p style={{ fontWeight: 600, marginBottom: "0.35rem" }}>{nombre}</p>
-                    <div className="table-wrap">
-                      <table>
-                        <thead>
-                          <tr>
-                            <th>Concepto</th>
-                            <th className="col-num">Apertura</th>
-                            <th className="col-num">Cierre</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {rows.map(([label, av, cv]) => (
-                            <tr key={label}>
-                              <td>{label}</td>
-                              <td className="col-num">{fmt(av)}</td>
-                              <td className="col-num">{cv === null ? "—" : fmt(cv)}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                );
-              })}
             </>
           ) : (
             <p style={{ color: "var(--text-muted)" }}>Sin datos.</p>

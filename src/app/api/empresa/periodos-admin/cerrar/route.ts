@@ -26,15 +26,16 @@ export async function POST(_request: NextRequest) {
     .doc(apiUser.empresaId)
     .collection(PERIODOS_ADMIN_SUBCOLLECTION);
 
-  const todos = await col.get();
-  const doc = todos.docs.find((d) => {
-    const x = d.data();
-    return x.adminId === apiUser.uid && x.estado === "abierto";
-  });
+  const abiertosSnap = await col
+    .where("adminId", "==", apiUser.uid)
+    .where("estado", "==", "abierto")
+    .limit(1)
+    .get();
 
-  if (!doc) {
+  if (abiertosSnap.empty) {
     return NextResponse.json({ error: "No hay un periodo abierto para cerrar." }, { status: 400 });
   }
+  const doc = abiertosSnap.docs[0];
   const cierre = await buildPeriodoAdminSnapshot(db, apiUser.empresaId, apiUser.uid);
 
   const rutasCol = db
@@ -51,7 +52,12 @@ export async function POST(_request: NextRequest) {
     cierre,
   });
   for (const r of cierre.rutas) {
-    batch.update(rutasCol.doc(r.rutaId), { ganancias: 0, ultimaActualizacion: nowRuta });
+    batch.update(rutasCol.doc(r.rutaId), {
+      ganancias: 0,
+      gastos: 0,
+      perdidas: 0,
+      ultimaActualizacion: nowRuta,
+    });
   }
   await batch.commit();
 

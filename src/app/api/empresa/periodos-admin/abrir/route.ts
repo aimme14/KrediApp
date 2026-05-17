@@ -21,11 +21,12 @@ export async function POST(_request: NextRequest) {
     .doc(apiUser.empresaId)
     .collection(PERIODOS_ADMIN_SUBCOLLECTION);
 
-  const todos = await col.get();
-  const tieneAbierto = todos.docs.some((d) => {
-    const x = d.data();
-    return x.adminId === apiUser.uid && x.estado === "abierto";
-  });
+  const abiertosSnap = await col
+    .where("adminId", "==", apiUser.uid)
+    .where("estado", "==", "abierto")
+    .limit(1)
+    .get();
+  const tieneAbierto = !abiertosSnap.empty;
 
   if (tieneAbierto) {
     return NextResponse.json(
