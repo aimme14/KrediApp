@@ -103,58 +103,53 @@ function NotifAdminPendientes({
 
 function NotifAdminOperativo({
   lines,
-  dismissed,
-  onDismiss,
+  onDismissItem,
 }: {
   lines: OperativoFcmSessionItem[];
-  dismissed: boolean;
-  onDismiss: () => void;
+  onDismissItem: (id: string) => void;
 }) {
-  if (lines.length === 0 || dismissed) return null;
+  if (lines.length === 0) return null;
   return (
-    <div
-      className="dashboard-notifications-alert dashboard-notifications-alert-warning dashboard-notifications-alert-gasto-fcm"
-      role="status"
-      style={{ marginTop: "0.75rem" }}
-    >
-      <button
-        type="button"
-        className="dashboard-notifications-close"
-        onClick={onDismiss}
-        aria-label="Cerrar notificación"
-        title="Cerrar"
-      >
-        ×
-      </button>
-      <div className="dashboard-notifications-admin-inner">
-        {lines.slice(0, 8).map((row, idx) => (
-          <div
-            key={`${row.kind}-${row.at}-${idx}`}
-            className={`dashboard-notifications-admin-item${idx > 0 ? " dashboard-notifications-admin-item-divider" : ""}`}
+    <>
+      {lines.slice(0, 8).map((row) => (
+        <div
+          key={row.id}
+          className="dashboard-notifications-alert dashboard-notifications-alert-warning dashboard-notifications-alert-gasto-fcm"
+          role="status"
+          style={{ marginTop: "0.5rem" }}
+        >
+          <button
+            type="button"
+            className="dashboard-notifications-close"
+            onClick={() => onDismissItem(row.id)}
+            aria-label="Cerrar notificación"
+            title="Cerrar"
           >
-            <span className="dashboard-notifications-admin-label">{row.title}</span>
-            <span className="dashboard-notifications-admin-name">{row.body}</span>
-            <span className="dashboard-notifications-admin-meta">
-              {new Date(row.at).toLocaleString("es-CO", {
-                day: "2-digit",
-                month: "short",
-                hour: "2-digit",
-                minute: "2-digit",
-              })}
-            </span>
-          </div>
-        ))}
-      </div>
-    </div>
+            ×
+          </button>
+          <span className="dashboard-notifications-admin-label">{row.title}</span>
+          <span className="dashboard-notifications-admin-name">{row.body}</span>
+          <span className="dashboard-notifications-admin-meta">
+            {new Date(row.at).toLocaleString("es-CO", {
+              day: "2-digit",
+              month: "short",
+              hour: "2-digit",
+              minute: "2-digit",
+            })}
+          </span>
+        </div>
+      ))}
+    </>
   );
 }
 
 export default function DashboardNotifications() {
   const { user, profile } = useAuth();
   const {
-    foregroundOperativoBadge,
+    unreadCount,
     sessionOperativoLines,
-    clearBadgeOnly,
+    markAllAsRead,
+    dismissItem,
   } = useGastoFcmCampanita();
   const [open, setOpen] = useState(false);
   const [panelMaxWidthPx, setPanelMaxWidthPx] = useState<number | null>(null);
@@ -213,7 +208,6 @@ export default function DashboardNotifications() {
   const workerPendingKey = pendienteTrabajador ? `worker-pending-${pendienteTrabajador.id}` : null;
   const workerRejectedKey = rechazadaTrabajador ? `worker-rejected-${rechazadaTrabajador.id}` : null;
   const adminPendingKey = "admin-pending-batch";
-  const adminOperativoKey = "admin-operativo-batch";
 
   useEffect(() => {
     if (!storageKey) {
@@ -245,11 +239,6 @@ export default function DashboardNotifications() {
       /* silencioso */
     }
   }, [storageKey, dismissedKeys]);
-
-  useEffect(() => {
-    if (foregroundOperativoBadge === 0) return;
-    setDismissedKeys((prev) => prev.filter((k) => k !== adminOperativoKey));
-  }, [foregroundOperativoBadge, adminOperativoKey]);
 
   useEffect(() => {
     if (!user || !role) return;
@@ -311,14 +300,14 @@ export default function DashboardNotifications() {
   }, [open]);
 
   const campanitaWasOpen = useRef(false);
-  /** Al abrir Avisos (transición cerrado → abierto), el badge FCM operativo vuelve a 0. */
+  /** Al abrir Avisos (transición cerrado → abierto), marcar notificaciones operativas como leídas. */
   useEffect(() => {
     if (role !== "admin") return;
     if (open && !campanitaWasOpen.current) {
-      clearBadgeOnly();
+      markAllAsRead();
     }
     campanitaWasOpen.current = open;
-  }, [open, role, clearBadgeOnly]);
+  }, [open, role, markAllAsRead]);
 
   const badgeCount = useMemo(() => {
     if (role === "trabajador") {
@@ -333,8 +322,7 @@ export default function DashboardNotifications() {
     }
     if (role === "admin") {
       const pendingCount = dismissedSet.has(adminPendingKey) ? 0 : adminPendientes.length;
-      const operativoCount = dismissedSet.has(adminOperativoKey) ? 0 : foregroundOperativoBadge;
-      return pendingCount + operativoCount;
+      return pendingCount + unreadCount;
     }
     return 0;
   }, [
@@ -345,9 +333,8 @@ export default function DashboardNotifications() {
     workerRejectedKey,
     dismissedSet,
     adminPendingKey,
-    adminOperativoKey,
     adminPendientes.length,
-    foregroundOperativoBadge,
+    unreadCount,
   ]);
 
   const badgeLabel =
@@ -460,8 +447,7 @@ export default function DashboardNotifications() {
               />
               <NotifAdminOperativo
                 lines={sessionOperativoLines}
-                dismissed={dismissedSet.has(adminOperativoKey)}
-                onDismiss={() => dismissNotification(adminOperativoKey)}
+                onDismissItem={dismissItem}
               />
             </>
           )}

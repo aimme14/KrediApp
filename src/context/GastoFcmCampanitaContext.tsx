@@ -12,22 +12,24 @@ import React, {
 export type OperativoFcmKind = "gasto" | "cuota";
 
 export type OperativoFcmSessionItem = {
+  id: string;
   kind: OperativoFcmKind;
   title: string;
   body: string;
   at: number;
+  read: boolean;
 };
 
 type GastoFcmCampanitaContextValue = {
-  /** Badge: gastos + cuotas en primer plano (sin Firestore). */
-  foregroundOperativoBadge: number;
+  unreadCount: number;
   sessionOperativoLines: OperativoFcmSessionItem[];
   bumpOperativoFromFcm: (
     kind: OperativoFcmKind,
     title: string,
     body: string
   ) => void;
-  clearBadgeOnly: () => void;
+  markAllAsRead: () => void;
+  dismissItem: (id: string) => void;
 };
 
 const GastoFcmCampanitaContext =
@@ -38,37 +40,56 @@ export function GastoFcmCampanitaProvider({
 }: {
   children: React.ReactNode;
 }) {
-  const [foregroundOperativoBadge, setForegroundOperativoBadge] = useState(0);
   const [sessionOperativoLines, setSessionOperativoLines] = useState<
     OperativoFcmSessionItem[]
   >([]);
 
+  const unreadCount = useMemo(
+    () => sessionOperativoLines.filter((l) => !l.read).length,
+    [sessionOperativoLines]
+  );
+
   const bumpOperativoFromFcm = useCallback(
     (kind: OperativoFcmKind, title: string, body: string) => {
-      setForegroundOperativoBadge((n) => n + 1);
       setSessionOperativoLines((prev) =>
-        [{ kind, title, body, at: Date.now() }, ...prev].slice(0, 16)
+        [
+          {
+            id: crypto.randomUUID(),
+            kind,
+            title,
+            body,
+            at: Date.now(),
+            read: false,
+          },
+          ...prev,
+        ].slice(0, 16)
       );
     },
     []
   );
 
-  const clearBadgeOnly = useCallback(() => {
-    setForegroundOperativoBadge(0);
+  const markAllAsRead = useCallback(() => {
+    setSessionOperativoLines((prev) => prev.map((l) => ({ ...l, read: true })));
+  }, []);
+
+  const dismissItem = useCallback((id: string) => {
+    setSessionOperativoLines((prev) => prev.filter((l) => l.id !== id));
   }, []);
 
   const value = useMemo(
     () => ({
-      foregroundOperativoBadge,
+      unreadCount,
       sessionOperativoLines,
       bumpOperativoFromFcm,
-      clearBadgeOnly,
+      markAllAsRead,
+      dismissItem,
     }),
     [
-      foregroundOperativoBadge,
+      unreadCount,
       sessionOperativoLines,
       bumpOperativoFromFcm,
-      clearBadgeOnly,
+      markAllAsRead,
+      dismissItem,
     ]
   );
 
