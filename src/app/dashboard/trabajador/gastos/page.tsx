@@ -1,9 +1,11 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
+import { collection, query, where, orderBy, limit, onSnapshot } from "firebase/firestore";
 import { useAuth } from "@/context/AuthContext";
 import { useTrabajadorCajaDia } from "@/context/TrabajadorCajaDiaContext";
-import { listGastos, createGasto, type GastoItem } from "@/lib/empresa-api";
+import { db } from "@/lib/firebase";
+import { createGasto, type GastoItem } from "@/lib/empresa-api";
 import {
   sanitizeMontoDecimalCOP,
   formatMontoDecimalCOPDisplay,
@@ -147,18 +149,53 @@ export default function GastosTrabajadorPage() {
     return timeB - timeA;
   });
 
-  const loadGastos = useCallback(async () => {
-    if (!user) return;
-    const token = await user.getIdToken();
-    listGastos(token)
-      .then(setGastos)
-      .catch((e) => setError(e instanceof Error ? e.message : "Error al cargar gastos"))
-      .finally(() => setLoading(false));
-  }, [user]);
-
   useEffect(() => {
-    loadGastos();
-  }, [loadGastos]);
+    if (!db || !user || profile?.role !== "trabajador") return;
+    const empresaId = profile?.empresaId?.trim();
+    if (!empresaId) return;
+
+    setLoading(true);
+
+    const q = query(
+      collection(db, "empresas", empresaId, "gastosEmpleado"),
+      where("empleadoId", "==", user.uid),
+      orderBy("fecha", "desc"),
+      limit(100)
+    );
+
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        const list: GastoItem[] = snap.docs.map((d) => {
+          const data = d.data();
+          return {
+            id: d.id,
+            descripcion: data.descripcion ?? "",
+            monto: data.monto ?? 0,
+            fecha: data.fecha?.toDate?.()?.toISOString?.() ?? null,
+            tipo: data.tipo ?? "otro",
+            creadoPor: data.creadoPor ?? "",
+            creadoPorNombre: data.creadoPorNombre ?? "",
+            rol: data.rol ?? "empleado",
+            rutaId: data.rutaId ?? "",
+            adminId: data.adminId ?? "",
+            empleadoId: data.empleadoId ?? "",
+            evidencia: data.evidencia ?? "",
+            alcance: data.alcance ?? "",
+          };
+        });
+        setGastos(list);
+        setLoading(false);
+      },
+      (err) => {
+        console.warn("[GastosTrabajador] onSnapshot:", err);
+        setError("Error al cargar gastos");
+        setLoading(false);
+      }
+    );
+
+    return unsub;
+  }, [user?.uid, profile?.role, profile?.empresaId]);
 
   useEffect(() => {
     if (!showCamera) return;
@@ -273,7 +310,6 @@ export default function GastosTrabajadorPage() {
       setEvidenciaFile(null);
       setEvidenciaPreview(null);
       setShowForm(false);
-      await loadGastos();
       void refreshCajaDia();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al registrar gasto");

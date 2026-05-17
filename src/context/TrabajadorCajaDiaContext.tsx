@@ -9,6 +9,8 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { doc, onSnapshot } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import { useAuth } from "@/context/AuthContext";
 import { fechaDiaColombiaHoy } from "@/lib/colombia-day-bounds";
 import {
@@ -16,18 +18,19 @@ import {
   type CobrosDelDiaEmpleadoResponse,
 } from "@/lib/empresa-api";
 
+const EMPRESAS_COLLECTION = "empresas";
+const USUARIOS_SUBCOLLECTION = "usuarios";
+
 export type TrabajadorCajaDiaContextValue = {
-  /** Día consultado (Colombia, yyyy-mm-dd). */
   fechaDia: string;
   data: CobrosDelDiaEmpleadoResponse | null;
   loading: boolean;
   error: string | null;
   refresh: () => Promise<void>;
+  cajaEmpleadoRT: number | null;
 };
 
-const TrabajadorCajaDiaContext = createContext<TrabajadorCajaDiaContextValue | null>(
-  null
-);
+const TrabajadorCajaDiaContext = createContext<TrabajadorCajaDiaContextValue | null>(null);
 
 export function TrabajadorCajaDiaProvider({ children }: { children: ReactNode }) {
   const { user, profile } = useAuth();
@@ -35,6 +38,7 @@ export function TrabajadorCajaDiaProvider({ children }: { children: ReactNode })
   const [data, setData] = useState<CobrosDelDiaEmpleadoResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [cajaEmpleadoRT, setCajaEmpleadoRT] = useState<number | null>(null);
 
   const refresh = useCallback(async () => {
     if (!user || profile?.role !== "trabajador") {
@@ -61,6 +65,34 @@ export function TrabajadorCajaDiaProvider({ children }: { children: ReactNode })
     void refresh();
   }, [refresh]);
 
+  useEffect(() => {
+    if (!db || !user || profile?.role !== "trabajador") return;
+    const empresaId = profile?.empresaId?.trim();
+    if (!empresaId) return;
+
+    const ref = doc(
+      db,
+      EMPRESAS_COLLECTION,
+      empresaId,
+      USUARIOS_SUBCOLLECTION,
+      user.uid
+    );
+
+    const unsub = onSnapshot(
+      ref,
+      (snap) => {
+        if (!snap.exists()) return;
+        const caja = snap.data()?.cajaEmpleado;
+        setCajaEmpleadoRT(typeof caja === "number" ? caja : null);
+      },
+      (err) => {
+        console.warn("[TrabajadorCajaDia] onSnapshot cajaEmpleado:", err);
+      }
+    );
+
+    return unsub;
+  }, [user?.uid, profile?.role, profile?.empresaId]);
+
   const value = useMemo(
     (): TrabajadorCajaDiaContextValue => ({
       fechaDia,
@@ -68,8 +100,9 @@ export function TrabajadorCajaDiaProvider({ children }: { children: ReactNode })
       loading,
       error,
       refresh,
+      cajaEmpleadoRT,
     }),
-    [fechaDia, data, loading, error, refresh]
+    [fechaDia, data, loading, error, refresh, cajaEmpleadoRT]
   );
 
   return (

@@ -4,7 +4,7 @@ import { useState, useMemo } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useAdminDashboard } from "@/context/AdminDashboardContext";
 import { useTrabajadorLista } from "@/context/TrabajadorListaContext";
-import { createCliente, formatClienteCodigoCorto } from "@/lib/empresa-api";
+import { createCliente, formatClienteCodigoRutaYNumero } from "@/lib/empresa-api";
 
 export default function ClientePage() {
   const { user, profile } = useAuth();
@@ -162,15 +162,16 @@ export default function ClientePage() {
 
       {!showForm && error && <p className="error-msg">{error}</p>}
 
-      <div className="card">
+      <div className="card admin-clientes-list-card">
         <h3 style={{ marginTop: 0 }}>Clientes</h3>
         {loading ? (
           <p>Cargando...</p>
         ) : clientes.length === 0 ? (
           <p style={{ color: "var(--text-muted)" }}>No hay clientes. Crea uno con el botón &quot;Nuevo cliente&quot;.</p>
         ) : (
-          <div className="table-wrap">
-            <table>
+          <>
+            <div className="table-wrap admin-clientes-table-wrap">
+              <table className="admin-clientes-table">
               <thead>
                 <tr>
                   <th>Código</th>
@@ -186,7 +187,7 @@ export default function ClientePage() {
                 {clientesPaginados.map((c) => (
                   <tr key={c.id}>
                     <td title={c.codigo ?? undefined}>
-                      {formatClienteCodigoCorto(c.codigo)}
+                      {formatClienteCodigoRutaYNumero(c.codigo)}
                     </td>
                     <td>{c.nombre}</td>
                     <td>{c.ubicacion || "—"}</td>
@@ -196,22 +197,21 @@ export default function ClientePage() {
                     <td>{c.moroso ? "Sí (excluido)" : "No"}</td>
                   </tr>
                 ))}
-                {hayMas && (
-                  <tr>
-                    <td colSpan={7} style={{ textAlign: "center", padding: "0.75rem" }}>
-                      <button
-                        type="button"
-                        className="btn btn-secondary"
-                        onClick={() => setPagina((p) => p + 1)}
-                      >
-                        Ver más clientes
-                      </button>
-                    </td>
-                  </tr>
-                )}
               </tbody>
             </table>
           </div>
+          {hayMas && (
+            <div className="admin-clientes-ver-mas">
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setPagina((p) => p + 1)}
+              >
+                Ver más clientes
+              </button>
+            </div>
+          )}
+          </>
         )}
       </div>
     </div>

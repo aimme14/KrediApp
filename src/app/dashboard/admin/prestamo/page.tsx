@@ -40,6 +40,11 @@ function formatMoneda(n: number): string {
   return decTrim ? `${conPuntos},${decTrim}` : conPuntos;
 }
 
+/** Vista móvil: saldo pendiente / monto prestado (ej. 50.000/100.000). */
+function formatDebeSlashMonto(saldoPendiente: number, monto: number): string {
+  return `${formatMoneda(saldoPendiente)}/${formatMoneda(monto)}`;
+}
+
 /** Cuotas ya pagadas (a partir de saldo y total). Para mostrar como "X / total". */
 function cuotasPagadas(totalAPagar: number, numeroCuotas: number, saldoPendiente: number): number {
   if (totalAPagar <= 0 || numeroCuotas <= 0) return 0;
@@ -94,6 +99,8 @@ export default function PrestamoPage() {
   const [creating, setCreating] = useState(false);
   const [confirmarMontoAlto, setConfirmarMontoAlto] = useState(false);
   const [filtroEstado, setFiltroEstado] = useState<"todos" | "activo" | "mora" | "pagado">("todos");
+  const [soloActivosMobile, setSoloActivosMobile] = useState(false);
+  const [isMobileView, setIsMobileView] = useState(false);
   const [historialEconomicoColapsado, setHistorialEconomicoColapsado] = useState(true);
 
   useEffect(() => {
@@ -106,12 +113,18 @@ export default function PrestamoPage() {
 
   useEffect(() => {
     const mq = window.matchMedia("(max-width: 768px)");
-    const syncFiltro = () => {
-      if (mq.matches) setFiltroEstado("todos");
+    const syncViewport = () => {
+      const mobile = mq.matches;
+      setIsMobileView(mobile);
+      if (mobile) {
+        setFiltroEstado("todos");
+      } else {
+        setSoloActivosMobile(false);
+      }
     };
-    syncFiltro();
-    mq.addEventListener("change", syncFiltro);
-    return () => mq.removeEventListener("change", syncFiltro);
+    syncViewport();
+    mq.addEventListener("change", syncViewport);
+    return () => mq.removeEventListener("change", syncViewport);
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -205,16 +218,22 @@ export default function PrestamoPage() {
   }, [prestamos]);
 
   const prestamosFiltrados = useMemo(() => {
-    if (filtroEstado === "todos") return prestamos;
-    return prestamos.filter((p) => p.estado === filtroEstado);
-  }, [prestamos, filtroEstado]);
+    let list = prestamos;
+    if (filtroEstado !== "todos") {
+      list = list.filter((p) => p.estado === filtroEstado);
+    }
+    if (isMobileView && soloActivosMobile) {
+      list = list.filter((p) => p.estado === "activo");
+    }
+    return list;
+  }, [prestamos, filtroEstado, isMobileView, soloActivosMobile]);
 
   const PAGE_SIZE = 15;
   const [pagina, setPagina] = useState(1);
 
   useEffect(() => {
     setPagina(1);
-  }, [filtroEstado]);
+  }, [filtroEstado, soloActivosMobile]);
 
   /** Grupos por cliente: principal = reciente y activo (activo > mora > pagado, luego por fecha). */
   const gruposPorCliente = useMemo((): GrupoClientePrestamos[] => {
@@ -268,7 +287,7 @@ export default function PrestamoPage() {
   return (
     <div className="card prestamo-admin-page">
       {showCreateForm && (
-      <form onSubmit={handleSubmit} className="card" style={{ marginBottom: "1.25rem" }}>
+      <form onSubmit={handleSubmit} className="card prestamo-admin-create-form" style={{ marginBottom: "1.25rem" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "0.75rem", marginBottom: "0.5rem" }}>
           <h3 style={{ margin: 0 }}>Nuevo préstamo</h3>
           <button
@@ -408,106 +427,114 @@ export default function PrestamoPage() {
           </div>
         )}
 
-        <div className="form-group">
-          <label>Fecha de creación</label>
-          <input
-            type="text"
-            readOnly
-            value={hoyDDMMAAAA()}
-            aria-label="Fecha de creación (día actual)"
-            style={{ backgroundColor: "var(--bg)", cursor: "default", maxWidth: "10rem" }}
-          />
+        <div className="prestamo-admin-create-row">
+          <div className="form-group prestamo-admin-create-fecha">
+            <label>Fecha de creación</label>
+            <input
+              type="text"
+              readOnly
+              value={hoyDDMMAAAA()}
+              aria-label="Fecha de creación (día actual)"
+              className="prestamo-admin-create-fecha-input"
+              style={{ backgroundColor: "var(--bg)", cursor: "default" }}
+            />
+          </div>
+          <div className="form-group prestamo-admin-create-freq">
+            <label>Frecuencia de pago</label>
+            <select
+              value={modalidad}
+              onChange={(e) => setModalidad(e.target.value as "diario" | "semanal" | "mensual")}
+              style={{ width: "100%", padding: "0.5rem" }}
+            >
+              {MODALIDADES.map((m) => (
+                <option key={m.value} value={m.value}>
+                  {m.label}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
-        <div className="form-group">
-          <label>Frecuencia de pago</label>
-          <select
-            value={modalidad}
-            onChange={(e) => setModalidad(e.target.value as "diario" | "semanal" | "mensual")}
-            style={{ width: "100%", padding: "0.5rem" }}
-          >
-            {MODALIDADES.map((m) => (
-              <option key={m.value} value={m.value}>
-                {m.label}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="form-group">
-          <label>Número de cuotas</label>
-          <input
-            type="number"
-            inputMode="numeric"
-            min={1}
-            max={CUOTAS_MAX}
-            value={numeroCuotas}
-            onChange={(e) => {
-              const v = e.target.value.replace(/\D/g, "");
-              if (v === "" || /^\d+$/.test(v)) setNumeroCuotas(v);
-            }}
-            onKeyDown={(e) => {
-              const k = e.key;
-              if (k === "e" || k === "E" || k === "+" || k === "-" || k === "." || k === ",") e.preventDefault();
-            }}
-            placeholder="Ej: 12 (según frecuencia: 12 pagos)"
-            required
-            aria-label="Número de cuotas"
-          />
-          <p style={{ color: "var(--text-muted)", fontSize: "0.75rem", marginTop: "0.25rem", marginBottom: 0 }}>
-            Número de pagos según la frecuencia elegida (diario, semanal o mensual).
-          </p>
-        </div>
-        <div className="form-group">
-          <label>Interés (%)</label>
-          <input
-            type="text"
-            inputMode="decimal"
-            value={interes}
-            onChange={(e) => {
-              const v = e.target.value.replace(",", ".");
-              if (v === "" || /^\d*\.?\d*$/.test(v)) setInteres(v);
-            }}
-            onKeyDown={(e) => {
-              const k = e.key;
-              if (k === "e" || k === "E" || k === "+" || k === "-") e.preventDefault();
-            }}
-            placeholder="Ej: 10 (porcentaje aplicado al monto)"
-            aria-label="Interés en porcentaje"
-          />
-        </div>
-        <div className="form-group">
-          <label>Cantidad a prestar</label>
-          <input
-            type="text"
-            inputMode="decimal"
-            value={monto ? formatMontoDecimalCOPDisplay(monto) : ""}
-            onChange={(e) => setMonto(sanitizeMontoDecimalCOP(e.target.value))}
-            required
-            placeholder="0,00"
-          />
-        </div>
-        <div className="form-group">
-          <label>Cuota</label>
-          <input
-            type="text"
-            readOnly
-            value={
-              (() => {
-                const montoNum = interiorDecimalCOPToNumber(monto);
-                const nCuotas = parseInt(numeroCuotas, 10);
-                const iVal = parseInteresPct(interes);
-                if (isNaN(montoNum) || montoNum <= 0 || !nCuotas || nCuotas < 1) return "—";
-                const total = montoNum * (1 + iVal / 100);
-                return formatMoneda(total / nCuotas);
-              })()
-            }
-            aria-label="Cuota (calculada)"
-            style={{ backgroundColor: "var(--bg)", cursor: "default" }}
-          />
-          <p style={{ color: "var(--text-muted)", fontSize: "0.75rem", marginTop: "0.25rem", marginBottom: 0 }}>
-            (Cantidad a prestar × (1 + interés %) ÷ número de cuotas)
+
+        <div className="prestamo-admin-create-row">
+          <div className="form-group prestamo-admin-create-monto">
+            <label>Cantidad a prestar</label>
+            <input
+              type="text"
+              inputMode="decimal"
+              value={monto ? formatMontoDecimalCOPDisplay(monto) : ""}
+              onChange={(e) => setMonto(sanitizeMontoDecimalCOP(e.target.value))}
+              required
+              placeholder="0,00"
+            />
+          </div>
+          <div className="form-group prestamo-admin-create-cuotas">
+            <label>Número de cuotas</label>
+            <input
+              type="number"
+              inputMode="numeric"
+              min={1}
+              max={CUOTAS_MAX}
+              value={numeroCuotas}
+              onChange={(e) => {
+                const v = e.target.value.replace(/\D/g, "");
+                if (v === "" || /^\d+$/.test(v)) setNumeroCuotas(v);
+              }}
+              onKeyDown={(e) => {
+                const k = e.key;
+                if (k === "e" || k === "E" || k === "+" || k === "-" || k === "." || k === ",") e.preventDefault();
+              }}
+              placeholder="Ej: 12"
+              required
+              aria-label="Número de cuotas"
+            />
+          </div>
+          <p className="prestamo-admin-create-field-hint prestamo-admin-create-field-hint--cuotas">
+
           </p>
         </div>
 
+        <div className="prestamo-admin-create-row">
+          <div className="form-group prestamo-admin-create-interes">
+            <label>Interés (%)</label>
+            <input
+              type="text"
+              inputMode="decimal"
+              value={interes}
+              onChange={(e) => {
+                const v = e.target.value.replace(",", ".");
+                if (v === "" || /^\d*\.?\d*$/.test(v)) setInteres(v);
+              }}
+              onKeyDown={(e) => {
+                const k = e.key;
+                if (k === "e" || k === "E" || k === "+" || k === "-") e.preventDefault();
+              }}
+              placeholder="Ej: 10"
+              aria-label="Interés en porcentaje"
+            />
+          </div>
+          <div className="form-group prestamo-admin-create-cuota">
+            <label>Cuota</label>
+            <input
+              type="text"
+              readOnly
+              value={
+                (() => {
+                  const montoNum = interiorDecimalCOPToNumber(monto);
+                  const nCuotas = parseInt(numeroCuotas, 10);
+                  const iVal = parseInteresPct(interes);
+                  if (isNaN(montoNum) || montoNum <= 0 || !nCuotas || nCuotas < 1) return "—";
+                  const total = montoNum * (1 + iVal / 100);
+                  return formatMoneda(total / nCuotas);
+                })()
+              }
+              aria-label="Cuota (calculada)"
+              style={{ backgroundColor: "var(--bg)", cursor: "default" }}
+            />
+          </div>
+          <p className="prestamo-admin-create-field-hint prestamo-admin-create-field-hint--cuota">
+            
+          </p>
+        </div>
         {totalAPagar > 0 && (
           <div
             className="form-group"
@@ -529,26 +556,35 @@ export default function PrestamoPage() {
           </div>
         )}
 
-        {requiereConfirmarMonto && (
-          <div className="form-group">
-            <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", cursor: "pointer" }}>
-              <input
-                type="checkbox"
-                checked={confirmarMontoAlto}
-                onChange={(e) => setConfirmarMontoAlto(e.target.checked)}
-                aria-label="Confirmar préstamo de monto alto"
-              />
-              <span>Confirmo el préstamo<strong>{formatMoneda(montoNum)}</strong></span>
-            </label>
-          </div>
-        )}
-
         {(error || listaError) && (
           <p className="error-msg">{error ?? listaError}</p>
         )}
-        <button type="submit" className="btn btn-primary" disabled={creating}>
-          {creating ? "Creando..." : "Crear préstamo"}
-        </button>
+        <div className="prestamo-nuevo-actions prestamo-admin-create-actions">
+          <button type="submit" className="btn btn-primary" disabled={creating}>
+            {creating ? "Creando..." : "Crear préstamo"}
+          </button>
+          <label className="prestamo-nuevo-confirm-label prestamo-admin-create-confirm-label">
+            <input
+              type="checkbox"
+              checked={confirmarMontoAlto}
+              onChange={(e) => setConfirmarMontoAlto(e.target.checked)}
+              aria-label={
+                requiereConfirmarMonto
+                  ? `Confirmo creación de préstamo por ${formatMoneda(montoNum)}`
+                  : "Confirmo creación del préstamo"
+              }
+            />
+            <span>
+              {requiereConfirmarMonto ? (
+                <>
+                  Confirmo el préstamo <strong>{formatMoneda(montoNum)}</strong>
+                </>
+              ) : (
+                "Confirmo"
+              )}
+            </span>
+          </label>
+        </div>
       </form>
       )}
 
@@ -589,7 +625,18 @@ export default function PrestamoPage() {
         )}
         <div className="card prestamo-admin-hist-card">
         <div className="prestamo-admin-hist-head">
-          <h3 className="prestamo-admin-hist-title">Historial de préstamos</h3>
+          <div className="prestamo-admin-hist-head-left">
+            <button
+              type="button"
+              className={`prestamo-admin-movil-filtro-activos${soloActivosMobile ? " prestamo-admin-movil-filtro-activos--on" : ""}`}
+              onClick={() => setSoloActivosMobile((v) => !v)}
+              aria-pressed={soloActivosMobile}
+              title={soloActivosMobile ? "Mostrar todos los préstamos" : "Mostrar solo préstamos activos"}
+            >
+              Activos
+            </button>
+            <h3 className="prestamo-admin-hist-title">Historial de préstamos</h3>
+          </div>
           <button
             type="button"
             className="prestamo-admin-add-btn"
@@ -627,7 +674,10 @@ export default function PrestamoPage() {
                   <th aria-label="Expandir historial" />
                   <th>Código</th>
                   <th>Cliente</th>
-                  <th className="col-num">Monto</th>
+                  <th className="col-num">
+                    <span className="prestamo-admin-monto-th-desktop">Monto</span>
+                    <span className="prestamo-admin-monto-th-mobile">Debe/Monto</span>
+                  </th>
                   <th className="col-num">Total a pagar</th>
                   <th className="col-num">Saldo</th>
                   <th className="col-num">Cuotas</th>
@@ -668,7 +718,12 @@ export default function PrestamoPage() {
                         </td>
                         <td>{codigoDisplay}</td>
                         <td>{nombre}</td>
-                        <td className="col-num">{formatMoneda(principal.monto)}</td>
+                        <td className="col-num">
+                          <span className="prestamo-admin-monto-desktop">{formatMoneda(principal.monto)}</span>
+                          <span className="prestamo-admin-monto-mobile">
+                            {formatDebeSlashMonto(principal.saldoPendiente, principal.monto)}
+                          </span>
+                        </td>
                         <td className="col-num">{formatMoneda(principal.totalAPagar)}</td>
                         <td className="col-num">{formatMoneda(principal.saldoPendiente)}</td>
                         <td className="col-num" title="Cuotas pagadas / total">{pagadas} / {principal.numeroCuotas}</td>
@@ -734,7 +789,9 @@ export default function PrestamoPage() {
           )}
           {prestamosFiltrados.length === 0 && (
             <p className="prestamo-admin-filtro-vacio">
-              No hay préstamos en el historial con estado «{filtroEstado === "todos" ? "todos" : filtroEstado === "activo" ? "activos" : filtroEstado === "mora" ? "en mora" : "pagados"}».
+              {isMobileView && soloActivosMobile
+                ? "No hay préstamos activos en el historial."
+                : `No hay préstamos en el historial con estado «${filtroEstado === "todos" ? "todos" : filtroEstado === "activo" ? "activos" : filtroEstado === "mora" ? "en mora" : "pagados"}».`}
             </p>
           )}
           </>

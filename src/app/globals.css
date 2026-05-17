@@ -1876,6 +1876,57 @@ td {
 }
 
 /* Admin — Crear préstamo / historial: KPIs, pestañas y tabla */
+.prestamo-admin-create-field-hint {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  margin: 0.25rem 0 0;
+  line-height: 1.35;
+}
+
+.prestamo-admin-create-fecha-input {
+  max-width: 10rem;
+}
+
+@media (min-width: 769px) {
+  .prestamo-admin-create-form {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .prestamo-admin-create-form .prestamo-admin-create-row {
+    display: contents;
+  }
+
+  .prestamo-admin-create-form .prestamo-admin-create-fecha {
+    order: 1;
+  }
+  .prestamo-admin-create-form .prestamo-admin-create-freq {
+    order: 2;
+  }
+  .prestamo-admin-create-form .prestamo-admin-create-interes {
+    order: 3;
+  }
+  .prestamo-admin-create-form .prestamo-admin-create-monto {
+    order: 4;
+  }
+  .prestamo-admin-create-form .prestamo-admin-create-cuotas {
+    order: 5;
+  }
+  .prestamo-admin-create-form .prestamo-admin-create-field-hint--cuotas {
+    order: 6;
+  }
+  .prestamo-admin-create-form .prestamo-admin-create-cuota {
+    order: 7;
+  }
+  .prestamo-admin-create-form .prestamo-admin-create-field-hint--cuota {
+    order: 8;
+  }
+
+  .prestamo-admin-create-form .prestamo-admin-create-field-hint {
+    margin-bottom: 1rem;
+  }
+}
+
 .prestamo-admin-page {
   margin-bottom: 0;
 }
@@ -1999,6 +2050,23 @@ td {
   justify-content: space-between;
   gap: 0.65rem;
   margin-bottom: 0.85rem;
+}
+
+.prestamo-admin-hist-head-left {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.prestamo-admin-movil-filtro-activos {
+  display: none;
+}
+
+.prestamo-admin-monto-mobile,
+.prestamo-admin-monto-th-mobile {
+  display: none;
 }
 
 .prestamo-admin-hist-title {
@@ -2134,6 +2202,90 @@ td {
 
 /* Móvil: solo Código, Cliente y Monto prestado (oculta expandir, totales, cobro, etc.) */
 @media (max-width: 768px) {
+  .prestamo-admin-movil-filtro-activos {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    padding: 0.28rem 0.55rem;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    border-radius: 999px;
+    border: 1px solid var(--card-border);
+    background: var(--input-bg);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s, border-color 0.15s, box-shadow 0.15s;
+  }
+
+  .prestamo-admin-movil-filtro-activos:hover {
+    color: var(--text);
+    border-color: var(--input-border);
+  }
+
+  .prestamo-admin-movil-filtro-activos--on {
+    background: linear-gradient(145deg, #22c55e 0%, #15803d 100%);
+    border-color: transparent;
+    color: #fafafa;
+    box-shadow: 0 2px 8px rgba(34, 197, 94, 0.35);
+  }
+
+  .prestamo-admin-movil-filtro-activos:focus-visible {
+    outline: 2px solid var(--link);
+    outline-offset: 2px;
+  }
+
+  .prestamo-admin-hist-title {
+    font-size: 0.95rem;
+    line-height: 1.25;
+  }
+
+  .prestamo-admin-monto-desktop,
+  .prestamo-admin-monto-th-desktop {
+    display: none !important;
+  }
+
+  .prestamo-admin-monto-mobile,
+  .prestamo-admin-monto-th-mobile {
+    display: inline;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+  }
+
+  .prestamo-admin-monto-th-mobile {
+    font-size: 0.65rem;
+    white-space: nowrap;
+  }
+
+  .prestamo-admin-create-form .prestamo-admin-create-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.65rem 0.75rem;
+    margin-bottom: 1rem;
+  }
+
+  .prestamo-admin-create-form .prestamo-admin-create-row .form-group {
+    flex: 1 1 calc(50% - 0.375rem);
+    min-width: 0;
+    margin-bottom: 0;
+  }
+
+  .prestamo-admin-create-form .prestamo-admin-create-field-hint {
+    flex: 1 1 100%;
+    margin-top: 0;
+    margin-bottom: 0;
+  }
+
+  .prestamo-admin-create-form .prestamo-admin-create-row .form-group label {
+    font-size: 0.8125rem;
+  }
+
+  .prestamo-admin-create-form .prestamo-admin-create-fecha-input {
+    max-width: none;
+    width: 100%;
+  }
+
   .table-wrap.prestamo-admin-hist-table-wrap {
     overflow-x: visible;
   }
@@ -2159,8 +2311,9 @@ td {
 
   .prestamo-admin-hist-card .table-historial th:nth-child(4),
   .prestamo-admin-hist-card .table-historial td:nth-child(4) {
-    width: 30%;
+    width: 36%;
     white-space: nowrap;
+    font-size: 0.75rem;
   }
 
   .prestamo-admin-hist-card .table-historial td:nth-child(3) {
@@ -2519,6 +2672,33 @@ td {
   margin: 0;
   color: var(--text-muted);
   font-size: 0.86rem;
+}
+
+/* Admin — lista Clientes */
+.admin-clientes-table-wrap {
+  border-radius: 10px;
+  border: 1px solid var(--table-border);
+  overflow: hidden;
+  margin-left: 0;
+  margin-right: 0;
+}
+
+.admin-clientes-ver-mas {
+  display: flex;
+  justify-content: center;
+  margin-top: 0.85rem;
+}
+
+@media (max-width: 768px) {
+  .admin-clientes-table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .admin-clientes-ver-mas .btn {
+    width: 100%;
+    max-width: 16rem;
+  }
 }
 
 .rutas-admin-loading {
@@ -8977,13 +9157,86 @@ a.admin-inicio-link-btn {
 .compartir-icono-mail { color: var(--text); }
 .compartir-dropdown-iconos .compartir-opcion { padding: 0.6rem 1rem; }
 
-/* Trabajador — Crear préstamo + Confirmo: margen solo en pantalla ancha; en móvil alinea al envolver */
+/* Trabajador / Admin — Crear préstamo + Confirmo en fila */
+.prestamo-nuevo-actions {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+  justify-content: flex-start;
+  width: 100%;
+}
+
+.prestamo-nuevo-actions .btn {
+  flex-shrink: 0;
+}
+
 .prestamo-nuevo-actions .prestamo-nuevo-confirm-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.65rem;
+  cursor: pointer;
+  margin: 0;
+  flex-shrink: 0;
+  line-height: 1.2;
+}
+
+.prestamo-nuevo-actions .prestamo-nuevo-confirm-label input[type="checkbox"] {
+  flex-shrink: 0;
+  cursor: pointer;
+  margin: 0 0.2rem;
+  transform: scale(1.5);
+  transform-origin: center;
+  accent-color: var(--link, #6366f1);
+}
+
+.prestamo-nuevo-actions .prestamo-nuevo-confirm-label span {
+  font-size: 1.05rem;
+}
+
+.prestamo-admin-create-confirm-label span {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+.prestamo-admin-create-confirm-label strong {
+  color: var(--text);
+}
+
+/* Trabajador: margen solo en pantalla ancha */
+.prestamo-nuevo-actions:not(.prestamo-admin-create-actions) .prestamo-nuevo-confirm-label {
   margin-left: 10%;
 }
+
 @media (max-width: 540px) {
-  .prestamo-nuevo-actions .prestamo-nuevo-confirm-label {
+  .prestamo-nuevo-actions:not(.prestamo-admin-create-actions) .prestamo-nuevo-confirm-label {
     margin-left: 0;
+  }
+}
+
+@media (max-width: 768px) {
+  .prestamo-admin-create-actions {
+    flex-wrap: nowrap;
+    gap: 0.65rem;
+    align-items: center;
+  }
+
+  .prestamo-admin-create-actions .prestamo-admin-create-confirm-label {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .prestamo-admin-create-actions .prestamo-admin-create-confirm-label span {
+    font-size: 0.8125rem;
+    line-height: 1.25;
+  }
+
+  .prestamo-admin-create-actions .btn {
+    flex: 0 0 auto;
+    padding-left: 0.85rem;
+    padding-right: 0.85rem;
+    white-space: nowrap;
   }
 }
 

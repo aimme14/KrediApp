@@ -17,6 +17,14 @@
       ]
     },
     {
+      "collectionGroup": "gastosEmpleado",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "empleadoId", "order": "ASCENDING" },
+        { "fieldPath": "fecha", "order": "DESCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "solicitudesEntregaReporte",
       "queryScope": "COLLECTION",
       "fields": [

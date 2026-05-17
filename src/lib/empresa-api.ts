@@ -389,6 +389,8 @@ export type CobrosDelDiaEmpleadoResponse = {
   cobros: CobroDiaItem[];
   noPagos: NoPagoDiaItem[];
   totalCobrosLista: number;
+  /** Saldo en `empresas/{empresaId}/usuarios/{uid}.cajaEmpleado` (si la API lo incluye). */
+  cajaEmpleado?: number;
   /** Total cobrado en ruta + base − gastos − préstamos desde tu caja (tarjeta «Tu caja del día»). */
   tuCajaDelDia: number;
   /** Cobros del día que por reglas de negocio ingresan a tu billetera (titular del préstamo o cobrador si no hay titular). */

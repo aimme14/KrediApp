@@ -1,15 +1,10 @@
 "use client";
 
-import { useMemo, useCallback, useState, useEffect } from "react";
+import { useMemo, useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
-import { fechaDiaColombiaHoy } from "@/lib/colombia-day-bounds";
-import {
-  getCobrosDelDiaEmpleado,
-  type CobrosDelDiaEmpleadoResponse,
-} from "@/lib/empresa-api";
-import { tuCajaDelDiaDesdeTotales } from "@/lib/tu-caja-del-dia";
+import { useTrabajadorCajaDia } from "@/context/TrabajadorCajaDiaContext";
 import { useRuta } from "@/hooks/useRuta";
 import { UMBRAL_INTENTOS_ALERTA, useRutaDia } from "@/hooks/useRutaDia";
 import type { ClienteRutaGrupo, PrioridadClienteRuta } from "@/types/finanzas";
@@ -86,36 +81,12 @@ function getBadgeLabel(
 }
 
 export default function RutaDelDiaPage() {
-  const { user, profile } = useAuth();
+  const { profile } = useAuth();
   const router = useRouter();
-  const [cajaDelDiaResumen, setCajaDelDiaResumen] =
-    useState<CobrosDelDiaEmpleadoResponse | null>(null);
-  const [loadingCajaDelDia, setLoadingCajaDelDia] = useState(true);
+  const { fechaDia, data: cajaDelDiaResumen, loading: loadingCajaDelDia, cajaEmpleadoRT } =
+    useTrabajadorCajaDia();
+  const cajaActual = cajaEmpleadoRT ?? cajaDelDiaResumen?.cajaEmpleado ?? 0;
   const [filtroExpandido, setFiltroExpandido] = useState(false);
-
-  useEffect(() => {
-    if (!user || profile?.role !== "trabajador") {
-      setCajaDelDiaResumen(null);
-      setLoadingCajaDelDia(false);
-      return;
-    }
-    let cancelled = false;
-    setLoadingCajaDelDia(true);
-    void (async () => {
-      try {
-        const token = await user.getIdToken();
-        const data = await getCobrosDelDiaEmpleado(token, fechaDiaColombiaHoy());
-        if (!cancelled) setCajaDelDiaResumen(data);
-      } catch {
-        if (!cancelled) setCajaDelDiaResumen(null);
-      } finally {
-        if (!cancelled) setLoadingCajaDelDia(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [user, profile?.role]);
 
   const {
     ruta,
@@ -228,19 +199,13 @@ export default function RutaDelDiaPage() {
             <h3 id="ruta-dia-caja-heading" className="ruta-dia-caja-title">
               caja 
             </h3>
-            {cajaDelDiaResumen?.fechaDia ? (
-              <p className="ruta-dia-caja-desc">{cajaDelDiaResumen.fechaDia}</p>
-            ) : null}
+            <p className="ruta-dia-caja-desc">{cajaDelDiaResumen?.fechaDia ?? fechaDia}</p>
           </div>
           <div className="ruta-dia-caja-monto-wrap">
             <span className="ruta-dia-caja-monto" aria-live="polite">
-              {loadingCajaDelDia
+              {loadingCajaDelDia && cajaEmpleadoRT == null
                 ? "…"
-                : cajaDelDiaResumen
-                  ? formatCurrency(
-                      cajaDelDiaResumen.tuCajaDelDia ?? tuCajaDelDiaDesdeTotales(cajaDelDiaResumen)
-                    )
-                  : "—"}
+                : formatCurrency(cajaActual)}
             </span>
             <Link href="/dashboard/trabajador/caja-del-dia" className="ruta-dia-caja-link">
               Ver detalles

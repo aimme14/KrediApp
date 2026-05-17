@@ -2,17 +2,21 @@
 
 import { useState, useRef, useEffect, useMemo, useLayoutEffect, useCallback } from "react";
 import Link from "next/link";
+import { collection, query, where, onSnapshot } from "firebase/firestore";
 import { useAuth } from "@/context/AuthContext";
 import {
   useGastoFcmCampanita,
   type OperativoFcmSessionItem,
 } from "@/context/GastoFcmCampanitaContext";
+import { db } from "@/lib/firebase";
 import {
   getMiSolicitudEntregaReporte,
-  getSolicitudesEntregaReportePendientes,
   type SolicitudEntregaReporteApi,
   type SolicitudEntregaPendienteAdmin,
 } from "@/lib/empresa-api";
+
+const EMPRESAS_COLLECTION = "empresas";
+const SOLICITUDES_SUBCOLLECTION = "solicitudesEntregaReporte";
 
 function BellIcon() {
   return (
@@ -241,7 +245,7 @@ export default function DashboardNotifications() {
   }, [storageKey, dismissedKeys]);
 
   useEffect(() => {
-    if (!user || !role) return;
+    if (!user || role !== "trabajador") return;
     const firebaseUser = user;
     let cancelled = false;
 
@@ -249,18 +253,12 @@ export default function DashboardNotifications() {
       if (document.visibilityState === "hidden") return;
       try {
         const token = await firebaseUser.getIdToken();
-        if (role === "trabajador") {
-          const { pendiente, ultimaRechazada } = await getMiSolicitudEntregaReporte(token);
-          if (cancelled) return;
-          setPendienteTrabajador(pendiente);
-          setRechazadaTrabajador(
-            pendiente ? null : ultimaRechazada?.estado === "rechazada" ? ultimaRechazada : null
-          );
-        } else if (role === "admin") {
-          const list = await getSolicitudesEntregaReportePendientes(token);
-          if (cancelled) return;
-          setAdminPendientes(Array.isArray(list) ? list : []);
-        }
+        const { pendiente, ultimaRechazada } = await getMiSolicitudEntregaReporte(token);
+        if (cancelled) return;
+        setPendienteTrabajador(pendiente);
+        setRechazadaTrabajador(
+          pendiente ? null : ultimaRechazada?.estado === "rechazada" ? ultimaRechazada : null
+        );
       } catch {
         /* silencioso */
       }
@@ -280,6 +278,45 @@ export default function DashboardNotifications() {
       document.removeEventListener("visibilitychange", onVisible);
     };
   }, [user, role]);
+
+  useEffect(() => {
+    if (!db || !user || role !== "admin" || !profile?.empresaId) return;
+
+    const empresaId = profile.empresaId.trim();
+    if (!empresaId) return;
+
+    const q = query(
+      collection(db, EMPRESAS_COLLECTION, empresaId, SOLICITUDES_SUBCOLLECTION),
+      where("adminId", "==", user.uid),
+      where("estado", "==", "pendiente")
+    );
+
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        const list: SolicitudEntregaPendienteAdmin[] = snap.docs.map((d) => {
+          const data = d.data();
+          return {
+            id: d.id,
+            empleadoUid: data.empleadoUid ?? "",
+            empleadoNombre: data.empleadoNombre ?? "",
+            rutaId: data.rutaId ?? "",
+            rutaNombre: data.rutaNombre ?? "",
+            estado: data.estado ?? "",
+            comentarioTrabajador: data.comentarioTrabajador ?? null,
+            montoAlSolicitar: typeof data.montoAlSolicitar === "number" ? data.montoAlSolicitar : 0,
+            creadaEn: data.creadaEn?.toDate?.()?.toISOString?.() ?? null,
+          };
+        });
+        setAdminPendientes(list);
+      },
+      (err) => {
+        console.warn("[DashboardNotifications] onSnapshot solicitudes:", err);
+      }
+    );
+
+    return unsub;
+  }, [user?.uid, role, profile?.empresaId]);
 
   useEffect(() => {
     if (!open) return;

@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useTrabajadorCajaDia } from "@/context/TrabajadorCajaDiaContext";
-import { tuCajaDelDiaDesdeTotales } from "@/lib/tu-caja-del-dia";
 
 function formatMonto(value: number): string {
   const hasDecimals = Math.round(value * 100) % 100 !== 0;
@@ -13,12 +12,9 @@ function formatMonto(value: number): string {
 }
 
 export function TrabajadorInicioCajaDelDia() {
-  const { fechaDia, data, loading, error } = useTrabajadorCajaDia();
+  const { fechaDia, data, loading, error, cajaEmpleadoRT } = useTrabajadorCajaDia();
   const fechaEtiqueta = data?.fechaDia ?? fechaDia;
-  const monto =
-    data != null
-      ? data.tuCajaDelDia ?? tuCajaDelDiaDesdeTotales(data)
-      : null;
+  const cajaActual = cajaEmpleadoRT ?? data?.cajaEmpleado ?? null;
 
   return (
     <Link
@@ -33,13 +29,13 @@ export function TrabajadorInicioCajaDelDia() {
         <span className="trabajador-inicio-caja-valor trabajador-inicio-caja-valor-muted">
           No disponible
         </span>
-      ) : loading && monto == null ? (
+      ) : loading && cajaActual == null ? (
         <span className="trabajador-inicio-caja-valor trabajador-inicio-caja-valor-muted">
           Cargando…
         </span>
       ) : (
         <span className="trabajador-inicio-caja-valor">
-          {formatMonto(typeof monto === "number" ? monto : 0)}
+          {formatMonto(typeof cajaActual === "number" ? cajaActual : 0)}
         </span>
       )}
     </Link>
