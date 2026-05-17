@@ -10,7 +10,6 @@ import {
 } from "@/context/GastoFcmCampanitaContext";
 import { db } from "@/lib/firebase";
 import {
-  getMiSolicitudEntregaReporte,
   type SolicitudEntregaReporteApi,
   type SolicitudEntregaPendienteAdmin,
 } from "@/lib/empresa-api";
@@ -245,39 +244,100 @@ export default function DashboardNotifications() {
   }, [storageKey, dismissedKeys]);
 
   useEffect(() => {
-    if (!user || role !== "trabajador") return;
-    const firebaseUser = user;
-    let cancelled = false;
+    if (!db || !user || role !== "trabajador" || !profile?.empresaId) return;
 
-    async function load() {
-      if (document.visibilityState === "hidden") return;
-      try {
-        const token = await firebaseUser.getIdToken();
-        const { pendiente, ultimaRechazada } = await getMiSolicitudEntregaReporte(token);
-        if (cancelled) return;
-        setPendienteTrabajador(pendiente);
-        setRechazadaTrabajador(
-          pendiente ? null : ultimaRechazada?.estado === "rechazada" ? ultimaRechazada : null
-        );
-      } catch {
-        /* silencioso */
+    const empresaId = profile.empresaId.trim();
+    if (!empresaId) return;
+
+    const qPendiente = query(
+      collection(db, EMPRESAS_COLLECTION, empresaId, SOLICITUDES_SUBCOLLECTION),
+      where("empleadoUid", "==", user.uid),
+      where("estado", "==", "pendiente")
+    );
+
+    const qRechazada = query(
+      collection(db, EMPRESAS_COLLECTION, empresaId, SOLICITUDES_SUBCOLLECTION),
+      where("empleadoUid", "==", user.uid),
+      where("estado", "==", "rechazada")
+    );
+
+    const unsubPendiente = onSnapshot(
+      qPendiente,
+      (snap) => {
+        if (snap.empty) {
+          setPendienteTrabajador(null);
+        } else {
+          const d = snap.docs[0];
+          const data = d.data();
+          setPendienteTrabajador({
+            id: d.id,
+            empleadoUid: data.empleadoUid ?? "",
+            empleadoNombre: data.empleadoNombre ?? "",
+            rutaId: data.rutaId ?? "",
+            rutaNombre: data.rutaNombre ?? "",
+            adminId: data.adminId ?? "",
+            estado: data.estado ?? "",
+            comentarioTrabajador: data.comentarioTrabajador ?? null,
+            montoAlSolicitar: typeof data.montoAlSolicitar === "number" ? data.montoAlSolicitar : 0,
+            creadaEn: data.creadaEn?.toDate?.()?.toISOString?.() ?? null,
+            resueltaEn: data.resueltaEn?.toDate?.()?.toISOString?.() ?? null,
+            resueltaPorUid: data.resueltaPorUid ?? null,
+            motivoRechazo: data.motivoRechazo ?? null,
+            montoEntregadoEfectivo: data.montoEntregadoEfectivo ?? null,
+          });
+          setRechazadaTrabajador(null);
+        }
+      },
+      (err) => {
+        console.warn("[DashboardNotifications] onSnapshot pendiente trabajador:", err);
       }
-    }
+    );
 
-    void load();
-    const id = setInterval(() => void load(), 45_000);
-
-    const onVisible = () => {
-      if (document.visibilityState === "visible") void load();
-    };
-    document.addEventListener("visibilitychange", onVisible);
+    const unsubRechazada = onSnapshot(
+      qRechazada,
+      (snap) => {
+        setPendienteTrabajador((pendiente) => {
+          if (pendiente) return pendiente;
+          if (snap.empty) {
+            setRechazadaTrabajador(null);
+          } else {
+            const docs = snap.docs.sort((a, b) => {
+              const ta = a.data().creadaEn?.toMillis?.() ?? 0;
+              const tb = b.data().creadaEn?.toMillis?.() ?? 0;
+              return tb - ta;
+            });
+            const d = docs[0];
+            const data = d.data();
+            setRechazadaTrabajador({
+              id: d.id,
+              empleadoUid: data.empleadoUid ?? "",
+              empleadoNombre: data.empleadoNombre ?? "",
+              rutaId: data.rutaId ?? "",
+              rutaNombre: data.rutaNombre ?? "",
+              adminId: data.adminId ?? "",
+              estado: data.estado ?? "",
+              comentarioTrabajador: data.comentarioTrabajador ?? null,
+              montoAlSolicitar: typeof data.montoAlSolicitar === "number" ? data.montoAlSolicitar : 0,
+              creadaEn: data.creadaEn?.toDate?.()?.toISOString?.() ?? null,
+              resueltaEn: data.resueltaEn?.toDate?.()?.toISOString?.() ?? null,
+              resueltaPorUid: data.resueltaPorUid ?? null,
+              motivoRechazo: data.motivoRechazo ?? null,
+              montoEntregadoEfectivo: data.montoEntregadoEfectivo ?? null,
+            });
+          }
+          return pendiente;
+        });
+      },
+      (err) => {
+        console.warn("[DashboardNotifications] onSnapshot rechazada trabajador:", err);
+      }
+    );
 
     return () => {
-      cancelled = true;
-      clearInterval(id);
-      document.removeEventListener("visibilitychange", onVisible);
+      unsubPendiente();
+      unsubRechazada();
     };
-  }, [user, role]);
+  }, [user?.uid, role, profile?.empresaId]);
 
   useEffect(() => {
     if (!db || !user || role !== "admin" || !profile?.empresaId) return;

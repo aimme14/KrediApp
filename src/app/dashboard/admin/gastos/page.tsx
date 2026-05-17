@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef, type ReactNode } from "react";
+import { useState, useEffect, useRef, type ReactNode } from "react";
+import { collection, query, where, onSnapshot } from "firebase/firestore";
 import { useAuth } from "@/context/AuthContext";
 import { useAdminDashboard } from "@/context/AdminDashboardContext";
+import { db } from "@/lib/firebase";
 import {
-  listGastos,
   createGasto,
   type GastoItem,
 } from "@/lib/empresa-api";
@@ -18,6 +19,10 @@ import {
   fechaDiaColombiaHoy,
   formatoFechaGastoColombia,
 } from "@/lib/colombia-day-bounds";
+
+const EMPRESAS_COLLECTION = "empresas";
+const GASTOS_ADMIN_SUBCOLLECTION = "gastosAdministrador";
+const GASTOS_EMPLEADO_SUBCOLLECTION = "gastosEmpleado";
 
 const TIPOS = [
   { value: "transporte", label: "Transporte", icon: "transporte" },
@@ -155,18 +160,102 @@ export default function GastosPage() {
     return timeB - timeA;
   });
 
-  const loadGastos = useCallback(async () => {
-    if (!user) return;
-    const token = await user.getIdToken();
-    listGastos(token)
-      .then(setGastos)
-      .catch((e) => setError(e instanceof Error ? e.message : "Error al cargar gastos"))
-      .finally(() => setLoading(false));
-  }, [user]);
-
   useEffect(() => {
-    loadGastos();
-  }, [loadGastos]);
+    if (!db || !user || !profile?.empresaId) return;
+    const empresaId = profile.empresaId.trim();
+    if (!empresaId) return;
+
+    setLoading(true);
+
+    const empresaBase = `${EMPRESAS_COLLECTION}/${empresaId}`;
+
+    const qAdmin = query(
+      collection(db, empresaBase, GASTOS_ADMIN_SUBCOLLECTION),
+      where("adminId", "==", user.uid)
+    );
+
+    const qEmpleado = query(
+      collection(db, empresaBase, GASTOS_EMPLEADO_SUBCOLLECTION),
+      where("adminId", "==", user.uid)
+    );
+
+    let gastosAdmin: GastoItem[] = [];
+    let gastosEmpleado: GastoItem[] = [];
+
+    const merge = () => {
+      const byId = new Map<string, GastoItem>();
+      gastosAdmin.forEach((g) => byId.set(`admin-${g.id}`, g));
+      gastosEmpleado.forEach((g) => byId.set(`empleado-${g.id}`, g));
+      const merged = Array.from(byId.values());
+      merged.sort((a, b) =>
+        (b.fecha ? new Date(b.fecha).getTime() : 0) -
+        (a.fecha ? new Date(a.fecha).getTime() : 0)
+      );
+      setGastos(merged);
+      setLoading(false);
+    };
+
+    const mapDoc = (
+      d: { id: string; data: () => Record<string, unknown> },
+      alcanceOverride?: string
+    ): GastoItem => {
+      const data = d.data();
+      return {
+        id: d.id,
+        descripcion: String(data.descripcion ?? ""),
+        monto: typeof data.monto === "number" ? data.monto : 0,
+        fecha:
+          typeof (data.fecha as { toDate?: () => Date })?.toDate === "function"
+            ? (data.fecha as { toDate: () => Date }).toDate().toISOString()
+            : null,
+        tipo: String(data.tipo ?? "otro"),
+        creadoPor: String(data.creadoPor ?? ""),
+        creadoPorNombre: String(data.creadoPorNombre ?? ""),
+        rol: String(data.rol ?? "admin"),
+        rutaId: String(data.rutaId ?? ""),
+        adminId: String(data.adminId ?? ""),
+        empleadoId: String(data.empleadoId ?? ""),
+        evidencia: String(data.evidencia ?? ""),
+        alcance: alcanceOverride ?? String(data.alcance ?? ""),
+      };
+    };
+
+    const unsubAdmin = onSnapshot(
+      qAdmin,
+      (snap) => {
+        gastosAdmin = snap.docs.map((d) =>
+          mapDoc(d as unknown as { id: string; data: () => Record<string, unknown> })
+        );
+        merge();
+      },
+      (err) => {
+        console.warn("[GastosAdmin] onSnapshot gastosAdmin:", err);
+        setLoading(false);
+      }
+    );
+
+    const unsubEmpleado = onSnapshot(
+      qEmpleado,
+      (snap) => {
+        gastosEmpleado = snap.docs.map((d) =>
+          mapDoc(
+            d as unknown as { id: string; data: () => Record<string, unknown> },
+            "empleado"
+          )
+        );
+        merge();
+      },
+      (err) => {
+        console.warn("[GastosAdmin] onSnapshot gastosEmpleado:", err);
+        setLoading(false);
+      }
+    );
+
+    return () => {
+      unsubAdmin();
+      unsubEmpleado();
+    };
+  }, [user?.uid, profile?.empresaId]);
 
   useEffect(() => {
     if (!showCamera) return;
@@ -289,7 +378,6 @@ export default function GastosPage() {
       setEvidenciaFile(null);
       setEvidenciaPreview(null);
       setShowForm(false);
-      await loadGastos();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al registrar gasto");
     } finally {

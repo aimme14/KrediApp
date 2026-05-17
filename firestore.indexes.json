@@ -42,6 +42,14 @@
       ]
     },
     {
+      "collectionGroup": "solicitudesEntregaReporte",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "empleadoUid", "order": "ASCENDING" },
+        { "fieldPath": "estado", "order": "ASCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "periodosAdmin",
       "queryScope": "COLLECTION",
       "fields": [
