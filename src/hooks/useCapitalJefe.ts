@@ -1,12 +1,20 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { doc, onSnapshot } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import { useAuth } from "@/context/AuthContext";
 import {
   getCapital,
   type CapitalHistorialEntry,
   type CapitalResponse,
 } from "@/lib/capital";
+import { computeCapitalEmpresa } from "@/lib/capital-formulas";
+import {
+  EMPRESAS_COLLECTION,
+  CAPITAL_SUBCOLLECTION,
+  CAPITAL_CAJA_EMPRESA_DOC,
+} from "@/lib/empresas-db";
 
 export type { CapitalHistorialEntry, CapitalResponse };
 
@@ -15,6 +23,7 @@ export function useCapitalJefe() {
   const [capital, setCapital] = useState<CapitalResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [cajaEmpresaRT, setCajaEmpresaRT] = useState<number | null>(null);
 
   const reload = useCallback(async () => {
     if (!user || !profile) return;
@@ -39,11 +48,38 @@ export function useCapitalJefe() {
     void reload();
   }, [reload]);
 
-  const monto =
-    capital?.capitalEmpresa ?? capital?.capitalTotal ?? capital?.monto ?? 0;
-  const cajaEmpresa = capital?.cajaEmpresa ?? 0;
+  useEffect(() => {
+    if (!db || !user || profile?.role !== "jefe") return;
+    const jefeUid = profile.uid;
+
+    const ref = doc(
+      db,
+      EMPRESAS_COLLECTION,
+      jefeUid,
+      CAPITAL_SUBCOLLECTION,
+      CAPITAL_CAJA_EMPRESA_DOC
+    );
+    const unsub = onSnapshot(
+      ref,
+      (snap) => {
+        if (!snap.exists()) return;
+        const caja = snap.data()?.cajaEmpresa;
+        setCajaEmpresaRT(typeof caja === "number" ? caja : null);
+      },
+      (err) => {
+        console.warn("[useCapitalJefe] onSnapshot cajaEmpresa:", err);
+      }
+    );
+    return unsub;
+  }, [user?.uid, profile?.role, profile?.uid]);
+
   const sumaCapitalAdmins =
     capital?.sumaCapitalAdmins ?? capital?.capitalAsignadoAdmins ?? 0;
+  const cajaEmpresa = cajaEmpresaRT ?? capital?.cajaEmpresa ?? 0;
+  const monto =
+    cajaEmpresaRT != null
+      ? computeCapitalEmpresa(cajaEmpresa, sumaCapitalAdmins)
+      : capital?.capitalEmpresa ?? capital?.capitalTotal ?? capital?.monto ?? 0;
   const historial = capital?.historial ?? [];
 
   return {

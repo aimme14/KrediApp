@@ -5264,8 +5264,42 @@ a.admin-inicio-link-btn {
   flex: 1 1 0;
   justify-content: center;
   min-width: 0;
-  padding: 0.38rem 0.5rem;
+  padding: 0.55rem 0.5rem;
   font-size: 0.8125rem;
+  border: 1.5px solid var(--card-border);
+  transition:
+    background 0.2s,
+    color 0.2s,
+    border-color 0.2s,
+    box-shadow 0.2s;
+}
+
+.jefe-inicio-compact-wrap #gf-tab-capital {
+  border-color: color-mix(in srgb, #22c55e 42%, var(--card-border));
+}
+
+.jefe-inicio-compact-wrap #gf-tab-capital:hover {
+  border-color: color-mix(in srgb, #22c55e 68%, var(--card-border));
+  background: color-mix(in srgb, #22c55e 10%, transparent);
+}
+
+.jefe-inicio-compact-wrap #gf-tab-capital.gf-tab-active {
+  border-color: #22c55e;
+  box-shadow: 0 1px 4px color-mix(in srgb, #22c55e 28%, transparent);
+}
+
+.jefe-inicio-compact-wrap #gf-tab-caja {
+  border-color: color-mix(in srgb, #a855f7 42%, var(--card-border));
+}
+
+.jefe-inicio-compact-wrap #gf-tab-caja:hover {
+  border-color: color-mix(in srgb, #a855f7 68%, var(--card-border));
+  background: color-mix(in srgb, #a855f7 10%, transparent);
+}
+
+.jefe-inicio-compact-wrap #gf-tab-caja.gf-tab-active {
+  border-color: #a855f7;
+  box-shadow: 0 1px 4px color-mix(in srgb, #a855f7 28%, transparent);
 }
 
 .jefe-inicio-compact-wrap .gf-tab-icon {
