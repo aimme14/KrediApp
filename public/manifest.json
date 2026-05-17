@@ -1,4 +1,5 @@
 {
+  "id": "/dashboard",
   "name": "KrediApp",
   "short_name": "KrediApp",
   "description": "Gestión de rutas, préstamos y cobranza",
