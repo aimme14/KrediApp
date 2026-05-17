@@ -8,18 +8,17 @@ function roundMoney(n: number): number {
 }
 
 /**
- * Patrimonio de ruta: base ruta + bases empleados + capital colocado en préstamos − pérdidas reconocidas.
+ * Patrimonio de ruta: cajaRuta + cajasEmpleados + inversiones.
+ * Las pérdidas reconocidas reducen `inversiones` al registrarse; no se restan aparte del capital.
  * La ganancia por intereses queda en la caja del trabajador (cajasEmpleados), no se suma aparte.
  */
 export function computeCapitalTotalRutaDesdeSaldos(r: {
   cajaRuta: number;
   cajasEmpleados: number;
   inversiones: number;
-  perdidas: number;
+  perdidas?: number;
 }): number {
-  return roundMoney(
-    r.cajaRuta + r.cajasEmpleados + r.inversiones - r.perdidas
-  );
+  return roundMoney(r.cajaRuta + r.cajasEmpleados + r.inversiones);
 }
 
 /**
@@ -37,7 +36,7 @@ export function computeCapitalEmpresa(
  * capitalAdmin = cajaAdmin + suma(capitalRuta).
  * Los gastos operativos del admin se pagan desde caja al registrarse (`descontarCajaAdmin`);
  * no se restan los montos de gastos otra vez aquí (evita doble descuento).
- * La suma de capitalRuta usa `capitalTotal` de cada ruta (ya neto de pérdidas registradas en la ruta).
+ * La suma de capitalRuta usa `capitalTotal` de cada ruta (cajaRuta + cajasEmpleados + inversiones).
  */
 export function computeCapitalAdmin(params: {
   cajaAdmin: number;
@@ -62,21 +61,21 @@ export function computeCapitalRutaParaSumaAdmin(r: {
 }
 
 /**
- * Patrimonio de ruta: cajaRuta + cajasEmpleados + inversiones − perdidas.
- * `ganancias` y `capitalTotal` opcional no alteran el resultado (compatibilidad de llamadas).
+ * Patrimonio de ruta: cajaRuta + cajasEmpleados + inversiones.
+ * `ganancias` y `perdidas` son informativos (p. ej. utilidad); no alteran el capital.
+ * `capitalTotal` opcional en el tipo se ignora aquí (usar valor persistido en el llamador si aplica).
  */
 export function computeCapitalRutaFromRutaFields(r: {
   cajaRuta: number;
   cajasEmpleados: number;
   inversiones: number;
   ganancias: number;
-  perdidas: number;
+  perdidas?: number;
   capitalTotal?: number;
 }): number {
   return computeCapitalTotalRutaDesdeSaldos({
     cajaRuta: r.cajaRuta,
     cajasEmpleados: r.cajasEmpleados,
     inversiones: r.inversiones,
-    perdidas: r.perdidas,
   });
 }

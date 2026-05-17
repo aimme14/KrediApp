@@ -25,7 +25,7 @@ export interface CapitalAdminDesglose {
   sumaCapitalRutas: number;
   gastosAdmin: number;
   gastosRuta: number;
-  /** Suma de ruta.perdidas (informativo; el capital de ruta ya lo refleja en capitalTotal) */
+  /** Suma de ruta.perdidas (informativo; el capital refleja el descuento en inversiones al registrar la pérdida) */
   perdidasAcumuladasRutas: number;
   capitalAdmin: number;
 }
