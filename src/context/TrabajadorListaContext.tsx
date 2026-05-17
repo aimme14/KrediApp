@@ -6,7 +6,6 @@ import {
   useContext,
   useEffect,
   useMemo,
-  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -19,13 +18,13 @@ import {
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/context/AuthContext";
 import {
-  listClientes,
   type ClienteItem,
   type PrestamoItem,
 } from "@/lib/empresa-api";
 
 const EMPRESAS_COLLECTION = "empresas";
 const PRESTAMOS_SUBCOLLECTION = "prestamos";
+const CLIENTES_SUBCOLLECTION = "clientes";
 
 export type TrabajadorListaContextValue = {
   clientes: ClienteItem[];
@@ -45,41 +44,71 @@ export function TrabajadorListaProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastFetchedAt, setLastFetchedAt] = useState(0);
-  const hasLoadedOnce = useRef(false);
 
   const refresh = useCallback(async () => {
-    const canUse =
-      !!user && !!profile && (profile.role === "trabajador" || profile.role === "admin");
-    if (!canUse) {
-      setClientes([]);
-      setPrestamos([]);
-      setError(null);
-      setLastFetchedAt(0);
-      hasLoadedOnce.current = false;
-      return;
-    }
+    // Los clientes y préstamos se actualizan via onSnapshot automáticamente
+    // refresh se mantiene por compatibilidad pero no hace fetch
+  }, []);
 
-    const initial = !hasLoadedOnce.current;
-    if (initial) setLoading(true);
-    setError(null);
-    try {
-      const token = await user.getIdToken();
-      const c = await listClientes(token);
-      setClientes(c);
-      setLastFetchedAt(Date.now());
-      hasLoadedOnce.current = true;
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : "Error al cargar clientes";
-      setError(msg);
-      if (!hasLoadedOnce.current) setClientes([]);
-    } finally {
-      if (initial) setLoading(false);
-    }
-  }, [user, profile]);
-
+  // onSnapshot para clientes
   useEffect(() => {
-    void refresh();
-  }, [refresh]);
+    if (!db || !user || !profile) return;
+    const empresaId = profile.empresaId?.trim();
+    if (!empresaId) return;
+
+    const canUse = profile.role === "trabajador" || profile.role === "admin";
+    if (!canUse) return;
+
+    setLoading(true);
+
+    const clientesCol = collection(
+      db,
+      EMPRESAS_COLLECTION,
+      empresaId,
+      CLIENTES_SUBCOLLECTION
+    );
+
+    const q =
+      profile.role === "trabajador" && profile.rutaId
+        ? query(clientesCol, where("rutaId", "==", profile.rutaId))
+        : query(clientesCol, where("adminId", "==", user.uid));
+
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        const list: ClienteItem[] = snap.docs.map((d) => {
+          const data = d.data();
+          return {
+            id: d.id,
+            nombre: data.nombre ?? "",
+            ubicacion: data.ubicacion ?? "",
+            direccion: data.direccion ?? "",
+            telefono: data.telefono ?? "",
+            cedula: data.cedula ?? "",
+            rutaId: data.rutaId ?? "",
+            adminId: data.adminId ?? "",
+            prestamo_activo: data.prestamo_activo === true,
+            moroso: data.moroso === true,
+            fechaCreacion: data.fechaCreacion?.toDate?.()?.toISOString?.() ?? null,
+            codigo: data.codigo ?? undefined,
+          };
+        });
+        list.sort((a, b) =>
+          (b.fechaCreacion ? new Date(b.fechaCreacion).getTime() : 0) -
+          (a.fechaCreacion ? new Date(a.fechaCreacion).getTime() : 0)
+        );
+        setClientes(list);
+        setLastFetchedAt(Date.now());
+        setLoading(false);
+      },
+      (err) => {
+        console.warn("[TrabajadorLista] onSnapshot clientes:", err);
+        setLoading(false);
+      }
+    );
+
+    return unsub;
+  }, [user?.uid, profile?.role, profile?.empresaId, profile?.rutaId]);
 
   useEffect(() => {
     if (!db || !user || !profile) return;
