@@ -113,6 +113,15 @@ function CloseIcon() {
   );
 }
 
+function EyeIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  );
+}
+
 export default function GastosPage() {
   const { user, profile } = useAuth();
   const { rutas } = useAdminDashboard();
@@ -127,6 +136,7 @@ export default function GastosPage() {
   const [evidenciaPreview, setEvidenciaPreview] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [motivoOverlay, setMotivoOverlay] = useState<string | null>(null);
+  const [gastoDetalle, setGastoDetalle] = useState<GastoItem | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [alcanceGasto, setAlcanceGasto] = useState<"admin" | "ruta">("admin");
   const [rutaIdGasto, setRutaIdGasto] = useState("");
@@ -687,7 +697,27 @@ export default function GastosPage() {
               <p className="gastos-empty-msg">No hay gastos que coincidan con la búsqueda.</p>
             ) : (
             <>
-            <div className="table-wrap gastos-table-wrap gastos-admin-table-wrap">
+            <div className="gastos-admin-mobile-list" role="list" aria-label="Lista de gastos">
+              {gastosOrdenados.map((g) => (
+                <div key={`${g.rol}-${g.id}-mobile`} className="gastos-admin-mobile-row" role="listitem">
+                  <span className="gastos-admin-mobile-nombre" title={g.creadoPorNombre ?? undefined}>
+                    {g.creadoPorNombre ?? <span className="gastos-admin-dash">—</span>}
+                  </span>
+                  <span className="gastos-admin-mobile-fecha">
+                    {formatoFechaGastoColombia(g.fecha ?? null)}
+                  </span>
+                  <button
+                    type="button"
+                    className="gastos-admin-mobile-ver-btn"
+                    onClick={() => setGastoDetalle(g)}
+                    aria-label={`Ver detalle del gasto de ${g.creadoPorNombre || "sin nombre"}`}
+                  >
+                    <EyeIcon />
+                  </button>
+                </div>
+              ))}
+            </div>
+            <div className="table-wrap gastos-table-wrap gastos-admin-table-wrap gastos-admin-table-desktop">
               <table className="gastos-table gastos-admin-table">
                 <thead>
                   <tr>
@@ -750,6 +780,66 @@ export default function GastosPage() {
             <span className="gastos-motivo-overlay-label">Motivo</span>
             <p className="gastos-motivo-overlay-text">{motivoOverlay}</p>
             <button type="button" className="btn btn-primary" onClick={() => setMotivoOverlay(null)}>
+              Cerrar
+            </button>
+          </div>
+        </div>
+      )}
+
+      {gastoDetalle !== null && (
+        <div className="gastos-motivo-overlay gastos-admin-detalle-overlay" role="dialog" aria-modal="true" aria-label="Detalle del gasto">
+          <div className="gastos-motivo-overlay-backdrop" onClick={() => setGastoDetalle(null)} aria-hidden />
+          <div className="gastos-motivo-overlay-box gastos-admin-detalle-box">
+            <div className="gastos-admin-detalle-header">
+              <h4 className="gastos-admin-detalle-title">Detalle del gasto</h4>
+              <button
+                type="button"
+                className="gastos-admin-detalle-close"
+                onClick={() => setGastoDetalle(null)}
+                aria-label="Cerrar detalle"
+              >
+                <CloseIcon />
+              </button>
+            </div>
+            <dl className="gastos-admin-detalle-dl">
+              <div className="gastos-admin-detalle-row">
+                <dt>Nombre</dt>
+                <dd>{gastoDetalle.creadoPorNombre || "—"}</dd>
+              </div>
+              <div className="gastos-admin-detalle-row">
+                <dt>Fecha</dt>
+                <dd>{formatoFechaGastoColombia(gastoDetalle.fecha ?? null)}</dd>
+              </div>
+              <div className="gastos-admin-detalle-row">
+                <dt>Tipo</dt>
+                <dd>{tipoLabel(gastoDetalle.tipo ?? "")}</dd>
+              </div>
+              <div className="gastos-admin-detalle-row">
+                <dt>Ámbito</dt>
+                <dd>{renderAlcance(gastoDetalle)}</dd>
+              </div>
+              <div className="gastos-admin-detalle-row">
+                <dt>Monto</dt>
+                <dd className="gastos-admin-detalle-monto">{formatMoneda(gastoDetalle.monto ?? 0)}</dd>
+              </div>
+              <div className="gastos-admin-detalle-row">
+                <dt>Evidencia</dt>
+                <dd>
+                  {gastoDetalle.evidencia ? (
+                    <a href={gastoDetalle.evidencia} target="_blank" rel="noopener noreferrer">
+                      Ver comprobante
+                    </a>
+                  ) : (
+                    "—"
+                  )}
+                </dd>
+              </div>
+              <div className="gastos-admin-detalle-row gastos-admin-detalle-row-motivo">
+                <dt>Motivo</dt>
+                <dd>{gastoDetalle.descripcion || "—"}</dd>
+              </div>
+            </dl>
+            <button type="button" className="btn btn-primary gastos-admin-detalle-cerrar" onClick={() => setGastoDetalle(null)}>
               Cerrar
             </button>
           </div>

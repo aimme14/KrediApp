@@ -1584,6 +1584,167 @@ td {
   border-color: var(--link);
 }
 
+/* Admin — historial móvil: lista nombre + ver detalle (escritorio sigue con tabla) */
+.gastos-admin-mobile-list {
+  display: none;
+}
+.gastos-admin-mobile-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 0.5rem 0.65rem;
+  padding: 0.7rem 0.8rem;
+  border-bottom: 1px solid var(--table-border);
+  background: var(--card-bg);
+}
+.gastos-admin-mobile-row:last-child {
+  border-bottom: none;
+}
+.gastos-admin-mobile-nombre {
+  min-width: 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gastos-admin-mobile-fecha {
+  flex-shrink: 0;
+  font-size: 0.78rem;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+  white-space: nowrap;
+  text-align: right;
+}
+.gastos-admin-mobile-ver-btn {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.35rem;
+  height: 2.35rem;
+  padding: 0;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--link) 38%, var(--input-border));
+  background: color-mix(in srgb, var(--link) 10%, transparent);
+  color: var(--link);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.gastos-admin-mobile-ver-btn:hover {
+  background: color-mix(in srgb, var(--link) 18%, transparent);
+  border-color: var(--link);
+}
+.gastos-admin-mobile-ver-btn:focus-visible {
+  outline: 2px solid var(--link);
+  outline-offset: 2px;
+}
+.gastos-admin-detalle-box {
+  max-width: min(380px, 100%);
+  padding: 1rem 1.125rem 1.125rem;
+}
+.gastos-admin-detalle-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+.gastos-admin-detalle-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text);
+}
+.gastos-admin-detalle-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.gastos-admin-detalle-close:hover {
+  background: color-mix(in srgb, var(--text-muted) 12%, transparent);
+  color: var(--text);
+}
+.gastos-admin-detalle-dl {
+  margin: 0 0 0.85rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+.gastos-admin-detalle-row {
+  display: grid;
+  grid-template-columns: 5.5rem 1fr;
+  gap: 0.45rem 0.65rem;
+  align-items: start;
+}
+.gastos-admin-detalle-row dt {
+  margin: 0;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  line-height: 1.35;
+}
+.gastos-admin-detalle-row dd {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.4;
+  color: var(--text);
+  word-break: break-word;
+}
+.gastos-admin-detalle-monto {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.gastos-admin-detalle-row-motivo dd {
+  white-space: pre-wrap;
+  max-height: 8rem;
+  overflow-y: auto;
+}
+.gastos-admin-detalle-row dd a {
+  color: var(--link);
+  font-weight: 600;
+  text-decoration: none;
+}
+.gastos-admin-detalle-row dd a:hover {
+  text-decoration: underline;
+}
+.gastos-admin-detalle-cerrar {
+  width: 100%;
+  justify-content: center;
+}
+
+@media (max-width: 640px) {
+  .gastos-admin-table-desktop {
+    display: none;
+  }
+  .gastos-admin-mobile-list {
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--table-border);
+    border-radius: 10px;
+    overflow: hidden;
+    margin-top: 0.25rem;
+  }
+}
+
+@media (min-width: 641px) {
+  .gastos-admin-mobile-list {
+    display: none !important;
+  }
+}
+
 /* Admin — formulario registrar gasto: motivo (textarea alineada a input en escritorio) */
 .gastos-admin-page .gastos-admin-motivo-field {
   display: block;
