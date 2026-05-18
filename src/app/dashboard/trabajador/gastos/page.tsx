@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { collection, query, where, orderBy, limit, onSnapshot } from "firebase/firestore";
+import { collection, query, where, orderBy, onSnapshot } from "firebase/firestore";
 import { useAuth } from "@/context/AuthContext";
 import { useTrabajadorCajaDia } from "@/context/TrabajadorCajaDiaContext";
 import { db } from "@/lib/firebase";
@@ -151,7 +151,7 @@ export default function GastosTrabajadorPage() {
 
   useEffect(() => {
     if (!db || !user || profile?.role !== "trabajador") return;
-    const empresaId = profile?.empresaId?.trim();
+    const empresaId = profile.empresaId?.trim();
     if (!empresaId) return;
 
     setLoading(true);
@@ -159,8 +159,7 @@ export default function GastosTrabajadorPage() {
     const q = query(
       collection(db, "empresas", empresaId, "gastosEmpleado"),
       where("empleadoId", "==", user.uid),
-      orderBy("fecha", "desc"),
-      limit(100)
+      orderBy("fecha", "desc")
     );
 
     const unsub = onSnapshot(
@@ -170,18 +169,18 @@ export default function GastosTrabajadorPage() {
           const data = d.data();
           return {
             id: d.id,
-            descripcion: data.descripcion ?? "",
-            monto: data.monto ?? 0,
+            descripcion: String(data.descripcion ?? ""),
+            monto: typeof data.monto === "number" ? data.monto : 0,
             fecha: data.fecha?.toDate?.()?.toISOString?.() ?? null,
-            tipo: data.tipo ?? "otro",
-            creadoPor: data.creadoPor ?? "",
-            creadoPorNombre: data.creadoPorNombre ?? "",
-            rol: data.rol ?? "empleado",
-            rutaId: data.rutaId ?? "",
-            adminId: data.adminId ?? "",
-            empleadoId: data.empleadoId ?? "",
-            evidencia: data.evidencia ?? "",
-            alcance: data.alcance ?? "",
+            tipo: String(data.tipo ?? "otro"),
+            creadoPor: String(data.creadoPor ?? ""),
+            creadoPorNombre: String(data.creadoPorNombre ?? ""),
+            rol: "empleado",
+            rutaId: String(data.rutaId ?? ""),
+            adminId: String(data.adminId ?? ""),
+            empleadoId: String(data.empleadoId ?? ""),
+            evidencia: String(data.evidencia ?? ""),
+            alcance: String(data.alcance ?? "empleado"),
           };
         });
         setGastos(list);
