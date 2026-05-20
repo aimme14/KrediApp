@@ -11,7 +11,6 @@ import type {
   PrestamoDesembolsoDiaItem,
 } from "@/lib/empresa-api";
 import { formatoCuotasRestanteTotal } from "@/lib/cuotas-display";
-import { tuCajaDelDiaDesdeTotales } from "@/lib/tu-caja-del-dia";
 
 function formatMonto(value: number): string {
   const hasDecimals = Math.round(value * 100) % 100 !== 0;
@@ -116,7 +115,8 @@ function TarjetaResumen(props: { etiqueta: ReactNode; valor: string }) {
 
 export default function CajaDelDiaPage() {
   const { profile } = useAuth();
-  const { fechaDia, data, loading, error } = useTrabajadorCajaDia();
+  const { fechaDia, data, loading, error, cajaEmpleadoRT } = useTrabajadorCajaDia();
+  const cajaActual = cajaEmpleadoRT ?? data?.cajaEmpleado ?? 0;
   const [evidenciaModalUrl, setEvidenciaModalUrl] = useState<string | null>(null);
   const evidenciaCerrarRef = useRef<HTMLButtonElement>(null);
 
@@ -211,7 +211,7 @@ export default function CajaDelDiaPage() {
                 >
                   <TarjetaResumen
                     etiqueta={`Tu caja del día (${data.fechaDia})`}
-                    valor={formatMonto(data.tuCajaDelDia ?? tuCajaDelDiaDesdeTotales(data))}
+                    valor={formatMonto(cajaActual)}
                   />
                   <TarjetaResumen
                     etiqueta={`Total cobrado (${data.fechaDia})`}

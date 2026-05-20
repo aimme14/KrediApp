@@ -17,6 +17,14 @@
       ]
     },
     {
+      "collectionGroup": "gastosEmpleado",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "empleadoId", "order": "ASCENDING" },
+        { "fieldPath": "fecha", "order": "DESCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "solicitudesEntregaReporte",
       "queryScope": "COLLECTION",
       "fields": [
@@ -31,6 +39,22 @@
       "fields": [
         { "fieldPath": "estado", "order": "ASCENDING" },
         { "fieldPath": "adminId", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "solicitudesEntregaReporte",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "empleadoUid", "order": "ASCENDING" },
+        { "fieldPath": "estado", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "periodosAdmin",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "adminId", "order": "ASCENDING" },
+        { "fieldPath": "estado", "order": "ASCENDING" }
       ]
     }
   ],

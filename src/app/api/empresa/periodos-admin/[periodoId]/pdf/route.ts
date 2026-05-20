@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminFirestore } from "@/lib/firebase-admin";
 import { getApiUser } from "@/lib/api-auth";
-import { EMPRESAS_COLLECTION, PERIODOS_ADMIN_SUBCOLLECTION } from "@/lib/empresas-db";
+import { EMPRESAS_COLLECTION, PERIODOS_ADMIN_SUBCOLLECTION, USUARIOS_SUBCOLLECTION } from "@/lib/empresas-db";
 import { buildPeriodoAdminPdf } from "@/lib/periodo-admin-pdf";
 import type { PeriodoAdminSnapshot } from "@/lib/periodo-admin-snapshot";
 
@@ -68,8 +68,27 @@ export async function GET(
     return NextResponse.json({ error: "Falta snapshot de cierre para generar el PDF." }, { status: 400 });
   }
 
+  const empresaSnap = await db
+    .collection(EMPRESAS_COLLECTION)
+    .doc(apiUser.empresaId)
+    .get();
+  const nombreEmpresa = (empresaSnap.data()?.nombre as string)?.trim() || "KrediApp";
+
+  const usuarioSnap = await db
+    .collection(EMPRESAS_COLLECTION)
+    .doc(apiUser.empresaId)
+    .collection(USUARIOS_SUBCOLLECTION)
+    .doc(apiUser.uid)
+    .get();
+  const nombreAdmin =
+    (usuarioSnap.data()?.displayName as string)?.trim() ||
+    (usuarioSnap.data()?.nombre as string)?.trim() ||
+    "Administrador";
+
   const bytes = await buildPeriodoAdminPdf({
     periodoId: snap.id,
+    nombreEmpresa,
+    nombreAdmin,
     fechaAperturaIso: tsToIso(data.fechaApertura) ?? "",
     fechaCierreIso: tsToIso(data.fechaCierre),
     abiertoPorUid: (data.abiertoPorUid as string) ?? "",

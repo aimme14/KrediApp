@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
+import { FieldValue } from "firebase-admin/firestore";
 import { getAdminFirestore } from "@/lib/firebase-admin";
 import { getApiUser } from "@/lib/api-auth";
 import {
   EMPRESAS_COLLECTION,
   CLIENTES_SUBCOLLECTION,
   RUTAS_SUBCOLLECTION,
+  USUARIOS_SUBCOLLECTION,
+  USERS_COLLECTION,
 } from "@/lib/empresas-db";
 
 const COUNTERS_COLLECTION = "counters";
@@ -51,7 +54,7 @@ export async function GET(request: NextRequest) {
   }> = [];
 
   if (apiUser.role === "empleado" && apiUser.rutaId) {
-    const snap = await col.where("rutaId", "==", apiUser.rutaId).get();
+    const snap = await col.where("rutaId", "==", apiUser.rutaId).limit(200).get();
     list = snap.docs.map((d) => {
       const data = d.data();
       return {
@@ -72,7 +75,7 @@ export async function GET(request: NextRequest) {
   } else {
     // Admin/Jefe: clientes con adminId == uid Y además clientes de sus rutas (por si adminId quedó mal en algún cliente)
     const [snapByAdmin, rutasSnap] = await Promise.all([
-      col.where("adminId", "==", apiUser.uid).get(),
+      col.where("adminId", "==", apiUser.uid).limit(200).get(),
       empresaRef
         .collection(RUTAS_SUBCOLLECTION)
         .where("adminId", "==", apiUser.uid)
@@ -112,7 +115,7 @@ export async function GET(request: NextRequest) {
         chunks.push(rutaIds.slice(i, i + limitIn));
       }
       const chunkSnaps = await Promise.all(
-        chunks.map((chunk) => col.where("rutaId", "in", chunk).get())
+        chunks.map((chunk) => col.where("rutaId", "in", chunk).limit(200).get())
       );
       for (const snapByRuta of chunkSnaps) {
         snapByRuta.docs.forEach(add);
@@ -201,6 +204,12 @@ export async function POST(request: NextRequest) {
   });
   const codigo = `CL-${adminNumStr}-${rutaNumStr}-${String(clienteNum).padStart(3, "0")}`;
 
+  const userSnapEmp = await db.collection(USERS_COLLECTION).doc(apiUser.uid).get();
+  const creadoPorNombre =
+    (userSnapEmp.data()?.displayName as string)?.trim() ||
+    (userSnapEmp.data()?.email as string)?.trim() ||
+    apiUser.uid;
+
   await ref.set({
     nombre: nombre.trim(),
     ubicacion: (ubicacion ?? "").trim() || "",
@@ -214,6 +223,36 @@ export async function POST(request: NextRequest) {
     fechaCreacion: now,
     codigo,
   });
+
+  const usuarioRef = db
+    .collection(EMPRESAS_COLLECTION)
+    .doc(apiUser.empresaId)
+    .collection(USUARIOS_SUBCOLLECTION)
+    .doc(adminIdFinal);
+
+  await usuarioRef.set(
+    { totalClientes: FieldValue.increment(1) },
+    { merge: true }
+  );
+
+  const adminUidCliente = adminIdFinal.trim();
+  if (apiUser.role === "empleado" && adminUidCliente) {
+    void (async () => {
+      try {
+        const { getAdminMessaging } = await import("@/lib/firebase-admin");
+        const { notifyAdminClienteEmpleado } = await import("@/lib/fcm-notify-admin");
+        await notifyAdminClienteEmpleado(getAdminMessaging(), {
+          adminUid: adminUidCliente,
+          empresaId: apiUser.empresaId,
+          empleadoNombre: creadoPorNombre ?? apiUser.uid,
+          clienteNombre: nombre.trim(),
+          clienteId: ref.id,
+        });
+      } catch (e) {
+        console.warn("[fcm] notify admin cliente:", e);
+      }
+    })();
+  }
 
   return NextResponse.json({ id: ref.id });
 }

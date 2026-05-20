@@ -73,7 +73,7 @@ export function getAuthErrorMessage(e: unknown, opts?: { mode?: "signIn" | "reau
     case "auth/invalid-email":
       return "El correo no es válido.";
     case "auth/user-disabled":
-      return "Esta cuenta está deshabilitada. Contacta al administrador.";
+      return "Horario no laboral.";
     case "auth/user-not-found":
     case "auth/wrong-password":
     case "auth/invalid-credential":

@@ -44,6 +44,18 @@ service cloud.firestore {
         allow read: if request.auth != null;
         allow write: if false;
       }
+      match /gastosEmpleado/{gastoId} {
+        allow read: if request.auth != null;
+        allow write: if false;
+      }
+      match /gastosAdministrador/{gastoId} {
+        allow read: if request.auth != null;
+        allow write: if false;
+      }
+      match /gastosEmpresa/{gastoId} {
+        allow read: if request.auth != null;
+        allow write: if false;
+      }
     }
   }
 }

@@ -257,8 +257,10 @@
     height: 100dvh;
     height: 100svh;
     overflow: hidden;
-    padding: max(10px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right))
-      max(10px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+    align-items: flex-start;
+    justify-content: center;
+    padding: 0 max(12px, env(safe-area-inset-right, 0px)) max(10px, env(safe-area-inset-bottom, 0px))
+      max(12px, env(safe-area-inset-left, 0px));
   }
 
   .shell {
@@ -269,6 +271,8 @@
     max-height: 100%;
     flex: 0 1 auto;
     overflow: hidden;
+    margin-top: calc(env(safe-area-inset-top, 0px) + 3dvh);
+    border-radius: 20px;
   }
 
   .left {

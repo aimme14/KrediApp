@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
-import { TrabajadorRutaProvider, useTrabajadorRuta } from "@/context/TrabajadorRutaContext";
+import { TrabajadorRutaProvider } from "@/context/TrabajadorRutaContext";
 import { TrabajadorListaProvider } from "@/context/TrabajadorListaContext";
 import { TrabajadorCajaDiaProvider } from "@/context/TrabajadorCajaDiaContext";
 import { TrabajadorActionIcon } from "@/components/trabajador/TrabajadorActionIcon";
@@ -28,26 +28,6 @@ const BOTTOM_NAV_ITEMS = [
   { href: "/dashboard/trabajador/caja-del-dia", label: "Caja del día", icon: "wallet" as const },
   { type: "menu" as const, label: "Más", icon: "menu" as const },
 ];
-
-/** Bloquea la operación si el admin cerró la ruta (`rutaOperativa === false`). Una sola suscripción en el provider. */
-function RutaOperativaGate({ children }: { children: React.ReactNode }) {
-  const { puedeOperar, loading } = useTrabajadorRuta();
-
-  if (loading || puedeOperar) {
-    return <>{children}</>;
-  }
-
-  return (
-    <div className="container" style={{ paddingTop: "2rem", maxWidth: "420px" }}>
-      <div className="card ruta-operativa-cerrada-card">
-        <h2 className="ruta-operativa-cerrada-title">Ruta no disponible.</h2>
-        <p className="ruta-operativa-cerrada-hint">
-          Si necesitas trabajar ya, contacta al administrador para que habilite la operación del día.
-        </p>
-      </div>
-    </div>
-  );
-}
 
 /** Rutas que conviene precargar para que el cambio de pestaña sea más rápido. */
 const PREFETCH_TRABAJADOR_HREFS = [
@@ -170,9 +150,7 @@ export default function TrabajadorLayout({ children }: { children: React.ReactNo
           {menuOpen && (
             <button type="button" className="jefe-drawer-backdrop" onClick={() => setMenuOpen(false)} aria-label="Cerrar menú" />
           )}
-          <main className="jefe-main">
-            <RutaOperativaGate>{children}</RutaOperativaGate>
-          </main>
+          <main className="jefe-main">{children}</main>
           {bottomNavHostReady ? createPortal(bottomNav, document.body) : bottomNav}
         </div>
         </TrabajadorCajaDiaProvider>

@@ -7,6 +7,7 @@ import {
   CLIENTES_SUBCOLLECTION,
   PRESTAMOS_SUBCOLLECTION,
   RUTAS_SUBCOLLECTION,
+  USERS_COLLECTION,
   USUARIOS_SUBCOLLECTION,
 } from "@/lib/empresas-db";
 import {
@@ -36,8 +37,8 @@ export async function GET(request: NextRequest) {
   const col = db.collection(EMPRESAS_COLLECTION).doc(apiUser.empresaId).collection(PRESTAMOS_SUBCOLLECTION);
   const snap =
     apiUser.role === "empleado" && apiUser.rutaId
-      ? await col.where("rutaId", "==", apiUser.rutaId).get()
-      : await col.where("adminId", "==", apiUser.uid).get();
+      ? await col.where("rutaId", "==", apiUser.rutaId).limit(200).get()
+      : await col.where("adminId", "==", apiUser.uid).limit(200).get();
 
   const prestamos = snap.docs.map((d) => {
     const data = d.data();
@@ -239,8 +240,29 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  const clienteNombre =
+    typeof clienteSnap.data()?.nombre === "string"
+      ? (clienteSnap.data()!.nombre as string).trim()
+      : "";
+
+  let empleadoNombre = "";
+  if (apiUser.role === "empleado") {
+    const userSnapEmpleado = await db
+      .collection(USERS_COLLECTION)
+      .doc(apiUser.uid)
+      .get();
+    const userDataEmpleado = userSnapEmpleado.data();
+    empleadoNombre =
+      (typeof userDataEmpleado?.displayName === "string" &&
+        userDataEmpleado.displayName.trim()) ||
+      (typeof userDataEmpleado?.email === "string" &&
+        userDataEmpleado.email.trim()) ||
+      apiUser.uid;
+  }
+
   await ref.set({
     clienteId: clienteId.trim(),
+    clienteNombre,
     rutaId: rutaIdPrestamo,
     adminId: adminIdPrestamo,
     empleadoId: empleadoIdPrestamo,
@@ -263,6 +285,16 @@ export async function POST(request: NextRequest) {
         }
       : {}),
   });
+
+  await db
+    .collection(EMPRESAS_COLLECTION)
+    .doc(apiUser.empresaId)
+    .collection(USUARIOS_SUBCOLLECTION)
+    .doc(adminIdPrestamo)
+    .set(
+      { totalPrestamosActivos: FieldValue.increment(1) },
+      { merge: true }
+    );
 
   if (clienteSnap.exists) {
     await clienteRef.update({ prestamo_activo: true });
@@ -298,5 +330,31 @@ export async function POST(request: NextRequest) {
   }
 
   const payload = { id: ref.id };
-  return finalize(200, payload);
+  const res = await finalize(200, payload);
+
+  if (apiUser.role === "empleado") {
+    const adminUid = adminIdPrestamo;
+    if (adminUid) {
+      void (async () => {
+        try {
+          const { getAdminMessaging } = await import("@/lib/firebase-admin");
+          const { notifyAdminPrestamoEmpleado } = await import(
+            "@/lib/fcm-notify-admin"
+          );
+          await notifyAdminPrestamoEmpleado(getAdminMessaging(), {
+            adminUid,
+            empresaId: apiUser.empresaId,
+            empleadoNombre: empleadoNombre.trim() || apiUser.uid,
+            clienteNombre: clienteNombre.trim() || "Cliente",
+            monto,
+            prestamoId: ref.id,
+          });
+        } catch (e) {
+          console.warn("[fcm] notify admin prestamo:", e);
+        }
+      })();
+    }
+  }
+
+  return res;
 }

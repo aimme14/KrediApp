@@ -7,7 +7,6 @@ import {
   createRuta,
   listClientes,
   listPrestamos,
-  patchRutaOperativa,
   formatClienteCodigoCorto,
   type RutaItem,
   type ClienteItem,
@@ -120,7 +119,6 @@ export default function RutasPage() {
   const [ubicacion, setUbicacion] = useState("");
   const [creating, setCreating] = useState(false);
   const [expandedRutaId, setExpandedRutaId] = useState<string | null>(null);
-  const [operativaSavingId, setOperativaSavingId] = useState<string | null>(null);
 
   const loadRutas = useCallback(async () => {
     if (!user) return;
@@ -176,21 +174,6 @@ export default function RutasPage() {
 
   const getPrestamoForCliente = (rutaId: string, clienteId: string): PrestamoItem | undefined =>
     (prestamosByRuta[rutaId] ?? []).find((p) => p.clienteId === clienteId);
-
-  const handleRutaOperativa = async (rutaId: string, siguiente: boolean) => {
-    if (!user) return;
-    setError(null);
-    setOperativaSavingId(rutaId);
-    try {
-      const token = await user.getIdToken();
-      await patchRutaOperativa(token, rutaId, siguiente);
-      await loadRutas();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Error al actualizar la ruta");
-    } finally {
-      setOperativaSavingId(null);
-    }
-  };
 
   if (!profile || profile.role !== "admin") return null;
 
@@ -290,44 +273,6 @@ export default function RutasPage() {
                       </div>
                     );
                   })}
-                </div>
-
-                <div className="rutas-admin-op-row">
-                  <span className="rutas-admin-op-label">
-                    Operación del día{" "}
-                    <span className="rutas-admin-op-label-sub">(trabajadores)</span>
-                  </span>
-                  <span
-                    className={`rutas-admin-op-badge ${
-                      ruta.rutaOperativa !== false ? "rutas-admin-op-badge--open" : "rutas-admin-op-badge--closed"
-                    }`}
-                  >
-                    {ruta.rutaOperativa !== false ? "Abierta" : "Cerrada"}
-                  </span>
-                  <div className="rutas-admin-op-btns">
-                    <button
-                      type="button"
-                      className="btn btn-primary rutas-admin-op-btn"
-                      disabled={operativaSavingId === ruta.id || ruta.rutaOperativa !== false}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        void handleRutaOperativa(ruta.id, true);
-                      }}
-                    >
-                      {operativaSavingId === ruta.id ? "…" : "Abrir ruta"}
-                    </button>
-                    <button
-                      type="button"
-                      className="btn rutas-admin-op-btn rutas-admin-btn-outline"
-                      disabled={operativaSavingId === ruta.id || ruta.rutaOperativa === false}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        void handleRutaOperativa(ruta.id, false);
-                      }}
-                    >
-                      {operativaSavingId === ruta.id ? "…" : "Cerrar ruta"}
-                    </button>
-                  </div>
                 </div>
 
                 {expanded && (

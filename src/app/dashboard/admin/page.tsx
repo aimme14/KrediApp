@@ -1,16 +1,9 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useMemo } from "react";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
-import {
-  getCajaAdmin,
-  getResumenEconomico,
-  listRutas,
-  listClientes,
-  listPrestamos,
-  type ResumenRutaItem,
-} from "@/lib/empresa-api";
+import { useAdminDashboard } from "@/context/AdminDashboardContext";
 
 function formatMoneda(value: number): string {
   const hasDecimals = Math.round(value * 100) % 100 !== 0;
@@ -30,28 +23,19 @@ function formatFechaCabecera(d: Date): string {
   return raw.charAt(0).toUpperCase() + raw.slice(1);
 }
 
-type Stats = {
-  rutasProgramadas: number;
-  rutasActivas: number;
-  clientes: number;
-  prestamosActivos: number;
-  morosos: number;
-};
-
 export default function AdminDashboardPage() {
   const { user, profile } = useAuth();
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [stats, setStats] = useState<Stats>({
-    rutasProgramadas: 0,
-    rutasActivas: 0,
-    clientes: 0,
-    prestamosActivos: 0,
-    morosos: 0,
-  });
-  const [cajaAdmin, setCajaAdmin] = useState(0);
-  const [capitalAdmin, setCapitalAdmin] = useState(0);
-  const [rutasResumen, setRutasResumen] = useState<ResumenRutaItem[]>([]);
+  const {
+    rutas,
+    cajaAdmin,
+    capitalAdmin,
+    gananciasTotales,
+    totalClientes,
+    totalMorosos,
+    totalPrestamosActivos,
+    loading,
+    error,
+  } = useAdminDashboard();
 
   const fechaTitulo = useMemo(() => formatFechaCabecera(new Date()), []);
 
@@ -67,61 +51,32 @@ export default function AdminDashboardPage() {
     return "Administrador";
   }, [profile, user?.email]);
 
-  const rutasOrdenadas = useMemo(() => {
-    return [...rutasResumen].sort((a, b) =>
-      (a.nombre || "").localeCompare(b.nombre || "", "es", { sensitivity: "base" })
-    );
-  }, [rutasResumen]);
+  const stats = useMemo(
+    () => ({
+      rutasProgramadas: rutas.length,
+      rutasActivas: rutas.length,
+      clientes: totalClientes,
+      prestamosActivos: totalPrestamosActivos,
+      morosos: totalMorosos,
+    }),
+    [rutas.length, totalClientes, totalPrestamosActivos, totalMorosos]
+  );
 
-  /** Misma magnitud que la tarjeta "Ganancias" de cada ruta (`getResumenEconomico`). */
-  const gananciasTotalesRegistradas = useMemo(() => {
-    return rutasResumen.reduce((sum, r) => sum + (r.ganancias ?? 0), 0);
-  }, [rutasResumen]);
+  const rutasOrdenadas = useMemo(
+    () =>
+      [...rutas].sort((a, b) =>
+        (a.nombre || "").localeCompare(b.nombre || "", "es", { sensitivity: "base" })
+      ),
+    [rutas]
+  );
 
-  useEffect(() => {
-    if (!user || !profile || profile.role !== "admin") return;
-    let cancelled = false;
+  const gananciasTotalesRegistradas = gananciasTotales;
 
-    const load = async () => {
-      try {
-        const token = await user.getIdToken();
-        const [rutas, clientes, prestamos, clientesMorosos, caja, resumen] = await Promise.all([
-          listRutas(token),
-          listClientes(token),
-          listPrestamos(token),
-          listClientes(token, undefined, { moroso: true }),
-          getCajaAdmin(token),
-          getResumenEconomico(token),
-        ]);
-        if (cancelled) return;
-        const activos = prestamos.filter((p) => p.estado !== "pagado");
-        const programadas = rutas.length;
-        const activas = Math.min(resumen.rutas.length, programadas);
-        setStats({
-          rutasProgramadas: programadas,
-          rutasActivas: activas,
-          clientes: clientes.length,
-          prestamosActivos: activos.length,
-          morosos: clientesMorosos.length,
-        });
-        setCajaAdmin(caja);
-        setCapitalAdmin(resumen.capitalAdmin ?? 0);
-        setRutasResumen(resumen.rutas ?? []);
-      } catch (e) {
-        if (!cancelled) setError(e instanceof Error ? e.message : "Error al cargar datos");
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    };
-    load();
-    return () => {
-      cancelled = true;
-    };
-  }, [user, profile]);
+  const panelLoading = loading;
 
   if (!profile || profile.role !== "admin") return null;
 
-  if (loading) {
+  if (panelLoading) {
     return (
       <div className="admin-inicio">
         <div className="card" style={{ margin: 0 }}>
@@ -271,7 +226,7 @@ export default function AdminDashboardPage() {
               {rutasOrdenadas.map((r) => {
                 const g = r.ganancias ?? 0;
                 return (
-                  <article key={r.rutaId} className="admin-inicio-ruta-card">
+                  <article key={r.id} className="admin-inicio-ruta-card">
                     <header className="admin-inicio-ruta-card-head">
                       <h3 className="admin-inicio-ruta-title">{r.nombre || "Sin nombre"}</h3>
                       {r.ubicacion ? (
@@ -314,7 +269,7 @@ export default function AdminDashboardPage() {
                         </span>
                         <div className="admin-inicio-ruta-stat-body">
                           <span className="admin-inicio-ruta-stat-label">Inversiones</span>
-                          <span className="admin-inicio-ruta-stat-value">{formatMoneda(r.inversion ?? 0)}</span>
+                          <span className="admin-inicio-ruta-stat-value">{formatMoneda(r.inversiones ?? 0)}</span>
                           <span className="admin-inicio-ruta-stat-hint">acumulado</span>
                         </div>
                       </div>

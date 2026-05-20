@@ -89,9 +89,6 @@ export interface RutaFinanciera {
 
   fechaCreacion: Timestamp;
   ultimaActualizacion: Timestamp;
-
-  /** false = admin cerró la ruta; trabajadores no deben operar hasta reapertura. */
-  rutaOperativa?: boolean;
 }
 
 // ── Estados y tipos de cuota / cobros ─

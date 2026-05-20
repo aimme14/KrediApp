@@ -24,8 +24,6 @@ export type RutaItem = {
   ganancias?: number;
   /** Patrimonio total de la ruta (caja ruta + bases empleados + inversiones − pérdidas). */
   capitalTotal?: number;
-  /** false = trabajadores no pueden cobrar hasta que el admin abra la ruta (manual). */
-  rutaOperativa?: boolean;
 };
 
 export type ClienteItem = {
@@ -218,20 +216,6 @@ export async function asignarBaseEmpleadoDesdeRuta(
   return data;
 }
 
-/** Admin: abre o cierra manualmente la operación del día para los trabajadores de la ruta. */
-export async function patchRutaOperativa(
-  token: string,
-  rutaId: string,
-  rutaOperativa: boolean
-): Promise<void> {
-  const res = await fetchWithAuth(`/api/empresa/rutas/${encodeURIComponent(rutaId)}`, token, {
-    method: "PATCH",
-    body: JSON.stringify({ rutaOperativa }),
-  });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error ?? "Error al actualizar la ruta");
-}
-
 export type SolicitudEntregaReporteApi = {
   id: string;
   empleadoUid: string;
@@ -405,6 +389,8 @@ export type CobrosDelDiaEmpleadoResponse = {
   cobros: CobroDiaItem[];
   noPagos: NoPagoDiaItem[];
   totalCobrosLista: number;
+  /** Saldo en `empresas/{empresaId}/usuarios/{uid}.cajaEmpleado` (si la API lo incluye). */
+  cajaEmpleado?: number;
   /** Total cobrado en ruta + base − gastos − préstamos desde tu caja (tarjeta «Tu caja del día»). */
   tuCajaDelDia: number;
   /** Cobros del día que por reglas de negocio ingresan a tu billetera (titular del préstamo o cobrador si no hay titular). */

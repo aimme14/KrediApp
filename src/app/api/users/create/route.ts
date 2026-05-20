@@ -283,14 +283,13 @@ export async function POST(request: NextRequest) {
         const rd = rutaSnap.data() as Record<string, unknown>;
         const cajaRuta = typeof rd.cajaRuta === "number" ? rd.cajaRuta : 0;
         const inversiones = typeof rd.inversiones === "number" ? rd.inversiones : 0;
-        const perdidas = typeof rd.perdidas === "number" ? rd.perdidas : 0;
         const oldCajas =
           typeof rd.cajasEmpleados === "number" ? rd.cajasEmpleados : 0;
         const cajasEmpleados = oldCajas + montoDesdeBase;
         const prevCapital =
           typeof rd.capitalTotal === "number"
             ? rd.capitalTotal
-            : cajaRuta + oldCajas + inversiones - perdidas;
+            : cajaRuta + oldCajas + inversiones;
         const capitalTotal = prevCapital + montoDesdeBase;
         const merged = { ...rd, cajasEmpleados, capitalTotal, ultimaActualizacion: now };
         await rutaRef.set(

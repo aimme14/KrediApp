@@ -27,11 +27,10 @@ export async function GET(request: NextRequest) {
     .doc(apiUser.empresaId)
     .collection(PERIODOS_ADMIN_SUBCOLLECTION);
 
-  const snap = await col.get();
+  const snap = await col.where("adminId", "==", apiUser.uid).get();
   const list = snap.docs
     .map((d) => {
       const data = d.data();
-      if ((data.adminId as string) !== apiUser.uid) return null;
       return {
         id: d.id,
         estado: (data.estado as string) === "cerrado" ? "cerrado" : "abierto",
@@ -41,7 +40,6 @@ export async function GET(request: NextRequest) {
         cerradoPorUid: (data.cerradoPorUid as string) ?? null,
       };
     })
-    .filter((x): x is NonNullable<typeof x> => x !== null)
     .sort((a, b) => {
       const ta = a.fechaApertura ?? "";
       const tb = b.fechaApertura ?? "";

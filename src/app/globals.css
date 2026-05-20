@@ -1584,6 +1584,167 @@ td {
   border-color: var(--link);
 }
 
+/* Admin — historial móvil: lista nombre + ver detalle (escritorio sigue con tabla) */
+.gastos-admin-mobile-list {
+  display: none;
+}
+.gastos-admin-mobile-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 0.5rem 0.65rem;
+  padding: 0.7rem 0.8rem;
+  border-bottom: 1px solid var(--table-border);
+  background: var(--card-bg);
+}
+.gastos-admin-mobile-row:last-child {
+  border-bottom: none;
+}
+.gastos-admin-mobile-nombre {
+  min-width: 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gastos-admin-mobile-fecha {
+  flex-shrink: 0;
+  font-size: 0.78rem;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+  white-space: nowrap;
+  text-align: right;
+}
+.gastos-admin-mobile-ver-btn {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.35rem;
+  height: 2.35rem;
+  padding: 0;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--link) 38%, var(--input-border));
+  background: color-mix(in srgb, var(--link) 10%, transparent);
+  color: var(--link);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.gastos-admin-mobile-ver-btn:hover {
+  background: color-mix(in srgb, var(--link) 18%, transparent);
+  border-color: var(--link);
+}
+.gastos-admin-mobile-ver-btn:focus-visible {
+  outline: 2px solid var(--link);
+  outline-offset: 2px;
+}
+.gastos-admin-detalle-box {
+  max-width: min(380px, 100%);
+  padding: 1rem 1.125rem 1.125rem;
+}
+.gastos-admin-detalle-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+.gastos-admin-detalle-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text);
+}
+.gastos-admin-detalle-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.gastos-admin-detalle-close:hover {
+  background: color-mix(in srgb, var(--text-muted) 12%, transparent);
+  color: var(--text);
+}
+.gastos-admin-detalle-dl {
+  margin: 0 0 0.85rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+.gastos-admin-detalle-row {
+  display: grid;
+  grid-template-columns: 5.5rem 1fr;
+  gap: 0.45rem 0.65rem;
+  align-items: start;
+}
+.gastos-admin-detalle-row dt {
+  margin: 0;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  line-height: 1.35;
+}
+.gastos-admin-detalle-row dd {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.4;
+  color: var(--text);
+  word-break: break-word;
+}
+.gastos-admin-detalle-monto {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.gastos-admin-detalle-row-motivo dd {
+  white-space: pre-wrap;
+  max-height: 8rem;
+  overflow-y: auto;
+}
+.gastos-admin-detalle-row dd a {
+  color: var(--link);
+  font-weight: 600;
+  text-decoration: none;
+}
+.gastos-admin-detalle-row dd a:hover {
+  text-decoration: underline;
+}
+.gastos-admin-detalle-cerrar {
+  width: 100%;
+  justify-content: center;
+}
+
+@media (max-width: 640px) {
+  .gastos-admin-table-desktop {
+    display: none;
+  }
+  .gastos-admin-mobile-list {
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--table-border);
+    border-radius: 10px;
+    overflow: hidden;
+    margin-top: 0.25rem;
+  }
+}
+
+@media (min-width: 641px) {
+  .gastos-admin-mobile-list {
+    display: none !important;
+  }
+}
+
 /* Admin — formulario registrar gasto: motivo (textarea alineada a input en escritorio) */
 .gastos-admin-page .gastos-admin-motivo-field {
   display: block;
@@ -1876,6 +2037,57 @@ td {
 }
 
 /* Admin — Crear préstamo / historial: KPIs, pestañas y tabla */
+.prestamo-admin-create-field-hint {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  margin: 0.25rem 0 0;
+  line-height: 1.35;
+}
+
+.prestamo-admin-create-fecha-input {
+  max-width: 10rem;
+}
+
+@media (min-width: 769px) {
+  .prestamo-admin-create-form {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .prestamo-admin-create-form .prestamo-admin-create-row {
+    display: contents;
+  }
+
+  .prestamo-admin-create-form .prestamo-admin-create-fecha {
+    order: 1;
+  }
+  .prestamo-admin-create-form .prestamo-admin-create-freq {
+    order: 2;
+  }
+  .prestamo-admin-create-form .prestamo-admin-create-interes {
+    order: 3;
+  }
+  .prestamo-admin-create-form .prestamo-admin-create-monto {
+    order: 4;
+  }
+  .prestamo-admin-create-form .prestamo-admin-create-cuotas {
+    order: 5;
+  }
+  .prestamo-admin-create-form .prestamo-admin-create-field-hint--cuotas {
+    order: 6;
+  }
+  .prestamo-admin-create-form .prestamo-admin-create-cuota {
+    order: 7;
+  }
+  .prestamo-admin-create-form .prestamo-admin-create-field-hint--cuota {
+    order: 8;
+  }
+
+  .prestamo-admin-create-form .prestamo-admin-create-field-hint {
+    margin-bottom: 1rem;
+  }
+}
+
 .prestamo-admin-page {
   margin-bottom: 0;
 }
@@ -1999,6 +2211,23 @@ td {
   justify-content: space-between;
   gap: 0.65rem;
   margin-bottom: 0.85rem;
+}
+
+.prestamo-admin-hist-head-left {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.prestamo-admin-movil-filtro-activos {
+  display: none;
+}
+
+.prestamo-admin-monto-mobile,
+.prestamo-admin-monto-th-mobile {
+  display: none;
 }
 
 .prestamo-admin-hist-title {
@@ -2134,6 +2363,90 @@ td {
 
 /* Móvil: solo Código, Cliente y Monto prestado (oculta expandir, totales, cobro, etc.) */
 @media (max-width: 768px) {
+  .prestamo-admin-movil-filtro-activos {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    padding: 0.28rem 0.55rem;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    border-radius: 999px;
+    border: 1px solid var(--card-border);
+    background: var(--input-bg);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s, border-color 0.15s, box-shadow 0.15s;
+  }
+
+  .prestamo-admin-movil-filtro-activos:hover {
+    color: var(--text);
+    border-color: var(--input-border);
+  }
+
+  .prestamo-admin-movil-filtro-activos--on {
+    background: linear-gradient(145deg, #22c55e 0%, #15803d 100%);
+    border-color: transparent;
+    color: #fafafa;
+    box-shadow: 0 2px 8px rgba(34, 197, 94, 0.35);
+  }
+
+  .prestamo-admin-movil-filtro-activos:focus-visible {
+    outline: 2px solid var(--link);
+    outline-offset: 2px;
+  }
+
+  .prestamo-admin-hist-title {
+    font-size: 0.95rem;
+    line-height: 1.25;
+  }
+
+  .prestamo-admin-monto-desktop,
+  .prestamo-admin-monto-th-desktop {
+    display: none !important;
+  }
+
+  .prestamo-admin-monto-mobile,
+  .prestamo-admin-monto-th-mobile {
+    display: inline;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+  }
+
+  .prestamo-admin-monto-th-mobile {
+    font-size: 0.65rem;
+    white-space: nowrap;
+  }
+
+  .prestamo-admin-create-form .prestamo-admin-create-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.65rem 0.75rem;
+    margin-bottom: 1rem;
+  }
+
+  .prestamo-admin-create-form .prestamo-admin-create-row .form-group {
+    flex: 1 1 calc(50% - 0.375rem);
+    min-width: 0;
+    margin-bottom: 0;
+  }
+
+  .prestamo-admin-create-form .prestamo-admin-create-field-hint {
+    flex: 1 1 100%;
+    margin-top: 0;
+    margin-bottom: 0;
+  }
+
+  .prestamo-admin-create-form .prestamo-admin-create-row .form-group label {
+    font-size: 0.8125rem;
+  }
+
+  .prestamo-admin-create-form .prestamo-admin-create-fecha-input {
+    max-width: none;
+    width: 100%;
+  }
+
   .table-wrap.prestamo-admin-hist-table-wrap {
     overflow-x: visible;
   }
@@ -2159,8 +2472,9 @@ td {
 
   .prestamo-admin-hist-card .table-historial th:nth-child(4),
   .prestamo-admin-hist-card .table-historial td:nth-child(4) {
-    width: 30%;
+    width: 36%;
     white-space: nowrap;
+    font-size: 0.75rem;
   }
 
   .prestamo-admin-hist-card .table-historial td:nth-child(3) {
@@ -2495,84 +2809,6 @@ td {
   box-shadow: 0 2px 8px rgba(74, 222, 128, 0.28);
 }
 
-.rutas-admin-op-row {
-  margin-top: 0.9rem;
-  padding-top: 0.9rem;
-  border-top: 1px solid var(--card-border);
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.55rem 0.75rem;
-}
-
-.rutas-admin-op-label {
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-}
-
-.rutas-admin-op-label-sub {
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  text-transform: none;
-  opacity: 0.88;
-}
-
-.rutas-admin-op-badge {
-  font-size: 0.72rem;
-  font-weight: 800;
-  padding: 0.22rem 0.55rem;
-  border-radius: 999px;
-  letter-spacing: 0.02em;
-}
-
-.rutas-admin-op-badge--open {
-  background: color-mix(in srgb, #22c55e 26%, transparent);
-  color: #86efac;
-  border: 1px solid color-mix(in srgb, #22c55e 45%, transparent);
-}
-
-.rutas-admin-op-badge--closed {
-  background: color-mix(in srgb, #f87171 18%, transparent);
-  color: #fecaca;
-  border: 1px solid color-mix(in srgb, #f87171 38%, transparent);
-}
-
-[data-theme="light"] .rutas-admin-op-badge--open {
-  color: #166534;
-}
-[data-theme="light"] .rutas-admin-op-badge--closed {
-  color: #b91c1c;
-}
-
-.rutas-admin-op-btns {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.45rem;
-  margin-left: auto;
-}
-
-.rutas-admin-op-btn {
-  padding: 0.38rem 0.85rem !important;
-  font-size: 0.8rem !important;
-  font-weight: 600 !important;
-  border-radius: 9px !important;
-  min-width: 0 !important;
-}
-
-.rutas-admin-btn-outline {
-  background: transparent !important;
-  border: 1px solid color-mix(in srgb, var(--text-muted) 55%, var(--card-border)) !important;
-  color: var(--text) !important;
-}
-
-.rutas-admin-btn-outline:hover:not(:disabled) {
-  background: var(--input-bg) !important;
-  border-color: var(--text-muted) !important;
-}
-
 .rutas-admin-clientes-panel {
   margin-top: 1rem;
   padding-top: 1rem;
@@ -2597,6 +2833,33 @@ td {
   margin: 0;
   color: var(--text-muted);
   font-size: 0.86rem;
+}
+
+/* Admin — lista Clientes */
+.admin-clientes-table-wrap {
+  border-radius: 10px;
+  border: 1px solid var(--table-border);
+  overflow: hidden;
+  margin-left: 0;
+  margin-right: 0;
+}
+
+.admin-clientes-ver-mas {
+  display: flex;
+  justify-content: center;
+  margin-top: 0.85rem;
+}
+
+@media (max-width: 768px) {
+  .admin-clientes-table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .admin-clientes-ver-mas .btn {
+    width: 100%;
+    max-width: 16rem;
+  }
 }
 
 .rutas-admin-loading {
@@ -5162,8 +5425,42 @@ a.admin-inicio-link-btn {
   flex: 1 1 0;
   justify-content: center;
   min-width: 0;
-  padding: 0.38rem 0.5rem;
+  padding: 0.55rem 0.5rem;
   font-size: 0.8125rem;
+  border: 1.5px solid var(--card-border);
+  transition:
+    background 0.2s,
+    color 0.2s,
+    border-color 0.2s,
+    box-shadow 0.2s;
+}
+
+.jefe-inicio-compact-wrap #gf-tab-capital {
+  border-color: color-mix(in srgb, #22c55e 42%, var(--card-border));
+}
+
+.jefe-inicio-compact-wrap #gf-tab-capital:hover {
+  border-color: color-mix(in srgb, #22c55e 68%, var(--card-border));
+  background: color-mix(in srgb, #22c55e 10%, transparent);
+}
+
+.jefe-inicio-compact-wrap #gf-tab-capital.gf-tab-active {
+  border-color: #22c55e;
+  box-shadow: 0 1px 4px color-mix(in srgb, #22c55e 28%, transparent);
+}
+
+.jefe-inicio-compact-wrap #gf-tab-caja {
+  border-color: color-mix(in srgb, #a855f7 42%, var(--card-border));
+}
+
+.jefe-inicio-compact-wrap #gf-tab-caja:hover {
+  border-color: color-mix(in srgb, #a855f7 68%, var(--card-border));
+  background: color-mix(in srgb, #a855f7 10%, transparent);
+}
+
+.jefe-inicio-compact-wrap #gf-tab-caja.gf-tab-active {
+  border-color: #a855f7;
+  box-shadow: 0 1px 4px color-mix(in srgb, #a855f7 28%, transparent);
 }
 
 .jefe-inicio-compact-wrap .gf-tab-icon {
@@ -8091,30 +8388,6 @@ a.admin-inicio-link-btn {
   background: var(--perfil-empresa-primary-hover);
 }
 
-/* Trabajador: ruta cerrada por admin */
-.ruta-operativa-cerrada-card {
-  padding: 1.25rem 1.35rem;
-  border: 1px solid var(--card-border);
-  border-radius: 12px;
-}
-.ruta-operativa-cerrada-title {
-  margin: 0 0 0.75rem 0;
-  font-size: 1.25rem;
-  font-weight: 700;
-}
-.ruta-operativa-cerrada-text {
-  margin: 0 0 0.65rem 0;
-  font-size: 0.9375rem;
-  line-height: 1.5;
-  color: var(--text);
-}
-.ruta-operativa-cerrada-hint {
-  margin: 0;
-  font-size: 0.875rem;
-  color: var(--text-muted);
-  line-height: 1.45;
-}
-
 /* ── Ruta del día ───────────────────────────────────────────────────────── */
 .ruta-dia-card {
   max-width: 480px;
@@ -9079,13 +9352,86 @@ a.admin-inicio-link-btn {
 .compartir-icono-mail { color: var(--text); }
 .compartir-dropdown-iconos .compartir-opcion { padding: 0.6rem 1rem; }
 
-/* Trabajador — Crear préstamo + Confirmo: margen solo en pantalla ancha; en móvil alinea al envolver */
+/* Trabajador / Admin — Crear préstamo + Confirmo en fila */
+.prestamo-nuevo-actions {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+  justify-content: flex-start;
+  width: 100%;
+}
+
+.prestamo-nuevo-actions .btn {
+  flex-shrink: 0;
+}
+
 .prestamo-nuevo-actions .prestamo-nuevo-confirm-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.65rem;
+  cursor: pointer;
+  margin: 0;
+  flex-shrink: 0;
+  line-height: 1.2;
+}
+
+.prestamo-nuevo-actions .prestamo-nuevo-confirm-label input[type="checkbox"] {
+  flex-shrink: 0;
+  cursor: pointer;
+  margin: 0 0.2rem;
+  transform: scale(1.5);
+  transform-origin: center;
+  accent-color: var(--link, #6366f1);
+}
+
+.prestamo-nuevo-actions .prestamo-nuevo-confirm-label span {
+  font-size: 1.05rem;
+}
+
+.prestamo-admin-create-confirm-label span {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+.prestamo-admin-create-confirm-label strong {
+  color: var(--text);
+}
+
+/* Trabajador: margen solo en pantalla ancha */
+.prestamo-nuevo-actions:not(.prestamo-admin-create-actions) .prestamo-nuevo-confirm-label {
   margin-left: 10%;
 }
+
 @media (max-width: 540px) {
-  .prestamo-nuevo-actions .prestamo-nuevo-confirm-label {
+  .prestamo-nuevo-actions:not(.prestamo-admin-create-actions) .prestamo-nuevo-confirm-label {
     margin-left: 0;
+  }
+}
+
+@media (max-width: 768px) {
+  .prestamo-admin-create-actions {
+    flex-wrap: nowrap;
+    gap: 0.65rem;
+    align-items: center;
+  }
+
+  .prestamo-admin-create-actions .prestamo-admin-create-confirm-label {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .prestamo-admin-create-actions .prestamo-admin-create-confirm-label span {
+    font-size: 0.8125rem;
+    line-height: 1.25;
+  }
+
+  .prestamo-admin-create-actions .btn {
+    flex: 0 0 auto;
+    padding-left: 0.85rem;
+    padding-right: 0.85rem;
+    white-space: nowrap;
   }
 }
 

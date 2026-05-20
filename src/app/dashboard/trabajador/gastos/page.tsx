@@ -1,8 +1,11 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
+import { collection, query, where, orderBy, onSnapshot } from "firebase/firestore";
 import { useAuth } from "@/context/AuthContext";
-import { listGastos, createGasto, type GastoItem } from "@/lib/empresa-api";
+import { useTrabajadorCajaDia } from "@/context/TrabajadorCajaDiaContext";
+import { db } from "@/lib/firebase";
+import { createGasto, type GastoItem } from "@/lib/empresa-api";
 import {
   sanitizeMontoDecimalCOP,
   formatMontoDecimalCOPDisplay,
@@ -105,6 +108,7 @@ function CloseIcon() {
 
 export default function GastosTrabajadorPage() {
   const { user, profile } = useAuth();
+  const { refresh: refreshCajaDia } = useTrabajadorCajaDia();
   const [gastos, setGastos] = useState<GastoItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -145,18 +149,52 @@ export default function GastosTrabajadorPage() {
     return timeB - timeA;
   });
 
-  const loadGastos = useCallback(async () => {
-    if (!user) return;
-    const token = await user.getIdToken();
-    listGastos(token)
-      .then(setGastos)
-      .catch((e) => setError(e instanceof Error ? e.message : "Error al cargar gastos"))
-      .finally(() => setLoading(false));
-  }, [user]);
-
   useEffect(() => {
-    loadGastos();
-  }, [loadGastos]);
+    if (!db || !user || profile?.role !== "trabajador") return;
+    const empresaId = profile.empresaId?.trim();
+    if (!empresaId) return;
+
+    setLoading(true);
+
+    const q = query(
+      collection(db, "empresas", empresaId, "gastosEmpleado"),
+      where("empleadoId", "==", user.uid),
+      orderBy("fecha", "desc")
+    );
+
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        const list: GastoItem[] = snap.docs.map((d) => {
+          const data = d.data();
+          return {
+            id: d.id,
+            descripcion: String(data.descripcion ?? ""),
+            monto: typeof data.monto === "number" ? data.monto : 0,
+            fecha: data.fecha?.toDate?.()?.toISOString?.() ?? null,
+            tipo: String(data.tipo ?? "otro"),
+            creadoPor: String(data.creadoPor ?? ""),
+            creadoPorNombre: String(data.creadoPorNombre ?? ""),
+            rol: "empleado",
+            rutaId: String(data.rutaId ?? ""),
+            adminId: String(data.adminId ?? ""),
+            empleadoId: String(data.empleadoId ?? ""),
+            evidencia: String(data.evidencia ?? ""),
+            alcance: String(data.alcance ?? "empleado"),
+          };
+        });
+        setGastos(list);
+        setLoading(false);
+      },
+      (err) => {
+        console.warn("[GastosTrabajador] onSnapshot:", err);
+        setError("Error al cargar gastos");
+        setLoading(false);
+      }
+    );
+
+    return unsub;
+  }, [user?.uid, profile?.role, profile?.empresaId]);
 
   useEffect(() => {
     if (!showCamera) return;
@@ -271,7 +309,7 @@ export default function GastosTrabajadorPage() {
       setEvidenciaFile(null);
       setEvidenciaPreview(null);
       setShowForm(false);
-      await loadGastos();
+      void refreshCajaDia();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al registrar gasto");
     } finally {

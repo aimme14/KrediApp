@@ -6,32 +6,36 @@ import {
   useContext,
   useEffect,
   useMemo,
-  useRef,
   useState,
   type ReactNode,
 } from "react";
+import {
+  collection,
+  query,
+  where,
+  onSnapshot,
+} from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import { useAuth } from "@/context/AuthContext";
 import {
-  listClientes,
-  listPrestamos,
   type ClienteItem,
   type PrestamoItem,
 } from "@/lib/empresa-api";
 
+const EMPRESAS_COLLECTION = "empresas";
+const PRESTAMOS_SUBCOLLECTION = "prestamos";
+const CLIENTES_SUBCOLLECTION = "clientes";
+
 export type TrabajadorListaContextValue = {
   clientes: ClienteItem[];
   prestamos: PrestamoItem[];
-  /** True solo en la primera carga sin datos previos (evita parpadeo en refrescos). */
   loading: boolean;
   error: string | null;
-  /** Timestamp ms de la última carga exitosa (para debounce de refetch). */
   lastFetchedAt: number;
   refresh: () => Promise<void>;
 };
 
-const TrabajadorListaContext = createContext<TrabajadorListaContextValue | null>(
-  null
-);
+const TrabajadorListaContext = createContext<TrabajadorListaContextValue | null>(null);
 
 export function TrabajadorListaProvider({ children }: { children: ReactNode }) {
   const { user, profile } = useAuth();
@@ -40,51 +44,128 @@ export function TrabajadorListaProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastFetchedAt, setLastFetchedAt] = useState(0);
-  const hasLoadedOnce = useRef(false);
 
   const refresh = useCallback(async () => {
-    // Este provider se usa en pantallas que necesitan listas (clientes / préstamos)
-    // tanto para trabajador como para admin.
-    const canUse =
-      !!user && !!profile && (profile.role === "trabajador" || profile.role === "admin");
-    if (!canUse) {
-      setClientes([]);
-      setPrestamos([]);
-      setError(null);
-      setLastFetchedAt(0);
-      hasLoadedOnce.current = false;
-      return;
-    }
+    // Los clientes y préstamos se actualizan via onSnapshot automáticamente
+    // refresh se mantiene por compatibilidad pero no hace fetch
+  }, []);
 
-    const initial = !hasLoadedOnce.current;
-    if (initial) setLoading(true);
-    setError(null);
-    try {
-      const token = await user.getIdToken();
-      const [c, p] = await Promise.all([
-        listClientes(token),
-        listPrestamos(token),
-      ]);
-      setClientes(c);
-      setPrestamos(p);
-      setLastFetchedAt(Date.now());
-      hasLoadedOnce.current = true;
-    } catch (e) {
-      const msg =
-        e instanceof Error ? e.message : "Error al cargar datos de la empresa";
-      setError(msg);
-      if (!hasLoadedOnce.current) {
-        setClientes([]);
-        setPrestamos([]);
+  // onSnapshot para clientes
+  useEffect(() => {
+    if (!db || !user || !profile) return;
+    const empresaId = profile.empresaId?.trim();
+    if (!empresaId) return;
+
+    const canUse = profile.role === "trabajador" || profile.role === "admin";
+    if (!canUse) return;
+
+    setLoading(true);
+
+    const clientesCol = collection(
+      db,
+      EMPRESAS_COLLECTION,
+      empresaId,
+      CLIENTES_SUBCOLLECTION
+    );
+
+    const q =
+      profile.role === "trabajador" && profile.rutaId
+        ? query(clientesCol, where("rutaId", "==", profile.rutaId))
+        : query(clientesCol, where("adminId", "==", user.uid));
+
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        const list: ClienteItem[] = snap.docs.map((d) => {
+          const data = d.data();
+          return {
+            id: d.id,
+            nombre: data.nombre ?? "",
+            ubicacion: data.ubicacion ?? "",
+            direccion: data.direccion ?? "",
+            telefono: data.telefono ?? "",
+            cedula: data.cedula ?? "",
+            rutaId: data.rutaId ?? "",
+            adminId: data.adminId ?? "",
+            prestamo_activo: data.prestamo_activo === true,
+            moroso: data.moroso === true,
+            fechaCreacion: data.fechaCreacion?.toDate?.()?.toISOString?.() ?? null,
+            codigo: data.codigo ?? undefined,
+          };
+        });
+        list.sort((a, b) =>
+          (b.fechaCreacion ? new Date(b.fechaCreacion).getTime() : 0) -
+          (a.fechaCreacion ? new Date(a.fechaCreacion).getTime() : 0)
+        );
+        setClientes(list);
+        setLastFetchedAt(Date.now());
+        setLoading(false);
+      },
+      (err) => {
+        console.warn("[TrabajadorLista] onSnapshot clientes:", err);
+        setLoading(false);
       }
-    } finally {
-      if (initial) setLoading(false);
-    }
-  }, [user, profile]);
+    );
+
+    return unsub;
+  }, [user?.uid, profile?.role, profile?.empresaId, profile?.rutaId]);
 
   useEffect(() => {
-    void refresh();
-  }, [refresh]);
+    if (!db || !user || !profile) return;
+    const empresaId = profile.empresaId?.trim();
+    if (!empresaId) return;
+
+    const canUse = profile.role === "trabajador" || profile.role === "admin";
+    if (!canUse) return;
+
+    const prestamosCol = collection(
+      db,
+      EMPRESAS_COLLECTION,
+      empresaId,
+      PRESTAMOS_SUBCOLLECTION
+    );
+
+    const q =
+      profile.role === "trabajador" && profile.rutaId
+        ? query(prestamosCol, where("rutaId", "==", profile.rutaId))
+        : query(prestamosCol, where("adminId", "==", user.uid));
+
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        const list: PrestamoItem[] = snap.docs.map((d) => {
+          const data = d.data();
+          return {
+            id: d.id,
+            clienteId: data.clienteId ?? "",
+            rutaId: data.rutaId ?? "",
+            adminId: data.adminId ?? "",
+            empleadoId: data.empleadoId ?? "",
+            monto: data.monto ?? 0,
+            interes: data.interes ?? 0,
+            modalidad: data.modalidad ?? "mensual",
+            numeroCuotas: data.numeroCuotas ?? 0,
+            totalAPagar: data.totalAPagar ?? 0,
+            saldoPendiente: data.saldoPendiente ?? 0,
+            estado: data.estado ?? "activo",
+            fechaInicio: data.fechaInicio?.toDate?.()?.toISOString?.() ?? null,
+            fechaVencimiento: data.fechaVencimiento?.toDate?.()?.toISOString?.() ?? null,
+            multaMora: data.multaMora ?? 0,
+            adelantoCuota: data.adelantoCuota ?? 0,
+            ultimoPagoFecha: data.ultimoPagoFecha?.toDate?.()?.toISOString?.() ?? null,
+            intentosFallidos:
+              typeof data.intentosFallidos === "number" ? data.intentosFallidos : 0,
+          };
+        });
+        setPrestamos(list);
+      },
+      (err) => {
+        console.warn("[TrabajadorLista] onSnapshot préstamos:", err);
+      }
+    );
+
+    return unsub;
+  }, [user?.uid, profile?.role, profile?.empresaId, profile?.rutaId]);
 
   const value = useMemo(
     (): TrabajadorListaContextValue => ({
@@ -108,9 +189,7 @@ export function TrabajadorListaProvider({ children }: { children: ReactNode }) {
 export function useTrabajadorLista(): TrabajadorListaContextValue {
   const ctx = useContext(TrabajadorListaContext);
   if (!ctx) {
-    throw new Error(
-      "useTrabajadorLista debe usarse dentro de TrabajadorListaProvider"
-    );
+    throw new Error("useTrabajadorLista debe usarse dentro de TrabajadorListaProvider");
   }
   return ctx;
 }

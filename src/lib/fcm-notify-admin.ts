@@ -1,5 +1,5 @@
 /**
- * Push al administrador: gastos operativos y registros de cuota por trabajador.
+ * Push al administrador: gastos, préstamos desembolsados y registros de cuota por trabajador.
  * Envío por topic FCM (misma suscripción que gastos): sin leer tokens por envío.
  */
 
@@ -39,8 +39,9 @@ export async function notifyAdminGastoEmpleado(
   try {
     await messaging.send({
       topic,
-      notification: { title, body },
       data: {
+        title,
+        body,
         type: "gasto_empleado",
         gastoId,
         empresaId,
@@ -52,6 +53,86 @@ export async function notifyAdminGastoEmpleado(
     }
   } catch (e) {
     console.warn("[fcm] notifyAdminGastoEmpleado falló (topic / API FCM / credenciales):", topic, e);
+  }
+}
+
+export type PayloadPrestamoEmpleadoFcm = {
+  adminUid: string;
+  empresaId: string;
+  empleadoNombre: string;
+  clienteNombre: string;
+  monto: number;
+  prestamoId: string;
+};
+
+export async function notifyAdminPrestamoEmpleado(
+  messaging: Messaging,
+  payload: PayloadPrestamoEmpleadoFcm
+): Promise<void> {
+  const { adminUid, empresaId, empleadoNombre, clienteNombre, monto, prestamoId } =
+    payload;
+  if (!adminUid.trim() || !empresaId.trim()) return;
+
+  const topic = topicGastosAdmin(empresaId, adminUid);
+  const title = "Nuevo préstamo desembolsado";
+  const body = truncateBody(
+    `${empleadoNombre} · ${clienteNombre} — ${formatMontoCOP(monto)}`,
+    180
+  );
+
+  try {
+    await messaging.send({
+      topic,
+      data: {
+        title,
+        body,
+        type: "prestamo_empleado",
+        empresaId,
+        prestamoId,
+        click_action: "/dashboard/admin/prestamo",
+      },
+    });
+    if (process.env.NODE_ENV === "development") {
+      console.info("[fcm] Push préstamo empleado enviado al topic:", topic);
+    }
+  } catch (e) {
+    console.warn("[fcm] notifyAdminPrestamoEmpleado falló:", topic, e);
+  }
+}
+
+export type PayloadClienteEmpleadoFcm = {
+  adminUid: string;
+  empresaId: string;
+  empleadoNombre: string;
+  clienteNombre: string;
+  clienteId: string;
+};
+
+export async function notifyAdminClienteEmpleado(
+  messaging: Messaging,
+  payload: PayloadClienteEmpleadoFcm
+): Promise<void> {
+  const { adminUid, empresaId, empleadoNombre, clienteNombre, clienteId } = payload;
+  if (!adminUid.trim() || !empresaId.trim()) return;
+
+  const topic = topicGastosAdmin(empresaId, adminUid);
+  const title = "Nuevo cliente registrado";
+  const body = truncateBody(`${empleadoNombre} · ${clienteNombre}`, 180);
+
+  try {
+    await messaging.send({
+      topic,
+      data: {
+        title,
+        body,
+        type: "cliente_empleado",
+        empresaId,
+        clienteId,
+        click_action: "/dashboard/admin/cliente",
+      },
+    });
+  } catch (e) {
+    console.warn("[fcm] notifyAdminClienteEmpleado falló:", topic, e);
   }
 }
 
@@ -148,8 +229,9 @@ export async function notifyAdminCuotaPrestamo(
   try {
     await messaging.send({
       topic,
-      notification: { title, body },
       data: {
+        title,
+        body,
         type: "cuota_prestamo",
         empresaId,
         prestamoId,
@@ -159,14 +241,8 @@ export async function notifyAdminCuotaPrestamo(
         click_action: clickPath,
       },
     });
-    if (process.env.NODE_ENV === "development") {
-      console.info("[fcm] Push cuota préstamo enviado al topic:", topic);
-    }
+    console.log("[fcm] Push cuota préstamo ENVIADO. Topic:", topic, "tipo:", tipoRegistro);
   } catch (e) {
-    console.warn(
-      "[fcm] notifyAdminCuotaPrestamo falló (topic / API FCM / credenciales):",
-      topic,
-      e
-    );
+    console.error("[fcm] notifyAdminCuotaPrestamo ERROR:", topic, JSON.stringify(e));
   }
 }

@@ -2,14 +2,20 @@
 
 import { useState, useRef, useEffect, useMemo, useLayoutEffect, useCallback } from "react";
 import Link from "next/link";
+import { collection, query, where, onSnapshot } from "firebase/firestore";
 import { useAuth } from "@/context/AuthContext";
-import { useGastoFcmCampanita } from "@/context/GastoFcmCampanitaContext";
 import {
-  getMiSolicitudEntregaReporte,
-  getSolicitudesEntregaReportePendientes,
+  useGastoFcmCampanita,
+  type OperativoFcmSessionItem,
+} from "@/context/GastoFcmCampanitaContext";
+import { db } from "@/lib/firebase";
+import {
   type SolicitudEntregaReporteApi,
   type SolicitudEntregaPendienteAdmin,
 } from "@/lib/empresa-api";
+
+const EMPRESAS_COLLECTION = "empresas";
+const SOLICITUDES_SUBCOLLECTION = "solicitudesEntregaReporte";
 
 function BellIcon() {
   return (
@@ -32,12 +38,121 @@ function formatMonto(value: number): string {
   })}`;
 }
 
+function NotifAdminPendientes({
+  pendientes,
+  dismissed,
+  onDismiss,
+  onClose,
+}: {
+  pendientes: SolicitudEntregaPendienteAdmin[];
+  dismissed: boolean;
+  onDismiss: () => void;
+  onClose: () => void;
+}) {
+  if (pendientes.length === 0 || dismissed) {
+    return (
+      <p className="dashboard-notifications-empty">No hay solicitudes de entrega pendientes.</p>
+    );
+  }
+  return (
+    <div
+      className="dashboard-notifications-alert dashboard-notifications-alert-info"
+      role="status"
+    >
+      <button
+        type="button"
+        className="dashboard-notifications-close"
+        onClick={onDismiss}
+        aria-label="Cerrar notificación"
+        title="Cerrar"
+      >
+        ×
+      </button>
+      <strong>
+        {pendientes.length === 1
+          ? "1 solicitud de entrega pendiente"
+          : `${pendientes.length} solicitudes de entrega pendientes`}
+      </strong>
+      <p className="dashboard-notifications-alert-text">
+        Hay trabajadores esperando que confirmes que recibiste el efectivo del reporte diario.
+      </p>
+      <div className="dashboard-notifications-admin-inner">
+        {pendientes.slice(0, 8).map((s, idx) => (
+          <div
+            key={s.id}
+            className={`dashboard-notifications-admin-item${idx > 0 ? " dashboard-notifications-admin-item-divider" : ""}`}
+          >
+            <span className="dashboard-notifications-admin-label">Trabajador</span>
+            <span className="dashboard-notifications-admin-name">{s.empleadoNombre}</span>
+            <span className="dashboard-notifications-admin-meta">{s.rutaNombre || "—"}</span>
+          </div>
+        ))}
+      </div>
+      {pendientes.length > 8 && (
+        <p className="dashboard-notifications-admin-extra">
+          … y {pendientes.length - 8} más (ver en reportes del día)
+        </p>
+      )}
+      <Link
+        href="/dashboard/admin/reportes-dia"
+        className="dashboard-notifications-link"
+        onClick={onClose}
+      >
+        Ir a reportes del día
+      </Link>
+    </div>
+  );
+}
+
+function NotifAdminOperativo({
+  lines,
+  onDismissItem,
+}: {
+  lines: OperativoFcmSessionItem[];
+  onDismissItem: (id: string) => void;
+}) {
+  if (lines.length === 0) return null;
+  return (
+    <>
+      {lines.slice(0, 8).map((row) => (
+        <div
+          key={row.id}
+          className="dashboard-notifications-alert dashboard-notifications-alert-warning dashboard-notifications-alert-gasto-fcm"
+          role="status"
+          style={{ marginTop: "0.5rem" }}
+        >
+          <button
+            type="button"
+            className="dashboard-notifications-close"
+            onClick={() => onDismissItem(row.id)}
+            aria-label="Cerrar notificación"
+            title="Cerrar"
+          >
+            ×
+          </button>
+          <span className="dashboard-notifications-admin-label">{row.title}</span>
+          <span className="dashboard-notifications-admin-name">{row.body}</span>
+          <span className="dashboard-notifications-admin-meta">
+            {new Date(row.at).toLocaleString("es-CO", {
+              day: "2-digit",
+              month: "short",
+              hour: "2-digit",
+              minute: "2-digit",
+            })}
+          </span>
+        </div>
+      ))}
+    </>
+  );
+}
+
 export default function DashboardNotifications() {
   const { user, profile } = useAuth();
   const {
-    foregroundOperativoBadge,
+    unreadCount,
     sessionOperativoLines,
-    clearBadgeOnly,
+    markAllAsRead,
+    dismissItem,
   } = useGastoFcmCampanita();
   const [open, setOpen] = useState(false);
   const [panelMaxWidthPx, setPanelMaxWidthPx] = useState<number | null>(null);
@@ -96,7 +211,6 @@ export default function DashboardNotifications() {
   const workerPendingKey = pendienteTrabajador ? `worker-pending-${pendienteTrabajador.id}` : null;
   const workerRejectedKey = rechazadaTrabajador ? `worker-rejected-${rechazadaTrabajador.id}` : null;
   const adminPendingKey = "admin-pending-batch";
-  const adminOperativoKey = "admin-operativo-batch";
 
   useEffect(() => {
     if (!storageKey) {
@@ -130,37 +244,139 @@ export default function DashboardNotifications() {
   }, [storageKey, dismissedKeys]);
 
   useEffect(() => {
-    if (!user || !role) return;
-    const firebaseUser = user;
-    let cancelled = false;
+    if (!db || !user || role !== "trabajador" || !profile?.empresaId) return;
 
-    async function load() {
-      try {
-        const token = await firebaseUser.getIdToken();
-        if (role === "trabajador") {
-          const { pendiente, ultimaRechazada } = await getMiSolicitudEntregaReporte(token);
-          if (cancelled) return;
-          setPendienteTrabajador(pendiente);
-          setRechazadaTrabajador(
-            pendiente ? null : ultimaRechazada?.estado === "rechazada" ? ultimaRechazada : null
-          );
-        } else if (role === "admin") {
-          const list = await getSolicitudesEntregaReportePendientes(token);
-          if (cancelled) return;
-          setAdminPendientes(Array.isArray(list) ? list : []);
+    const empresaId = profile.empresaId.trim();
+    if (!empresaId) return;
+
+    const qPendiente = query(
+      collection(db, EMPRESAS_COLLECTION, empresaId, SOLICITUDES_SUBCOLLECTION),
+      where("empleadoUid", "==", user.uid),
+      where("estado", "==", "pendiente")
+    );
+
+    const qRechazada = query(
+      collection(db, EMPRESAS_COLLECTION, empresaId, SOLICITUDES_SUBCOLLECTION),
+      where("empleadoUid", "==", user.uid),
+      where("estado", "==", "rechazada")
+    );
+
+    const unsubPendiente = onSnapshot(
+      qPendiente,
+      (snap) => {
+        if (snap.empty) {
+          setPendienteTrabajador(null);
+        } else {
+          const d = snap.docs[0];
+          const data = d.data();
+          setPendienteTrabajador({
+            id: d.id,
+            empleadoUid: data.empleadoUid ?? "",
+            empleadoNombre: data.empleadoNombre ?? "",
+            rutaId: data.rutaId ?? "",
+            rutaNombre: data.rutaNombre ?? "",
+            adminId: data.adminId ?? "",
+            estado: data.estado ?? "",
+            comentarioTrabajador: data.comentarioTrabajador ?? null,
+            montoAlSolicitar: typeof data.montoAlSolicitar === "number" ? data.montoAlSolicitar : 0,
+            creadaEn: data.creadaEn?.toDate?.()?.toISOString?.() ?? null,
+            resueltaEn: data.resueltaEn?.toDate?.()?.toISOString?.() ?? null,
+            resueltaPorUid: data.resueltaPorUid ?? null,
+            motivoRechazo: data.motivoRechazo ?? null,
+            montoEntregadoEfectivo: data.montoEntregadoEfectivo ?? null,
+          });
+          setRechazadaTrabajador(null);
         }
-      } catch {
-        /* silencioso */
+      },
+      (err) => {
+        console.warn("[DashboardNotifications] onSnapshot pendiente trabajador:", err);
       }
-    }
+    );
 
-    void load();
-    const id = setInterval(() => void load(), 45_000);
+    const unsubRechazada = onSnapshot(
+      qRechazada,
+      (snap) => {
+        setPendienteTrabajador((pendiente) => {
+          if (pendiente) return pendiente;
+          if (snap.empty) {
+            setRechazadaTrabajador(null);
+          } else {
+            const docs = snap.docs.sort((a, b) => {
+              const ta = a.data().creadaEn?.toMillis?.() ?? 0;
+              const tb = b.data().creadaEn?.toMillis?.() ?? 0;
+              return tb - ta;
+            });
+            const d = docs[0];
+            const data = d.data();
+            setRechazadaTrabajador({
+              id: d.id,
+              empleadoUid: data.empleadoUid ?? "",
+              empleadoNombre: data.empleadoNombre ?? "",
+              rutaId: data.rutaId ?? "",
+              rutaNombre: data.rutaNombre ?? "",
+              adminId: data.adminId ?? "",
+              estado: data.estado ?? "",
+              comentarioTrabajador: data.comentarioTrabajador ?? null,
+              montoAlSolicitar: typeof data.montoAlSolicitar === "number" ? data.montoAlSolicitar : 0,
+              creadaEn: data.creadaEn?.toDate?.()?.toISOString?.() ?? null,
+              resueltaEn: data.resueltaEn?.toDate?.()?.toISOString?.() ?? null,
+              resueltaPorUid: data.resueltaPorUid ?? null,
+              motivoRechazo: data.motivoRechazo ?? null,
+              montoEntregadoEfectivo: data.montoEntregadoEfectivo ?? null,
+            });
+          }
+          return pendiente;
+        });
+      },
+      (err) => {
+        console.warn("[DashboardNotifications] onSnapshot rechazada trabajador:", err);
+      }
+    );
+
     return () => {
-      cancelled = true;
-      clearInterval(id);
+      unsubPendiente();
+      unsubRechazada();
     };
-  }, [user, role]);
+  }, [user?.uid, role, profile?.empresaId]);
+
+  useEffect(() => {
+    if (!db || !user || role !== "admin" || !profile?.empresaId) return;
+
+    const empresaId = profile.empresaId.trim();
+    if (!empresaId) return;
+
+    const q = query(
+      collection(db, EMPRESAS_COLLECTION, empresaId, SOLICITUDES_SUBCOLLECTION),
+      where("adminId", "==", user.uid),
+      where("estado", "==", "pendiente")
+    );
+
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        const list: SolicitudEntregaPendienteAdmin[] = snap.docs.map((d) => {
+          const data = d.data();
+          return {
+            id: d.id,
+            empleadoUid: data.empleadoUid ?? "",
+            empleadoNombre: data.empleadoNombre ?? "",
+            rutaId: data.rutaId ?? "",
+            rutaNombre: data.rutaNombre ?? "",
+            estado: data.estado ?? "",
+            comentarioTrabajador: data.comentarioTrabajador ?? null,
+            montoAlSolicitar: typeof data.montoAlSolicitar === "number" ? data.montoAlSolicitar : 0,
+            creadaEn: data.creadaEn?.toDate?.()?.toISOString?.() ?? null,
+          };
+        });
+        setAdminPendientes(list);
+      },
+      (err) => {
+        console.warn("[DashboardNotifications] onSnapshot solicitudes:", err);
+      }
+    );
+
+    return unsub;
+  }, [user?.uid, role, profile?.empresaId]);
 
   useEffect(() => {
     if (!open) return;
@@ -181,14 +397,14 @@ export default function DashboardNotifications() {
   }, [open]);
 
   const campanitaWasOpen = useRef(false);
-  /** Al abrir Avisos (transición cerrado → abierto), el badge FCM operativo vuelve a 0. */
+  /** Al abrir Avisos (transición cerrado → abierto), marcar notificaciones operativas como leídas. */
   useEffect(() => {
     if (role !== "admin") return;
     if (open && !campanitaWasOpen.current) {
-      clearBadgeOnly();
+      markAllAsRead();
     }
     campanitaWasOpen.current = open;
-  }, [open, role, clearBadgeOnly]);
+  }, [open, role, markAllAsRead]);
 
   const badgeCount = useMemo(() => {
     if (role === "trabajador") {
@@ -203,8 +419,7 @@ export default function DashboardNotifications() {
     }
     if (role === "admin") {
       const pendingCount = dismissedSet.has(adminPendingKey) ? 0 : adminPendientes.length;
-      const operativoCount = dismissedSet.has(adminOperativoKey) ? 0 : foregroundOperativoBadge;
-      return pendingCount + operativoCount;
+      return pendingCount + unreadCount;
     }
     return 0;
   }, [
@@ -215,9 +430,8 @@ export default function DashboardNotifications() {
     workerRejectedKey,
     dismissedSet,
     adminPendingKey,
-    adminOperativoKey,
     adminPendientes.length,
-    foregroundOperativoBadge,
+    unreadCount,
   ]);
 
   const badgeLabel =
@@ -322,112 +536,16 @@ export default function DashboardNotifications() {
 
           {role === "admin" && (
             <>
-              {adminPendientes.length > 0 && !dismissedSet.has(adminPendingKey) ? (
-                <div className="dashboard-notifications-alert dashboard-notifications-alert-info" role="status">
-                  <button
-                    type="button"
-                    className="dashboard-notifications-close"
-                    onClick={() => dismissNotification(adminPendingKey)}
-                    aria-label="Cerrar notificación"
-                    title="Cerrar"
-                  >
-                    ×
-                  </button>
-                  <strong>
-                    {adminPendientes.length === 1
-                      ? "1 solicitud de entrega pendiente"
-                      : `${adminPendientes.length} solicitudes de entrega pendientes`}
-                  </strong>
-                  <p className="dashboard-notifications-alert-text">
-                    Hay trabajadores esperando que confirmes que recibiste el efectivo del reporte diario.
-                  </p>
-                  <div className="dashboard-notifications-admin-inner">
-                    {adminPendientes.slice(0, 8).map((s, idx) => (
-                      <div
-                        key={s.id}
-                        className={`dashboard-notifications-admin-item${idx > 0 ? " dashboard-notifications-admin-item-divider" : ""}`}
-                      >
-                        <span className="dashboard-notifications-admin-label">Trabajador</span>
-                        <span className="dashboard-notifications-admin-name">{s.empleadoNombre}</span>
-                        <span className="dashboard-notifications-admin-meta">
-                          {s.rutaNombre || "—"}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                  {adminPendientes.length > 8 && (
-                    <p className="dashboard-notifications-admin-extra">
-                      … y {adminPendientes.length - 8} más (ver en reportes del día)
-                    </p>
-                  )}
-                  <Link
-                    href="/dashboard/admin/reportes-dia"
-                    className="dashboard-notifications-link"
-                    onClick={() => setOpen(false)}
-                  >
-                    Ir a reportes del día
-                  </Link>
-                </div>
-              ) : (
-                <p className="dashboard-notifications-empty">No hay solicitudes de entrega pendientes.</p>
-              )}
-
-              {sessionOperativoLines.length > 0 && !dismissedSet.has(adminOperativoKey) && (
-                <div
-                  className="dashboard-notifications-alert dashboard-notifications-alert-warning dashboard-notifications-alert-gasto-fcm"
-                  role="status"
-                  style={{ marginTop: "0.75rem" }}
-                >
-                  <button
-                    type="button"
-                    className="dashboard-notifications-close"
-                    onClick={() => dismissNotification(adminOperativoKey)}
-                    aria-label="Cerrar notificación"
-                    title="Cerrar"
-                  >
-                    ×
-                  </button>
-                  <div className="dashboard-notifications-admin-inner">
-                    {sessionOperativoLines.slice(0, 8).map((row, idx) => (
-                      <div
-                        key={`${row.kind}-${row.at}-${idx}`}
-                        className={`dashboard-notifications-admin-item${idx > 0 ? " dashboard-notifications-admin-item-divider" : ""}`}
-                      >
-                        <span className="dashboard-notifications-admin-label">{row.title}</span>
-                        <span className="dashboard-notifications-admin-name">{row.body}</span>
-                        <span className="dashboard-notifications-admin-meta">
-                          {new Date(row.at).toLocaleString("es-CO", {
-                            day: "2-digit",
-                            month: "short",
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                  {sessionOperativoLines.some((l) => l.kind === "gasto") && (
-                    <Link
-                      href="/dashboard/admin/gastos"
-                      className="dashboard-notifications-link"
-                      onClick={() => setOpen(false)}
-                      style={{ display: "block", marginTop: "0.35rem" }}
-                    >
-                      Ver gastos operativos
-                    </Link>
-                  )}
-                  {sessionOperativoLines.some((l) => l.kind === "cuota") && (
-                    <Link
-                      href="/dashboard/admin/cobrar"
-                      className="dashboard-notifications-link"
-                      onClick={() => setOpen(false)}
-                      style={{ display: "block", marginTop: "0.35rem" }}
-                    >
-                      Ir a cobrar / préstamos
-                    </Link>
-                  )}
-                </div>
-              )}
+              <NotifAdminPendientes
+                pendientes={adminPendientes}
+                dismissed={dismissedSet.has(adminPendingKey)}
+                onDismiss={() => dismissNotification(adminPendingKey)}
+                onClose={() => setOpen(false)}
+              />
+              <NotifAdminOperativo
+                lines={sessionOperativoLines}
+                onDismissItem={dismissItem}
+              />
             </>
           )}
 

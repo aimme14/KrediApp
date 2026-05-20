@@ -9,9 +9,20 @@ const dmMono = DM_Mono({ weight: ["400", "500"], subsets: ["latin"], variable: "
 export const metadata: Metadata = {
   title: "angry birds - Gestión por roles",
   description: "Aplicación con roles: Super Admin, Jefe, Admin y Trabajador",
+  manifest: "/manifest.json",
   icons: {
+<<<<<<< HEAD
     icon: "/angry-birds-icon.png",
     apple: "/angry-birds-icon.png",
+=======
+    icon: "/icon-192.png",
+    apple: "/icon-192.png",
+  },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "KrediApp",
+>>>>>>> 6e76c302351cb157eb4a15e98d66888c6f3a4293
   },
 };
 
@@ -21,6 +32,7 @@ export const viewport: Viewport = {
   maximumScale: 5,
   userScalable: true,
   viewportFit: "cover",
+  themeColor: "#1e140f",
 };
 
 /** Script que aplica el tema guardado antes del primer pintado para evitar parpadeo */

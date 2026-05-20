@@ -3,6 +3,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useTrabajadorLista } from "@/context/TrabajadorListaContext";
+import { useTrabajadorCajaDia } from "@/context/TrabajadorCajaDiaContext";
 import {
   createPrestamo,
   clienteNumFromCodigo,
@@ -60,6 +61,7 @@ export default function PrestamoTrabajadorPage() {
     error: listaError,
     refresh,
   } = useTrabajadorLista();
+  const { refresh: refreshCajaDia } = useTrabajadorCajaDia();
   const [error, setError] = useState<string | null>(null);
   const [clienteId, setClienteId] = useState("");
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -132,6 +134,7 @@ export default function PrestamoTrabajadorPage() {
       setConfirmarMontoAlto(false);
       setShowCreateForm(false);
       await refresh();
+      void refreshCajaDia();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al crear préstamo");
     } finally {

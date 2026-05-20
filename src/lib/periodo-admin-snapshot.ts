@@ -83,14 +83,15 @@ export async function buildPeriodoAdminSnapshot(
 
     const capitalTotalRaw =
       typeof data.capitalTotal === "number" ? data.capitalTotal : undefined;
-    const capitalRuta = computeCapitalRutaFromRutaFields({
-      cajaRuta,
-      cajasEmpleados,
-      inversiones,
-      ganancias,
-      perdidas,
-      capitalTotal: capitalTotalRaw,
-    });
+    const capitalRuta =
+      capitalTotalRaw ??
+      computeCapitalRutaFromRutaFields({
+        cajaRuta,
+        cajasEmpleados,
+        inversiones,
+        ganancias,
+        perdidas,
+      });
 
     const utilidad = ganancias - gastosRuta - perdidas;
 

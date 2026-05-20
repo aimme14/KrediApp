@@ -1,13 +1,13 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef, type ReactNode } from "react";
+import { useState, useEffect, useRef, type ReactNode } from "react";
+import { collection, query, where, onSnapshot } from "firebase/firestore";
 import { useAuth } from "@/context/AuthContext";
+import { useAdminDashboard } from "@/context/AdminDashboardContext";
+import { db } from "@/lib/firebase";
 import {
-  listGastos,
   createGasto,
-  listRutas,
   type GastoItem,
-  type RutaItem,
 } from "@/lib/empresa-api";
 import {
   sanitizeMontoDecimalCOP,
@@ -19,6 +19,10 @@ import {
   fechaDiaColombiaHoy,
   formatoFechaGastoColombia,
 } from "@/lib/colombia-day-bounds";
+
+const EMPRESAS_COLLECTION = "empresas";
+const GASTOS_ADMIN_SUBCOLLECTION = "gastosAdministrador";
+const GASTOS_EMPLEADO_SUBCOLLECTION = "gastosEmpleado";
 
 const TIPOS = [
   { value: "transporte", label: "Transporte", icon: "transporte" },
@@ -109,8 +113,18 @@ function CloseIcon() {
   );
 }
 
+function EyeIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  );
+}
+
 export default function GastosPage() {
   const { user, profile } = useAuth();
+  const { rutas } = useAdminDashboard();
   const [gastos, setGastos] = useState<GastoItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -122,8 +136,8 @@ export default function GastosPage() {
   const [evidenciaPreview, setEvidenciaPreview] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [motivoOverlay, setMotivoOverlay] = useState<string | null>(null);
+  const [gastoDetalle, setGastoDetalle] = useState<GastoItem | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [rutas, setRutas] = useState<RutaItem[]>([]);
   const [alcanceGasto, setAlcanceGasto] = useState<"admin" | "ruta">("admin");
   const [rutaIdGasto, setRutaIdGasto] = useState("");
   const [showCamera, setShowCamera] = useState(false);
@@ -156,31 +170,102 @@ export default function GastosPage() {
     return timeB - timeA;
   });
 
-  const loadGastos = useCallback(async () => {
-    if (!user) return;
-    const token = await user.getIdToken();
-    listGastos(token)
-      .then(setGastos)
-      .catch((e) => setError(e instanceof Error ? e.message : "Error al cargar gastos"))
-      .finally(() => setLoading(false));
-  }, [user]);
-
   useEffect(() => {
-    loadGastos();
-  }, [loadGastos]);
+    if (!db || !user || !profile?.empresaId) return;
+    const empresaId = profile.empresaId.trim();
+    if (!empresaId) return;
 
-  useEffect(() => {
-    if (!user || !profile || profile.role !== "admin") return;
-    (async () => {
-      const token = await user.getIdToken();
-      try {
-        const list = await listRutas(token);
-        setRutas(list);
-      } catch {
-        setRutas([]);
+    setLoading(true);
+
+    const empresaBase = `${EMPRESAS_COLLECTION}/${empresaId}`;
+
+    const qAdmin = query(
+      collection(db, empresaBase, GASTOS_ADMIN_SUBCOLLECTION),
+      where("adminId", "==", user.uid)
+    );
+
+    const qEmpleado = query(
+      collection(db, empresaBase, GASTOS_EMPLEADO_SUBCOLLECTION),
+      where("adminId", "==", user.uid)
+    );
+
+    let gastosAdmin: GastoItem[] = [];
+    let gastosEmpleado: GastoItem[] = [];
+
+    const merge = () => {
+      const byId = new Map<string, GastoItem>();
+      gastosAdmin.forEach((g) => byId.set(`admin-${g.id}`, g));
+      gastosEmpleado.forEach((g) => byId.set(`empleado-${g.id}`, g));
+      const merged = Array.from(byId.values());
+      merged.sort((a, b) =>
+        (b.fecha ? new Date(b.fecha).getTime() : 0) -
+        (a.fecha ? new Date(a.fecha).getTime() : 0)
+      );
+      setGastos(merged);
+      setLoading(false);
+    };
+
+    const mapDoc = (
+      d: { id: string; data: () => Record<string, unknown> },
+      alcanceOverride?: string
+    ): GastoItem => {
+      const data = d.data();
+      return {
+        id: d.id,
+        descripcion: String(data.descripcion ?? ""),
+        monto: typeof data.monto === "number" ? data.monto : 0,
+        fecha:
+          typeof (data.fecha as { toDate?: () => Date })?.toDate === "function"
+            ? (data.fecha as { toDate: () => Date }).toDate().toISOString()
+            : null,
+        tipo: String(data.tipo ?? "otro"),
+        creadoPor: String(data.creadoPor ?? ""),
+        creadoPorNombre: String(data.creadoPorNombre ?? ""),
+        rol: String(data.rol ?? "admin"),
+        rutaId: String(data.rutaId ?? ""),
+        adminId: String(data.adminId ?? ""),
+        empleadoId: String(data.empleadoId ?? ""),
+        evidencia: String(data.evidencia ?? ""),
+        alcance: alcanceOverride ?? String(data.alcance ?? ""),
+      };
+    };
+
+    const unsubAdmin = onSnapshot(
+      qAdmin,
+      (snap) => {
+        gastosAdmin = snap.docs.map((d) =>
+          mapDoc(d as unknown as { id: string; data: () => Record<string, unknown> })
+        );
+        merge();
+      },
+      (err) => {
+        console.warn("[GastosAdmin] onSnapshot gastosAdmin:", err);
+        setLoading(false);
       }
-    })();
-  }, [user, profile]);
+    );
+
+    const unsubEmpleado = onSnapshot(
+      qEmpleado,
+      (snap) => {
+        gastosEmpleado = snap.docs.map((d) =>
+          mapDoc(
+            d as unknown as { id: string; data: () => Record<string, unknown> },
+            "empleado"
+          )
+        );
+        merge();
+      },
+      (err) => {
+        console.warn("[GastosAdmin] onSnapshot gastosEmpleado:", err);
+        setLoading(false);
+      }
+    );
+
+    return () => {
+      unsubAdmin();
+      unsubEmpleado();
+    };
+  }, [user?.uid, profile?.empresaId]);
 
   useEffect(() => {
     if (!showCamera) return;
@@ -303,7 +388,6 @@ export default function GastosPage() {
       setEvidenciaFile(null);
       setEvidenciaPreview(null);
       setShowForm(false);
-      await loadGastos();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al registrar gasto");
     } finally {
@@ -613,7 +697,27 @@ export default function GastosPage() {
               <p className="gastos-empty-msg">No hay gastos que coincidan con la búsqueda.</p>
             ) : (
             <>
-            <div className="table-wrap gastos-table-wrap gastos-admin-table-wrap">
+            <div className="gastos-admin-mobile-list" role="list" aria-label="Lista de gastos">
+              {gastosOrdenados.map((g) => (
+                <div key={`${g.rol}-${g.id}-mobile`} className="gastos-admin-mobile-row" role="listitem">
+                  <span className="gastos-admin-mobile-nombre" title={g.creadoPorNombre ?? undefined}>
+                    {g.creadoPorNombre ?? <span className="gastos-admin-dash">—</span>}
+                  </span>
+                  <span className="gastos-admin-mobile-fecha">
+                    {formatoFechaGastoColombia(g.fecha ?? null)}
+                  </span>
+                  <button
+                    type="button"
+                    className="gastos-admin-mobile-ver-btn"
+                    onClick={() => setGastoDetalle(g)}
+                    aria-label={`Ver detalle del gasto de ${g.creadoPorNombre || "sin nombre"}`}
+                  >
+                    <EyeIcon />
+                  </button>
+                </div>
+              ))}
+            </div>
+            <div className="table-wrap gastos-table-wrap gastos-admin-table-wrap gastos-admin-table-desktop">
               <table className="gastos-table gastos-admin-table">
                 <thead>
                   <tr>
@@ -676,6 +780,66 @@ export default function GastosPage() {
             <span className="gastos-motivo-overlay-label">Motivo</span>
             <p className="gastos-motivo-overlay-text">{motivoOverlay}</p>
             <button type="button" className="btn btn-primary" onClick={() => setMotivoOverlay(null)}>
+              Cerrar
+            </button>
+          </div>
+        </div>
+      )}
+
+      {gastoDetalle !== null && (
+        <div className="gastos-motivo-overlay gastos-admin-detalle-overlay" role="dialog" aria-modal="true" aria-label="Detalle del gasto">
+          <div className="gastos-motivo-overlay-backdrop" onClick={() => setGastoDetalle(null)} aria-hidden />
+          <div className="gastos-motivo-overlay-box gastos-admin-detalle-box">
+            <div className="gastos-admin-detalle-header">
+              <h4 className="gastos-admin-detalle-title">Detalle del gasto</h4>
+              <button
+                type="button"
+                className="gastos-admin-detalle-close"
+                onClick={() => setGastoDetalle(null)}
+                aria-label="Cerrar detalle"
+              >
+                <CloseIcon />
+              </button>
+            </div>
+            <dl className="gastos-admin-detalle-dl">
+              <div className="gastos-admin-detalle-row">
+                <dt>Nombre</dt>
+                <dd>{gastoDetalle.creadoPorNombre || "—"}</dd>
+              </div>
+              <div className="gastos-admin-detalle-row">
+                <dt>Fecha</dt>
+                <dd>{formatoFechaGastoColombia(gastoDetalle.fecha ?? null)}</dd>
+              </div>
+              <div className="gastos-admin-detalle-row">
+                <dt>Tipo</dt>
+                <dd>{tipoLabel(gastoDetalle.tipo ?? "")}</dd>
+              </div>
+              <div className="gastos-admin-detalle-row">
+                <dt>Ámbito</dt>
+                <dd>{renderAlcance(gastoDetalle)}</dd>
+              </div>
+              <div className="gastos-admin-detalle-row">
+                <dt>Monto</dt>
+                <dd className="gastos-admin-detalle-monto">{formatMoneda(gastoDetalle.monto ?? 0)}</dd>
+              </div>
+              <div className="gastos-admin-detalle-row">
+                <dt>Evidencia</dt>
+                <dd>
+                  {gastoDetalle.evidencia ? (
+                    <a href={gastoDetalle.evidencia} target="_blank" rel="noopener noreferrer">
+                      Ver comprobante
+                    </a>
+                  ) : (
+                    "—"
+                  )}
+                </dd>
+              </div>
+              <div className="gastos-admin-detalle-row gastos-admin-detalle-row-motivo">
+                <dt>Motivo</dt>
+                <dd>{gastoDetalle.descripcion || "—"}</dd>
+              </div>
+            </dl>
+            <button type="button" className="btn btn-primary gastos-admin-detalle-cerrar" onClick={() => setGastoDetalle(null)}>
               Cerrar
             </button>
           </div>
