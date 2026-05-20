@@ -9,7 +9,7 @@ export default function RootLoading() {
         fontFamily: "system-ui, sans-serif",
       }}
     >
-      <p>Cargando KrediApp...</p>
+      <p>Cargando angry birds...</p>
     </div>
   );
 }

@@ -7,11 +7,11 @@ import "./globals.css";
 const dmMono = DM_Mono({ weight: ["400", "500"], subsets: ["latin"], variable: "--font-dm-mono", display: "swap" });
 
 export const metadata: Metadata = {
-  title: "KrediApp - Gestión por roles",
+  title: "angry birds - Gestión por roles",
   description: "Aplicación con roles: Super Admin, Jefe, Admin y Trabajador",
   icons: {
-    icon: "/krediapp-icon.png",
-    apple: "/krediapp-icon.png",
+    icon: "/angry-birds-icon.png",
+    apple: "/angry-birds-icon.png",
   },
 };
 

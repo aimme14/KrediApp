@@ -101,13 +101,12 @@
 .brandIcon {
   width: 40px;
   height: 40px;
-  background: linear-gradient(145deg, #8b73ff 0%, #6a52ee 100%);
   border-radius: 11px;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #fff;
-  box-shadow: 0 8px 24px rgba(106, 82, 238, 0.35);
+  overflow: hidden;
+  flex-shrink: 0;
 }
 
 .brandName {

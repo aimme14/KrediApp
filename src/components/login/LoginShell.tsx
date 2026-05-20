@@ -1,9 +1,10 @@
 "use client";
 
+import Image from "next/image";
 import { Inter } from "next/font/google";
 import ThemeToggle from "@/components/ThemeToggle";
 import styles from "./loginShell.module.css";
-import { IconCash, IconDots } from "./loginIcons";
+import { IconDots } from "./loginIcons";
 
 const inter = Inter({ subsets: ["latin"], display: "swap" });
 
@@ -25,9 +26,16 @@ export default function LoginShell({ children }: LoginShellProps) {
           <div className={styles.bubble} aria-hidden />
           <div className={styles.brand}>
             <div className={styles.brandIcon}>
-              <IconCash />
+              <Image
+                src="/angry-birds-icon.png"
+                alt=""
+                width={40}
+                height={40}
+                priority
+                style={{ width: "100%", height: "100%", objectFit: "contain" }}
+              />
             </div>
-            <span className={styles.brandName}>krediapp</span>
+            <span className={styles.brandName}>angry birds</span>
           </div>
 
           <div className={styles.copy}>

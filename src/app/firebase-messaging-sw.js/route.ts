@@ -29,7 +29,7 @@ firebase.initializeApp(${cfg});
 const messaging = firebase.messaging();
 messaging.onBackgroundMessage(function (payload) {
   const n = payload.notification || {};
-  const title = n.title || 'KrediApp';
+  const title = n.title || 'angry birds';
   const body = n.body || '';
   const data = payload.data || {};
   if (data.type === 'gasto_empleado' || data.type === 'cuota_prestamo') {

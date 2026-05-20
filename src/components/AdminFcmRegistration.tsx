@@ -5,7 +5,7 @@ import { getMessaging, getToken, isSupported } from "firebase/messaging";
 import { app } from "@/lib/firebase";
 import { useAuth } from "@/context/AuthContext";
 
-const LOG = "[KrediApp FCM]";
+const LOG = "[angry birds FCM]";
 
 /**
  * Solicita permiso de notificaciones, registra token FCM y suscribe al topic de gastos (vía API).

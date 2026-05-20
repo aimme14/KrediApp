@@ -85,7 +85,7 @@ export async function buildPeriodoAdminPdf(payload: PeriodoAdminPdfPayload): Pro
     y -= n;
   };
 
-  line("KrediApp — Periodo contable (admin)", { bold: true, size: 14 });
+  line("angry birds — Periodo contable (admin)", { bold: true, size: 14 });
   spacer(4);
   line(`Id periodo: ${payload.periodoId}`, { size: 8, color: COL_MUTED });
   line(`Apertura: ${new Date(payload.fechaAperturaIso).toLocaleString("es-CO")}`, { size: 8 });
