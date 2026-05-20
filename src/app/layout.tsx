@@ -11,18 +11,13 @@ export const metadata: Metadata = {
   description: "Aplicación con roles: Super Admin, Jefe, Admin y Trabajador",
   manifest: "/manifest.json",
   icons: {
-<<<<<<< HEAD
     icon: "/angry-birds-icon.png",
     apple: "/angry-birds-icon.png",
-=======
-    icon: "/icon-192.png",
-    apple: "/icon-192.png",
   },
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "KrediApp",
->>>>>>> 6e76c302351cb157eb4a15e98d66888c6f3a4293
+    title: "angry birds",
   },
 };
 

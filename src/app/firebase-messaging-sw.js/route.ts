@@ -34,12 +34,6 @@ importScripts(
 firebase.initializeApp(${cfg});
 const messaging = firebase.messaging();
 messaging.onBackgroundMessage(function (payload) {
-<<<<<<< HEAD
-  const n = payload.notification || {};
-  const title = n.title || 'angry birds';
-  const body = n.body || '';
-=======
->>>>>>> 6e76c302351cb157eb4a15e98d66888c6f3a4293
   const data = payload.data || {};
   const title = data.title || payload.notification?.title || 'KrediApp';
   const body = data.body || payload.notification?.body || '';

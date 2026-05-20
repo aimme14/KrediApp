@@ -129,41 +129,10 @@ export async function buildPeriodoAdminPdf(payload: PeriodoAdminPdfPayload): Pro
 
   // ── Header ────────────────────────────────────────────────────────────────
 
-<<<<<<< HEAD
-  line("angry birds — Periodo contable (admin)", { bold: true, size: 14 });
-  spacer(4);
-  line(`Id periodo: ${payload.periodoId}`, { size: 8, color: COL_MUTED });
-  line(`Apertura: ${new Date(payload.fechaAperturaIso).toLocaleString("es-CO")}`, { size: 8 });
-  line(
-    payload.fechaCierreIso
-      ? `Cierre: ${new Date(payload.fechaCierreIso).toLocaleString("es-CO")}`
-      : "Estado: abierto (sin cierre)",
-    { size: 8 }
-  );
-  line(`Abierto por UID: ${payload.abiertoPorUid}`, { size: 7, color: COL_MUTED });
-  if (payload.cerradoPorUid) {
-    line(`Cerrado por UID: ${payload.cerradoPorUid}`, { size: 7, color: COL_MUTED });
-  }
-  spacer(12);
-
-  const colA = M + 160;
-  const colC = M + 320;
-  ensure(24);
-  page.drawText(sanitizarTextoPdf("Concepto"), { x: M, y, size: 8, font: fontBold, color: COL_HEAD });
-  page.drawText(sanitizarTextoPdf("Apertura"), { x: colA, y, size: 8, font: fontBold, color: COL_HEAD });
-  page.drawText(sanitizarTextoPdf("Cierre"), { x: colC, y, size: 8, font: fontBold, color: COL_HEAD });
-  y -= 14;
-  page.drawLine({
-    start: { x: M, y },
-    end: { x: PAGE_W - M, y },
-    thickness: 0.5,
-    color: rgb(0.78, 0.81, 0.86),
-=======
   // Banda superior de color
   page.drawRectangle({
     x: 0, y: PAGE_H - 52, width: PAGE_W, height: 52,
     color: C.brand,
->>>>>>> 6e76c302351cb157eb4a15e98d66888c6f3a4293
   });
 
   txt(payload.nombreEmpresa, ML, PAGE_H - 30, 18, fontBold, rgb(1,1,1));
