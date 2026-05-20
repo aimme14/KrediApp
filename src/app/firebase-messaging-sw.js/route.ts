@@ -35,7 +35,7 @@ firebase.initializeApp(${cfg});
 const messaging = firebase.messaging();
 messaging.onBackgroundMessage(function (payload) {
   const data = payload.data || {};
-  const title = data.title || payload.notification?.title || 'KrediApp';
+  const title = data.title || payload.notification?.title || 'angry birds';
   const body = data.body || payload.notification?.body || '';
 
   self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function (clients) {
