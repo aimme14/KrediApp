@@ -92,10 +92,21 @@ function IconoOjo(props: { size?: number }) {
   );
 }
 
-function TarjetaResumen(props: { etiqueta: ReactNode; valor: string }) {
-  const { etiqueta, valor } = props;
+function TarjetaResumen(props: {
+  etiqueta: ReactNode;
+  valor: string;
+  dimmed?: boolean;
+}) {
+  const { etiqueta, valor, dimmed } = props;
   return (
-    <div className="card" style={TARJETA_RESUMEN_STYLE}>
+    <div
+      className="card"
+      style={{
+        ...TARJETA_RESUMEN_STYLE,
+        opacity: dimmed ? 0.75 : 1,
+        borderLeft: dimmed ? "3px solid var(--card-border)" : undefined,
+      }}
+    >
       <span
         style={{
           fontSize: "0.7rem",
@@ -108,7 +119,15 @@ function TarjetaResumen(props: { etiqueta: ReactNode; valor: string }) {
       >
         {etiqueta}
       </span>
-      <span style={{ fontSize: "1.05rem", fontWeight: 700 }}>{valor}</span>
+      <span
+        style={{
+          fontSize: dimmed ? "0.95rem" : "1.05rem",
+          fontWeight: 700,
+          color: dimmed ? "var(--text-muted)" : "var(--text)",
+        }}
+      >
+        {valor}
+      </span>
     </div>
   );
 }
@@ -199,6 +218,10 @@ export default function CajaDelDiaPage() {
               return !esEfectivo && !esTransfer;
             });
 
+            const totalEfectivo = cobrosEfectivo.reduce((s, c) => s + c.monto, 0);
+            const totalTransferencia = cobrosTransferencia.reduce((s, c) => s + c.monto, 0);
+            const totalOtros = cobrosOtros.reduce((s, c) => s + c.monto, 0);
+
             return (
               <>
                 <div
@@ -210,12 +233,12 @@ export default function CajaDelDiaPage() {
                   }}
                 >
                   <TarjetaResumen
-                    etiqueta={`Tu caja del día (${data.fechaDia})`}
+                    etiqueta="Caja actual (efectivo)"
                     valor={formatMonto(cajaActual)}
                   />
                   <TarjetaResumen
-                    etiqueta={`Total cobrado (${data.fechaDia})`}
-                    valor={formatMonto(data.totalCobrosLista)}
+                    etiqueta={`Base asignada (${data.fechaDia})`}
+                    valor={formatMonto(data.totalBaseAsignadaDia)}
                   />
                   <TarjetaResumen
                     etiqueta="Gastos del día"
@@ -226,9 +249,26 @@ export default function CajaDelDiaPage() {
                     valor={formatMonto(data.totalPrestamosDesembolsoDia ?? 0)}
                   />
                   <TarjetaResumen
-                    etiqueta={`Base asignada (${data.fechaDia})`}
-                    valor={formatMonto(data.totalBaseAsignadaDia)}
+                    etiqueta={`Total cobrado (${data.fechaDia})`}
+                    valor={formatMonto(data.totalCobrosLista)}
                   />
+                  <TarjetaResumen
+                    etiqueta="↳ En efectivo"
+                    valor={formatMonto(totalEfectivo)}
+                    dimmed
+                  />
+                  <TarjetaResumen
+                    etiqueta="↳ Transferencia"
+                    valor={formatMonto(totalTransferencia)}
+                    dimmed
+                  />
+                  {totalOtros > 0 && (
+                    <TarjetaResumen
+                      etiqueta="↳ Otros métodos"
+                      valor={formatMonto(totalOtros)}
+                      dimmed
+                    />
+                  )}
                 </div>
 
                 <h3 style={{ fontSize: "1.05rem", marginBottom: "0.5rem" }}>
