@@ -1,10 +1,12 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
+import { collection, query, where, onSnapshot } from "firebase/firestore";
 import { useAuth } from "@/context/AuthContext";
+import { db } from "@/lib/firebase";
+import { useTrabajadorCajaDia } from "@/context/TrabajadorCajaDiaContext";
 import {
   solicitarEntregaReporteDia,
-  getMiSolicitudEntregaReporte,
   type SolicitudEntregaReporteApi,
 } from "@/lib/empresa-api";
 
@@ -20,6 +22,7 @@ function formatMonto(value: number): string {
 
 export default function ResumenDelDiaPage() {
   const { user, profile } = useAuth();
+  const { data: cajaDia, tuCajaEfectivo } = useTrabajadorCajaDia();
   const [entregando, setEntregando] = useState(false);
   const [modalEntregaAbierto, setModalEntregaAbierto] = useState(false);
   const [comentarioEntrega, setComentarioEntrega] = useState("");
@@ -28,25 +31,82 @@ export default function ResumenDelDiaPage() {
   const [solicitudPendiente, setSolicitudPendiente] = useState<SolicitudEntregaReporteApi | null>(null);
   const [solicitudRechazada, setSolicitudRechazada] = useState<SolicitudEntregaReporteApi | null>(null);
 
-  const cargarSolicitudReporte = useCallback(async () => {
-    if (!user) return;
-    try {
-      const token = await user.getIdToken();
-      const { pendiente, ultimaRechazada } = await getMiSolicitudEntregaReporte(token);
-      setSolicitudPendiente(pendiente);
-      setSolicitudRechazada(
-        pendiente ? null : ultimaRechazada?.estado === "rechazada" ? ultimaRechazada : null
-      );
-    } catch {
-      /* silencioso */
-    }
-  }, [user]);
-
   useEffect(() => {
-    void cargarSolicitudReporte();
-    const id = setInterval(() => void cargarSolicitudReporte(), 45_000);
-    return () => clearInterval(id);
-  }, [cargarSolicitudReporte]);
+    if (!db || !user || !profile?.empresaId) return;
+    const empresaId = profile.empresaId.trim();
+
+    const qPendiente = query(
+      collection(db, "empresas", empresaId, "solicitudesEntregaReporte"),
+      where("empleadoUid", "==", user.uid),
+      where("estado", "==", "pendiente")
+    );
+    const qRechazada = query(
+      collection(db, "empresas", empresaId, "solicitudesEntregaReporte"),
+      where("empleadoUid", "==", user.uid),
+      where("estado", "==", "rechazada")
+    );
+
+    const unsubPendiente = onSnapshot(qPendiente, (snap) => {
+      if (snap.empty) {
+        setSolicitudPendiente(null);
+      } else {
+        const d = snap.docs[0].data();
+        setSolicitudPendiente({
+          id: snap.docs[0].id,
+          empleadoUid: d.empleadoUid ?? "",
+          empleadoNombre: d.empleadoNombre ?? "",
+          rutaId: d.rutaId ?? "",
+          rutaNombre: d.rutaNombre ?? "",
+          adminId: d.adminId ?? "",
+          estado: d.estado ?? "",
+          comentarioTrabajador: d.comentarioTrabajador ?? null,
+          montoAlSolicitar: typeof d.montoAlSolicitar === "number" ? d.montoAlSolicitar : 0,
+          creadaEn: d.creadaEn?.toDate?.()?.toISOString?.() ?? null,
+          resueltaEn: d.resueltaEn?.toDate?.()?.toISOString?.() ?? null,
+          resueltaPorUid: d.resueltaPorUid ?? null,
+          motivoRechazo: d.motivoRechazo ?? null,
+          montoEntregadoEfectivo: d.montoEntregadoEfectivo ?? null,
+        });
+        setSolicitudRechazada(null);
+      }
+    });
+
+    const unsubRechazada = onSnapshot(qRechazada, (snap) => {
+      setSolicitudPendiente((pendiente) => {
+        if (pendiente) return pendiente;
+        if (snap.empty) {
+          setSolicitudRechazada(null);
+        } else {
+          const docs = snap.docs.sort((a, b) =>
+            (b.data().creadaEn?.toMillis?.() ?? 0) - (a.data().creadaEn?.toMillis?.() ?? 0)
+          );
+          const d = docs[0].data();
+          setSolicitudRechazada({
+            id: docs[0].id,
+            empleadoUid: d.empleadoUid ?? "",
+            empleadoNombre: d.empleadoNombre ?? "",
+            rutaId: d.rutaId ?? "",
+            rutaNombre: d.rutaNombre ?? "",
+            adminId: d.adminId ?? "",
+            estado: d.estado ?? "",
+            comentarioTrabajador: d.comentarioTrabajador ?? null,
+            montoAlSolicitar: typeof d.montoAlSolicitar === "number" ? d.montoAlSolicitar : 0,
+            creadaEn: d.creadaEn?.toDate?.()?.toISOString?.() ?? null,
+            resueltaEn: d.resueltaEn?.toDate?.()?.toISOString?.() ?? null,
+            resueltaPorUid: d.resueltaPorUid ?? null,
+            motivoRechazo: d.motivoRechazo ?? null,
+            montoEntregadoEfectivo: d.montoEntregadoEfectivo ?? null,
+          });
+        }
+        return pendiente;
+      });
+    });
+
+    return () => {
+      unsubPendiente();
+      unsubRechazada();
+    };
+  }, [user?.uid, profile?.empresaId]);
 
   useEffect(() => {
     if (!modalEntregaAbierto) return;
@@ -81,7 +141,6 @@ export default function ResumenDelDiaPage() {
       });
       setMsgReporte(r.mensaje || `Solicitud enviada (${formatMonto(r.montoAlSolicitar)}). Esperá la confirmación del administrador.`);
       cerrarModalEntrega();
-      await cargarSolicitudReporte();
     } catch (e) {
       setErrReporte(e instanceof Error ? e.message : "No se pudo entregar");
     } finally {
@@ -140,6 +199,77 @@ export default function ResumenDelDiaPage() {
               </p>
             </>
           )}
+        </div>
+      )}
+
+      {cajaDia && (
+        <div
+          style={{
+            marginBottom: "1.25rem",
+            padding: "1rem",
+            borderRadius: "12px",
+            border: "1px solid var(--card-border)",
+            background: "var(--input-bg)",
+          }}
+        >
+          <p
+            style={{
+              margin: "0 0 0.75rem",
+              fontSize: "0.75rem",
+              fontWeight: 700,
+              letterSpacing: "0.08em",
+              textTransform: "uppercase",
+              color: "var(--text-muted)",
+            }}
+          >
+            Resumen del día — {cajaDia.fechaDia}
+          </p>
+          {[
+            { label: "Base asignada", valor: cajaDia.totalBaseAsignadaDia },
+            { label: "Cobrado en efectivo", valor: cajaDia.totalCobrosEfectivoDia },
+            {
+              label: "Cobrado por transferencia",
+              valor: cajaDia.totalCobrosLista - cajaDia.totalCobrosEfectivoDia,
+            },
+            { label: "Gastos del día", valor: -cajaDia.totalGastosDia },
+            { label: "Préstamos desembolsados", valor: -(cajaDia.totalPrestamosDesembolsoDia ?? 0) },
+          ].map(({ label, valor }) => (
+            <div
+              key={label}
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                padding: "0.35rem 0",
+                borderBottom: "1px solid var(--card-border)",
+                fontSize: "0.875rem",
+              }}
+            >
+              <span style={{ color: "var(--text-muted)" }}>{label}</span>
+              <span
+                style={{
+                  fontWeight: 600,
+                  color: valor < 0 ? "var(--danger, #f87171)" : "var(--text)",
+                }}
+              >
+                {valor < 0 ? `- ${formatMonto(Math.abs(valor))}` : formatMonto(valor)}
+              </span>
+            </div>
+          ))}
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              paddingTop: "0.65rem",
+              marginTop: "0.25rem",
+            }}
+          >
+            <span style={{ fontWeight: 700, fontSize: "0.9rem" }}>A entregar (efectivo)</span>
+            <span style={{ fontWeight: 800, fontSize: "1.1rem", color: "var(--text)" }}>
+              {formatMonto(tuCajaEfectivo ?? 0)}
+            </span>
+          </div>
         </div>
       )}
 

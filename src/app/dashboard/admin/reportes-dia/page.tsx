@@ -408,15 +408,26 @@ export default function ReportesDiaPage() {
                 <div>
                   <strong>Resumen</strong>
                   <ul style={{ margin: "0.5rem 0 0", paddingLeft: "1.25rem" }}>
-                    <li>Total cobros del día: {formatMonto(previewSnapshot.totalCobrosLista)}</li>
-                    <li>Base asignada hoy: {formatMonto(previewSnapshot.totalBaseAsignadaDia)}</li>
-                    <li>Gastos del día: {formatMonto(previewSnapshot.totalGastosDia)}</li>
+                    <li>Cobrado en efectivo: {formatMonto(previewSnapshot.totalCobrosEfectivoDia)}</li>
                     <li>
-                      Préstamos:{" "}
-                      {formatMonto(previewSnapshot.totalPrestamosDesembolsoDia ?? 0)}
+                      Cobrado por transferencia:{" "}
+                      {formatMonto(
+                        previewSnapshot.totalCobrosLista - previewSnapshot.totalCobrosEfectivoDia
+                      )}
                     </li>
+                    <li>Base asignada: {formatMonto(previewSnapshot.totalBaseAsignadaDia)}</li>
+                    <li>Gastos: {formatMonto(previewSnapshot.totalGastosDia)}</li>
+                    <li>Préstamos: {formatMonto(previewSnapshot.totalPrestamosDesembolsoDia ?? 0)}</li>
                     <li>
-                      <strong> caja  {formatMonto(previewSnapshot.tuCajaDelDia)}</strong>
+                      <strong>
+                        A recibir en efectivo:{" "}
+                        {formatMonto(
+                          previewSnapshot.totalCobrosEfectivoDia +
+                            previewSnapshot.totalBaseAsignadaDia -
+                            previewSnapshot.totalGastosDia -
+                            (previewSnapshot.totalPrestamosDesembolsoDia ?? 0)
+                        )}
+                      </strong>
                     </li>
                     <li>Clientes que pagaron: {previewSnapshot.cobros.length}</li>
                     <li>Clientes que no pagaron: {previewSnapshot.noPagos.length}</li>
