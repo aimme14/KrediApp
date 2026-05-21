@@ -16,6 +16,11 @@ service cloud.firestore {
             || resource.data.createdBy == request.auth.uid);
       allow write: if false;
     }
+    match /{path=**}/pagos/{pagoId} {
+      allow read: if request.auth != null
+        && resource.data.empleadoId == request.auth.uid;
+      allow write: if false;
+    }
     // Empresas y todas sus subcolecciones
     match /empresas/{empresaId} {
       allow read: if request.auth != null;
@@ -23,6 +28,11 @@ service cloud.firestore {
       match /usuarios/{usuarioId} {
         allow read: if request.auth != null;
         allow write: if false;
+        match /asignacionesBase/{asigId} {
+          allow read: if request.auth != null
+            && request.auth.uid == usuarioId;
+          allow write: if false;
+        }
       }
       match /rutas/{rutaId} {
         allow read: if request.auth != null;
@@ -60,6 +70,11 @@ service cloud.firestore {
         allow read: if request.auth != null
           && (resource.data.empleadoUid == request.auth.uid
               || resource.data.adminId == request.auth.uid);
+        allow write: if false;
+      }
+      match /reportesDia/{reporteId} {
+        allow read: if request.auth != null
+          && resource.data.adminId == request.auth.uid;
         allow write: if false;
       }
     }

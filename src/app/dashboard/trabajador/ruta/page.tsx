@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { useTrabajadorCajaDia } from "@/context/TrabajadorCajaDiaContext";
+import { formatFechaDia } from "@/lib/colombia-day-bounds";
 import { useRuta } from "@/hooks/useRuta";
 import { UMBRAL_INTENTOS_ALERTA, useRutaDia } from "@/hooks/useRutaDia";
 import type { ClienteRutaGrupo, PrioridadClienteRuta } from "@/types/finanzas";
@@ -199,7 +200,9 @@ export default function RutaDelDiaPage() {
             <h3 id="ruta-dia-caja-heading" className="ruta-dia-caja-title">
               caja 
             </h3>
-            <p className="ruta-dia-caja-desc">{cajaDelDiaResumen?.fechaDia ?? fechaDia}</p>
+            <p className="ruta-dia-caja-desc">
+              {formatFechaDia(cajaDelDiaResumen?.fechaDia ?? fechaDia)}
+            </p>
           </div>
           <div className="ruta-dia-caja-monto-wrap">
             <span className="ruta-dia-caja-monto" aria-live="polite">

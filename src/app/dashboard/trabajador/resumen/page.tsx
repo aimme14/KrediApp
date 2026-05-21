@@ -5,6 +5,7 @@ import { collection, query, where, onSnapshot } from "firebase/firestore";
 import { useAuth } from "@/context/AuthContext";
 import { db } from "@/lib/firebase";
 import { useTrabajadorCajaDia } from "@/context/TrabajadorCajaDiaContext";
+import { formatFechaDia } from "@/lib/colombia-day-bounds";
 import {
   solicitarEntregaReporteDia,
   type SolicitudEntregaReporteApi,
@@ -222,7 +223,7 @@ export default function ResumenDelDiaPage() {
               color: "var(--text-muted)",
             }}
           >
-            Resumen del día — {cajaDia.fechaDia}
+            Resumen del día — {formatFechaDia(cajaDia.fechaDia)}
           </p>
           {[
             { label: "Base asignada", valor: cajaDia.totalBaseAsignadaDia },

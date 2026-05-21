@@ -29,6 +29,19 @@ export function finDiaColombiaUtc(fechaDia: string): Date | null {
   return new Date(start.getTime() + 24 * 60 * 60 * 1000 - 1);
 }
 
+/** YYYY-MM-DD → etiqueta dd/mm/yyyy en calendario Colombia. */
+export function formatFechaDia(yyyyMmDd: string): string {
+  if (!yyyyMmDd) return "";
+  const date = new Date(`${yyyyMmDd}T05:00:00Z`);
+  if (Number.isNaN(date.getTime())) return yyyyMmDd;
+  return date.toLocaleDateString("es-CO", {
+    timeZone: "America/Bogota",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+}
+
 /** Fecha calendario actual en America/Bogota (YYYY-MM-DD). */
 export function fechaDiaColombiaHoy(): string {
   return new Date()

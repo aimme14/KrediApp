@@ -10,6 +10,7 @@ import type {
   NoPagoDiaItem,
   PrestamoDesembolsoDiaItem,
 } from "@/lib/empresa-api";
+import { formatFechaDia } from "@/lib/colombia-day-bounds";
 import { formatoCuotasRestanteTotal } from "@/lib/cuotas-display";
 
 function formatMonto(value: number): string {
@@ -31,18 +32,6 @@ function formatHora(iso: string | null): string {
   } catch {
     return "—";
   }
-}
-
-function formatFechaDia(yyyyMmDd: string): string {
-  // yyyy-mm-dd → Date en UTC para evitar desplazamientos por zona horaria
-  const date = new Date(`${yyyyMmDd}T00:00:00Z`);
-  if (Number.isNaN(date.getTime())) return yyyyMmDd;
-  return date.toLocaleDateString("es-CO", {
-    timeZone: "America/Bogota",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  });
 }
 
 /** Mismas etiquetas que en cobrar → «No pagó». */
@@ -237,7 +226,7 @@ export default function CajaDelDiaPage() {
                     valor={formatMonto(cajaActual)}
                   />
                   <TarjetaResumen
-                    etiqueta={`Base asignada (${data.fechaDia})`}
+                    etiqueta={`Base asignada (${formatFechaDia(data.fechaDia)})`}
                     valor={formatMonto(data.totalBaseAsignadaDia)}
                   />
                   <TarjetaResumen
@@ -245,11 +234,11 @@ export default function CajaDelDiaPage() {
                     valor={formatMonto(data.totalGastosDia)}
                   />
                   <TarjetaResumen
-                    etiqueta={`Préstamos (${data.fechaDia})`}
+                    etiqueta={`Préstamos (${formatFechaDia(data.fechaDia)})`}
                     valor={formatMonto(data.totalPrestamosDesembolsoDia ?? 0)}
                   />
                   <TarjetaResumen
-                    etiqueta={`Total cobrado (${data.fechaDia})`}
+                    etiqueta={`Total cobrado (${formatFechaDia(data.fechaDia)})`}
                     valor={formatMonto(data.totalCobrosLista)}
                   />
                   <TarjetaResumen

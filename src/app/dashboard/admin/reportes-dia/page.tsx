@@ -1,11 +1,21 @@
 "use client";
 
-import { useState, useEffect, useCallback, type CSSProperties } from "react";
+import { useState, useEffect, type CSSProperties } from "react";
+import { collection, query, where, onSnapshot, Timestamp } from "firebase/firestore";
 import { useAuth } from "@/context/AuthContext";
+import { db } from "@/lib/firebase";
+import {
+  inicioDiaColombiaUtc,
+  finDiaColombiaUtc,
+  parseFechaDiaColombia,
+} from "@/lib/colombia-day-bounds";
+import {
+  EMPRESAS_COLLECTION,
+  SOLICITUDES_ENTREGA_REPORTE_SUBCOLLECTION,
+  REPORTES_DIA_SUBCOLLECTION,
+} from "@/lib/empresas-db";
 import { formatoCuotasRestanteTotal } from "@/lib/cuotas-display";
 import {
-  getReportesDia,
-  getSolicitudesEntregaReportePendientes,
   getPreviewEntregaReporteAdmin,
   getReporteDiaPdfUrl,
   regenerarReporteDiaPdf,
@@ -140,38 +150,104 @@ export default function ReportesDiaPage() {
     texto: string | null;
   } | null>(null);
 
-  const load = useCallback(async () => {
-    if (!user) {
-      setLoading(false);
-      setError("No autenticado. Recarga la página o vuelve a iniciar sesión.");
-      setItems([]);
-      setSolicitudes([]);
-      return;
-    }
-    setLoading(true);
-    setError(null);
-    setRegenerarPdfErr(null);
-    try {
-      const token = await user.getIdToken();
-      const [res, pend] = await Promise.all([
-        getReportesDia(token, fecha),
-        getSolicitudesEntregaReportePendientes(token),
-      ]);
-      setItems(res.items);
-      setFechaDia(res.fechaDia);
-      setSolicitudes(pend);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Error al cargar");
-      setItems([]);
-      setSolicitudes([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [user, fecha]);
+  useEffect(() => {
+    if (!db || !user || !profile?.empresaId) return;
+    const empresaId = profile.empresaId.trim();
+
+    const q = query(
+      collection(db, EMPRESAS_COLLECTION, empresaId, SOLICITUDES_ENTREGA_REPORTE_SUBCOLLECTION),
+      where("adminId", "==", user.uid),
+      where("estado", "==", "pendiente")
+    );
+
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        const list: SolicitudEntregaPendienteAdmin[] = snap.docs.map((d) => {
+          const x = d.data();
+          return {
+            id: d.id,
+            empleadoUid: x.empleadoUid ?? "",
+            empleadoNombre: x.empleadoNombre ?? "",
+            rutaId: x.rutaId ?? "",
+            rutaNombre: x.rutaNombre ?? "",
+            estado: x.estado ?? "",
+            comentarioTrabajador: x.comentarioTrabajador ?? null,
+            montoAlSolicitar: typeof x.montoAlSolicitar === "number" ? x.montoAlSolicitar : 0,
+            creadaEn: x.creadaEn?.toDate?.()?.toISOString?.() ?? null,
+          };
+        });
+        setSolicitudes(list);
+      },
+      (err) => {
+        console.warn("[ReportesDia] onSnapshot solicitudes:", err);
+      }
+    );
+
+    return unsub;
+  }, [user?.uid, profile?.empresaId]);
 
   useEffect(() => {
-    load();
-  }, [load]);
+    if (!db || !user || !profile?.empresaId) return;
+    if (!parseFechaDiaColombia(fecha).ok) return;
+    const empresaId = profile.empresaId.trim();
+
+    const start = inicioDiaColombiaUtc(fecha);
+    const end = finDiaColombiaUtc(fecha);
+    if (!start || !end) return;
+
+    setLoading(true);
+
+    const q = query(
+      collection(db, EMPRESAS_COLLECTION, empresaId, REPORTES_DIA_SUBCOLLECTION),
+      where("adminId", "==", user.uid),
+      where("fecha", ">=", Timestamp.fromDate(start)),
+      where("fecha", "<=", Timestamp.fromDate(end))
+    );
+
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        const list: ReporteDiaItem[] = snap.docs.map((d) => {
+          const x = d.data();
+          const comentarioRaw = x.comentario;
+          const comentario =
+            typeof comentarioRaw === "string" && comentarioRaw.trim()
+              ? comentarioRaw.trim()
+              : null;
+          const pdfStoragePath =
+            typeof x.pdfStoragePath === "string" && x.pdfStoragePath.trim()
+              ? x.pdfStoragePath.trim()
+              : "";
+          const pdfError =
+            typeof x.pdfError === "string" && x.pdfError.trim() ? x.pdfError.trim() : null;
+          return {
+            id: d.id,
+            fechaDia: typeof x.fechaDia === "string" ? x.fechaDia : fecha,
+            rutaId: typeof x.rutaId === "string" ? x.rutaId : "",
+            rutaNombre: typeof x.rutaNombre === "string" ? x.rutaNombre : "",
+            empleadoId: typeof x.empleadoId === "string" ? x.empleadoId : "",
+            empleadoNombre: typeof x.empleadoNombre === "string" ? x.empleadoNombre : "",
+            montoEntregado: typeof x.montoEntregado === "number" ? x.montoEntregado : 0,
+            fecha: x.fecha?.toDate?.()?.toISOString?.() ?? null,
+            comentario,
+            tienePdf: Boolean(pdfStoragePath),
+            pdfError,
+          };
+        });
+        list.sort((a, b) => (b.fecha ?? "").localeCompare(a.fecha ?? ""));
+        setItems(list);
+        setFechaDia(fecha);
+        setLoading(false);
+      },
+      (err) => {
+        console.warn("[ReportesDia] onSnapshot reportes:", err);
+        setLoading(false);
+      }
+    );
+
+    return unsub;
+  }, [user?.uid, profile?.empresaId, fecha]);
 
   useEffect(() => {
     if (!previewSolicitudId || !user) {
@@ -232,7 +308,6 @@ export default function ReportesDiaPage() {
     try {
       const token = await user.getIdToken();
       await regenerarReporteDiaPdf(token, reporteId);
-      await load();
     } catch (e) {
       setRegenerarPdfErr(e instanceof Error ? e.message : "Error al regenerar el PDF");
     } finally {
@@ -293,7 +368,6 @@ export default function ReportesDiaPage() {
                       try {
                         const token = await user.getIdToken();
                         await aprobarSolicitudEntregaReporte(token, s.id);
-                        await load();
                       } catch (e) {
                         setError(e instanceof Error ? e.message : "Error al aprobar");
                       } finally {
@@ -320,7 +394,6 @@ export default function ReportesDiaPage() {
                         await rechazarSolicitudEntregaReporte(token, s.id, {
                           motivo: motivo || undefined,
                         });
-                        await load();
                       } catch (e) {
                         setError(e instanceof Error ? e.message : "Error al rechazar");
                       } finally {
