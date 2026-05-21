@@ -101,6 +101,7 @@ export type CierreDiaSnapshot = {
   cobros: CobroDiaSnapshotItem[];
   noPagos: NoPagoDiaSnapshotItem[];
   totalCobrosLista: number;
+  totalCobrosEfectivoDia: number;
   /** Total cobrado en ruta + base − gastos − desembolsos desde tu caja. */
   tuCajaDelDia: number;
   totalCobrosAcreditanTuCaja: number;
@@ -390,6 +391,11 @@ export async function buildCierreDiaSnapshot(
   noPagos.sort((a, b) => (b.fecha ?? "").localeCompare(a.fecha ?? ""));
 
   const totalCobrosLista = round2(cobros.reduce((s, c) => s + c.monto, 0));
+  const totalCobrosEfectivoDia = round2(
+    cobros
+      .filter((c) => c.metodoPago === "efectivo")
+      .reduce((s, c) => s + c.monto, 0)
+  );
 
   const gastosSnap = await db
     .collection(EMPRESAS_COLLECTION)
@@ -492,6 +498,7 @@ export async function buildCierreDiaSnapshot(
     cobros,
     noPagos,
     totalCobrosLista,
+    totalCobrosEfectivoDia,
     tuCajaDelDia,
     totalCobrosAcreditanTuCaja,
     totalGastosDia,

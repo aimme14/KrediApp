@@ -20,6 +20,24 @@ export function tuCajaDelDiaFormula(
   );
 }
 
+/** Cobros en efectivo + base − gastos − desembolsos desde tu caja. */
+export function tuCajaEfectivoFormula(
+  totalCobrosEfectivoDia: number,
+  totalBaseAsignadaDia: number,
+  totalGastosDia: number,
+  totalPrestamosDesembolsoDia = 0
+): number {
+  return (
+    Math.round(
+      (totalCobrosEfectivoDia +
+        totalBaseAsignadaDia -
+        totalGastosDia -
+        totalPrestamosDesembolsoDia) *
+        100
+    ) / 100
+  );
+}
+
 /** Mismos totales que devuelve cobros-del-día. */
 export function tuCajaDelDiaDesdeTotales(
   d: Pick<

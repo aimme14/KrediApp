@@ -389,6 +389,7 @@ export type CobrosDelDiaEmpleadoResponse = {
   cobros: CobroDiaItem[];
   noPagos: NoPagoDiaItem[];
   totalCobrosLista: number;
+  totalCobrosEfectivoDia: number;
   /** Saldo en `empresas/{empresaId}/usuarios/{uid}.cajaEmpleado` (si la API lo incluye). */
   cajaEmpleado?: number;
   /** Total cobrado en ruta + base − gastos − préstamos desde tu caja (tarjeta «Tu caja del día»). */
@@ -456,6 +457,10 @@ export async function getPreviewEntregaReporteAdmin(
       cobros: Array.isArray(data.snapshot?.cobros) ? data.snapshot.cobros : [],
       noPagos: Array.isArray(data.snapshot?.noPagos) ? data.snapshot.noPagos : [],
       totalCobrosLista: typeof data.snapshot?.totalCobrosLista === "number" ? data.snapshot.totalCobrosLista : 0,
+      totalCobrosEfectivoDia:
+        typeof data.snapshot?.totalCobrosEfectivoDia === "number"
+          ? data.snapshot.totalCobrosEfectivoDia
+          : 0,
       tuCajaDelDia: typeof data.snapshot?.tuCajaDelDia === "number" ? data.snapshot.tuCajaDelDia : 0,
       totalCobrosAcreditanTuCaja:
         typeof data.snapshot?.totalCobrosAcreditanTuCaja === "number"
@@ -586,6 +591,8 @@ export async function getCobrosDelDiaEmpleado(
     cobros,
     noPagos,
     totalCobrosLista: typeof data.totalCobrosLista === "number" ? data.totalCobrosLista : 0,
+    totalCobrosEfectivoDia:
+      typeof data.totalCobrosEfectivoDia === "number" ? data.totalCobrosEfectivoDia : 0,
     tuCajaDelDia: typeof data.tuCajaDelDia === "number" ? data.tuCajaDelDia : 0,
     totalCobrosAcreditanTuCaja:
       typeof data.totalCobrosAcreditanTuCaja === "number"

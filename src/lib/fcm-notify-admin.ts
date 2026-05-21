@@ -39,6 +39,8 @@ export async function notifyAdminGastoEmpleado(
   try {
     await messaging.send({
       topic,
+      android: { collapseKey: `gasto_${gastoId}` },
+      webpush: { headers: { Topic: `gasto_${gastoId}` } },
       data: {
         title,
         body,
@@ -83,6 +85,8 @@ export async function notifyAdminPrestamoEmpleado(
   try {
     await messaging.send({
       topic,
+      android: { collapseKey: `prestamo_${prestamoId}` },
+      webpush: { headers: { Topic: `prestamo_${prestamoId}` } },
       data: {
         title,
         body,
@@ -122,6 +126,8 @@ export async function notifyAdminClienteEmpleado(
   try {
     await messaging.send({
       topic,
+      android: { collapseKey: `cliente_${clienteId}` },
+      webpush: { headers: { Topic: `cliente_${clienteId}` } },
       data: {
         title,
         body,
@@ -229,6 +235,8 @@ export async function notifyAdminCuotaPrestamo(
   try {
     await messaging.send({
       topic,
+      android: { collapseKey: `cuota_${pagoId}` },
+      webpush: { headers: { Topic: `cuota_${pagoId}` } },
       data: {
         title,
         body,

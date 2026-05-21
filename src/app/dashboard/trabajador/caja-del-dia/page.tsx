@@ -134,8 +134,8 @@ function TarjetaResumen(props: {
 
 export default function CajaDelDiaPage() {
   const { profile } = useAuth();
-  const { fechaDia, data, loading, error, cajaEmpleadoRT } = useTrabajadorCajaDia();
-  const cajaActual = cajaEmpleadoRT ?? data?.cajaEmpleado ?? 0;
+  const { fechaDia, data, loading, error, tuCajaEfectivo } = useTrabajadorCajaDia();
+  const cajaActual = tuCajaEfectivo ?? 0;
   const [evidenciaModalUrl, setEvidenciaModalUrl] = useState<string | null>(null);
   const evidenciaCerrarRef = useRef<HTMLButtonElement>(null);
 

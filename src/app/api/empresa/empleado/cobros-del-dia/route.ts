@@ -67,6 +67,7 @@ export async function GET(request: NextRequest) {
       cobros: snap.cobros,
       noPagos: snap.noPagos,
       totalCobrosLista: snap.totalCobrosLista,
+      totalCobrosEfectivoDia: snap.totalCobrosEfectivoDia,
       tuCajaDelDia: snap.tuCajaDelDia,
       totalCobrosAcreditanTuCaja: snap.totalCobrosAcreditanTuCaja,
       totalGastosDia: snap.totalGastosDia,

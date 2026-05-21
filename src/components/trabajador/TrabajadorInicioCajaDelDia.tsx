@@ -12,9 +12,9 @@ function formatMonto(value: number): string {
 }
 
 export function TrabajadorInicioCajaDelDia() {
-  const { fechaDia, data, loading, error, cajaEmpleadoRT } = useTrabajadorCajaDia();
+  const { fechaDia, data, loading, error, tuCajaEfectivo } = useTrabajadorCajaDia();
   const fechaEtiqueta = data?.fechaDia ?? fechaDia;
-  const cajaActual = cajaEmpleadoRT ?? data?.cajaEmpleado ?? null;
+  const cajaActual = tuCajaEfectivo;
 
   return (
     <Link

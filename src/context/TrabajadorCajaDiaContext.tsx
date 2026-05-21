@@ -17,6 +17,7 @@ import {
   getCobrosDelDiaEmpleado,
   type CobrosDelDiaEmpleadoResponse,
 } from "@/lib/empresa-api";
+import { tuCajaEfectivoFormula } from "@/lib/tu-caja-del-dia";
 
 const EMPRESAS_COLLECTION = "empresas";
 const USUARIOS_SUBCOLLECTION = "usuarios";
@@ -28,6 +29,7 @@ export type TrabajadorCajaDiaContextValue = {
   error: string | null;
   refresh: () => Promise<void>;
   cajaEmpleadoRT: number | null;
+  tuCajaEfectivo: number | null;
 };
 
 const TrabajadorCajaDiaContext = createContext<TrabajadorCajaDiaContextValue | null>(null);
@@ -93,6 +95,15 @@ export function TrabajadorCajaDiaProvider({ children }: { children: ReactNode })
     return unsub;
   }, [user?.uid, profile?.role, profile?.empresaId]);
 
+  const tuCajaEfectivo = data
+    ? tuCajaEfectivoFormula(
+        data.totalCobrosEfectivoDia,
+        data.totalBaseAsignadaDia,
+        data.totalGastosDia,
+        data.totalPrestamosDesembolsoDia ?? 0
+      )
+    : null;
+
   const value = useMemo(
     (): TrabajadorCajaDiaContextValue => ({
       fechaDia,
@@ -101,8 +112,9 @@ export function TrabajadorCajaDiaProvider({ children }: { children: ReactNode })
       error,
       refresh,
       cajaEmpleadoRT,
+      tuCajaEfectivo,
     }),
-    [fechaDia, data, loading, error, refresh, cajaEmpleadoRT]
+    [fechaDia, data, loading, error, refresh, cajaEmpleadoRT, tuCajaEfectivo]
   );
 
   return (
