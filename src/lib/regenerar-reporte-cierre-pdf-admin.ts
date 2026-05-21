@@ -81,6 +81,7 @@ export async function regenerarPdfReporteCierreDia(
     rutaInversiones,
     rutaGanancias,
     aprobadoEn,
+    totalCobrosEfectivoDia: snapshot.totalCobrosEfectivoDia,
   });
 
   const pdfStoragePath = await uploadReporteCierrePdfBuffer(empresaId, reporteDiaId, pdfBytes);

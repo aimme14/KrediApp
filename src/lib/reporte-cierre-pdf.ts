@@ -52,6 +52,7 @@ export type ReporteCierrePdfMeta = {
   rutaInversiones: number;
   rutaGanancias: number;
   aprobadoEn: Date;
+  totalCobrosEfectivoDia: number;
 };
 
 const PAGE_W = 595;
@@ -109,6 +110,12 @@ export async function buildReporteCierrePdf(
   };
 
   const LH = { body: 11.5, tight: 10 };
+
+  const cajaEfectivo =
+    snapshot.totalCobrosEfectivoDia +
+    snapshot.totalBaseAsignadaDia -
+    snapshot.totalGastosDia -
+    (snapshot.totalPrestamosDesembolsoDia ?? 0);
 
   let page = pdf.addPage([PAGE_W, PAGE_H]);
   let y = PAGE_H - M;
@@ -347,7 +354,7 @@ export async function buildReporteCierrePdf(
       borderWidth: 0.5,
     });
     let ly = yBottom + boxH - pad - 4;
-    page.drawText(sanitizarTextoPdf("Monto entregado a caja ruta"), {
+    page.drawText(sanitizarTextoPdf("A entregar en efectivo"), {
       x: leftX + pad,
       y: ly,
       size: FS.meta,
@@ -355,7 +362,7 @@ export async function buildReporteCierrePdf(
       color: WHITE,
     });
     ly -= lineH + 2;
-    page.drawText(fmtMoney(snapshot.tuCajaDelDia), {
+    page.drawText(fmtMoney(cajaEfectivo), {
       x: leftX + pad,
       y: ly,
       size: FS.section + 1,
@@ -403,20 +410,20 @@ export async function buildReporteCierrePdf(
     const labelBand = 10;
     const blockH = padTop + labelBand + gapLabelValor + valBand + padBottom;
     const labels = [
-      "Total cobros",
-      "Total gastos",
-      "Caja del día",
+      "Cobros efectivo",
+      "Cobros transferencia",
+      "A entregar (efectivo)",
       "Clientes pagaron",
       "Clientes no pagaron",
-      "Préstamos caja",
+      "Gastos del día",
     ];
     const vals = [
-      fmtMoney(snapshot.totalCobrosLista),
-      fmtMoney(snapshot.totalGastosDia),
-      fmtMoney(snapshot.tuCajaDelDia),
+      fmtMoney(snapshot.totalCobrosEfectivoDia),
+      fmtMoney(snapshot.totalCobrosLista - snapshot.totalCobrosEfectivoDia),
+      fmtMoney(cajaEfectivo),
       String(snapshot.cobros.length),
       String(snapshot.noPagos.length),
-      fmtMoney(snapshot.totalPrestamosDesembolsoDia ?? 0),
+      fmtMoney(snapshot.totalGastosDia),
     ];
 
     ensureBottom(blockH + 16);
