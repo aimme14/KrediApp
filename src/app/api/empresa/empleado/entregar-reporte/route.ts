@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
       montoAlSolicitar: result.montoAlSolicitar,
       rutaId: result.rutaId,
       mensaje:
-        "Tu solicitud fue enviada al administrador. El efectivo se pasará a la base de la ruta cuando confirme la entrega.",
+         "",
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Error al solicitar entrega de reporte";
