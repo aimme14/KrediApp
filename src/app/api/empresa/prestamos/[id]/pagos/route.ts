@@ -155,6 +155,7 @@ export async function GET(
       fecha: d.fecha?.toDate?.()?.toISOString() ?? null,
       tipo: d.tipo ?? "pago",
       metodoPago: d.metodoPago ?? null,
+      motivoNoPago: typeof d.motivoNoPago === "string" ? d.motivoNoPago : null,
       motivoPerdida: typeof d.motivoPerdida === "string" ? d.motivoPerdida : null,
       registradoPorUid: d.registradoPorUid ?? d.empleadoId ?? null,
       registradoPorNombre: d.registradoPorNombre ?? null,

@@ -11,7 +11,7 @@ import type {
   PrioridadClienteRuta,
 } from "@/types/finanzas";
 
-export type FiltroRutaDia = "todos" | "mora" | "pendientes" | "cobrados";
+export type FiltroRutaDia = "todos" | "mora" | "no_pago_hoy" | "pendientes" | "cobrados";
 
 const VISITADOS_STORAGE_PREFIX = "krediapp-ruta-visitados-";
 
@@ -240,8 +240,13 @@ export function useRutaDia(): UseRutaDiaState {
       case "mora":
         lista = lista.filter((c) => c.estado === "mora");
         break;
+      case "no_pago_hoy":
+        lista = lista.filter((c) => c.noPagoHoy);
+        break;
       case "pendientes":
-        lista = lista.filter((c) => !c.cuotaPagadaHoy);
+        lista = lista.filter(
+          (c) => !c.cuotaPagadaHoy && !c.noPagoHoy && c.estado !== "mora"
+        );
         break;
       case "cobrados":
         lista = lista.filter((c) => c.cuotaPagadaHoy);

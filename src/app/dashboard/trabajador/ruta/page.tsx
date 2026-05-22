@@ -51,11 +51,12 @@ function getSemaforoLabel(semaforo: SemaforoRuta): string {
 }
 
 const FILTROS_OPCIONES: {
-  id: "todos" | "mora" | "pendientes" | "cobrados";
+  id: "todos" | "mora" | "no_pago_hoy" | "pendientes" | "cobrados";
   label: string;
 }[] = [
   { id: "todos", label: "Todos" },
   { id: "mora", label: "En mora" },
+  { id: "no_pago_hoy", label: "No pagaron hoy" },
   { id: "pendientes", label: "Pendientes" },
   { id: "cobrados", label: "Cobrados" },
 ];
@@ -68,10 +69,7 @@ function formatCurrency(value: number): string {
   });
 }
 
-function getBadgeLabel(
-  grupo: ClienteRutaGrupo,
-  prioridad: PrioridadClienteRuta
-): string {
+function getBadgeLabel(grupo: ClienteRutaGrupo, _prioridad: PrioridadClienteRuta): string {
   const hasMora = grupo.items.some((i) => i.estado === "mora");
   const allCuotaPagadaHoy =
     grupo.items.length > 0 && grupo.items.every((i) => i.cuotaPagadaHoy);
@@ -79,18 +77,15 @@ function getBadgeLabel(
   if (hasMora) return "Mora";
   if (allCuotaPagadaHoy) return "Pagó hoy";
   if (tieneNoPagoHoy) return "No pagó hoy";
-  if (tieneAlertaNoPago(grupo)) return "Alerta";
-  if (prioridad === 3) return "Hoy";
-  if (prioridad === 4) return "Mañana";
-  return "Pronto";
+  return "Pendiente";
 }
 
 export default function RutaDelDiaPage() {
   const { profile } = useAuth();
   const router = useRouter();
-  const { fechaDia, data: cajaDelDiaResumen, loading: loadingCajaDelDia, cajaEmpleadoRT } =
+  const { fechaDia, data: cajaDelDiaResumen, loading: loadingCajaDelDia, tuCajaEfectivo } =
     useTrabajadorCajaDia();
-  const cajaActual = cajaEmpleadoRT ?? cajaDelDiaResumen?.cajaEmpleado ?? 0;
+  const cajaActual = tuCajaEfectivo ?? 0;
   const [filtroExpandido, setFiltroExpandido] = useState(false);
 
   const {
@@ -210,7 +205,7 @@ export default function RutaDelDiaPage() {
           </div>
           <div className="ruta-dia-caja-monto-wrap">
             <span className="ruta-dia-caja-monto" aria-live="polite">
-              {loadingCajaDelDia && cajaEmpleadoRT == null
+              {loadingCajaDelDia && tuCajaEfectivo == null
                 ? "…"
                 : formatCurrency(cajaActual)}
             </span>

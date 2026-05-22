@@ -933,7 +933,7 @@ function CobrarClientePageContent() {
     );
   }
 
-  const pagosHistorial = ultimosPagos.filter((p) => p.tipo === "pago" || p.tipo === "perdida");
+  const pagosHistorial = ultimosPagos;
   const formatFechaPago = (f: string | null) =>
     f ? new Date(f).toLocaleString("es-CO", { dateStyle: "short", timeStyle: "short" }) : "—";
 
@@ -994,12 +994,28 @@ function CobrarClientePageContent() {
                 <li key={p.id || `p-${idx}`} className="cobrar-historial-li">
                   <span className="cobrar-historial-fecha">{formatFechaPago(p.fecha)}</span>
                   <span className="cobrar-historial-monto">{formatCurrency(p.monto)}</span>
-                  <span className="cobrar-historial-metodo">
+                  <span
+                    className="cobrar-historial-metodo"
+                    style={{
+                      color:
+                        p.tipo === "perdida"
+                          ? "var(--danger, #f87171)"
+                          : p.tipo === "no_pago"
+                            ? "var(--warning, #eab308)"
+                            : "inherit",
+                    }}
+                  >
                     {p.tipo === "perdida"
                       ? "Pérdida"
-                      : p.metodoPago === "transferencia"
-                        ? "Transferencia"
-                        : "Efectivo"}
+                      : p.tipo === "no_pago"
+                        ? `No pagó${
+                            p.motivoNoPago
+                              ? ` — ${MOTIVOS_NO_PAGO.find((m) => m.value === p.motivoNoPago)?.label ?? p.motivoNoPago}`
+                              : ""
+                          }`
+                        : p.metodoPago === "transferencia"
+                          ? "Transferencia"
+                          : "Efectivo"}
                   </span>
                   <span className="cobrar-historial-registrado" title="Registrado por">
                     {p.registradoPorNombre || p.registradoPorUid || "—"}

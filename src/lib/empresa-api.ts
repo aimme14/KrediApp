@@ -123,6 +123,7 @@ export type PagoItem = {
   fecha: string | null;
   tipo: "pago" | "no_pago" | "perdida";
   metodoPago: string | null;
+  motivoNoPago?: string | null;
   motivoPerdida?: string | null;
   registradoPorUid: string | null;
   registradoPorNombre: string | null;
