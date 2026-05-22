@@ -2,6 +2,7 @@
 
 import { useMemo, useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/context/AuthContext";
+import { useTrabajadorCajaDia } from "@/context/TrabajadorCajaDiaContext";
 import { useTrabajadorLista } from "@/context/TrabajadorListaContext";
 import { type ClienteItem, type PrestamoItem } from "@/lib/empresa-api";
 import type {
@@ -138,13 +139,15 @@ function toDate(value: string | null | undefined): Date | null {
 
 function buildClientesRuta(
   clientes: ClienteItem[],
-  prestamos: PrestamoItem[]
+  prestamos: PrestamoItem[],
+  noPagosHoy: { prestamoId: string }[]
 ): ClienteRuta[] {
   const prestamosPendientes = prestamos.filter(
     (p) => p.estado !== "pagado" && (p.saldoPendiente ?? 0) > 0
   );
   const mapClientesById = new Map(clientes.map((c) => [c.id, c]));
   const visitados = getVisitadosHoy();
+  const noPagoHoySet = new Set(noPagosHoy.map((n) => n.prestamoId));
 
   const map: ClienteRuta[] = [];
   for (const p of prestamosPendientes) {
@@ -175,6 +178,7 @@ function buildClientesRuta(
       prioridad,
       visitado: visitados.has(p.clienteId),
       cuotaPagadaHoy,
+      noPagoHoy: noPagoHoySet.has(p.id),
       moroso: c?.moroso === true,
     });
   }
@@ -192,6 +196,7 @@ export function useRutaDia(): UseRutaDiaState {
     lastFetchedAt,
     refresh,
   } = useTrabajadorLista();
+  const { data: cajaDia } = useTrabajadorCajaDia();
 
   const [filtro, setFiltro] = useState<FiltroRutaDia>("todos");
   /** Invalida memo de visitados tras markVisitado */
@@ -199,8 +204,8 @@ export function useRutaDia(): UseRutaDiaState {
 
   const clientesRuta = useMemo(() => {
     if (!user || !profile || profile.role !== "trabajador") return [];
-    return buildClientesRuta(clientes, prestamos);
-  }, [user, profile, clientes, prestamos, visitadosBump]);
+    return buildClientesRuta(clientes, prestamos, cajaDia?.noPagos ?? []);
+  }, [user, profile, clientes, prestamos, visitadosBump, cajaDia?.noPagos]);
 
   const loading =
     Boolean(user && profile?.role === "trabajador") && loadingLista;

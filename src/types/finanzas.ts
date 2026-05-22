@@ -182,6 +182,8 @@ export interface ClienteRuta {
   visitado: boolean;
   /** True si el último pago del préstamo fue hoy (semáforo verde en ruta del día). */
   cuotaPagadaHoy: boolean;
+  /** True si hoy se registró «no pagó» para este préstamo (cobros del día). */
+  noPagoHoy: boolean;
   /** Marcado moroso por el admin (solo UI; no es el estado mora del préstamo). */
   moroso: boolean;
 }

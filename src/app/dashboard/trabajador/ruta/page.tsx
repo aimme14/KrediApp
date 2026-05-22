@@ -27,7 +27,9 @@ function getSemaforo(grupo: ClienteRutaGrupo): SemaforoRuta {
   const hasMora = grupo.items.some((i) => i.estado === "mora");
   const allCuotaPagadaHoy =
     grupo.items.length > 0 && grupo.items.every((i) => i.cuotaPagadaHoy);
+  const tieneNoPagoHoy = grupo.items.some((i) => i.noPagoHoy);
   if (hasMora) return "rojo";
+  if (tieneNoPagoHoy) return "naranja";
   if (tieneAlertaNoPago(grupo)) return "naranja";
   if (allCuotaPagadaHoy) return "verde";
   return "amarillo";
@@ -73,8 +75,10 @@ function getBadgeLabel(
   const hasMora = grupo.items.some((i) => i.estado === "mora");
   const allCuotaPagadaHoy =
     grupo.items.length > 0 && grupo.items.every((i) => i.cuotaPagadaHoy);
+  const tieneNoPagoHoy = grupo.items.some((i) => i.noPagoHoy);
   if (hasMora) return "Mora";
-  if (allCuotaPagadaHoy) return "Pagada hoy";
+  if (allCuotaPagadaHoy) return "Pagó hoy";
+  if (tieneNoPagoHoy) return "No pagó hoy";
   if (tieneAlertaNoPago(grupo)) return "Alerta";
   if (prioridad === 3) return "Hoy";
   if (prioridad === 4) return "Mañana";
