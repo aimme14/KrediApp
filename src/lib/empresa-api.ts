@@ -22,6 +22,8 @@ export type RutaItem = {
   inversiones?: number;
   /** Intereses / ganancias acumuladas. */
   ganancias?: number;
+  /** Pérdidas acumuladas del período. */
+  perdidas?: number;
   /** Patrimonio total de la ruta (caja ruta + bases empleados + inversiones − pérdidas). */
   capitalTotal?: number;
 };
