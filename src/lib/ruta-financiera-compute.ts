@@ -170,12 +170,7 @@ export function computeRutaCamposTrasPerdidaPrestamo(
           perdidas,
         });
 
-  const { capital: parteCapital } = splitMontoPagoEnCapitalYGanancia(
-    montoPerdida,
-    montoPrestamo,
-    totalAPagar
-  );
-  const capitalDescontar = round2(Math.min(parteCapital, inversiones));
+  const capitalDescontar = round2(Math.min(montoPerdida, inversiones));
   inversiones = round2(inversiones - capitalDescontar);
   perdidas = round2(perdidas + montoPerdida);
   const nuevoCapitalTotal = round2(capitalTotal - capitalDescontar);
