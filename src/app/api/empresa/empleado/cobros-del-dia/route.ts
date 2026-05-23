@@ -66,6 +66,8 @@ export async function GET(request: NextRequest) {
       rutaId: snap.rutaId,
       cobros: snap.cobros,
       noPagos: snap.noPagos,
+      perdidasDelDia: snap.perdidasDelDia,
+      totalPerdidasDia: snap.totalPerdidasDia,
       totalCobrosLista: snap.totalCobrosLista,
       totalCobrosEfectivoDia: snap.totalCobrosEfectivoDia,
       tuCajaDelDia: snap.tuCajaDelDia,

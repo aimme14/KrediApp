@@ -491,6 +491,11 @@ export default function ReportesDiaPage() {
                     <li>Base asignada: {formatMonto(previewSnapshot.totalBaseAsignadaDia)}</li>
                     <li>Gastos: {formatMonto(previewSnapshot.totalGastosDia)}</li>
                     <li>Préstamos: {formatMonto(previewSnapshot.totalPrestamosDesembolsoDia ?? 0)}</li>
+                    {(previewSnapshot.totalPerdidasDia ?? 0) > 0 && (
+                      <li style={{ color: "var(--danger, #f87171)" }}>
+                        Pérdidas del día: {formatMonto(previewSnapshot.totalPerdidasDia ?? 0)}
+                      </li>
+                    )}
                     <li>
                       <strong>
                         A recibir en efectivo:{" "}
@@ -746,6 +751,52 @@ export default function ReportesDiaPage() {
                         <td style={footCellStyle} />
                         <td className="col-num" style={footCellStyle}>
                           {formatMonto(t.gastosMonto)}
+                        </td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+                <div className="table-wrap">
+                  <strong>Pérdidas</strong>
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Cliente</th>
+                        <th>Motivo</th>
+                        <th className="col-num">Monto</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(previewSnapshot.perdidasDelDia ?? []).length === 0 ? (
+                        <tr>
+                          <td colSpan={3} style={{ color: "var(--text-muted)" }}>
+                            —
+                          </td>
+                        </tr>
+                      ) : (
+                        (previewSnapshot.perdidasDelDia ?? []).map((p) => (
+                          <tr key={p.pagoId}>
+                            <td>{p.clienteNombre}</td>
+                            <td>{p.motivoPerdida ?? "—"}</td>
+                            <td className="col-num" style={{ color: "var(--danger, #f87171)" }}>
+                              {formatMonto(p.monto)}
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                    <tfoot>
+                      <tr>
+                        <td style={footCellStyle}>Total</td>
+                        <td style={footCellStyle} />
+                        <td
+                          className="col-num"
+                          style={{
+                            ...footCellStyle,
+                            color: "var(--danger, #f87171)",
+                          }}
+                        >
+                          {formatMonto(previewSnapshot.totalPerdidasDia ?? 0)}
                         </td>
                       </tr>
                     </tfoot>

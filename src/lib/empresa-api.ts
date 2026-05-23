@@ -384,11 +384,24 @@ export type PrestamoDesembolsoDiaItem = {
   totalAPagar: number;
 };
 
+export type PerdidaDiaSnapshotItem = {
+  pagoId: string;
+  prestamoId: string;
+  clienteId: string;
+  clienteNombre: string;
+  monto: number;
+  motivoPerdida: string | null;
+  fecha: string | null;
+  saldoPendienteTrasPerdida: number;
+};
+
 export type CobrosDelDiaEmpleadoResponse = {
   fechaDia: string;
   rutaId: string;
   cobros: CobroDiaItem[];
   noPagos: NoPagoDiaItem[];
+  perdidasDelDia: PerdidaDiaSnapshotItem[];
+  totalPerdidasDia: number;
   totalCobrosLista: number;
   totalCobrosEfectivoDia: number;
   /** Saldo en `empresas/{empresaId}/usuarios/{uid}.cajaEmpleado` (si la API lo incluye). */
@@ -448,6 +461,25 @@ export async function getPreviewEntregaReporteAdmin(
       totalAPagar: typeof row.totalAPagar === "number" ? row.totalAPagar : 0,
     })
   );
+  const perdidasPrevRaw = Array.isArray(data.snapshot?.perdidasDelDia)
+    ? data.snapshot.perdidasDelDia
+    : [];
+  const perdidasDelDia: PerdidaDiaSnapshotItem[] = perdidasPrevRaw.map(
+    (row: Record<string, unknown>) => ({
+      pagoId: String(row.pagoId ?? ""),
+      prestamoId: String(row.prestamoId ?? ""),
+      clienteId: String(row.clienteId ?? ""),
+      clienteNombre: String(row.clienteNombre ?? ""),
+      monto: typeof row.monto === "number" ? row.monto : 0,
+      motivoPerdida:
+        typeof row.motivoPerdida === "string" && row.motivoPerdida.trim()
+          ? row.motivoPerdida.trim()
+          : null,
+      fecha: typeof row.fecha === "string" ? row.fecha : null,
+      saldoPendienteTrasPerdida:
+        typeof row.saldoPendienteTrasPerdida === "number" ? row.saldoPendienteTrasPerdida : 0,
+    })
+  );
 
   return {
     fechaDiaPreview: data.fechaDiaPreview ?? "",
@@ -457,6 +489,9 @@ export async function getPreviewEntregaReporteAdmin(
       rutaId: data.snapshot?.rutaId ?? "",
       cobros: Array.isArray(data.snapshot?.cobros) ? data.snapshot.cobros : [],
       noPagos: Array.isArray(data.snapshot?.noPagos) ? data.snapshot.noPagos : [],
+      perdidasDelDia,
+      totalPerdidasDia:
+        typeof data.snapshot?.totalPerdidasDia === "number" ? data.snapshot.totalPerdidasDia : 0,
       totalCobrosLista: typeof data.snapshot?.totalCobrosLista === "number" ? data.snapshot.totalCobrosLista : 0,
       totalCobrosEfectivoDia:
         typeof data.snapshot?.totalCobrosEfectivoDia === "number"
@@ -586,11 +621,31 @@ export async function getCobrosDelDiaEmpleado(
     })
   );
 
+  const perdidasRaw = Array.isArray(data.perdidasDelDia) ? data.perdidasDelDia : [];
+  const perdidasDelDia: PerdidaDiaSnapshotItem[] = perdidasRaw.map(
+    (row: Record<string, unknown>) => ({
+      pagoId: String(row.pagoId ?? ""),
+      prestamoId: String(row.prestamoId ?? ""),
+      clienteId: String(row.clienteId ?? ""),
+      clienteNombre: String(row.clienteNombre ?? ""),
+      monto: typeof row.monto === "number" ? row.monto : 0,
+      motivoPerdida:
+        typeof row.motivoPerdida === "string" && row.motivoPerdida.trim()
+          ? row.motivoPerdida.trim()
+          : null,
+      fecha: typeof row.fecha === "string" ? row.fecha : null,
+      saldoPendienteTrasPerdida:
+        typeof row.saldoPendienteTrasPerdida === "number" ? row.saldoPendienteTrasPerdida : 0,
+    })
+  );
+
   return {
     fechaDia: data.fechaDia ?? "",
     rutaId: data.rutaId ?? "",
     cobros,
     noPagos,
+    perdidasDelDia,
+    totalPerdidasDia: typeof data.totalPerdidasDia === "number" ? data.totalPerdidasDia : 0,
     totalCobrosLista: typeof data.totalCobrosLista === "number" ? data.totalCobrosLista : 0,
     totalCobrosEfectivoDia:
       typeof data.totalCobrosEfectivoDia === "number" ? data.totalCobrosEfectivoDia : 0,

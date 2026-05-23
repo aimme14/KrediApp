@@ -237,6 +237,13 @@ export default function CajaDelDiaPage() {
                     etiqueta={`Préstamos (${formatFechaDia(data.fechaDia)})`}
                     valor={formatMonto(data.totalPrestamosDesembolsoDia ?? 0)}
                   />
+                  {(data.totalPerdidasDia ?? 0) > 0 && (
+                    <TarjetaResumen
+                      etiqueta="Pérdidas del día"
+                      valor={formatMonto(data.totalPerdidasDia ?? 0)}
+                      dimmed
+                    />
+                  )}
                   <TarjetaResumen
                     etiqueta={`Total cobrado (${formatFechaDia(data.fechaDia)})`}
                     valor={formatMonto(data.totalCobrosLista)}
@@ -497,6 +504,36 @@ export default function CajaDelDiaPage() {
                         <td>{g.motivo || "—"}</td>
                         <td>{g.descripcion || "—"}</td>
                         <td className="col-num">{formatMonto(g.monto)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+
+          {(data.perdidasDelDia ?? []).length > 0 && (
+            <>
+              <h3 style={{ fontSize: "1.05rem", marginTop: "1.25rem", marginBottom: "0.5rem" }}>
+                Pérdidas del día
+              </h3>
+              <div className="table-wrap table-wrap-caja-dia">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Cliente</th>
+                      <th>Motivo</th>
+                      <th className="col-num">Monto</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(data.perdidasDelDia ?? []).map((p) => (
+                      <tr key={p.pagoId}>
+                        <td>{p.clienteNombre}</td>
+                        <td>{p.motivoPerdida ?? "—"}</td>
+                        <td className="col-num" style={{ color: "var(--danger, #f87171)" }}>
+                          {formatMonto(p.monto)}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
