@@ -581,6 +581,7 @@ export async function POST(
         typeof d.empleadoId === "string" && d.empleadoId.trim()
           ? d.empleadoId.trim()
           : apiUser.uid;
+      const adminEstaCobrando = apiUser.role === "admin";
       const usuarioEmpRef = db
         .collection(EMPRESAS_COLLECTION)
         .doc(apiUser.empresaId)
@@ -606,8 +607,10 @@ export async function POST(
         if (!rutaSnap.exists) {
           throw new Error("RUTA_NOT_FOUND");
         }
-        uSnap = await tx.get(usuarioEmpRef);
-        if (!uSnap.exists) throw new Error("EMPLEADO_USUARIO_NOT_FOUND");
+        if (!adminEstaCobrando) {
+          uSnap = await tx.get(usuarioEmpRef);
+          if (!uSnap.exists) throw new Error("EMPLEADO_USUARIO_NOT_FOUND");
+        }
       }
 
       tx.set(pagoRef, pagoData);
@@ -622,26 +625,49 @@ export async function POST(
       });
 
       if (rutaRef && rutaSnap?.exists) {
-        const rutaUpd = computeRutaCamposTrasCobroPrestamoCobroEnEmpleado(
-          rutaSnap.data() as Record<string, unknown>,
-          montoAplicar,
-          montoPrestamo,
-          totalAPagar
-        );
-        const { montoAcreditarCajaEmpleado, ...rutaCampos } = rutaUpd;
-        tx.update(rutaRef, {
-          ...rutaCampos,
-          ultimaActualizacion: nowTx,
-        });
+        if (adminEstaCobrando) {
+          const rutaData = rutaSnap.data() as Record<string, unknown>;
+          const cajaRuta = typeof rutaData.cajaRuta === "number" ? rutaData.cajaRuta : 0;
+          const cajasEmpleados =
+            typeof rutaData.cajasEmpleados === "number" ? rutaData.cajasEmpleados : 0;
+          let inversiones = typeof rutaData.inversiones === "number" ? rutaData.inversiones : 0;
+          let ganancias = typeof rutaData.ganancias === "number" ? rutaData.ganancias : 0;
 
-        if (uSnap?.exists) {
-          const ud = uSnap.data() as Record<string, unknown>;
-          const cEmp = typeof ud.cajaEmpleado === "number" ? ud.cajaEmpleado : 0;
-          walletBalanceAfter = Math.round((cEmp + montoAcreditarCajaEmpleado) * 100) / 100;
-          tx.update(usuarioEmpRef, {
-            cajaEmpleado: walletBalanceAfter,
-            ultimaActualizacionCapital: nowTx,
+          const capitalDescontar = Math.min(parteCapital, inversiones);
+          inversiones = Math.round((inversiones - capitalDescontar) * 100) / 100;
+          ganancias = Math.round((ganancias + parteGanancia) * 100) / 100;
+          const nuevaCajaRuta = Math.round((cajaRuta + montoAplicar) * 100) / 100;
+          const nuevoCapital = Math.round((nuevaCajaRuta + cajasEmpleados + inversiones) * 100) / 100;
+
+          tx.update(rutaRef, {
+            cajaRuta: nuevaCajaRuta,
+            inversiones,
+            ganancias,
+            capitalTotal: nuevoCapital,
+            ultimaActualizacion: nowTx,
           });
+        } else {
+          const rutaUpd = computeRutaCamposTrasCobroPrestamoCobroEnEmpleado(
+            rutaSnap.data() as Record<string, unknown>,
+            montoAplicar,
+            montoPrestamo,
+            totalAPagar
+          );
+          const { montoAcreditarCajaEmpleado, ...rutaCampos } = rutaUpd;
+          tx.update(rutaRef, {
+            ...rutaCampos,
+            ultimaActualizacion: nowTx,
+          });
+
+          if (uSnap?.exists) {
+            const ud = uSnap.data() as Record<string, unknown>;
+            const cEmp = typeof ud.cajaEmpleado === "number" ? ud.cajaEmpleado : 0;
+            walletBalanceAfter = Math.round((cEmp + montoAcreditarCajaEmpleado) * 100) / 100;
+            tx.update(usuarioEmpRef, {
+              cajaEmpleado: walletBalanceAfter,
+              ultimaActualizacionCapital: nowTx,
+            });
+          }
         }
       }
 

@@ -24,7 +24,7 @@ export type AdminNavItem = {
 export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
   { href: "/dashboard/admin", label: "Inicio", icon: "home" },
   { href: "/dashboard/admin/ruta-del-dia", label: "Ruta del día", icon: "ruta-dia" },
-  { href: "/dashboard/admin/prestamo", label: "Crear préstamo", icon: "loan" },
+  { href: "/dashboard/admin/prestamo", label: "Préstamos", icon: "loan" },
   { href: "/dashboard/admin/reportes-dia", label: "Reportes del día", icon: "report" },
   { href: "/dashboard/admin/cliente", label: "Clientes", icon: "client" },
   { href: "/dashboard/admin/empleado", label: "Empleados", icon: "user" },
