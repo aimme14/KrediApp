@@ -803,6 +803,10 @@ function CobrarClientePageContent() {
   }
 
   if (showPerdida) {
+    if (profile?.role === "trabajador") {
+      setShowPerdida(false);
+      return null;
+    }
     const cobrarQuery = `clienteId=${clienteId}&prestamoId=${prestamoId}${fromAdmin ? "&from=admin" : ""}`;
     const maxPerdida = prestamo.saldoPendiente ?? 0;
     const montoPerdidaAplicar = Math.min(montoPerdidaNum, maxPerdida);
@@ -942,21 +946,23 @@ function CobrarClientePageContent() {
       <div className="cobrar-header">
         <div className="cobrar-header-top">
           <Link href={backHref} className="cobrar-back">← {backLabel}</Link>
-          <button
-            type="button"
-            className="btn btn-secondary cobrar-btn-perdida"
-            onClick={() => {
-              setShowPerdida(true);
-              setMontoPerdidaInput(
-                prestamo.saldoPendiente > 0 ? String(Math.round(prestamo.saldoPendiente)) : ""
-              );
-              setMotivoPerdida("");
-              setNotaPerdida("");
-              setError(null);
-            }}
-          >
-            Pérdida
-          </button>
+          {profile?.role !== "trabajador" && (
+            <button
+              type="button"
+              className="btn btn-secondary cobrar-btn-perdida"
+              onClick={() => {
+                setShowPerdida(true);
+                setMontoPerdidaInput(
+                  prestamo.saldoPendiente > 0 ? String(Math.round(prestamo.saldoPendiente)) : ""
+                );
+                setMotivoPerdida("");
+                setNotaPerdida("");
+                setError(null);
+              }}
+            >
+              Pérdida
+            </button>
+          )}
         </div>
         <h2 className="cobrar-title">{cliente.nombre}</h2>
         <p className="cobrar-subtitle">
