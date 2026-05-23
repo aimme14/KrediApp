@@ -106,5 +106,57 @@ export function AdminFcmForegroundListener() {
     };
   }, [profile?.role, bumpOperativoFromFcm]);
 
+  // ── Notificaciones pendientes en IndexedDB (background sin cliente visible) ─
+  useEffect(() => {
+    if (profile?.role !== "admin") return;
+
+    const leerPendientes = () => {
+      try {
+        const req = indexedDB.open("krediapp_fcm", 1);
+        req.onupgradeneeded = (e) => {
+          (e.target as IDBOpenDBRequest).result.createObjectStore("pendientes", {
+            keyPath: "id",
+          });
+        };
+        req.onsuccess = (e) => {
+          const db = (e.target as IDBOpenDBRequest).result;
+          if (!db.objectStoreNames.contains("pendientes")) return;
+          const tx = db.transaction("pendientes", "readwrite");
+          const store = tx.objectStore("pendientes");
+          const getAll = store.getAll();
+          getAll.onsuccess = () => {
+            const pendientes = getAll.result as Array<{
+              id: string;
+              title: string;
+              body: string;
+              kind: string;
+              at: number;
+            }>;
+            if (pendientes.length === 0) return;
+            const processed = processedIdsRef.current;
+            for (const n of pendientes) {
+              const key = `biz:${n.id}`;
+              if (processed.has(key)) continue;
+              processed.add(key);
+              const kind: OperativoFcmKind = n.kind === "cuota" ? "cuota" : "gasto";
+              bumpOperativoFromFcm(kind, n.title, n.body);
+            }
+            store.clear();
+          };
+        };
+      } catch (e) {
+        console.warn("[FCM] No se pudo leer pendientes:", e);
+      }
+    };
+
+    leerPendientes();
+
+    const onVisible = () => {
+      if (document.visibilityState === "visible") leerPendientes();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [profile?.role, bumpOperativoFromFcm]);
+
   return null;
 }

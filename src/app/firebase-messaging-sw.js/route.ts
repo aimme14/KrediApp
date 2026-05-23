@@ -33,7 +33,34 @@ importScripts(
 );
 firebase.initializeApp(${cfg});
 const messaging = firebase.messaging();
+
+function guardarNotificacionPendiente(payload) {
+  try {
+    const db = indexedDB.open('krediapp_fcm', 1);
+    db.onupgradeneeded = function (e) {
+      e.target.result.createObjectStore('pendientes', { keyPath: 'id' });
+    };
+    db.onsuccess = function (e) {
+      const data = payload.data || {};
+      const store = e.target.result
+        .transaction('pendientes', 'readwrite')
+        .objectStore('pendientes');
+      store.put({
+        id: data.gastoId || data.pagoId || data.clienteId || data.prestamoId || Date.now().toString(),
+        title: data.title || 'Notificación',
+        body: data.body || '',
+        type: data.type || '',
+        kind: data.type === 'cuota_prestamo' || data.type === 'prestamo_empleado' ? 'cuota' : 'gasto',
+        at: Date.now(),
+      });
+    };
+  } catch (e) {
+    console.warn('[SW] No se pudo guardar notificación pendiente:', e);
+  }
+}
+
 messaging.onBackgroundMessage(function (payload) {
+  guardarNotificacionPendiente(payload);
   const data = payload.data || {};
   const title = data.title || payload.notification?.title || 'angry birds';
   const body = data.body || payload.notification?.body || '';
