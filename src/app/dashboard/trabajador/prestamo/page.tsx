@@ -1,12 +1,14 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { useTrabajadorLista } from "@/context/TrabajadorListaContext";
 import { useTrabajadorCajaDia } from "@/context/TrabajadorCajaDiaContext";
 import {
   createPrestamo,
   clienteNumFromCodigo,
+  formatClienteCodigoCorto,
   type ClienteItem,
   type PrestamoItem,
 } from "@/lib/empresa-api";
@@ -54,6 +56,7 @@ function ordenarPrestamosParaPrincipal(prestamos: PrestamoItem[]): PrestamoItem[
 
 export default function PrestamoTrabajadorPage() {
   const { user, profile } = useAuth();
+  const searchParams = useSearchParams();
   const {
     clientes,
     prestamos,
@@ -72,6 +75,15 @@ export default function PrestamoTrabajadorPage() {
   const [creating, setCreating] = useState(false);
   const [confirmarMontoAlto, setConfirmarMontoAlto] = useState(false);
   const [filtroEstado, setFiltroEstado] = useState<"todos" | "activo" | "mora" | "pagado">("todos");
+  const [busquedaNombre, setBusquedaNombre] = useState("");
+
+  useEffect(() => {
+    const id = searchParams.get("clienteId")?.trim();
+    if (!id || loading) return;
+    if (!clientes.some((c) => c.id === id)) return;
+    setClienteId(id);
+    setShowCreateForm(true);
+  }, [searchParams, clientes, loading]);
 
   useEffect(() => {
     const mq = window.matchMedia("(max-width: 768px)");
@@ -158,10 +170,35 @@ export default function PrestamoTrabajadorPage() {
   const cuotaPorPago = totalAPagar > 0 && nCuotasVal >= 1 ? totalAPagar / nCuotasVal : 0;
   const requiereConfirmarMonto = !isNaN(montoNum) && montoNum >= MONTO_CONFIRMAR_ALTO;
 
+  const busquedaTrim = busquedaNombre.trim();
+  const busquedaLower = busquedaTrim.toLowerCase();
+
   const prestamosFiltrados = useMemo(() => {
-    if (filtroEstado === "todos") return prestamos;
-    return prestamos.filter((p) => p.estado === filtroEstado);
-  }, [prestamos, filtroEstado]);
+    let lista = prestamos;
+    if (filtroEstado !== "todos") {
+      lista = lista.filter((p) => p.estado === filtroEstado);
+    }
+    if (busquedaLower) {
+      lista = lista.filter((p) => {
+        const cl = clientePorId[p.clienteId];
+        if (!cl) return false;
+        const nombre = (cl.nombre ?? "").toLowerCase();
+        const codigo = cl.codigo
+          ? formatClienteCodigoCorto(cl.codigo).toLowerCase()
+          : "";
+        const numCodigo = clienteNumFromCodigo(cl.codigo);
+        const numStr = numCodigo ? `#${numCodigo}` : "";
+        const cedula = (cl.cedula ?? "").toLowerCase();
+        return (
+          nombre.includes(busquedaLower) ||
+          codigo.includes(busquedaLower) ||
+          numStr.includes(busquedaLower) ||
+          cedula.includes(busquedaLower)
+        );
+      });
+    }
+    return lista;
+  }, [prestamos, filtroEstado, busquedaLower, clientePorId]);
 
   const prestamosHistorialOrdenados = useMemo(
     () => ordenarPrestamosParaPrincipal([...prestamosFiltrados]),
@@ -482,6 +519,43 @@ export default function PrestamoTrabajadorPage() {
           <p style={{ color: "var(--text-muted)" }}>No hay préstamos.</p>
         ) : (
           <>
+            <div className="ruta-dia-search-toolbar" style={{ marginBottom: "0.85rem" }}>
+              <div className="ruta-dia-search-field">
+                <span className="ruta-dia-search-icon" aria-hidden>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="11" cy="11" r="8" />
+                    <path d="m21 21-4.3-4.3" />
+                  </svg>
+                </span>
+                <input
+                  id="trabajador-prestamos-buscador"
+                  className="ruta-dia-search-input"
+                  type="search"
+                  value={busquedaNombre}
+                  onChange={(e) => setBusquedaNombre(e.target.value)}
+                  placeholder="Buscar por nombre, código o cédula..."
+                  aria-label="Buscar préstamos por nombre de cliente"
+                  autoComplete="off"
+                />
+                {busquedaTrim ? (
+                  <button
+                    type="button"
+                    className="ruta-dia-search-clear"
+                    onClick={() => setBusquedaNombre("")}
+                    aria-label="Limpiar búsqueda"
+                  >
+                    ×
+                  </button>
+                ) : null}
+              </div>
+              {busquedaTrim ? (
+                <p className="ruta-dia-search-hint">
+                  {prestamosFiltrados.length} préstamo
+                  {prestamosFiltrados.length !== 1 ? "s" : ""} encontrado
+                  {prestamosFiltrados.length !== 1 ? "s" : ""}
+                </p>
+              ) : null}
+            </div>
             <div className="prestamo-historial-filtros prestamo-trabajador-historial-filtros" role="tablist" aria-label="Filtrar por estado">
               {(["todos", "activo", "mora", "pagado"] as const).map((est) => (
                 <button
@@ -532,7 +606,9 @@ export default function PrestamoTrabajadorPage() {
             </div>
           {prestamosFiltrados.length === 0 && (
             <p style={{ color: "var(--text-muted)", fontSize: "0.875rem", marginTop: "0.5rem" }}>
-              No hay préstamos con estado «{filtroEstado === "todos" ? "todos" : filtroEstado === "activo" ? "activos" : filtroEstado === "mora" ? "en mora" : "pagados"}».
+              {busquedaTrim
+                ? `No hay préstamos que coincidan con «${busquedaTrim}».`
+                : `No hay préstamos con estado «${filtroEstado === "todos" ? "todos" : filtroEstado === "activo" ? "activos" : filtroEstado === "mora" ? "en mora" : "pagados"}».`}
             </p>
           )}
           </>

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo, Fragment } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { useAdminDashboard } from "@/context/AdminDashboardContext";
 import { useTrabajadorLista } from "@/context/TrabajadorListaContext";
@@ -80,6 +81,7 @@ function hoyDDMMAAAA(): string {
 
 export default function PrestamoPage() {
   const { user, profile } = useAuth();
+  const searchParams = useSearchParams();
   const { rutas } = useAdminDashboard();
   const {
     clientes,
@@ -111,6 +113,23 @@ export default function PrestamoPage() {
   useEffect(() => {
     setClienteId("");
   }, [rutaIdForm]);
+
+  useEffect(() => {
+    const id = searchParams.get("clienteId")?.trim();
+    if (!id || loading) return;
+    const cl = clientes.find((c) => c.id === id);
+    if (!cl) return;
+    setRutaIdForm(cl.rutaId ?? "");
+  }, [searchParams, clientes, loading]);
+
+  useEffect(() => {
+    const id = searchParams.get("clienteId")?.trim();
+    if (!id || loading) return;
+    const cl = clientes.find((c) => c.id === id);
+    if (!cl || (cl.rutaId ?? "") !== rutaIdForm) return;
+    setClienteId(id);
+    setShowCreateForm(true);
+  }, [searchParams, clientes, loading, rutaIdForm]);
 
   useEffect(() => {
     const mq = window.matchMedia("(max-width: 768px)");

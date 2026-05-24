@@ -578,6 +578,7 @@ function CobrarClientePageContent() {
   if (!profile || (profile.role !== "trabajador" && profile.role !== "admin")) return null;
   const backHref = fromAdmin ? "/dashboard/admin/prestamo" : "/dashboard/trabajador/ruta";
   const backLabel = fromAdmin ? "Volver a Préstamos" : "Ruta del día";
+  const renovarPrestamoHref = `/dashboard/${fromAdmin ? "admin" : "trabajador"}/prestamo?clienteId=${encodeURIComponent(clienteId ?? "")}`;
   if (!clienteId || !prestamoId) {
     return (
       <div className="card">
@@ -771,6 +772,40 @@ function CobrarClientePageContent() {
           </div>
           <Link href={backHref} className="btn btn-secondary">{backLabel}</Link>
         </div>
+        {prestamoSaldado && (
+          <div style={{
+            marginTop: "1rem",
+            paddingTop: "1rem",
+            borderTop: "1px solid var(--card-border)",
+          }}>
+            <p style={{
+              margin: "0 0 0.65rem",
+              fontSize: "0.875rem",
+              color: "var(--text-muted)",
+              fontWeight: 600,
+            }}>
+              Renovación
+            </p>
+            <p style={{
+              margin: "0 0 0.75rem",
+              fontSize: "0.8125rem",
+              color: "var(--text-muted)",
+            }}>
+              El préstamo de {cliente.nombre} quedó saldado. ¿Deseas crear un nuevo préstamo?
+            </p>
+            <Link
+              href={renovarPrestamoHref}
+              className="btn btn-primary"
+              style={{ display: "inline-flex", alignItems: "center", gap: "0.5rem" }}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="12" y1="5" x2="12" y2="19"/>
+                <line x1="5" y1="12" x2="19" y2="12"/>
+              </svg>
+              Renovar préstamo
+            </Link>
+          </div>
+        )}
       </div>
     );
   }
