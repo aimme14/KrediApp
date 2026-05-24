@@ -36,7 +36,7 @@ function fmtDelta(apertura: number, cierre: number | null): {
   positivo: boolean;
   neutro: boolean;
 } {
-  if (cierre === null) return { texto: "â€”", positivo: false, neutro: true };
+  if (cierre === null) return { texto: "—", positivo: false, neutro: true };
   const diff = cierre - apertura;
   const signo = diff > 0 ? "+" : "";
   return {

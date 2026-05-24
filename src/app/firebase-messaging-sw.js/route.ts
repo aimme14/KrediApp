@@ -46,11 +46,11 @@ function guardarNotificacionPendiente(payload) {
         .transaction('pendientes', 'readwrite')
         .objectStore('pendientes');
       store.put({
-        id: data.gastoId || data.pagoId || data.clienteId || data.prestamoId || Date.now().toString(),
+        id: data.gastoId || data.pagoId || data.clienteId || data.prestamoId || data.solicitudId || Date.now().toString(),
         title: data.title || 'Notificación',
         body: data.body || '',
         type: data.type || '',
-        kind: data.type === 'cuota_prestamo' || data.type === 'prestamo_empleado' ? 'cuota' : 'gasto',
+        kind: data.type === 'cuota_prestamo' || data.type === 'prestamo_empleado' || data.type === 'solicitud_prestamo' ? 'cuota' : 'gasto',
         at: Date.now(),
       });
     };
@@ -73,17 +73,18 @@ messaging.onBackgroundMessage(function (payload) {
     if (hasVisibleClient) {
       clients.forEach(function (client) {
         if (client.visibilityState === 'visible') {
-          if (data.type === 'gasto_empleado' || data.type === 'cuota_prestamo' || data.type === 'cliente_empleado') {
+          if (data.type === 'gasto_empleado' || data.type === 'cuota_prestamo' || data.type === 'cliente_empleado' || data.type === 'solicitud_prestamo') {
             client.postMessage({
               type: 'KREDI_FCM_OPERATIVO',
-              kind: data.type === 'cuota_prestamo' ? 'cuota' : 'gasto',
+              kind: data.type === 'cuota_prestamo' || data.type === 'solicitud_prestamo' ? 'cuota' : 'gasto',
               title: title,
               body: body,
-              messageId: payload.messageId || data.gastoId || data.pagoId || data.clienteId || data.prestamoId || '',
+              messageId: payload.messageId || data.gastoId || data.pagoId || data.clienteId || data.prestamoId || data.solicitudId || '',
               gastoId: data.gastoId || '',
               pagoId: data.pagoId || '',
               clienteId: data.clienteId || '',
               prestamoId: data.prestamoId || '',
+              solicitudId: data.solicitudId || '',
             });
           } else if (data.type === 'prestamo_empleado') {
             client.postMessage({

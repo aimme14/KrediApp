@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
+import { collection, query, where, onSnapshot } from "firebase/firestore";
 import { useAuth } from "@/context/AuthContext";
 import { useDashboardHeaderSlot } from "@/context/DashboardHeaderContext";
 import { AdminFcmRegistration } from "@/components/AdminFcmRegistration";
@@ -10,6 +11,11 @@ import { TrabajadorListaProvider, useTrabajadorLista } from "@/context/Trabajado
 import { TrabajadorCajaDiaProvider } from "@/context/TrabajadorCajaDiaContext";
 import { AdminDashboardProvider } from "@/context/AdminDashboardContext";
 import { ADMIN_NAV_ITEMS, AdminNavIcon } from "@/components/admin/adminNavConfig";
+import { db } from "@/lib/firebase";
+import {
+  EMPRESAS_COLLECTION,
+  SOLICITUDES_PRESTAMO_SUBCOLLECTION,
+} from "@/lib/empresas-db";
 
 function adminNavItemActive(pathname: string, href: string): boolean {
   if (href === "/dashboard/admin") return pathname === "/dashboard/admin";
@@ -27,6 +33,34 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
     () => clientes.filter((c) => c.moroso === true).length,
     [clientes]
   );
+  const [solicitudesPendientes, setSolicitudesPendientes] = useState(0);
+
+  useEffect(() => {
+    if (!db || !user || profile?.role !== "admin" || !profile.empresaId) {
+      setSolicitudesPendientes(0);
+      return;
+    }
+
+    const empresaId = profile.empresaId.trim();
+    if (!empresaId) return;
+
+    const q = query(
+      collection(db, EMPRESAS_COLLECTION, empresaId, SOLICITUDES_PRESTAMO_SUBCOLLECTION),
+      where("adminId", "==", user.uid),
+      where("estado", "==", "pendiente")
+    );
+
+    const unsub = onSnapshot(
+      q,
+      (snap) => setSolicitudesPendientes(snap.size),
+      (err) => {
+        console.warn("[AdminLayout] onSnapshot solicitudes prestamo:", err);
+        setSolicitudesPendientes(0);
+      }
+    );
+
+    return unsub;
+  }, [user?.uid, profile?.role, profile?.empresaId]);
 
   useEffect(() => {
     if (loading) return;
@@ -105,6 +139,10 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
             const active = adminNavItemActive(pathname, item.href);
             const badge = item.morosoBadge ? (
               <span className="admin-nav-badge">{morososCount > 99 ? "99+" : morososCount}</span>
+            ) : item.solicitudesPrestamoBadge && solicitudesPendientes > 0 ? (
+              <span className="admin-nav-badge">
+                {solicitudesPendientes > 99 ? "99+" : solicitudesPendientes}
+              </span>
             ) : null;
             return (
               <Link

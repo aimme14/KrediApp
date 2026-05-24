@@ -4,13 +4,14 @@ import { useState, useMemo, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { useTrabajadorLista } from "@/context/TrabajadorListaContext";
-import { useTrabajadorCajaDia } from "@/context/TrabajadorCajaDiaContext";
 import {
-  createPrestamo,
+  solicitarPrestamoEmpleado,
+  getMiSolicitudPrestamoPendiente,
   clienteNumFromCodigo,
   formatClienteCodigoCorto,
   type ClienteItem,
   type PrestamoItem,
+  type SolicitudPrestamoApi,
 } from "@/lib/empresa-api";
 import { formatInteresResumenPct, parseInteresPct } from "@/lib/interes-pct";
 import {
@@ -62,9 +63,7 @@ export default function PrestamoTrabajadorPage() {
     prestamos,
     loading,
     error: listaError,
-    refresh,
   } = useTrabajadorLista();
-  const { refresh: refreshCajaDia } = useTrabajadorCajaDia();
   const [error, setError] = useState<string | null>(null);
   const [clienteId, setClienteId] = useState("");
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -74,6 +73,8 @@ export default function PrestamoTrabajadorPage() {
   const [monto, setMonto] = useState("");
   const [creating, setCreating] = useState(false);
   const [confirmarMontoAlto, setConfirmarMontoAlto] = useState(false);
+  const [solicitudPendiente, setSolicitudPendiente] = useState<SolicitudPrestamoApi | null>(null);
+  const [loadingSolicitud, setLoadingSolicitud] = useState(true);
   const [filtroEstado, setFiltroEstado] = useState<"todos" | "activo" | "mora" | "pagado">("todos");
   const [busquedaNombre, setBusquedaNombre] = useState("");
 
@@ -84,6 +85,26 @@ export default function PrestamoTrabajadorPage() {
     setClienteId(id);
     setShowCreateForm(true);
   }, [searchParams, clientes, loading]);
+
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    (async () => {
+      setLoadingSolicitud(true);
+      try {
+        const token = await user.getIdToken();
+        const pendiente = await getMiSolicitudPrestamoPendiente(token);
+        if (!cancelled) setSolicitudPendiente(pendiente);
+      } catch {
+        if (!cancelled) setSolicitudPendiente(null);
+      } finally {
+        if (!cancelled) setLoadingSolicitud(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
 
   useEffect(() => {
     const mq = window.matchMedia("(max-width: 768px)");
@@ -119,18 +140,22 @@ export default function PrestamoTrabajadorPage() {
       return;
     }
     if (montoNum >= MONTO_CONFIRMAR_ALTO && !confirmarMontoAlto) {
-      setError(`Confirma que deseas crear un préstamo de ${formatMoneda(montoNum)} marcando la casilla`);
+      setError(`Confirma que deseas solicitar un préstamo de ${formatMoneda(montoNum)} marcando la casilla`);
       return;
     }
     if (!clienteId.trim()) {
       setError("Selecciona un cliente");
       return;
     }
+    if (solicitudPendiente) {
+      setError("Ya tienes una solicitud pendiente. Espera la respuesta del administrador.");
+      return;
+    }
     setError(null);
     setCreating(true);
     try {
       const token = await user.getIdToken();
-      await createPrestamo(token, {
+      await solicitarPrestamoEmpleado(token, {
         clienteId: clienteId.trim(),
         monto: montoNum,
         interes: iVal,
@@ -145,10 +170,11 @@ export default function PrestamoTrabajadorPage() {
       setModalidad("mensual");
       setConfirmarMontoAlto(false);
       setShowCreateForm(false);
-      await refresh();
-      void refreshCajaDia();
+      const tokenRefresh = await user.getIdToken();
+      const pendiente = await getMiSolicitudPrestamoPendiente(tokenRefresh);
+      setSolicitudPendiente(pendiente);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Error al crear préstamo");
+      setError(e instanceof Error ? e.message : "Error al solicitar préstamo");
     } finally {
       setCreating(false);
     }
@@ -209,10 +235,30 @@ export default function PrestamoTrabajadorPage() {
 
   return (
     <div className="card">
+      {solicitudPendiente && !showCreateForm && (
+        <div
+          className="card"
+          style={{
+            marginBottom: "1.25rem",
+            padding: "1rem",
+            border: "1px solid var(--warning, #f59e0b)",
+            backgroundColor: "rgba(245, 158, 11, 0.08)",
+          }}
+          role="status"
+        >
+          <strong>Solicitud de préstamo pendiente</strong>
+          <p style={{ margin: "0.5rem 0 0", fontSize: "0.875rem", lineHeight: 1.5 }}>
+            Cliente: <strong>{solicitudPendiente.clienteNombre}</strong> · Monto:{" "}
+            <strong>{formatMoneda(solicitudPendiente.monto)}</strong>. El administrador debe
+            aprobarla para que se cree el préstamo.
+          </p>
+        </div>
+      )}
+
       {showCreateForm && (
       <form onSubmit={handleSubmit} className="card" style={{ marginBottom: "1.25rem" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "0.75rem", marginBottom: "0.5rem" }}>
-          <h3 style={{ margin: 0 }}>Nuevo préstamo</h3>
+          <h3 style={{ margin: 0 }}>Solicitar préstamo</h3>
           <button
             type="button"
             onClick={() => setShowCreateForm(false)}
@@ -436,6 +482,7 @@ export default function PrestamoTrabajadorPage() {
               <li>Cuota por pago: <strong>{formatMoneda(cuotaPorPago)}</strong></li>
             </ul>
             <p style={{ margin: "0.75rem 0 0", fontSize: "0.8rem", color: "var(--text-muted)", lineHeight: 1.5 }}>
+              El administrador debe aprobar esta solicitud antes de que se cree el préstamo.
             </p>
           </div>
         )}
@@ -461,7 +508,7 @@ export default function PrestamoTrabajadorPage() {
             disabled={creating}
             style={{ flexShrink: 0 }}
           >
-            {creating ? "Creando..." : "Crear préstamo"}
+            {creating ? "Enviando..." : "Solicitar préstamo"}
           </button>
           {requiereConfirmarMonto && (
             <label
@@ -480,7 +527,7 @@ export default function PrestamoTrabajadorPage() {
                 type="checkbox"
                 checked={confirmarMontoAlto}
                 onChange={(e) => setConfirmarMontoAlto(e.target.checked)}
-                aria-label={`Confirmo creación de préstamo por ${formatMoneda(montoNum)}`}
+                aria-label={`Confirmo solicitud de préstamo por ${formatMoneda(montoNum)}`}
                 style={{
                   flexShrink: 0,
                   cursor: "pointer",
@@ -506,8 +553,9 @@ export default function PrestamoTrabajadorPage() {
             type="button"
             className="btn btn-primary"
             onClick={() => setShowCreateForm(true)}
-            aria-label="Crear nuevo préstamo"
-            title="Crear nuevo préstamo"
+            disabled={!!solicitudPendiente || loadingSolicitud}
+            aria-label="Solicitar nuevo préstamo"
+            title={solicitudPendiente ? "Tienes una solicitud pendiente" : "Solicitar nuevo préstamo"}
             style={{ padding: "0.4rem 0.65rem", minWidth: "auto", lineHeight: 1, flexShrink: 0 }}
           >
             +

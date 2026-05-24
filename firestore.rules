@@ -72,6 +72,12 @@ service cloud.firestore {
               || resource.data.adminId == request.auth.uid);
         allow write: if false;
       }
+      match /solicitudesPrestamo/{solicitudId} {
+        allow read: if request.auth != null
+          && (resource.data.empleadoUid == request.auth.uid
+              || resource.data.adminId == request.auth.uid);
+        allow write: if false;
+      }
       match /reportesDia/{reporteId} {
         allow read: if request.auth != null
           && resource.data.adminId == request.auth.uid;

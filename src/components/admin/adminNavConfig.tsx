@@ -19,12 +19,20 @@ export type AdminNavItem = {
   icon: AdminNavIconName;
   /** Si true, muestra badge con contador de morosos */
   morosoBadge?: boolean;
+  /** Si true, muestra badge con solicitudes de préstamo pendientes */
+  solicitudesPrestamoBadge?: boolean;
 };
 
 export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
   { href: "/dashboard/admin", label: "Inicio", icon: "home" },
   { href: "/dashboard/admin/ruta-del-dia", label: "Ruta del día", icon: "ruta-dia" },
   { href: "/dashboard/admin/prestamo", label: "Préstamos", icon: "loan" },
+  {
+    href: "/dashboard/admin/solicitudes-prestamo",
+    label: "Solicitudes préstamo",
+    icon: "loan",
+    solicitudesPrestamoBadge: true,
+  },
   { href: "/dashboard/admin/reportes-dia", label: "Reportes del día", icon: "report" },
   { href: "/dashboard/admin/cliente", label: "Clientes", icon: "client" },
   { href: "/dashboard/admin/empleado", label: "Empleados", icon: "user" },

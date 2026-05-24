@@ -27,6 +27,9 @@ export const REPORTES_DIA_SUBCOLLECTION = "reportesDia";
 /** Solicitud de entrega de reporte (pendiente → admin aprueba/rechaza). empresas/{empresaId}/solicitudesEntregaReporte/{id} */
 export const SOLICITUDES_ENTREGA_REPORTE_SUBCOLLECTION = "solicitudesEntregaReporte";
 
+/** Solicitud de préstamo por empleado (pendiente → admin aprueba/rechaza). empresas/{empresaId}/solicitudesPrestamo/{id} */
+export const SOLICITUDES_PRESTAMO_SUBCOLLECTION = "solicitudesPrestamo";
+
 /** Colección empresas/{jefeUid}/capital — documentos por capa (cajaEmpresa, cajaAdmin, cajaEmpleado) y rama para rutas. */
 export const CAPITAL_SUBCOLLECTION = "capital";
 

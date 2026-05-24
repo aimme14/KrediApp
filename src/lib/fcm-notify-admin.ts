@@ -156,6 +156,52 @@ const LABEL_PERDIDA: Record<string, string> = {
   otro: "Otro",
 };
 
+export type PayloadSolicitudPrestamoFcm = {
+  adminUid: string;
+  empresaId: string;
+  empleadoNombre: string;
+  clienteNombre: string;
+  monto: number;
+  solicitudId: string;
+};
+
+export async function notifyAdminSolicitudPrestamo(
+  messaging: Messaging,
+  payload: PayloadSolicitudPrestamoFcm
+): Promise<void> {
+  const { adminUid, empresaId, empleadoNombre, clienteNombre, monto, solicitudId } =
+    payload;
+  if (!adminUid.trim() || !empresaId.trim()) return;
+
+  const topic = topicGastosAdmin(empresaId, adminUid);
+  const title = "Solicitud de préstamo";
+  const body = truncateBody(
+    `${empleadoNombre} · ${clienteNombre} — ${formatMontoCOP(monto)}`,
+    180
+  );
+
+  try {
+    await messaging.send({
+      topic,
+      android: { collapseKey: `sol_prestamo_${solicitudId}` },
+      webpush: { headers: { Topic: `sol_prestamo_${solicitudId}` } },
+      data: {
+        title,
+        body,
+        type: "solicitud_prestamo",
+        empresaId,
+        solicitudId,
+        click_action: "/dashboard/admin/solicitudes-prestamo",
+      },
+    });
+    if (process.env.NODE_ENV === "development") {
+      console.info("[fcm] Push solicitud préstamo enviado al topic:", topic);
+    }
+  } catch (e) {
+    console.warn("[fcm] notifyAdminSolicitudPrestamo falló:", topic, e);
+  }
+}
+
 export type PayloadCuotaPrestamoFcm = {
   adminUid: string;
   empresaId: string;

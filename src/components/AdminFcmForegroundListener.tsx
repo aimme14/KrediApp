@@ -13,6 +13,7 @@ function kindFromFcmDataType(t: string | undefined): OperativoFcmKind | null {
   if (t === "gasto_empleado") return "gasto";
   if (t === "cuota_prestamo") return "cuota";
   if (t === "prestamo_empleado") return "cuota";
+  if (t === "solicitud_prestamo") return "cuota";
   if (t === "cliente_empleado") return "gasto";
   return null;
 }
@@ -20,7 +21,7 @@ function kindFromFcmDataType(t: string | undefined): OperativoFcmKind | null {
 // Extrae el ID de negocio del payload FCM (no el messageId de Firebase)
 function businessIdFromData(data: Record<string, string> | undefined): string | null {
   if (!data) return null;
-  return data.gastoId ?? data.pagoId ?? data.clienteId ?? data.prestamoId ?? null;
+  return data.gastoId ?? data.pagoId ?? data.clienteId ?? data.prestamoId ?? data.solicitudId ?? null;
 }
 
 export function AdminFcmForegroundListener() {
@@ -71,6 +72,7 @@ export function AdminFcmForegroundListener() {
         (typeof d.pagoId === "string" && d.pagoId) ||
         (typeof d.clienteId === "string" && d.clienteId) ||
         (typeof d.prestamoId === "string" && d.prestamoId) ||
+        (typeof d.solicitudId === "string" && d.solicitudId) ||
         null;
 
       // Clave compartida con onMessage
