@@ -8560,11 +8560,75 @@ a.admin-inicio-link-btn {
 
 .ruta-dia-toolbar {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.65rem;
   margin-bottom: 1.25rem;
+}
+.ruta-dia-search-field {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  width: 100%;
+  padding: 0.45rem 0.65rem;
+  border-radius: 10px;
+  border: 1px solid var(--input-border);
+  background: var(--input-bg);
+}
+.ruta-dia-search-field:focus-within {
+  border-color: color-mix(in srgb, var(--link) 55%, var(--input-border));
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--link) 18%, transparent);
+}
+.ruta-dia-search-icon {
+  flex-shrink: 0;
+  color: var(--text-muted);
+  display: flex;
+  line-height: 0;
+}
+.ruta-dia-search-input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 0.875rem;
+}
+.ruta-dia-search-input::placeholder {
+  color: var(--text-muted);
+  opacity: 0.85;
+}
+.ruta-dia-search-input:focus {
+  outline: none;
+}
+.ruta-dia-search-clear {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background: var(--card-border);
+  color: var(--text-muted);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.ruta-dia-search-clear:hover {
+  color: var(--text);
+  background: color-mix(in srgb, var(--card-border) 70%, var(--text-muted));
+}
+.ruta-dia-search-hint {
+  margin: -0.25rem 0 0;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+.ruta-dia-search-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
 }
 .ruta-dia-filtros-wrap {
   position: relative;

@@ -59,6 +59,8 @@ interface UseRutaDiaState {
   clientesFiltradosGrouped: ClienteRutaGrupo[];
   filtro: FiltroRutaDia;
   setFiltro: (f: FiltroRutaDia) => void;
+  busquedaNombre: string;
+  setBusquedaNombre: (value: string) => void;
   loading: boolean;
   error: string | null;
   refetch: () => void;
@@ -199,6 +201,7 @@ export function useRutaDia(): UseRutaDiaState {
   const { data: cajaDia } = useTrabajadorCajaDia();
 
   const [filtro, setFiltro] = useState<FiltroRutaDia>("todos");
+  const [busquedaNombre, setBusquedaNombre] = useState("");
   /** Invalida memo de visitados tras markVisitado */
   const [visitadosBump, setVisitadosBump] = useState(0);
 
@@ -256,10 +259,17 @@ export function useRutaDia(): UseRutaDiaState {
         break;
     }
 
+    const q = busquedaNombre.trim().toLowerCase();
+    if (q) {
+      lista = lista.filter((c) =>
+        c.clienteNombre.toLowerCase().includes(q)
+      );
+    }
+
     lista.sort(compareClienteRutaPrioridad);
 
     return lista;
-  }, [clientesRuta, filtro]);
+  }, [clientesRuta, filtro, busquedaNombre]);
 
   const clientesFiltradosGrouped = useMemo((): ClienteRutaGrupo[] => {
     const byClient = new Map<string, ClienteRuta[]>();
@@ -310,6 +320,8 @@ export function useRutaDia(): UseRutaDiaState {
     clientes: clientesRuta,
     filtro,
     setFiltro,
+    busquedaNombre,
+    setBusquedaNombre,
     clientesFiltrados,
     clientesFiltradosGrouped,
     loading,

@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useTrabajadorLista } from "@/context/TrabajadorListaContext";
 import { createCliente, formatClienteCodigoCorto } from "@/lib/empresa-api";
@@ -22,6 +22,26 @@ export default function ClienteTrabajadorPage() {
   const [cedula, setCedula] = useState("");
   const [creating, setCreating] = useState(false);
   const [clienteExpandidoId, setClienteExpandidoId] = useState<string | null>(null);
+  const [busquedaNombre, setBusquedaNombre] = useState("");
+
+  const busquedaTrim = busquedaNombre.trim();
+  const busquedaLower = busquedaTrim.toLowerCase();
+
+  const clientesFiltrados = useMemo(() => {
+    if (!busquedaLower) return clientes;
+    return clientes.filter((c) => {
+      const nombre = (c.nombre ?? "").toLowerCase();
+      const codigo = c.codigo
+        ? formatClienteCodigoCorto(c.codigo).toLowerCase()
+        : "";
+      const cedula = (c.cedula ?? "").toLowerCase();
+      return (
+        nombre.includes(busquedaLower) ||
+        codigo.includes(busquedaLower) ||
+        cedula.includes(busquedaLower)
+      );
+    });
+  }, [clientes, busquedaLower]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -109,6 +129,49 @@ export default function ClienteTrabajadorPage() {
         ) : clientes.length === 0 ? (
           <p style={{ color: "var(--text-muted)" }}>No hay clientes en tu ruta.</p>
         ) : (
+          <>
+            <div className="ruta-dia-search-toolbar" style={{ marginBottom: "0.85rem" }}>
+              <div className="ruta-dia-search-field">
+                <span className="ruta-dia-search-icon" aria-hidden>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="11" cy="11" r="8" />
+                    <path d="m21 21-4.3-4.3" />
+                  </svg>
+                </span>
+                <input
+                  id="trabajador-clientes-buscador"
+                  className="ruta-dia-search-input"
+                  type="search"
+                  value={busquedaNombre}
+                  onChange={(e) => setBusquedaNombre(e.target.value)}
+                  placeholder="Buscar por nombre, código o cédula..."
+                  aria-label="Buscar clientes por nombre, código o cédula"
+                  autoComplete="off"
+                />
+                {busquedaTrim ? (
+                  <button
+                    type="button"
+                    className="ruta-dia-search-clear"
+                    onClick={() => setBusquedaNombre("")}
+                    aria-label="Limpiar búsqueda"
+                  >
+                    ×
+                  </button>
+                ) : null}
+              </div>
+              {busquedaTrim ? (
+                <p className="ruta-dia-search-hint">
+                  {clientesFiltrados.length} cliente
+                  {clientesFiltrados.length !== 1 ? "s" : ""} encontrado
+                  {clientesFiltrados.length !== 1 ? "s" : ""}
+                </p>
+              ) : null}
+            </div>
+            {clientesFiltrados.length === 0 ? (
+              <p style={{ color: "var(--text-muted)" }}>
+                No hay clientes que coincidan con «{busquedaTrim}».
+              </p>
+            ) : (
           <div className="table-wrap">
             <table>
               <thead>
@@ -122,7 +185,7 @@ export default function ClienteTrabajadorPage() {
                 </tr>
               </thead>
               <tbody>
-                {clientes.map((c) => {
+                {clientesFiltrados.map((c) => {
                   const estaExpandido = clienteExpandidoId === c.id;
                   return (
                     <Fragment key={c.id}>
@@ -167,6 +230,8 @@ export default function ClienteTrabajadorPage() {
               </tbody>
             </table>
           </div>
+            )}
+          </>
         )}
       </div>
     </div>

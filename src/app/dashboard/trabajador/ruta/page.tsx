@@ -97,6 +97,8 @@ export default function RutaDelDiaPage() {
     clientes,
     filtro,
     setFiltro,
+    busquedaNombre,
+    setBusquedaNombre,
     clientesFiltrados,
     clientesFiltradosGrouped,
     loading,
@@ -172,6 +174,7 @@ export default function RutaDelDiaPage() {
   const emptySinClientes = clientes.length === 0;
   const emptyFiltro =
     !emptySinClientes && clientesFiltrados.length === 0;
+  const busquedaTrim = busquedaNombre.trim();
 
   return (
     <div className="card ruta-dia-card">
@@ -230,6 +233,41 @@ export default function RutaDelDiaPage() {
       )}
 
       <div className="ruta-dia-toolbar">
+        <div className="ruta-dia-search-field">
+          <span className="ruta-dia-search-icon" aria-hidden>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="11" cy="11" r="8" />
+              <path d="m21 21-4.3-4.3" />
+            </svg>
+          </span>
+          <input
+            id="ruta-dia-buscador"
+            className="ruta-dia-search-input"
+            type="search"
+            value={busquedaNombre}
+            onChange={(e) => setBusquedaNombre(e.target.value)}
+            placeholder="Buscar cliente por nombre..."
+            aria-label="Buscar cliente por nombre"
+            autoComplete="off"
+          />
+          {busquedaTrim ? (
+            <button
+              type="button"
+              className="ruta-dia-search-clear"
+              onClick={() => setBusquedaNombre("")}
+              aria-label="Limpiar búsqueda"
+            >
+              ×
+            </button>
+          ) : null}
+        </div>
+        {busquedaTrim && !loading && !emptySinClientes ? (
+          <p className="ruta-dia-search-hint">
+            {clientesFiltradosGrouped.length} cliente
+            {clientesFiltradosGrouped.length !== 1 ? "s" : ""} encontrado
+            {clientesFiltradosGrouped.length !== 1 ? "s" : ""}
+          </p>
+        ) : null}
         <div className="ruta-dia-filtros-wrap">
           {!filtroExpandido ? (
             <button
@@ -272,7 +310,9 @@ export default function RutaDelDiaPage() {
         </p>
       ) : emptyFiltro ? (
         <p className="ruta-dia-empty">
-          Ningún cliente coincide con {filtroLabel}.
+          {busquedaTrim
+            ? `No hay clientes que coincidan con «${busquedaTrim}».`
+            : `Ningún cliente coincide con ${filtroLabel}.`}
         </p>
       ) : (
         <div className="ruta-dia-list">
