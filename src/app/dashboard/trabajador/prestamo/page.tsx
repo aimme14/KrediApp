@@ -2,16 +2,20 @@
 
 import { useState, useMemo, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
+import { collection, query, where, onSnapshot, limit } from "firebase/firestore";
 import { useAuth } from "@/context/AuthContext";
 import { useTrabajadorLista } from "@/context/TrabajadorListaContext";
+import { db } from "@/lib/firebase";
+import {
+  EMPRESAS_COLLECTION,
+  SOLICITUDES_PRESTAMO_SUBCOLLECTION,
+} from "@/lib/empresas-db";
 import {
   solicitarPrestamoEmpleado,
-  getMiSolicitudPrestamoPendiente,
   clienteNumFromCodigo,
   formatClienteCodigoCorto,
   type ClienteItem,
   type PrestamoItem,
-  type SolicitudPrestamoApi,
 } from "@/lib/empresa-api";
 import { formatInteresResumenPct, parseInteresPct } from "@/lib/interes-pct";
 import {
@@ -73,8 +77,13 @@ export default function PrestamoTrabajadorPage() {
   const [monto, setMonto] = useState("");
   const [creating, setCreating] = useState(false);
   const [confirmarMontoAlto, setConfirmarMontoAlto] = useState(false);
-  const [solicitudPendiente, setSolicitudPendiente] = useState<SolicitudPrestamoApi | null>(null);
-  const [loadingSolicitud, setLoadingSolicitud] = useState(true);
+  const [solicitudPendiente, setSolicitudPendiente] = useState<{
+    id: string;
+    estado: string;
+    clienteNombre: string;
+    monto: number;
+    motivoRechazo: string | null;
+  } | null>(null);
   const [filtroEstado, setFiltroEstado] = useState<"todos" | "activo" | "mora" | "pagado">("todos");
   const [busquedaNombre, setBusquedaNombre] = useState("");
 
@@ -87,24 +96,38 @@ export default function PrestamoTrabajadorPage() {
   }, [searchParams, clientes, loading]);
 
   useEffect(() => {
-    if (!user) return;
-    let cancelled = false;
-    (async () => {
-      setLoadingSolicitud(true);
-      try {
-        const token = await user.getIdToken();
-        const pendiente = await getMiSolicitudPrestamoPendiente(token);
-        if (!cancelled) setSolicitudPendiente(pendiente);
-      } catch {
-        if (!cancelled) setSolicitudPendiente(null);
-      } finally {
-        if (!cancelled) setLoadingSolicitud(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [user]);
+    if (!db || !user || profile?.role !== "trabajador" || !profile?.empresaId) return;
+    const empresaId = profile.empresaId.trim();
+
+    const q = query(
+      collection(db, EMPRESAS_COLLECTION, empresaId, SOLICITUDES_PRESTAMO_SUBCOLLECTION),
+      where("empleadoUid", "==", user.uid),
+      where("estado", "==", "pendiente"),
+      limit(1)
+    );
+
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        const d = snap.docs[0];
+        if (!d) {
+          setSolicitudPendiente(null);
+          return;
+        }
+        const x = d.data();
+        setSolicitudPendiente({
+          id: d.id,
+          estado: x.estado ?? "pendiente",
+          clienteNombre: x.clienteNombre ?? "",
+          monto: typeof x.monto === "number" ? x.monto : 0,
+          motivoRechazo: x.motivoRechazo ?? null,
+        });
+      },
+      (err) => console.warn("[TrabajadorPrestamo] onSnapshot solicitud:", err)
+    );
+
+    return unsub;
+  }, [user?.uid, profile?.role, profile?.empresaId]);
 
   useEffect(() => {
     const mq = window.matchMedia("(max-width: 768px)");
@@ -170,9 +193,6 @@ export default function PrestamoTrabajadorPage() {
       setModalidad("mensual");
       setConfirmarMontoAlto(false);
       setShowCreateForm(false);
-      const tokenRefresh = await user.getIdToken();
-      const pendiente = await getMiSolicitudPrestamoPendiente(tokenRefresh);
-      setSolicitudPendiente(pendiente);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al solicitar préstamo");
     } finally {
@@ -235,23 +255,36 @@ export default function PrestamoTrabajadorPage() {
 
   return (
     <div className="card">
-      {solicitudPendiente && !showCreateForm && (
+      {solicitudPendiente && (
         <div
-          className="card"
           style={{
-            marginBottom: "1.25rem",
             padding: "1rem",
-            border: "1px solid var(--warning, #f59e0b)",
-            backgroundColor: "rgba(245, 158, 11, 0.08)",
+            marginBottom: "1rem",
+            borderRadius: "var(--radius)",
+            background: "var(--card-bg)",
+            border: "1px solid var(--card-border)",
           }}
-          role="status"
         >
-          <strong>Solicitud de préstamo pendiente</strong>
-          <p style={{ margin: "0.5rem 0 0", fontSize: "0.875rem", lineHeight: 1.5 }}>
-            Cliente: <strong>{solicitudPendiente.clienteNombre}</strong> · Monto:{" "}
-            <strong>{formatMoneda(solicitudPendiente.monto)}</strong>. El administrador debe
-            aprobarla para que se cree el préstamo.
+          <p style={{ margin: "0 0 0.25rem", fontWeight: 600 }}>
+            Solicitud pendiente de aprobación
           </p>
+          <p style={{ margin: 0, fontSize: "0.875rem", color: "var(--text-muted)" }}>
+            Préstamo de $ {solicitudPendiente.monto.toLocaleString("es-CO")} para{" "}
+            {solicitudPendiente.clienteNombre} — esperando respuesta del administrador...
+          </p>
+          <div style={{ marginTop: "0.5rem", display: "flex", alignItems: "center", gap: "0.5rem" }}>
+            <span
+              style={{
+                display: "inline-block",
+                width: "8px",
+                height: "8px",
+                borderRadius: "50%",
+                background: "#eab308",
+                animation: "gf-pulse-dot 1.5s ease-in-out infinite",
+              }}
+            />
+            <span style={{ fontSize: "0.8125rem", color: "var(--text-muted)" }}>En espera...</span>
+          </div>
         </div>
       )}
 
@@ -553,9 +586,9 @@ export default function PrestamoTrabajadorPage() {
             type="button"
             className="btn btn-primary"
             onClick={() => setShowCreateForm(true)}
-            disabled={!!solicitudPendiente || loadingSolicitud}
+            disabled={!!solicitudPendiente}
+            title={solicitudPendiente ? "Tienes una solicitud pendiente" : "Crear nuevo préstamo"}
             aria-label="Solicitar nuevo préstamo"
-            title={solicitudPendiente ? "Tienes una solicitud pendiente" : "Solicitar nuevo préstamo"}
             style={{ padding: "0.4rem 0.65rem", minWidth: "auto", lineHeight: 1, flexShrink: 0 }}
           >
             +

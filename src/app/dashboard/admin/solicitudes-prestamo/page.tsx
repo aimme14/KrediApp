@@ -1,16 +1,20 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
+import { collection, query, where, onSnapshot } from "firebase/firestore";
 import { useAuth } from "@/context/AuthContext";
-import { formatInteresResumenPct } from "@/lib/interes-pct";
+import { db } from "@/lib/firebase";
 import {
-  getSolicitudesPrestamoPendientes,
+  EMPRESAS_COLLECTION,
+  SOLICITUDES_PRESTAMO_SUBCOLLECTION,
+} from "@/lib/empresas-db";
+import {
   aprobarSolicitudPrestamo,
   rechazarSolicitudPrestamo,
   type SolicitudPrestamoApi,
 } from "@/lib/empresa-api";
 
-function formatMoneda(n: number): string {
+function formatMonto(n: number): string {
   if (typeof n !== "number" || isNaN(n)) return "—";
   const [entero, dec = ""] = n.toFixed(2).split(".");
   const conPuntos = entero.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
@@ -18,72 +22,92 @@ function formatMoneda(n: number): string {
   return decTrim ? `${conPuntos},${decTrim}` : conPuntos;
 }
 
-const MODALIDAD_LABEL: Record<string, string> = {
-  diario: "Diario",
-  semanal: "Semanal",
-  mensual: "Mensual",
-};
-
 export default function SolicitudesPrestamoAdminPage() {
   const { user, profile } = useAuth();
   const [solicitudes, setSolicitudes] = useState<SolicitudPrestamoApi[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [accionId, setAccionId] = useState<string | null>(null);
-  const [rechazarId, setRechazarId] = useState<string | null>(null);
-  const [motivoRechazo, setMotivoRechazo] = useState("");
-
-  const cargar = useCallback(async () => {
-    if (!user) return;
-    setLoading(true);
-    setError(null);
-    try {
-      const token = await user.getIdToken();
-      const items = await getSolicitudesPrestamoPendientes(token);
-      setSolicitudes(items);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Error al cargar solicitudes");
-      setSolicitudes([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [user]);
+  const [accion, setAccion] = useState<"aprobar" | "rechazar" | null>(null);
 
   useEffect(() => {
-    void cargar();
-  }, [cargar]);
+    if (!db || !user || !profile?.empresaId) return;
+    const empresaId = profile.empresaId.trim();
+
+    const q = query(
+      collection(db, EMPRESAS_COLLECTION, empresaId, SOLICITUDES_PRESTAMO_SUBCOLLECTION),
+      where("adminId", "==", user.uid),
+      where("estado", "==", "pendiente")
+    );
+
+    setLoading(true);
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        const items: SolicitudPrestamoApi[] = snap.docs.map((d) => {
+          const x = d.data();
+          return {
+            id: d.id,
+            empleadoUid: x.empleadoUid ?? "",
+            empleadoNombre: x.empleadoNombre ?? "",
+            clienteId: x.clienteId ?? "",
+            clienteNombre: x.clienteNombre ?? "",
+            monto: typeof x.monto === "number" ? x.monto : 0,
+            interes: typeof x.interes === "number" ? x.interes : 0,
+            numeroCuotas: typeof x.numeroCuotas === "number" ? x.numeroCuotas : 0,
+            modalidad: x.modalidad ?? "mensual",
+            fechaInicio: typeof x.fechaInicio === "string" ? x.fechaInicio : "",
+            adminId: x.adminId ?? "",
+            rutaId: x.rutaId ?? "",
+            estado: x.estado ?? "pendiente",
+            motivoRechazo: x.motivoRechazo ?? null,
+            prestamoId: x.prestamoId ?? null,
+            creadaEn: x.creadaEn?.toDate?.()?.toISOString?.() ?? null,
+            resueltaEn: x.resueltaEn?.toDate?.()?.toISOString?.() ?? null,
+          };
+        });
+        items.sort((a, b) => (b.creadaEn ?? "").localeCompare(a.creadaEn ?? ""));
+        setSolicitudes(items);
+        setLoading(false);
+      },
+      (err) => {
+        console.warn("[SolicitudesPrestamo] onSnapshot:", err);
+        setLoading(false);
+      }
+    );
+
+    return unsub;
+  }, [user?.uid, profile?.empresaId]);
 
   const handleAprobar = async (solicitudId: string) => {
     if (!user) return;
     setAccionId(solicitudId);
+    setAccion("aprobar");
     setError(null);
     try {
       const token = await user.getIdToken();
       await aprobarSolicitudPrestamo(token, solicitudId);
-      await cargar();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al aprobar");
     } finally {
       setAccionId(null);
+      setAccion(null);
     }
   };
 
-  const handleRechazar = async () => {
-    if (!user || !rechazarId) return;
-    setAccionId(rechazarId);
+  const handleRechazar = async (solicitudId: string) => {
+    if (!user) return;
+    setAccionId(solicitudId);
+    setAccion("rechazar");
     setError(null);
     try {
       const token = await user.getIdToken();
-      await rechazarSolicitudPrestamo(token, rechazarId, {
-        motivo: motivoRechazo.trim() || undefined,
-      });
-      setRechazarId(null);
-      setMotivoRechazo("");
-      await cargar();
+      await rechazarSolicitudPrestamo(token, solicitudId);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al rechazar");
     } finally {
       setAccionId(null);
+      setAccion(null);
     }
   };
 
@@ -104,120 +128,96 @@ export default function SolicitudesPrestamoAdminPage() {
       ) : solicitudes.length === 0 ? (
         <p style={{ color: "var(--text-muted)" }}>No hay solicitudes pendientes.</p>
       ) : (
-        <div className="table-wrap">
-          <table className="table-historial">
-            <thead>
-              <tr>
-                <th>Trabajador</th>
-                <th>Cliente</th>
-                <th className="col-num">Monto</th>
-                <th className="col-num">Interés</th>
-                <th>Cuotas</th>
-                <th>Modalidad</th>
-                <th>Solicitada</th>
-                <th>Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {solicitudes.map((s) => {
-                const totalAPagar = Math.round(s.monto * (1 + s.interes / 100) * 100) / 100;
-                const cuota =
-                  s.numeroCuotas > 0 ? Math.round((totalAPagar / s.numeroCuotas) * 100) / 100 : 0;
-                const fecha =
-                  s.creadaEn &&
-                  new Date(s.creadaEn).toLocaleString("es-CO", {
-                    day: "2-digit",
-                    month: "short",
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  });
-                return (
-                  <tr key={s.id}>
-                    <td>{s.empleadoNombre || "—"}</td>
-                    <td>{s.clienteNombre || "—"}</td>
-                    <td className="col-num">{formatMoneda(s.monto)}</td>
-                    <td className="col-num">{formatInteresResumenPct(s.interes)}%</td>
-                    <td>
-                      {s.numeroCuotas} ({formatMoneda(cuota)}/cuota)
-                    </td>
-                    <td>{MODALIDAD_LABEL[s.modalidad] ?? s.modalidad}</td>
-                    <td>{fecha || "—"}</td>
-                    <td>
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
-                        <button
-                          type="button"
-                          className="btn btn-primary"
-                          disabled={accionId === s.id}
-                          onClick={() => void handleAprobar(s.id)}
-                        >
-                          {accionId === s.id ? "…" : "Aprobar"}
-                        </button>
-                        <button
-                          type="button"
-                          className="btn"
-                          disabled={accionId === s.id}
-                          onClick={() => {
-                            setRechazarId(s.id);
-                            setMotivoRechazo("");
-                          }}
-                        >
-                          Rechazar
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {rechazarId && (
-        <div
-          className="card"
-          style={{
-            marginTop: "1.25rem",
-            padding: "1rem",
-            border: "1px solid var(--border)",
-          }}
-          role="dialog"
-          aria-label="Rechazar solicitud"
-        >
-          <h3 style={{ marginTop: 0 }}>Rechazar solicitud</h3>
-          <div className="form-group">
-            <label htmlFor="motivo-rechazo-prestamo">Motivo (opcional)</label>
-            <textarea
-              id="motivo-rechazo-prestamo"
-              value={motivoRechazo}
-              onChange={(e) => setMotivoRechazo(e.target.value)}
-              rows={3}
-              maxLength={500}
-              style={{ width: "100%", resize: "vertical" }}
-              placeholder="Indica por qué rechazas la solicitud…"
-            />
-          </div>
-          <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
-            <button
-              type="button"
-              className="btn btn-primary"
-              disabled={accionId === rechazarId}
-              onClick={() => void handleRechazar()}
-            >
-              {accionId === rechazarId ? "Rechazando…" : "Confirmar rechazo"}
-            </button>
-            <button
-              type="button"
-              className="btn"
-              disabled={accionId === rechazarId}
-              onClick={() => {
-                setRechazarId(null);
-                setMotivoRechazo("");
+        <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+          {solicitudes.map((s) => (
+            <div
+              key={s.id}
+              className="card"
+              style={{
+                margin: 0,
+                padding: "1rem",
+                border: "1px solid var(--card-border)",
               }}
             >
-              Cancelar
-            </button>
-          </div>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "flex-start",
+                  gap: "1rem",
+                  flexWrap: "wrap",
+                }}
+              >
+                <div style={{ flex: "1 1 0", minWidth: 0 }}>
+                  <p style={{ margin: "0 0 0.25rem", fontWeight: 600, fontSize: "1rem" }}>
+                    {s.clienteNombre}
+                  </p>
+                  <p style={{ margin: "0 0 0.5rem", fontSize: "0.8125rem", color: "var(--text-muted)" }}>
+                    Solicitado por {s.empleadoNombre}
+                  </p>
+                  <div
+                    style={{
+                      display: "flex",
+                      flexWrap: "wrap",
+                      gap: "0.5rem 1.25rem",
+                      fontSize: "0.875rem",
+                    }}
+                  >
+                    <span>
+                      <span style={{ color: "var(--text-muted)" }}>Monto: </span>
+                      <strong>$ {formatMonto(s.monto)}</strong>
+                    </span>
+                    <span>
+                      <span style={{ color: "var(--text-muted)" }}>Interés: </span>
+                      <strong>{s.interes}%</strong>
+                    </span>
+                    <span>
+                      <span style={{ color: "var(--text-muted)" }}>Cuotas: </span>
+                      <strong>
+                        {s.numeroCuotas} {s.modalidad}s
+                      </strong>
+                    </span>
+                    <span>
+                      <span style={{ color: "var(--text-muted)" }}>Cuota: </span>
+                      <strong>
+                        $ {formatMonto((s.monto * (1 + s.interes / 100)) / s.numeroCuotas)}
+                      </strong>
+                    </span>
+                    <span>
+                      <span style={{ color: "var(--text-muted)" }}>Total a pagar: </span>
+                      <strong>$ {formatMonto(s.monto * (1 + s.interes / 100))}</strong>
+                    </span>
+                  </div>
+                  <p style={{ margin: "0.5rem 0 0", fontSize: "0.75rem", color: "var(--text-muted)" }}>
+                    {s.creadaEn
+                      ? new Date(s.creadaEn).toLocaleString("es-CO", {
+                          dateStyle: "medium",
+                          timeStyle: "short",
+                        })
+                      : "—"}
+                  </p>
+                </div>
+                <div style={{ display: "flex", gap: "0.5rem", flexShrink: 0 }}>
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    disabled={accionId !== null}
+                    onClick={() => void handleAprobar(s.id)}
+                  >
+                    {accionId === s.id && accion === "aprobar" ? "Aprobando..." : "Aprobar"}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    disabled={accionId !== null}
+                    onClick={() => void handleRechazar(s.id)}
+                  >
+                    {accionId === s.id && accion === "rechazar" ? "Rechazando..." : "Rechazar"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       )}
     </div>
