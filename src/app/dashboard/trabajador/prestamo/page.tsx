@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
-import { collection, query, where, onSnapshot, limit } from "firebase/firestore";
+import { collection, doc, query, where, onSnapshot, limit } from "firebase/firestore";
 import { useAuth } from "@/context/AuthContext";
 import { useTrabajadorLista } from "@/context/TrabajadorListaContext";
 import { db } from "@/lib/firebase";
@@ -136,42 +136,38 @@ export default function PrestamoTrabajadorPage() {
   }, [user?.uid, profile?.role, profile?.empresaId]);
 
   useEffect(() => {
-    if (!db || !user || profile?.role !== "trabajador" || !profile?.empresaId) return;
+    if (!db || !solicitudPendiente?.id || !profile?.empresaId) return;
     const empresaId = profile.empresaId.trim();
 
-    const q = query(
-      collection(db, EMPRESAS_COLLECTION, empresaId, SOLICITUDES_PRESTAMO_SUBCOLLECTION),
-      where("empleadoUid", "==", user.uid),
-      where("estado", "in", ["aprobada", "rechazada"]),
-      limit(1)
+    const docRef = doc(
+      db,
+      EMPRESAS_COLLECTION,
+      empresaId,
+      SOLICITUDES_PRESTAMO_SUBCOLLECTION,
+      solicitudPendiente.id
     );
 
     const unsub = onSnapshot(
-      q,
+      docRef,
       (snap) => {
-        const d = snap.docs[0];
-        if (!d) {
-          setUltimaResolucion(null);
-          return;
+        if (!snap.exists()) return;
+        const x = snap.data();
+        const estado = x.estado as string;
+        if (estado === "aprobada" || estado === "rechazada") {
+          setUltimaResolucion({
+            estado: estado as "aprobada" | "rechazada",
+            clienteNombre: x.clienteNombre ?? "",
+            monto: typeof x.monto === "number" ? x.monto : 0,
+            motivoRechazo: x.motivoRechazo ?? null,
+          });
+          setTimeout(() => setUltimaResolucion(null), 10 * 60 * 1000);
         }
-        const x = d.data();
-        const resueltaEn = x.resueltaEn?.toDate?.()?.getTime?.() ?? 0;
-        if (Date.now() - resueltaEn > 5 * 60 * 1000) {
-          setUltimaResolucion(null);
-          return;
-        }
-        setUltimaResolucion({
-          estado: x.estado as "aprobada" | "rechazada",
-          clienteNombre: x.clienteNombre ?? "",
-          monto: typeof x.monto === "number" ? x.monto : 0,
-          motivoRechazo: x.motivoRechazo ?? null,
-        });
       },
-      (err) => console.warn("[TrabajadorPrestamo] onSnapshot resolucion:", err)
+      (err) => console.warn("[TrabajadorPrestamo] onSnapshot doc:", err)
     );
 
     return unsub;
-  }, [user?.uid, profile?.role, profile?.empresaId]);
+  }, [solicitudPendiente?.id, profile?.empresaId]);
 
   useEffect(() => {
     const mq = window.matchMedia("(max-width: 768px)");
