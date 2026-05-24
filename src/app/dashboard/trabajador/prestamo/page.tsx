@@ -84,6 +84,12 @@ export default function PrestamoTrabajadorPage() {
     monto: number;
     motivoRechazo: string | null;
   } | null>(null);
+  const [ultimaResolucion, setUltimaResolucion] = useState<{
+    estado: "aprobada" | "rechazada";
+    clienteNombre: string;
+    monto: number;
+    motivoRechazo: string | null;
+  } | null>(null);
   const [filtroEstado, setFiltroEstado] = useState<"todos" | "activo" | "mora" | "pagado">("todos");
   const [busquedaNombre, setBusquedaNombre] = useState("");
 
@@ -124,6 +130,44 @@ export default function PrestamoTrabajadorPage() {
         });
       },
       (err) => console.warn("[TrabajadorPrestamo] onSnapshot solicitud:", err)
+    );
+
+    return unsub;
+  }, [user?.uid, profile?.role, profile?.empresaId]);
+
+  useEffect(() => {
+    if (!db || !user || profile?.role !== "trabajador" || !profile?.empresaId) return;
+    const empresaId = profile.empresaId.trim();
+
+    const q = query(
+      collection(db, EMPRESAS_COLLECTION, empresaId, SOLICITUDES_PRESTAMO_SUBCOLLECTION),
+      where("empleadoUid", "==", user.uid),
+      where("estado", "in", ["aprobada", "rechazada"]),
+      limit(1)
+    );
+
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        const d = snap.docs[0];
+        if (!d) {
+          setUltimaResolucion(null);
+          return;
+        }
+        const x = d.data();
+        const resueltaEn = x.resueltaEn?.toDate?.()?.getTime?.() ?? 0;
+        if (Date.now() - resueltaEn > 5 * 60 * 1000) {
+          setUltimaResolucion(null);
+          return;
+        }
+        setUltimaResolucion({
+          estado: x.estado as "aprobada" | "rechazada",
+          clienteNombre: x.clienteNombre ?? "",
+          monto: typeof x.monto === "number" ? x.monto : 0,
+          motivoRechazo: x.motivoRechazo ?? null,
+        });
+      },
+      (err) => console.warn("[TrabajadorPrestamo] onSnapshot resolucion:", err)
     );
 
     return unsub;
@@ -285,6 +329,45 @@ export default function PrestamoTrabajadorPage() {
             />
             <span style={{ fontSize: "0.8125rem", color: "var(--text-muted)" }}>En espera...</span>
           </div>
+        </div>
+      )}
+
+      {ultimaResolucion && (
+        <div
+          style={{
+            padding: "1rem",
+            marginBottom: "1rem",
+            borderRadius: "var(--radius)",
+            background: "var(--card-bg)",
+            border: `1px solid ${ultimaResolucion.estado === "aprobada" ? "#16a34a" : "#dc2626"}`,
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.25rem" }}>
+            <span
+              style={{
+                display: "inline-block",
+                width: "10px",
+                height: "10px",
+                borderRadius: "50%",
+                background: ultimaResolucion.estado === "aprobada" ? "#16a34a" : "#dc2626",
+                flexShrink: 0,
+              }}
+            />
+            <p
+              style={{
+                margin: 0,
+                fontWeight: 600,
+                color: ultimaResolucion.estado === "aprobada" ? "#16a34a" : "#dc2626",
+              }}
+            >
+              {ultimaResolucion.estado === "aprobada" ? "✅ Préstamo aprobado" : "❌ Préstamo rechazado"}
+            </p>
+          </div>
+          <p style={{ margin: 0, fontSize: "0.875rem", color: "var(--text-muted)" }}>
+            {ultimaResolucion.estado === "aprobada"
+              ? `El préstamo de $ ${ultimaResolucion.monto.toLocaleString("es-CO")} para ${ultimaResolucion.clienteNombre} fue aprobado.`
+              : `El préstamo para ${ultimaResolucion.clienteNombre} fue rechazado${ultimaResolucion.motivoRechazo ? `: ${ultimaResolucion.motivoRechazo}` : "."}`}
+          </p>
         </div>
       )}
 
