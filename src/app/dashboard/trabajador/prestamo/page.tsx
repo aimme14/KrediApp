@@ -25,7 +25,7 @@ const MODALIDADES = [
 
 /** Límites de validación para creación de préstamos */
 const MONTO_MIN = 1;
-const MONTO_MAX = 999_999.99;
+const MONTO_MAX = 999_999_999.99;
 const CUOTAS_MAX = 999;
 const INTERES_MAX = 50;
 const MONTO_CONFIRMAR_ALTO = 10_000;
