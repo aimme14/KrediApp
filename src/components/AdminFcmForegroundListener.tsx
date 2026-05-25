@@ -24,6 +24,8 @@ function businessIdFromData(data: Record<string, string> | undefined): string | 
   return data.gastoId ?? data.pagoId ?? data.clienteId ?? data.prestamoId ?? data.solicitudId ?? null;
 }
 
+const TTL_MS = 24 * 60 * 60 * 1000; // 24 horas
+
 export function AdminFcmForegroundListener() {
   const { profile } = useAuth();
   const { bumpOperativoFromFcm } = useGastoFcmCampanita();
@@ -135,15 +137,24 @@ export function AdminFcmForegroundListener() {
               at: number;
             }>;
             if (pendientes.length === 0) return;
+            const ahora = Date.now();
+            const vigentes = pendientes.filter((n) => ahora - (n.at ?? 0) < TTL_MS);
+            const expirados = pendientes.filter((n) => ahora - (n.at ?? 0) >= TTL_MS);
+            for (const n of expirados) {
+              store.delete(n.id);
+            }
             const processed = processedIdsRef.current;
-            for (const n of pendientes) {
+            for (const n of vigentes) {
               const key = `biz:${n.id}`;
-              if (processed.has(key)) continue;
+              if (processed.has(key)) {
+                store.delete(n.id);
+                continue;
+              }
               processed.add(key);
               const kind: OperativoFcmKind = n.kind === "cuota" ? "cuota" : "gasto";
               bumpOperativoFromFcm(kind, n.title, n.body);
+              store.delete(n.id);
             }
-            store.clear();
           };
         };
       } catch (e) {

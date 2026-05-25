@@ -34,6 +34,8 @@ importScripts(
 firebase.initializeApp(${cfg});
 const messaging = firebase.messaging();
 
+var TTL_MS = 24 * 60 * 60 * 1000;
+
 function guardarNotificacionPendiente(payload) {
   try {
     const db = indexedDB.open('krediapp_fcm', 1);
@@ -42,6 +44,9 @@ function guardarNotificacionPendiente(payload) {
     };
     db.onsuccess = function (e) {
       const data = payload.data || {};
+      const at = Date.now();
+      var existingAt = data.at ? parseInt(data.at, 10) : at;
+      if (!isNaN(existingAt) && at - existingAt >= TTL_MS) return;
       const store = e.target.result
         .transaction('pendientes', 'readwrite')
         .objectStore('pendientes');
@@ -51,7 +56,7 @@ function guardarNotificacionPendiente(payload) {
         body: data.body || '',
         type: data.type || '',
         kind: data.type === 'cuota_prestamo' || data.type === 'prestamo_empleado' || data.type === 'solicitud_prestamo' ? 'cuota' : 'gasto',
-        at: Date.now(),
+        at: at,
       });
     };
   } catch (e) {

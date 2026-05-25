@@ -30,6 +30,15 @@ function BellIcon() {
 const NOTIFICATIONS_PANEL_IDEAL_MAX_PX = 288;
 const NOTIFICATIONS_PANEL_FALLBACK_PX = 200;
 const NOTIFICATIONS_PANEL_VIEWPORT_MARGIN_PX = 10;
+const TTL_MS = 24 * 60 * 60 * 1000; // 24 horas
+
+function formatNotifTime(ms: number): string {
+  return new Date(ms).toLocaleTimeString("es-CO", {
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "America/Bogota",
+  });
+}
 
 function formatMonto(value: number): string {
   return `$ ${value.toLocaleString("es-CO", {
@@ -104,41 +113,29 @@ function NotifAdminPendientes({
   );
 }
 
-function NotifAdminOperativo({
-  lines,
-  onDismissItem,
-}: {
-  lines: OperativoFcmSessionItem[];
-  onDismissItem: (id: string) => void;
-}) {
-  if (lines.length === 0) return null;
+function NotifAdminOperativo({ lines }: { lines: OperativoFcmSessionItem[] }) {
+  const ahora = Date.now();
+  const vigentes = lines.filter((row) => ahora - (row.at ?? 0) < TTL_MS);
+  if (vigentes.length === 0) return null;
   return (
     <>
-      {lines.slice(0, 8).map((row) => (
+      <div className="dashboard-notifications-operativo-header">
+        <span>Notificaciones de hoy</span>
+        <span style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
+          Se borran automáticamente después de 24 h
+        </span>
+      </div>
+      {vigentes.slice(0, 8).map((row) => (
         <div
           key={row.id}
           className="dashboard-notifications-alert dashboard-notifications-alert-warning dashboard-notifications-alert-gasto-fcm"
           role="status"
           style={{ marginTop: "0.5rem" }}
         >
-          <button
-            type="button"
-            className="dashboard-notifications-close"
-            onClick={() => onDismissItem(row.id)}
-            aria-label="Cerrar notificación"
-            title="Cerrar"
-          >
-            ×
-          </button>
-          <span className="dashboard-notifications-admin-label">{row.title}</span>
-          <span className="dashboard-notifications-admin-name">{row.body}</span>
-          <span className="dashboard-notifications-admin-meta">
-            {new Date(row.at).toLocaleString("es-CO", {
-              day: "2-digit",
-              month: "short",
-              hour: "2-digit",
-              minute: "2-digit",
-            })}
+          <p className="dashboard-notifications-admin-label">{row.title}</p>
+          <p className="dashboard-notifications-admin-name">{row.body}</p>
+          <span className="dashboard-notifications-admin-meta notif-time">
+            {formatNotifTime(row.at)}
           </span>
         </div>
       ))}
@@ -149,10 +146,8 @@ function NotifAdminOperativo({
 export default function DashboardNotifications() {
   const { user, profile } = useAuth();
   const {
-    unreadCount,
     sessionOperativoLines,
     markAllAsRead,
-    dismissItem,
   } = useGastoFcmCampanita();
   const [open, setOpen] = useState(false);
   const [panelMaxWidthPx, setPanelMaxWidthPx] = useState<number | null>(null);
@@ -418,8 +413,12 @@ export default function DashboardNotifications() {
       return 0;
     }
     if (role === "admin") {
+      const ahora = Date.now();
+      const operativoUnread = sessionOperativoLines.filter(
+        (l) => !l.read && ahora - (l.at ?? 0) < TTL_MS
+      ).length;
       const pendingCount = dismissedSet.has(adminPendingKey) ? 0 : adminPendientes.length;
-      return pendingCount + unreadCount;
+      return pendingCount + operativoUnread;
     }
     return 0;
   }, [
@@ -431,7 +430,7 @@ export default function DashboardNotifications() {
     dismissedSet,
     adminPendingKey,
     adminPendientes.length,
-    unreadCount,
+    sessionOperativoLines,
   ]);
 
   const badgeLabel =
@@ -542,10 +541,7 @@ export default function DashboardNotifications() {
                 onDismiss={() => dismissNotification(adminPendingKey)}
                 onClose={() => setOpen(false)}
               />
-              <NotifAdminOperativo
-                lines={sessionOperativoLines}
-                onDismissItem={dismissItem}
-              />
+              <NotifAdminOperativo lines={sessionOperativoLines} />
             </>
           )}
 

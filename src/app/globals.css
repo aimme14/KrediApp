@@ -3553,6 +3553,16 @@ th {
   margin-bottom: 0.65rem;
 }
 
+.dashboard-notifications-operativo-header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  margin: 0 0.6rem 0.45rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
 .dashboard-notifications-alert {
   margin: 0 0.6rem 0.55rem;
   padding: 0.65rem 0.7rem;
