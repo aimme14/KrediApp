@@ -1,97 +1,97 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<coverage generated="1779751175662" clover="3.2.0">
-  <project timestamp="1779751175662" name="All files">
-    <metrics statements="82" coveredstatements="55" conditionals="55" coveredconditionals="20" methods="14" coveredmethods="8" elements="151" coveredelements="83" complexity="0" loc="82" ncloc="82" packages="1" files="3" classes="3"/>
+<coverage generated="1779752026033" clover="3.2.0">
+  <project timestamp="1779752026034" name="All files">
+    <metrics statements="82" coveredstatements="79" conditionals="55" coveredconditionals="44" methods="14" coveredmethods="14" elements="151" coveredelements="137" complexity="0" loc="82" ncloc="82" packages="1" files="3" classes="3"/>
     <file name="capital-formulas.ts" path="C:\Users\JOSUE.WIN-88BHFO68NK9\Documents\KrediApp\src\lib\capital-formulas.ts">
-      <metrics statements="13" coveredstatements="9" conditionals="2" coveredconditionals="0" methods="6" coveredmethods="3"/>
-      <line num="7" count="8" type="stmt"/>
+      <metrics statements="13" coveredstatements="13" conditionals="2" coveredconditionals="2" methods="6" coveredmethods="6"/>
+      <line num="7" count="21" type="stmt"/>
       <line num="15" count="2" type="stmt"/>
-      <line num="21" count="8" type="stmt"/>
+      <line num="21" count="19" type="stmt"/>
       <line num="28" count="2" type="stmt"/>
-      <line num="32" count="0" type="stmt"/>
+      <line num="32" count="3" type="stmt"/>
       <line num="41" count="2" type="stmt"/>
       <line num="45" count="2" type="stmt"/>
       <line num="46" count="2" type="stmt"/>
       <line num="53" count="2" type="stmt"/>
-      <line num="59" count="0" type="cond" truecount="0" falsecount="2"/>
-      <line num="60" count="0" type="stmt"/>
+      <line num="59" count="2" type="cond" truecount="2" falsecount="0"/>
+      <line num="60" count="1" type="stmt"/>
       <line num="68" count="2" type="stmt"/>
-      <line num="76" count="0" type="stmt"/>
+      <line num="76" count="2" type="stmt"/>
     </file>
     <file name="ruta-financiera-compute.ts" path="C:\Users\JOSUE.WIN-88BHFO68NK9\Documents\KrediApp\src\lib\ruta-financiera-compute.ts">
-      <metrics statements="63" coveredstatements="42" conditionals="49" coveredconditionals="20" methods="5" coveredmethods="4"/>
+      <metrics statements="63" coveredstatements="60" conditionals="49" coveredconditionals="41" methods="5" coveredmethods="5"/>
       <line num="5" count="1" type="stmt"/>
       <line num="7" count="1" type="stmt"/>
-      <line num="8" count="61" type="stmt"/>
+      <line num="8" count="136" type="stmt"/>
       <line num="15" count="1" type="stmt"/>
-      <line num="20" count="8" type="cond" truecount="2" falsecount="0"/>
-      <line num="21" count="7" type="cond" truecount="1" falsecount="1"/>
+      <line num="20" count="17" type="cond" truecount="2" falsecount="0"/>
+      <line num="21" count="15" type="cond" truecount="1" falsecount="1"/>
       <line num="22" count="0" type="stmt"/>
-      <line num="24" count="7" type="stmt"/>
-      <line num="25" count="7" type="stmt"/>
-      <line num="26" count="7" type="stmt"/>
-      <line num="27" count="7" type="stmt"/>
+      <line num="24" count="15" type="stmt"/>
+      <line num="25" count="15" type="stmt"/>
+      <line num="26" count="15" type="stmt"/>
+      <line num="27" count="15" type="stmt"/>
       <line num="40" count="1" type="stmt"/>
-      <line num="46" count="0" type="cond" truecount="0" falsecount="2"/>
-      <line num="48" count="0" type="cond" truecount="0" falsecount="2"/>
-      <line num="49" count="0" type="cond" truecount="0" falsecount="2"/>
-      <line num="50" count="0" type="cond" truecount="0" falsecount="2"/>
-      <line num="51" count="0" type="cond" truecount="0" falsecount="2"/>
-      <line num="54" count="0" type="stmt"/>
-      <line num="56" count="0" type="stmt"/>
-      <line num="57" count="0" type="stmt"/>
-      <line num="58" count="0" type="stmt"/>
-      <line num="60" count="0" type="stmt"/>
-      <line num="61" count="0" type="stmt"/>
-      <line num="62" count="0" type="stmt"/>
-      <line num="63" count="0" type="stmt"/>
-      <line num="70" count="0" type="cond" truecount="0" falsecount="4"/>
+      <line num="46" count="6" type="cond" truecount="2" falsecount="0"/>
+      <line num="48" count="6" type="cond" truecount="2" falsecount="0"/>
+      <line num="49" count="6" type="cond" truecount="2" falsecount="0"/>
+      <line num="50" count="6" type="cond" truecount="2" falsecount="0"/>
+      <line num="51" count="6" type="cond" truecount="2" falsecount="0"/>
+      <line num="54" count="6" type="stmt"/>
+      <line num="56" count="6" type="stmt"/>
+      <line num="57" count="6" type="stmt"/>
+      <line num="58" count="6" type="stmt"/>
+      <line num="60" count="6" type="stmt"/>
+      <line num="61" count="6" type="stmt"/>
+      <line num="62" count="6" type="stmt"/>
+      <line num="63" count="6" type="stmt"/>
+      <line num="70" count="6" type="cond" truecount="3" falsecount="1"/>
       <line num="71" count="0" type="stmt"/>
-      <line num="74" count="0" type="stmt"/>
+      <line num="74" count="6" type="stmt"/>
       <line num="96" count="1" type="stmt"/>
-      <line num="102" count="4" type="cond" truecount="1" falsecount="1"/>
-      <line num="104" count="4" type="cond" truecount="1" falsecount="1"/>
-      <line num="105" count="4" type="cond" truecount="1" falsecount="1"/>
-      <line num="106" count="4" type="cond" truecount="1" falsecount="1"/>
-      <line num="107" count="4" type="cond" truecount="1" falsecount="1"/>
-      <line num="110" count="4" type="stmt"/>
-      <line num="112" count="4" type="stmt"/>
-      <line num="113" count="4" type="stmt"/>
-      <line num="114" count="4" type="stmt"/>
-      <line num="116" count="4" type="stmt"/>
-      <line num="117" count="4" type="stmt"/>
-      <line num="118" count="4" type="stmt"/>
-      <line num="119" count="4" type="stmt"/>
-      <line num="126" count="4" type="cond" truecount="4" falsecount="1"/>
-      <line num="127" count="0" type="stmt"/>
-      <line num="130" count="4" type="stmt"/>
+      <line num="102" count="6" type="cond" truecount="2" falsecount="0"/>
+      <line num="104" count="6" type="cond" truecount="2" falsecount="0"/>
+      <line num="105" count="6" type="cond" truecount="2" falsecount="0"/>
+      <line num="106" count="6" type="cond" truecount="2" falsecount="0"/>
+      <line num="107" count="6" type="cond" truecount="2" falsecount="0"/>
+      <line num="110" count="6" type="stmt"/>
+      <line num="112" count="6" type="stmt"/>
+      <line num="113" count="6" type="stmt"/>
+      <line num="114" count="6" type="stmt"/>
+      <line num="116" count="6" type="stmt"/>
+      <line num="117" count="6" type="stmt"/>
+      <line num="118" count="6" type="stmt"/>
+      <line num="119" count="6" type="stmt"/>
+      <line num="126" count="6" type="cond" truecount="5" falsecount="0"/>
+      <line num="127" count="1" type="stmt"/>
+      <line num="130" count="5" type="stmt"/>
       <line num="149" count="1" type="stmt"/>
-      <line num="155" count="4" type="cond" truecount="1" falsecount="1"/>
-      <line num="156" count="0" type="stmt"/>
-      <line num="158" count="4" type="cond" truecount="1" falsecount="1"/>
-      <line num="160" count="4" type="cond" truecount="1" falsecount="1"/>
-      <line num="161" count="4" type="cond" truecount="1" falsecount="1"/>
-      <line num="162" count="4" type="cond" truecount="1" falsecount="1"/>
-      <line num="164" count="4" type="cond" truecount="1" falsecount="1"/>
-      <line num="173" count="4" type="stmt"/>
-      <line num="174" count="4" type="stmt"/>
-      <line num="175" count="4" type="stmt"/>
-      <line num="176" count="4" type="stmt"/>
-      <line num="178" count="4" type="stmt"/>
-      <line num="179" count="4" type="cond" truecount="1" falsecount="1"/>
-      <line num="180" count="0" type="stmt"/>
-      <line num="182" count="4" type="cond" truecount="1" falsecount="1"/>
+      <line num="155" count="7" type="cond" truecount="2" falsecount="0"/>
+      <line num="156" count="1" type="stmt"/>
+      <line num="158" count="6" type="cond" truecount="1" falsecount="1"/>
+      <line num="160" count="6" type="cond" truecount="1" falsecount="1"/>
+      <line num="161" count="6" type="cond" truecount="1" falsecount="1"/>
+      <line num="162" count="6" type="cond" truecount="1" falsecount="1"/>
+      <line num="164" count="6" type="cond" truecount="1" falsecount="1"/>
+      <line num="173" count="6" type="stmt"/>
+      <line num="174" count="6" type="stmt"/>
+      <line num="175" count="6" type="stmt"/>
+      <line num="176" count="6" type="stmt"/>
+      <line num="178" count="6" type="stmt"/>
+      <line num="179" count="6" type="cond" truecount="2" falsecount="0"/>
+      <line num="180" count="1" type="stmt"/>
+      <line num="182" count="5" type="cond" truecount="1" falsecount="1"/>
       <line num="183" count="0" type="stmt"/>
-      <line num="186" count="4" type="stmt"/>
+      <line num="186" count="5" type="stmt"/>
     </file>
     <file name="tu-caja-del-dia.ts" path="C:\Users\JOSUE.WIN-88BHFO68NK9\Documents\KrediApp\src\lib\tu-caja-del-dia.ts">
-      <metrics statements="6" coveredstatements="4" conditionals="4" coveredconditionals="0" methods="3" coveredmethods="1"/>
+      <metrics statements="6" coveredstatements="6" conditionals="4" coveredconditionals="1" methods="3" coveredmethods="3"/>
       <line num="6" count="1" type="stmt"/>
-      <line num="12" count="0" type="stmt"/>
+      <line num="12" count="7" type="stmt"/>
       <line num="24" count="1" type="stmt"/>
-      <line num="30" count="4" type="stmt"/>
+      <line num="30" count="5" type="stmt"/>
       <line num="42" count="1" type="stmt"/>
-      <line num="51" count="0" type="stmt"/>
+      <line num="51" count="3" type="stmt"/>
     </file>
   </project>
 </coverage>

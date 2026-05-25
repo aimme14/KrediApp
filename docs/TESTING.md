@@ -50,6 +50,20 @@ src/lib/__tests__/
 
 ---
 
+## Cobertura actual
+
+| Archivo | Stmts | Branch | Funcs | Lines |
+|---|---|---|---|---|
+| capital-formulas.ts | 100% | 100% | 100% | 100% |
+| ruta-financiera-compute.ts | 95.31% | 83.67% | 100% | 95.23% |
+| tu-caja-del-dia.ts | 100% | 25% | 100% | 100% |
+| **Total** | **96.42%** | **80%** | **100%** | **96.34%** |
+
+> Las líneas sin cubrir son guardias defensivas (errores imposibles en uso normal).
+> No es necesario forzar tests para ellas.
+
+---
+
 ## Funciones críticas cubiertas
 
 | Función | Archivo | Por qué es crítica |
