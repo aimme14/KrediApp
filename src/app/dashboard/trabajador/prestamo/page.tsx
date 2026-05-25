@@ -4,6 +4,7 @@ import { useState, useMemo, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import { collection, doc, query, where, onSnapshot, limit } from "firebase/firestore";
 import { useAuth } from "@/context/AuthContext";
+import { useTrabajadorCajaDia } from "@/context/TrabajadorCajaDiaContext";
 import { useTrabajadorLista } from "@/context/TrabajadorListaContext";
 import { db } from "@/lib/firebase";
 import {
@@ -32,10 +33,8 @@ const MODALIDADES = [
 
 /** Límites de validación para creación de préstamos */
 const MONTO_MIN = 1;
-const MONTO_MAX = 999_999_999.99;
 const CUOTAS_MAX = 999;
 const INTERES_MAX = 50;
-const MONTO_CONFIRMAR_ALTO = 10_000;
 
 /** Formato moneda: miles con punto; decimales con coma solo si son distintos de cero (ej: 1.234 o 1.234,56) */
 function formatMoneda(n: number): string {
@@ -68,6 +67,10 @@ export default function PrestamoTrabajadorPage() {
     loading,
     error: listaError,
   } = useTrabajadorLista();
+  const { cajaEmpleadoRT, data: cajaDia } = useTrabajadorCajaDia();
+  const cajaEmpleado = cajaEmpleadoRT ?? cajaDia?.cajaEmpleado ?? 0;
+  const MONTO_MAX = cajaEmpleado > 0 ? cajaEmpleado : 50_000_000;
+  const MONTO_CONFIRMAR_ALTO = 1_000_000;
   const [error, setError] = useState<string | null>(null);
   const [clienteId, setClienteId] = useState("");
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -188,6 +191,10 @@ export default function PrestamoTrabajadorPage() {
 
     if (isNaN(montoNum) || montoNum < MONTO_MIN) {
       setError(`El monto debe ser al menos ${formatMoneda(MONTO_MIN)}`);
+      return;
+    }
+    if (montoNum > cajaEmpleado) {
+      setError("El monto supera la base disponible");
       return;
     }
     if (montoNum > MONTO_MAX) {
@@ -551,6 +558,9 @@ export default function PrestamoTrabajadorPage() {
               placeholder="0,00"
               style={{ width: "100%" }}
             />
+            <p style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "0.25rem" }}>
+              Base disponible: <strong>$ {formatMoneda(cajaEmpleado)}</strong>
+            </p>
           </div>
           <div className="form-group" style={{ flex: "1 1 0", minWidth: 0, marginBottom: 0 }}>
             <label>Cuota</label>

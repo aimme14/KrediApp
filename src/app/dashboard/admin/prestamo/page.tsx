@@ -27,10 +27,8 @@ const MODALIDADES = [
 
 /** Límites de validación para creación de préstamos */
 const MONTO_MIN = 1;
-const MONTO_MAX = 999_999_999.99;
 const CUOTAS_MAX = 999;
 const INTERES_MAX = 50;
-const MONTO_CONFIRMAR_ALTO = 10_000;
 
 /** Formato moneda: miles con punto; decimales con coma solo si son distintos de cero (ej: 1.234 o 1.234,56) */
 function formatMoneda(n: number): string {
@@ -92,6 +90,10 @@ export default function PrestamoPage() {
   } = useTrabajadorLista();
   const [error, setError] = useState<string | null>(null);
   const [rutaIdForm, setRutaIdForm] = useState("");
+  const rutaSeleccionada = rutas.find((r) => r.id === rutaIdForm);
+  const cajaRuta = rutaSeleccionada?.cajaRuta ?? 0;
+  const MONTO_MAX = cajaRuta > 0 ? cajaRuta : 50_000_000;
+  const MONTO_CONFIRMAR_ALTO = 1_000_000;
   const [clienteId, setClienteId] = useState("");
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [modalidad, setModalidad] = useState<"diario" | "semanal" | "mensual">("mensual");
@@ -156,6 +158,10 @@ export default function PrestamoPage() {
 
     if (isNaN(montoNum) || montoNum < MONTO_MIN) {
       setError(`El monto debe ser al menos ${formatMoneda(MONTO_MIN)}`);
+      return;
+    }
+    if (cajaRuta > 0 && montoNum > cajaRuta) {
+      setError("El monto supera la base disponible");
       return;
     }
     if (montoNum > MONTO_MAX) {
@@ -502,6 +508,11 @@ export default function PrestamoPage() {
               required
               placeholder="0,00"
             />
+            {rutaIdForm && (
+              <p style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "0.25rem" }}>
+                Base disponible en ruta: <strong>$ {formatMoneda(cajaRuta)}</strong>
+              </p>
+            )}
           </div>
           <div className="form-group prestamo-admin-create-cuotas">
             <label>Número de cuotas</label>
