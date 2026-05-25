@@ -1132,17 +1132,21 @@ export type PeriodoAdminSnapshotRuta = {
   rutaId: string;
   nombre: string;
   cajaRuta: number;
+  cajasEmpleados: number;
   inversiones: number;
   ganancias: number;
   perdidas: number;
-  gastos: number;
+  gastosRuta: number;
+  gastosAdmin: number;
+  gastosEmpleados: number;
+  gastosTotales: number;
   capitalRuta: number;
-  utilidad: number;
 };
 
 export type PeriodoAdminSnapshot = {
   admin: PeriodoAdminSnapshotAdmin;
   rutas: PeriodoAdminSnapshotRuta[];
+  fechaSnapshot?: string;
 };
 
 export type PeriodoAdminListaItem = {

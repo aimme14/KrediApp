@@ -46,6 +46,13 @@ function fmtDelta(apertura: number, cierre: number | null): {
   };
 }
 
+function gastosTotalesRuta(r: PeriodoAdminSnapshotRuta | undefined): number {
+  if (!r) return 0;
+  if (typeof r.gastosTotales === "number") return r.gastosTotales;
+  const legacy = r as PeriodoAdminSnapshotRuta & { gastos?: number };
+  return typeof legacy.gastos === "number" ? legacy.gastos : 0;
+}
+
 function calcularTotales(rutas: PeriodoAdminSnapshotRuta[]) {
   return rutas.reduce(
     (acc, r) => ({
@@ -53,11 +60,17 @@ function calcularTotales(rutas: PeriodoAdminSnapshotRuta[]) {
       inversiones: acc.inversiones + r.inversiones,
       ganancias: acc.ganancias + r.ganancias,
       perdidas: acc.perdidas + r.perdidas,
-      gastos: acc.gastos + r.gastos,
+      gastosTotales: acc.gastosTotales + gastosTotalesRuta(r),
       capitalRuta: acc.capitalRuta + r.capitalRuta,
-      utilidad: acc.utilidad + r.utilidad,
     }),
-    { cajaRuta: 0, inversiones: 0, ganancias: 0, perdidas: 0, gastos: 0, capitalRuta: 0, utilidad: 0 }
+    {
+      cajaRuta: 0,
+      inversiones: 0,
+      ganancias: 0,
+      perdidas: 0,
+      gastosTotales: 0,
+      capitalRuta: 0,
+    }
   );
 }
 
@@ -268,9 +281,9 @@ export default function ResumenPage() {
                       <th className="col-num">Capital cierre</th>
                       <th className="col-num">Variación</th>
                       <th className="col-num">Ganancias</th>
-                      <th className="col-num">Gastos</th>
+                      <th className="col-num">Gastos totales</th>
                       <th className="col-num">Pérdidas</th>
-                      <th className="col-num">Utilidad</th>
+                      <th className="col-num">Utilidad (variación capital)</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -279,6 +292,8 @@ export default function ResumenPage() {
                       const rc = ci?.rutas.find((r) => r.rutaId === rid);
                       const nombre = ra?.nombre ?? rc?.nombre ?? rid;
                       const delta = fmtDelta(ra?.capitalRuta ?? 0, rc?.capitalRuta ?? null);
+                      const utilidadReal =
+                        rc && ra ? rc.capitalRuta - ra.capitalRuta : null;
                       return (
                         <tr key={rid}>
                           <td>{nombre}</td>
@@ -298,19 +313,25 @@ export default function ResumenPage() {
                             {delta.texto}
                           </td>
                           <td className="col-num">{fmt(rc?.ganancias ?? ra?.ganancias ?? 0)}</td>
-                          <td className="col-num">{fmt(rc?.gastos ?? ra?.gastos ?? 0)}</td>
+                          <td className="col-num">
+                            {fmt(gastosTotalesRuta(rc ?? ra))}
+                          </td>
                           <td className="col-num">{fmt(rc?.perdidas ?? ra?.perdidas ?? 0)}</td>
                           <td
                             className="col-num"
                             style={{
                               fontWeight: 600,
                               color:
-                                (rc?.utilidad ?? ra?.utilidad ?? 0) >= 0
-                                  ? "var(--success, #16a34a)"
-                                  : "var(--danger, #dc2626)",
+                                utilidadReal === null
+                                  ? "var(--text-muted)"
+                                  : utilidadReal >= 0
+                                    ? "var(--success, #16a34a)"
+                                    : "var(--danger, #dc2626)",
                             }}
                           >
-                            {fmt(rc?.utilidad ?? ra?.utilidad ?? 0)}
+                            {utilidadReal === null
+                              ? "—"
+                              : `${utilidadReal >= 0 ? "+" : ""}${fmt(utilidadReal)}`}
                           </td>
                         </tr>
                       );
@@ -321,6 +342,8 @@ export default function ResumenPage() {
                       const totAp = ap ? calcularTotales(ap.rutas) : null;
                       const totCi = ci ? calcularTotales(ci.rutas) : null;
                       const deltaTotal = fmtDelta(totAp?.capitalRuta ?? 0, totCi?.capitalRuta ?? null);
+                      const utilidadTotal =
+                        totAp && totCi ? totCi.capitalRuta - totAp.capitalRuta : null;
                       return (
                         <tfoot>
                           <tr style={{ fontWeight: 700, borderTop: "2px solid var(--border)" }}>
@@ -340,19 +363,25 @@ export default function ResumenPage() {
                               {deltaTotal.texto}
                             </td>
                             <td className="col-num">{fmt(totCi?.ganancias ?? totAp?.ganancias ?? 0)}</td>
-                            <td className="col-num">{fmt(totCi?.gastos ?? totAp?.gastos ?? 0)}</td>
+                            <td className="col-num">
+                              {fmt(totCi?.gastosTotales ?? totAp?.gastosTotales ?? 0)}
+                            </td>
                             <td className="col-num">{fmt(totCi?.perdidas ?? totAp?.perdidas ?? 0)}</td>
                             <td
                               className="col-num"
                               style={{
                                 fontWeight: 700,
                                 color:
-                                  (totCi?.utilidad ?? totAp?.utilidad ?? 0) >= 0
-                                    ? "var(--success, #16a34a)"
-                                    : "var(--danger, #dc2626)",
+                                  utilidadTotal === null
+                                    ? "var(--text-muted)"
+                                    : utilidadTotal >= 0
+                                      ? "var(--success, #16a34a)"
+                                      : "var(--danger, #dc2626)",
                               }}
                             >
-                              {fmt(totCi?.utilidad ?? totAp?.utilidad ?? 0)}
+                              {utilidadTotal === null
+                                ? "—"
+                                : `${utilidadTotal >= 0 ? "+" : ""}${fmt(utilidadTotal)}`}
                             </td>
                           </tr>
                         </tfoot>

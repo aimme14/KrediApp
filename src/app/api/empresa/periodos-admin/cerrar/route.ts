@@ -36,7 +36,18 @@ export async function POST(_request: NextRequest) {
     return NextResponse.json({ error: "No hay un periodo abierto para cerrar." }, { status: 400 });
   }
   const doc = abiertosSnap.docs[0];
-  const cierre = await buildPeriodoAdminSnapshot(db, apiUser.empresaId, apiUser.uid);
+  const periodoData = doc.data() as Record<string, unknown>;
+  const fechaApertura =
+    (
+      periodoData.fechaApertura as { toDate?: () => Date } | undefined
+    )?.toDate?.() ?? new Date(0);
+
+  const cierre = await buildPeriodoAdminSnapshot(
+    db,
+    apiUser.empresaId,
+    apiUser.uid,
+    { desde: fechaApertura, hasta: new Date() }
+  );
 
   const rutasCol = db
     .collection(EMPRESAS_COLLECTION)
