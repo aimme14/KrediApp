@@ -7,6 +7,7 @@ import {
   useEffect,
   useMemo,
   useState,
+  useRef,
   type ReactNode,
 } from "react";
 import {
@@ -14,21 +15,31 @@ import {
   query,
   where,
   onSnapshot,
+  orderBy,
+  limit,
+  startAfter,
+  getDocs,
+  type QueryConstraint,
+  type QueryDocumentSnapshot,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/context/AuthContext";
-import {
-  type ClienteItem,
-  type PrestamoItem,
-} from "@/lib/empresa-api";
+import { type ClienteItem, type PrestamoItem } from "@/lib/empresa-api";
 
 const EMPRESAS_COLLECTION = "empresas";
 const PRESTAMOS_SUBCOLLECTION = "prestamos";
 const CLIENTES_SUBCOLLECTION = "clientes";
+const PAGE_SIZE_PAGADOS = 20;
 
 export type TrabajadorListaContextValue = {
   clientes: ClienteItem[];
+  /** Solo activos y en mora — en tiempo real */
   prestamos: PrestamoItem[];
+  /** Préstamos pagados — carga lazy */
+  prestamosPagados: PrestamoItem[];
+  loadingPagados: boolean;
+  hayMasPagados: boolean;
+  cargarMasPagados: () => Promise<void>;
   loading: boolean;
   error: string | null;
   lastFetchedAt: number;
@@ -37,37 +48,62 @@ export type TrabajadorListaContextValue = {
 
 const TrabajadorListaContext = createContext<TrabajadorListaContextValue | null>(null);
 
+function mapPrestamo(d: QueryDocumentSnapshot): PrestamoItem {
+  const data = d.data();
+  return {
+    id: d.id,
+    clienteId: data.clienteId ?? "",
+    rutaId: data.rutaId ?? "",
+    adminId: data.adminId ?? "",
+    empleadoId: data.empleadoId ?? "",
+    monto: data.monto ?? 0,
+    interes: data.interes ?? 0,
+    modalidad: data.modalidad ?? "mensual",
+    numeroCuotas: data.numeroCuotas ?? 0,
+    totalAPagar: data.totalAPagar ?? 0,
+    saldoPendiente: data.saldoPendiente ?? 0,
+    estado: data.estado ?? "activo",
+    fechaInicio: data.fechaInicio?.toDate?.()?.toISOString?.() ?? null,
+    fechaVencimiento: data.fechaVencimiento?.toDate?.()?.toISOString?.() ?? null,
+    multaMora: data.multaMora ?? 0,
+    adelantoCuota: data.adelantoCuota ?? 0,
+    ultimoPagoFecha: data.ultimoPagoFecha?.toDate?.()?.toISOString?.() ?? null,
+    intentosFallidos: typeof data.intentosFallidos === "number" ? data.intentosFallidos : 0,
+  };
+}
+
 export function TrabajadorListaProvider({ children }: { children: ReactNode }) {
   const { user, profile } = useAuth();
   const [clientes, setClientes] = useState<ClienteItem[]>([]);
   const [prestamos, setPrestamos] = useState<PrestamoItem[]>([]);
+  const [prestamosPagados, setPrestamosPagados] = useState<PrestamoItem[]>([]);
+  const [loadingPagados, setLoadingPagados] = useState(false);
+  const [hayMasPagados, setHayMasPagados] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastFetchedAt, setLastFetchedAt] = useState(0);
+  const lastDocPagadosRef = useRef<QueryDocumentSnapshot | null>(null);
 
   const refresh = useCallback(async () => {
-    // Los clientes y préstamos se actualizan via onSnapshot automáticamente
-    // refresh se mantiene por compatibilidad pero no hace fetch
+    // onSnapshot actualiza automáticamente
   }, []);
 
-  // onSnapshot para clientes
+  useEffect(() => {
+    lastDocPagadosRef.current = null;
+    setPrestamosPagados([]);
+    setHayMasPagados(true);
+    setLoadingPagados(false);
+  }, [user?.uid, profile?.empresaId, profile?.rutaId]);
+
   useEffect(() => {
     if (!db || !user || !profile) return;
     const empresaId = profile.empresaId?.trim();
     if (!empresaId) return;
-
     const canUse = profile.role === "trabajador" || profile.role === "admin";
     if (!canUse) return;
 
     setLoading(true);
-
-    const clientesCol = collection(
-      db,
-      EMPRESAS_COLLECTION,
-      empresaId,
-      CLIENTES_SUBCOLLECTION
-    );
-
+    const clientesCol = collection(db, EMPRESAS_COLLECTION, empresaId, CLIENTES_SUBCOLLECTION);
     const q =
       profile.role === "trabajador" && profile.rutaId
         ? query(clientesCol, where("rutaId", "==", profile.rutaId))
@@ -93,9 +129,10 @@ export function TrabajadorListaProvider({ children }: { children: ReactNode }) {
             codigo: data.codigo ?? undefined,
           };
         });
-        list.sort((a, b) =>
-          (b.fechaCreacion ? new Date(b.fechaCreacion).getTime() : 0) -
-          (a.fechaCreacion ? new Date(a.fechaCreacion).getTime() : 0)
+        list.sort(
+          (a, b) =>
+            (b.fechaCreacion ? new Date(b.fechaCreacion).getTime() : 0) -
+            (a.fechaCreacion ? new Date(a.fechaCreacion).getTime() : 0)
         );
         setClientes(list);
         setLastFetchedAt(Date.now());
@@ -106,7 +143,6 @@ export function TrabajadorListaProvider({ children }: { children: ReactNode }) {
         setLoading(false);
       }
     );
-
     return unsub;
   }, [user?.uid, profile?.role, profile?.empresaId, profile?.rutaId]);
 
@@ -114,69 +150,104 @@ export function TrabajadorListaProvider({ children }: { children: ReactNode }) {
     if (!db || !user || !profile) return;
     const empresaId = profile.empresaId?.trim();
     if (!empresaId) return;
-
     const canUse = profile.role === "trabajador" || profile.role === "admin";
     if (!canUse) return;
 
-    const prestamosCol = collection(
-      db,
-      EMPRESAS_COLLECTION,
-      empresaId,
-      PRESTAMOS_SUBCOLLECTION
-    );
+    const prestamosCol = collection(db, EMPRESAS_COLLECTION, empresaId, PRESTAMOS_SUBCOLLECTION);
 
     const q =
       profile.role === "trabajador" && profile.rutaId
-        ? query(prestamosCol, where("rutaId", "==", profile.rutaId))
-        : query(prestamosCol, where("adminId", "==", user.uid));
+        ? query(
+            prestamosCol,
+            where("rutaId", "==", profile.rutaId),
+            where("estado", "in", ["activo", "mora"])
+          )
+        : query(
+            prestamosCol,
+            where("adminId", "==", user.uid),
+            where("estado", "in", ["activo", "mora"])
+          );
 
     const unsub = onSnapshot(
       q,
       (snap) => {
-        const list: PrestamoItem[] = snap.docs.map((d) => {
-          const data = d.data();
-          return {
-            id: d.id,
-            clienteId: data.clienteId ?? "",
-            rutaId: data.rutaId ?? "",
-            adminId: data.adminId ?? "",
-            empleadoId: data.empleadoId ?? "",
-            monto: data.monto ?? 0,
-            interes: data.interes ?? 0,
-            modalidad: data.modalidad ?? "mensual",
-            numeroCuotas: data.numeroCuotas ?? 0,
-            totalAPagar: data.totalAPagar ?? 0,
-            saldoPendiente: data.saldoPendiente ?? 0,
-            estado: data.estado ?? "activo",
-            fechaInicio: data.fechaInicio?.toDate?.()?.toISOString?.() ?? null,
-            fechaVencimiento: data.fechaVencimiento?.toDate?.()?.toISOString?.() ?? null,
-            multaMora: data.multaMora ?? 0,
-            adelantoCuota: data.adelantoCuota ?? 0,
-            ultimoPagoFecha: data.ultimoPagoFecha?.toDate?.()?.toISOString?.() ?? null,
-            intentosFallidos:
-              typeof data.intentosFallidos === "number" ? data.intentosFallidos : 0,
-          };
-        });
-        setPrestamos(list);
+        setPrestamos(snap.docs.map(mapPrestamo));
       },
       (err) => {
-        console.warn("[TrabajadorLista] onSnapshot préstamos:", err);
+        console.warn("[TrabajadorLista] onSnapshot préstamos activos:", err);
       }
     );
-
     return unsub;
   }, [user?.uid, profile?.role, profile?.empresaId, profile?.rutaId]);
+
+  const cargarMasPagados = useCallback(async () => {
+    if (!db || !user || !profile || loadingPagados || !hayMasPagados) return;
+    const empresaId = profile.empresaId?.trim();
+    if (!empresaId) return;
+
+    setLoadingPagados(true);
+    try {
+      const prestamosCol = collection(db, EMPRESAS_COLLECTION, empresaId, PRESTAMOS_SUBCOLLECTION);
+
+      const constraints: QueryConstraint[] =
+        profile.role === "trabajador" && profile.rutaId
+          ? [
+              where("rutaId", "==", profile.rutaId),
+              where("estado", "==", "pagado"),
+              orderBy("fechaInicio", "desc"),
+            ]
+          : [
+              where("adminId", "==", user.uid),
+              where("estado", "==", "pagado"),
+              orderBy("fechaInicio", "desc"),
+            ];
+
+      if (lastDocPagadosRef.current) {
+        constraints.push(startAfter(lastDocPagadosRef.current));
+      }
+      constraints.push(limit(PAGE_SIZE_PAGADOS));
+
+      const snap = await getDocs(query(prestamosCol, ...constraints));
+      const nuevos = snap.docs.map(mapPrestamo);
+
+      if (snap.docs.length < PAGE_SIZE_PAGADOS) setHayMasPagados(false);
+      if (snap.docs.length > 0) {
+        lastDocPagadosRef.current = snap.docs[snap.docs.length - 1] ?? null;
+      }
+
+      setPrestamosPagados((prev) => [...prev, ...nuevos]);
+    } catch (e) {
+      console.warn("[TrabajadorLista] fetch pagados:", e);
+    } finally {
+      setLoadingPagados(false);
+    }
+  }, [user, profile, loadingPagados, hayMasPagados]);
 
   const value = useMemo(
     (): TrabajadorListaContextValue => ({
       clientes,
       prestamos,
+      prestamosPagados,
+      loadingPagados,
+      hayMasPagados,
+      cargarMasPagados,
       loading,
       error,
       lastFetchedAt,
       refresh,
     }),
-    [clientes, prestamos, loading, error, lastFetchedAt, refresh]
+    [
+      clientes,
+      prestamos,
+      prestamosPagados,
+      loadingPagados,
+      hayMasPagados,
+      cargarMasPagados,
+      loading,
+      error,
+      lastFetchedAt,
+      refresh,
+    ]
   );
 
   return (

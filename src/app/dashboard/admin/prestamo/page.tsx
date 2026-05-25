@@ -84,6 +84,10 @@ export default function PrestamoPage() {
   const {
     clientes,
     prestamos,
+    prestamosPagados,
+    loadingPagados,
+    hayMasPagados,
+    cargarMasPagados,
     loading,
     error: listaError,
     refresh,
@@ -148,6 +152,19 @@ export default function PrestamoPage() {
     mq.addEventListener("change", syncViewport);
     return () => mq.removeEventListener("change", syncViewport);
   }, []);
+
+  useEffect(() => {
+    if (filtroEstado !== "pagado" && filtroEstado !== "todos") return;
+    if (loadingPagados || !hayMasPagados) return;
+    if (filtroEstado === "pagado" && prestamosPagados.length > 0) return;
+    void cargarMasPagados();
+  }, [
+    filtroEstado,
+    loadingPagados,
+    hayMasPagados,
+    prestamosPagados.length,
+    cargarMasPagados,
+  ]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -245,11 +262,16 @@ export default function PrestamoPage() {
 
   const filtroNombreLower = filtroNombre.trim().toLowerCase();
 
-  const prestamosFiltrados = useMemo(() => {
-    let list = prestamos;
-    if (filtroEstado !== "todos") {
-      list = list.filter((p) => p.estado === filtroEstado);
+  const prestamosBase = useMemo(() => {
+    if (filtroEstado === "pagado") return prestamosPagados;
+    if (filtroEstado === "activo" || filtroEstado === "mora") {
+      return prestamos.filter((p) => p.estado === filtroEstado);
     }
+    return [...prestamos, ...prestamosPagados];
+  }, [prestamos, prestamosPagados, filtroEstado]);
+
+  const prestamosFiltrados = useMemo(() => {
+    let list = prestamosBase;
     if (isMobileView && soloActivosMobile) {
       list = list.filter((p) => p.estado === "activo");
     }
@@ -268,7 +290,7 @@ export default function PrestamoPage() {
       });
     }
     return list;
-  }, [prestamos, filtroEstado, isMobileView, soloActivosMobile, filtroNombreLower, clientePorId]);
+  }, [prestamosBase, isMobileView, soloActivosMobile, filtroNombreLower, clientePorId]);
 
   const PAGE_SIZE = 15;
   const [pagina, setPagina] = useState(1);
@@ -319,10 +341,17 @@ export default function PrestamoPage() {
     });
   }, []);
 
-  const prestamosDelCliente = useMemo(
-    () => (clienteId ? prestamos.filter((p) => p.clienteId === clienteId) : []),
-    [prestamos, clienteId]
-  );
+  const prestamosDelCliente = useMemo(() => {
+    if (!clienteId) return [];
+    const ids = new Set<string>();
+    const merged: PrestamoItem[] = [];
+    for (const p of [...prestamos, ...prestamosPagados]) {
+      if (p.clienteId !== clienteId || ids.has(p.id)) continue;
+      ids.add(p.id);
+      merged.push(p);
+    }
+    return ordenarPrestamosParaPrincipal(merged);
+  }, [prestamos, prestamosPagados, clienteId]);
 
   if (!profile || profile.role !== "admin") return null;
 
@@ -696,7 +725,10 @@ export default function PrestamoPage() {
         </div>
         {loading ? (
           <p className="prestamo-admin-loading">Cargando…</p>
-        ) : prestamos.length === 0 ? (
+        ) : prestamos.length === 0 &&
+          prestamosPagados.length === 0 &&
+          !loadingPagados &&
+          filtroEstado !== "pagado" ? (
           <p className="prestamo-admin-empty">No hay préstamos en el historial.</p>
         ) : (
           <>
@@ -860,7 +892,22 @@ export default function PrestamoPage() {
               </button>
             </div>
           )}
-          {prestamosFiltrados.length === 0 && (
+          {(filtroEstado === "pagado" || filtroEstado === "todos") && hayMasPagados ? (
+            <div style={{ textAlign: "center", marginTop: "0.75rem" }}>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() => void cargarMasPagados()}
+                disabled={loadingPagados}
+              >
+                {loadingPagados ? "Cargando..." : "Ver más pagados"}
+              </button>
+            </div>
+          ) : null}
+          {loadingPagados && prestamosFiltrados.length === 0 ? (
+            <p className="prestamo-admin-filtro-vacio">Cargando préstamos pagados...</p>
+          ) : null}
+          {prestamosFiltrados.length === 0 && !loadingPagados ? (
             <p className="prestamo-admin-filtro-vacio">
               {filtroNombreLower
                 ? `No hay préstamos que coincidan con «${filtroNombre.trim()}».`
@@ -868,7 +915,7 @@ export default function PrestamoPage() {
                   ? "No hay préstamos activos en el historial."
                   : `No hay préstamos en el historial con estado «${filtroEstado === "todos" ? "todos" : filtroEstado === "activo" ? "activos" : filtroEstado === "mora" ? "en mora" : "pagados"}».`}
             </p>
-          )}
+          ) : null}
           </>
         )}
         </div>

@@ -64,6 +64,10 @@ export default function PrestamoTrabajadorPage() {
   const {
     clientes,
     prestamos,
+    prestamosPagados,
+    loadingPagados,
+    hayMasPagados,
+    cargarMasPagados,
     loading,
     error: listaError,
   } = useTrabajadorLista();
@@ -182,6 +186,19 @@ export default function PrestamoTrabajadorPage() {
     return () => mq.removeEventListener("change", syncFiltro);
   }, []);
 
+  useEffect(() => {
+    if (filtroEstado !== "pagado" && filtroEstado !== "todos") return;
+    if (loadingPagados || !hayMasPagados) return;
+    if (filtroEstado === "pagado" && prestamosPagados.length > 0) return;
+    void cargarMasPagados();
+  }, [
+    filtroEstado,
+    loadingPagados,
+    hayMasPagados,
+    prestamosPagados.length,
+    cargarMasPagados,
+  ]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
@@ -266,11 +283,16 @@ export default function PrestamoTrabajadorPage() {
   const busquedaTrim = busquedaNombre.trim();
   const busquedaLower = busquedaTrim.toLowerCase();
 
-  const prestamosFiltrados = useMemo(() => {
-    let lista = prestamos;
-    if (filtroEstado !== "todos") {
-      lista = lista.filter((p) => p.estado === filtroEstado);
+  const prestamosBase = useMemo(() => {
+    if (filtroEstado === "pagado") return prestamosPagados;
+    if (filtroEstado === "activo" || filtroEstado === "mora") {
+      return prestamos.filter((p) => p.estado === filtroEstado);
     }
+    return [...prestamos, ...prestamosPagados];
+  }, [prestamos, prestamosPagados, filtroEstado]);
+
+  const prestamosFiltrados = useMemo(() => {
+    let lista = prestamosBase;
     if (busquedaLower) {
       lista = lista.filter((p) => {
         const cl = clientePorId[p.clienteId];
@@ -291,7 +313,7 @@ export default function PrestamoTrabajadorPage() {
       });
     }
     return lista;
-  }, [prestamos, filtroEstado, busquedaLower, clientePorId]);
+  }, [prestamosBase, busquedaLower, clientePorId]);
 
   const prestamosHistorialOrdenados = useMemo(
     () => ordenarPrestamosParaPrincipal([...prestamosFiltrados]),
@@ -685,7 +707,10 @@ export default function PrestamoTrabajadorPage() {
         </div>
         {loading ? (
           <p>Cargando...</p>
-        ) : prestamos.length === 0 ? (
+        ) : prestamos.length === 0 &&
+          prestamosPagados.length === 0 &&
+          !loadingPagados &&
+          filtroEstado !== "pagado" ? (
           <p style={{ color: "var(--text-muted)" }}>No hay préstamos.</p>
         ) : (
           <>
@@ -774,13 +799,30 @@ export default function PrestamoTrabajadorPage() {
                 </tbody>
               </table>
             </div>
-          {prestamosFiltrados.length === 0 && (
+          {loadingPagados && prestamosHistorialOrdenados.length === 0 ? (
+            <p style={{ color: "var(--text-muted)", fontSize: "0.875rem", marginTop: "0.5rem" }}>
+              Cargando préstamos pagados...
+            </p>
+          ) : null}
+          {prestamosFiltrados.length === 0 && !loadingPagados ? (
             <p style={{ color: "var(--text-muted)", fontSize: "0.875rem", marginTop: "0.5rem" }}>
               {busquedaTrim
                 ? `No hay préstamos que coincidan con «${busquedaTrim}».`
                 : `No hay préstamos con estado «${filtroEstado === "todos" ? "todos" : filtroEstado === "activo" ? "activos" : filtroEstado === "mora" ? "en mora" : "pagados"}».`}
             </p>
-          )}
+          ) : null}
+          {(filtroEstado === "pagado" || filtroEstado === "todos") && hayMasPagados ? (
+            <div style={{ marginTop: "0.75rem", textAlign: "center" }}>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() => void cargarMasPagados()}
+                disabled={loadingPagados}
+              >
+                {loadingPagados ? "Cargando..." : "Ver más"}
+              </button>
+            </div>
+          ) : null}
           </>
         )}
         </div>
