@@ -9,10 +9,26 @@
       ]
     },
     {
+      "collectionGroup": "gastosAdministrador",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "adminId", "order": "ASCENDING" },
+        { "fieldPath": "fecha", "order": "ASCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "gastosEmpleado",
       "queryScope": "COLLECTION",
       "fields": [
         { "fieldPath": "empleadoId", "order": "ASCENDING" },
+        { "fieldPath": "fecha", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "gastosEmpleado",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "adminId", "order": "ASCENDING" },
         { "fieldPath": "fecha", "order": "ASCENDING" }
       ]
     },
@@ -50,11 +66,52 @@
       ]
     },
     {
+      "collectionGroup": "solicitudesPrestamo",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "empleadoUid", "order": "ASCENDING" },
+        { "fieldPath": "estado", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "solicitudesPrestamo",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "adminId", "order": "ASCENDING" },
+        { "fieldPath": "estado", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "solicitudesPrestamo",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "empleadoUid", "order": "ASCENDING" },
+        { "fieldPath": "estado", "order": "ASCENDING" },
+        { "fieldPath": "resueltaEn", "order": "DESCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "periodosAdmin",
       "queryScope": "COLLECTION",
       "fields": [
         { "fieldPath": "adminId", "order": "ASCENDING" },
         { "fieldPath": "estado", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "pagos",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "empleadoId", "order": "ASCENDING" },
+        { "fieldPath": "fecha", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "reportesDia",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "adminId", "order": "ASCENDING" },
+        { "fieldPath": "fecha", "order": "ASCENDING" }
       ]
     }
   ],

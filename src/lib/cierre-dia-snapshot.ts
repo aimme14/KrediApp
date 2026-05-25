@@ -76,6 +76,17 @@ export type NoPagoDiaSnapshotItem = {
   cuotasPendientes: number;
 };
 
+export type PerdidaDiaSnapshotItem = {
+  pagoId: string;
+  prestamoId: string;
+  clienteId: string;
+  clienteNombre: string;
+  monto: number;
+  motivoPerdida: string | null;
+  fecha: string | null;
+  saldoPendienteTrasPerdida: number;
+};
+
 export type GastoDiaSnapshotItem = {
   id: string;
   monto: number;
@@ -100,7 +111,10 @@ export type CierreDiaSnapshot = {
   rutaId: string;
   cobros: CobroDiaSnapshotItem[];
   noPagos: NoPagoDiaSnapshotItem[];
+  perdidasDelDia: PerdidaDiaSnapshotItem[];
+  totalPerdidasDia: number;
   totalCobrosLista: number;
+  totalCobrosEfectivoDia: number;
   /** Total cobrado en ruta + base − gastos − desembolsos desde tu caja. */
   tuCajaDelDia: number;
   totalCobrosAcreditanTuCaja: number;
@@ -244,6 +258,7 @@ export async function buildCierreDiaSnapshot(
 
   const pagosRaw: PagoRow[] = [];
   const noPagosRaw: NoPagoRow[] = [];
+  const perdidasRaw: PerdidaDiaSnapshotItem[] = [];
 
   const CHUNK = 12;
   const prestamoDocs = prestamosSnap.docs;
@@ -280,6 +295,30 @@ export async function buildCierreDiaSnapshot(
               fechaMs,
               motivoNoPago: motivo,
               nota,
+            });
+            continue;
+          }
+
+          if (tipo === "perdida") {
+            const empId = typeof pd.empleadoId === "string" ? pd.empleadoId.trim() : "";
+            if (empId !== empleadoUid) continue;
+            const monto = typeof pd.monto === "number" && pd.monto > 0 ? pd.monto : 0;
+            if (monto <= 0) continue;
+            const fechaIso = fechaMs > 0 ? new Date(fechaMs).toISOString() : null;
+            const meta = prestamoMeta.get(pdoc.id);
+            const cid = meta?.clienteId ?? "";
+            const nombre = clienteNombre.get(cid) ?? "—";
+            const motivoPerdida =
+              typeof pd.motivoPerdida === "string" ? pd.motivoPerdida.trim() : null;
+            perdidasRaw.push({
+              pagoId: p.id,
+              prestamoId: pdoc.id,
+              clienteId: cid,
+              clienteNombre: nombre,
+              monto: round2(monto),
+              motivoPerdida,
+              fecha: fechaIso,
+              saldoPendienteTrasPerdida: round2(meta?.saldoPendienteActual ?? 0),
             });
             continue;
           }
@@ -390,6 +429,11 @@ export async function buildCierreDiaSnapshot(
   noPagos.sort((a, b) => (b.fecha ?? "").localeCompare(a.fecha ?? ""));
 
   const totalCobrosLista = round2(cobros.reduce((s, c) => s + c.monto, 0));
+  const totalCobrosEfectivoDia = round2(
+    cobros
+      .filter((c) => c.metodoPago === "efectivo")
+      .reduce((s, c) => s + c.monto, 0)
+  );
 
   const gastosSnap = await db
     .collection(EMPRESAS_COLLECTION)
@@ -486,12 +530,18 @@ export async function buildCierreDiaSnapshot(
     totalPrestamosDesembolsoDia
   );
 
+  perdidasRaw.sort((a, b) => (b.fecha ?? "").localeCompare(a.fecha ?? ""));
+  const totalPerdidasDia = round2(perdidasRaw.reduce((s, p) => s + p.monto, 0));
+
   return {
     fechaDia,
     rutaId,
     cobros,
     noPagos,
+    perdidasDelDia: perdidasRaw,
+    totalPerdidasDia,
     totalCobrosLista,
+    totalCobrosEfectivoDia,
     tuCajaDelDia,
     totalCobrosAcreditanTuCaja,
     totalGastosDia,

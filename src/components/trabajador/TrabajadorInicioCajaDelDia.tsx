@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useTrabajadorCajaDia } from "@/context/TrabajadorCajaDiaContext";
+import { formatFechaDia } from "@/lib/colombia-day-bounds";
 
 function formatMonto(value: number): string {
   const hasDecimals = Math.round(value * 100) % 100 !== 0;
@@ -12,9 +13,9 @@ function formatMonto(value: number): string {
 }
 
 export function TrabajadorInicioCajaDelDia() {
-  const { fechaDia, data, loading, error, cajaEmpleadoRT } = useTrabajadorCajaDia();
-  const fechaEtiqueta = data?.fechaDia ?? fechaDia;
-  const cajaActual = cajaEmpleadoRT ?? data?.cajaEmpleado ?? null;
+  const { fechaDia, data, loading, error, tuCajaEfectivo } = useTrabajadorCajaDia();
+  const fechaEtiqueta = formatFechaDia(data?.fechaDia ?? fechaDia);
+  const cajaActual = tuCajaEfectivo;
 
   return (
     <Link

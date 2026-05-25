@@ -52,6 +52,7 @@ export type ReporteCierrePdfMeta = {
   rutaInversiones: number;
   rutaGanancias: number;
   aprobadoEn: Date;
+  totalCobrosEfectivoDia: number;
 };
 
 const PAGE_W = 595;
@@ -109,6 +110,12 @@ export async function buildReporteCierrePdf(
   };
 
   const LH = { body: 11.5, tight: 10 };
+
+  const cajaEfectivo =
+    snapshot.totalCobrosEfectivoDia +
+    snapshot.totalBaseAsignadaDia -
+    snapshot.totalGastosDia -
+    (snapshot.totalPrestamosDesembolsoDia ?? 0);
 
   let page = pdf.addPage([PAGE_W, PAGE_H]);
   let y = PAGE_H - M;
@@ -347,7 +354,7 @@ export async function buildReporteCierrePdf(
       borderWidth: 0.5,
     });
     let ly = yBottom + boxH - pad - 4;
-    page.drawText(sanitizarTextoPdf("Monto entregado a caja ruta"), {
+    page.drawText(sanitizarTextoPdf("A entregar en efectivo"), {
       x: leftX + pad,
       y: ly,
       size: FS.meta,
@@ -355,7 +362,7 @@ export async function buildReporteCierrePdf(
       color: WHITE,
     });
     ly -= lineH + 2;
-    page.drawText(fmtMoney(snapshot.tuCajaDelDia), {
+    page.drawText(fmtMoney(cajaEfectivo), {
       x: leftX + pad,
       y: ly,
       size: FS.section + 1,
@@ -403,20 +410,20 @@ export async function buildReporteCierrePdf(
     const labelBand = 10;
     const blockH = padTop + labelBand + gapLabelValor + valBand + padBottom;
     const labels = [
-      "Total cobros",
-      "Total gastos",
-      "Caja del día",
+      "Cobros efectivo",
+      "Cobros transferencia",
+      "A entregar (efectivo)",
       "Clientes pagaron",
       "Clientes no pagaron",
-      "Préstamos caja",
+      "Gastos del día",
     ];
     const vals = [
-      fmtMoney(snapshot.totalCobrosLista),
-      fmtMoney(snapshot.totalGastosDia),
-      fmtMoney(snapshot.tuCajaDelDia),
+      fmtMoney(snapshot.totalCobrosEfectivoDia),
+      fmtMoney(snapshot.totalCobrosLista - snapshot.totalCobrosEfectivoDia),
+      fmtMoney(cajaEfectivo),
       String(snapshot.cobros.length),
       String(snapshot.noPagos.length),
-      fmtMoney(snapshot.totalPrestamosDesembolsoDia ?? 0),
+      fmtMoney(snapshot.totalGastosDia),
     ];
 
     ensureBottom(blockH + 16);
@@ -963,7 +970,85 @@ export async function buildReporteCierrePdf(
       return yy;
     };
 
+    const drawPerdidasBlock = (startY: number): number => {
+      y = startY;
+      let yy = sectionBarDark("Pérdidas del día", xBox, blockW, startY);
+      const innerPad = 2;
+      const px = xBox + innerPad + 4;
+      const usable = blockW - 12 - 2 * innerPad;
+      const gapsP = 2 * COL_GAP;
+      const wMonto = 58;
+      const wMot = 80;
+      const wCli = Math.max(24, usable - wMonto - wMot - gapsP);
+
+      const xCli = px;
+      const xMot = xCli + wCli + COL_GAP;
+      const xMon = xMot + wMot + COL_GAP;
+
+      tableRow(
+        [
+          { text: "Cliente", x: xCli, w: wCli, bold: true, color: COL.tableHead },
+          { text: "Motivo", x: xMot, w: wMot, bold: true, color: COL.tableHead },
+          { text: "Monto", x: xMon, w: wMonto, bold: true, color: COL.tableHead, align: "right" },
+        ],
+        yy
+      );
+      yy -= TB.lh + 4;
+
+      const perdidas = snapshot.perdidasDelDia ?? [];
+      let sumP = 0;
+      if (perdidas.length === 0) {
+        page.drawText(sanitizarTextoPdf("Sin pérdidas registradas."), {
+          x: px,
+          y: yy,
+          size: FS.meta,
+          font,
+          color: COL.muted,
+        });
+        yy -= TB.lh;
+      } else {
+        for (const p of perdidas) {
+          sumP += p.monto;
+          tableRow(
+            [
+              { text: trunc(p.clienteNombre, 36), x: xCli, w: wCli },
+              { text: trunc(p.motivoPerdida ?? "—", 24), x: xMot, w: wMot },
+              {
+                text: fmtMoney(p.monto),
+                x: xMon,
+                w: wMonto,
+                align: "right",
+                color: rgb(0.8, 0.15, 0.15),
+              },
+            ],
+            yy
+          );
+          yy -= TB.lh;
+        }
+      }
+      yy = hrDual(xBox, blockW, yy);
+      tableRow(
+        [
+          { text: "Total pérdidas", x: xCli, w: wCli + wMot + COL_GAP, bold: true },
+          {
+            text: perdidas.length ? fmtMoney(sumP) : fmtMoney(0),
+            x: xMon,
+            w: wMonto,
+            bold: true,
+            align: "right",
+            color: rgb(0.8, 0.15, 0.15),
+          },
+        ],
+        yy
+      );
+      yy -= TB.lh + 6;
+      y = yy;
+      return yy;
+    };
+
     drawGastosBlock(yStart);
+    spacer(8);
+    drawPerdidasBlock(y);
     spacer(8);
     drawPrestamosBlock(y);
   }

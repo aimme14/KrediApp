@@ -22,6 +22,8 @@ export type RutaItem = {
   inversiones?: number;
   /** Intereses / ganancias acumuladas. */
   ganancias?: number;
+  /** Pérdidas acumuladas del período. */
+  perdidas?: number;
   /** Patrimonio total de la ruta (caja ruta + bases empleados + inversiones − pérdidas). */
   capitalTotal?: number;
 };
@@ -123,6 +125,7 @@ export type PagoItem = {
   fecha: string | null;
   tipo: "pago" | "no_pago" | "perdida";
   metodoPago: string | null;
+  motivoNoPago?: string | null;
   motivoPerdida?: string | null;
   registradoPorUid: string | null;
   registradoPorNombre: string | null;
@@ -332,6 +335,99 @@ export async function rechazarSolicitudEntregaReporte(
   if (!res.ok) throw new Error(data.error ?? "Error al rechazar");
 }
 
+export type SolicitudPrestamoApi = {
+  id: string;
+  empleadoUid: string;
+  empleadoNombre: string;
+  clienteId: string;
+  clienteNombre: string;
+  monto: number;
+  interes: number;
+  numeroCuotas: number;
+  modalidad: string;
+  fechaInicio: string;
+  adminId: string;
+  rutaId: string;
+  estado: string;
+  motivoRechazo: string | null;
+  prestamoId: string | null;
+  creadaEn: string | null;
+  resueltaEn: string | null;
+};
+
+/** Trabajador: solicita un préstamo (requiere aprobación del administrador). */
+export async function solicitarPrestamoEmpleado(
+  token: string,
+  params: {
+    clienteId: string;
+    monto: number;
+    interes?: number;
+    modalidad?: "diario" | "semanal" | "mensual";
+    numeroCuotas: number;
+    fechaInicio?: string;
+  }
+): Promise<{ solicitudId: string; mensaje: string }> {
+  const res = await fetchWithAuth("/api/empresa/solicitudes-prestamo", token, {
+    method: "POST",
+    body: JSON.stringify(params),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error ?? "Error al solicitar préstamo");
+  return {
+    solicitudId: data.solicitudId ?? "",
+    mensaje: typeof data.mensaje === "string" ? data.mensaje : "",
+  };
+}
+
+export async function getMiSolicitudPrestamoPendiente(
+  token: string
+): Promise<SolicitudPrestamoApi | null> {
+  const res = await fetchWithAuth("/api/empresa/solicitudes-prestamo", token);
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error ?? "Error al cargar solicitud");
+  return data.pendiente ?? null;
+}
+
+export async function getSolicitudesPrestamoPendientes(
+  token: string
+): Promise<SolicitudPrestamoApi[]> {
+  const res = await fetchWithAuth("/api/empresa/solicitudes-prestamo", token);
+  const data = await parseJsonResponse(res);
+  if (!res.ok) throw new Error(String(data.error ?? "Error al cargar solicitudes"));
+  return Array.isArray(data.solicitudes) ? data.solicitudes : [];
+}
+
+export async function aprobarSolicitudPrestamo(
+  token: string,
+  solicitudId: string
+): Promise<{ prestamoId: string }> {
+  const res = await fetchWithAuth(
+    `/api/empresa/solicitudes-prestamo/${encodeURIComponent(solicitudId)}/aprobar`,
+    token,
+    { method: "POST", body: "{}" }
+  );
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error ?? "Error al aprobar");
+  return { prestamoId: data.prestamoId ?? "" };
+}
+
+export async function rechazarSolicitudPrestamo(
+  token: string,
+  solicitudId: string,
+  options?: { motivo?: string }
+): Promise<void> {
+  const res = await fetchWithAuth(
+    `/api/empresa/solicitudes-prestamo/${encodeURIComponent(solicitudId)}/rechazar`,
+    token,
+    {
+      method: "POST",
+      body: JSON.stringify({ motivo: options?.motivo ?? "" }),
+    }
+  );
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error ?? "Error al rechazar");
+}
+
 export type CobroDiaItem = {
   pagoId: string;
   prestamoId: string;
@@ -383,12 +479,26 @@ export type PrestamoDesembolsoDiaItem = {
   totalAPagar: number;
 };
 
+export type PerdidaDiaSnapshotItem = {
+  pagoId: string;
+  prestamoId: string;
+  clienteId: string;
+  clienteNombre: string;
+  monto: number;
+  motivoPerdida: string | null;
+  fecha: string | null;
+  saldoPendienteTrasPerdida: number;
+};
+
 export type CobrosDelDiaEmpleadoResponse = {
   fechaDia: string;
   rutaId: string;
   cobros: CobroDiaItem[];
   noPagos: NoPagoDiaItem[];
+  perdidasDelDia: PerdidaDiaSnapshotItem[];
+  totalPerdidasDia: number;
   totalCobrosLista: number;
+  totalCobrosEfectivoDia: number;
   /** Saldo en `empresas/{empresaId}/usuarios/{uid}.cajaEmpleado` (si la API lo incluye). */
   cajaEmpleado?: number;
   /** Total cobrado en ruta + base − gastos − préstamos desde tu caja (tarjeta «Tu caja del día»). */
@@ -446,6 +556,25 @@ export async function getPreviewEntregaReporteAdmin(
       totalAPagar: typeof row.totalAPagar === "number" ? row.totalAPagar : 0,
     })
   );
+  const perdidasPrevRaw = Array.isArray(data.snapshot?.perdidasDelDia)
+    ? data.snapshot.perdidasDelDia
+    : [];
+  const perdidasDelDia: PerdidaDiaSnapshotItem[] = perdidasPrevRaw.map(
+    (row: Record<string, unknown>) => ({
+      pagoId: String(row.pagoId ?? ""),
+      prestamoId: String(row.prestamoId ?? ""),
+      clienteId: String(row.clienteId ?? ""),
+      clienteNombre: String(row.clienteNombre ?? ""),
+      monto: typeof row.monto === "number" ? row.monto : 0,
+      motivoPerdida:
+        typeof row.motivoPerdida === "string" && row.motivoPerdida.trim()
+          ? row.motivoPerdida.trim()
+          : null,
+      fecha: typeof row.fecha === "string" ? row.fecha : null,
+      saldoPendienteTrasPerdida:
+        typeof row.saldoPendienteTrasPerdida === "number" ? row.saldoPendienteTrasPerdida : 0,
+    })
+  );
 
   return {
     fechaDiaPreview: data.fechaDiaPreview ?? "",
@@ -455,7 +584,14 @@ export async function getPreviewEntregaReporteAdmin(
       rutaId: data.snapshot?.rutaId ?? "",
       cobros: Array.isArray(data.snapshot?.cobros) ? data.snapshot.cobros : [],
       noPagos: Array.isArray(data.snapshot?.noPagos) ? data.snapshot.noPagos : [],
+      perdidasDelDia,
+      totalPerdidasDia:
+        typeof data.snapshot?.totalPerdidasDia === "number" ? data.snapshot.totalPerdidasDia : 0,
       totalCobrosLista: typeof data.snapshot?.totalCobrosLista === "number" ? data.snapshot.totalCobrosLista : 0,
+      totalCobrosEfectivoDia:
+        typeof data.snapshot?.totalCobrosEfectivoDia === "number"
+          ? data.snapshot.totalCobrosEfectivoDia
+          : 0,
       tuCajaDelDia: typeof data.snapshot?.tuCajaDelDia === "number" ? data.snapshot.tuCajaDelDia : 0,
       totalCobrosAcreditanTuCaja:
         typeof data.snapshot?.totalCobrosAcreditanTuCaja === "number"
@@ -580,12 +716,34 @@ export async function getCobrosDelDiaEmpleado(
     })
   );
 
+  const perdidasRaw = Array.isArray(data.perdidasDelDia) ? data.perdidasDelDia : [];
+  const perdidasDelDia: PerdidaDiaSnapshotItem[] = perdidasRaw.map(
+    (row: Record<string, unknown>) => ({
+      pagoId: String(row.pagoId ?? ""),
+      prestamoId: String(row.prestamoId ?? ""),
+      clienteId: String(row.clienteId ?? ""),
+      clienteNombre: String(row.clienteNombre ?? ""),
+      monto: typeof row.monto === "number" ? row.monto : 0,
+      motivoPerdida:
+        typeof row.motivoPerdida === "string" && row.motivoPerdida.trim()
+          ? row.motivoPerdida.trim()
+          : null,
+      fecha: typeof row.fecha === "string" ? row.fecha : null,
+      saldoPendienteTrasPerdida:
+        typeof row.saldoPendienteTrasPerdida === "number" ? row.saldoPendienteTrasPerdida : 0,
+    })
+  );
+
   return {
     fechaDia: data.fechaDia ?? "",
     rutaId: data.rutaId ?? "",
     cobros,
     noPagos,
+    perdidasDelDia,
+    totalPerdidasDia: typeof data.totalPerdidasDia === "number" ? data.totalPerdidasDia : 0,
     totalCobrosLista: typeof data.totalCobrosLista === "number" ? data.totalCobrosLista : 0,
+    totalCobrosEfectivoDia:
+      typeof data.totalCobrosEfectivoDia === "number" ? data.totalCobrosEfectivoDia : 0,
     tuCajaDelDia: typeof data.tuCajaDelDia === "number" ? data.tuCajaDelDia : 0,
     totalCobrosAcreditanTuCaja:
       typeof data.totalCobrosAcreditanTuCaja === "number"
@@ -974,17 +1132,21 @@ export type PeriodoAdminSnapshotRuta = {
   rutaId: string;
   nombre: string;
   cajaRuta: number;
+  cajasEmpleados: number;
   inversiones: number;
   ganancias: number;
   perdidas: number;
-  gastos: number;
+  gastosRuta: number;
+  gastosAdmin: number;
+  gastosEmpleados: number;
+  gastosTotales: number;
   capitalRuta: number;
-  utilidad: number;
 };
 
 export type PeriodoAdminSnapshot = {
   admin: PeriodoAdminSnapshotAdmin;
   rutas: PeriodoAdminSnapshotRuta[];
+  fechaSnapshot?: string;
 };
 
 export type PeriodoAdminListaItem = {

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo, Fragment } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { useAdminDashboard } from "@/context/AdminDashboardContext";
 import { useTrabajadorLista } from "@/context/TrabajadorListaContext";
@@ -80,6 +81,7 @@ function hoyDDMMAAAA(): string {
 
 export default function PrestamoPage() {
   const { user, profile } = useAuth();
+  const searchParams = useSearchParams();
   const { rutas } = useAdminDashboard();
   const {
     clientes,
@@ -99,6 +101,7 @@ export default function PrestamoPage() {
   const [creating, setCreating] = useState(false);
   const [confirmarMontoAlto, setConfirmarMontoAlto] = useState(false);
   const [filtroEstado, setFiltroEstado] = useState<"todos" | "activo" | "mora" | "pagado">("todos");
+  const [filtroNombre, setFiltroNombre] = useState("");
   const [soloActivosMobile, setSoloActivosMobile] = useState(false);
   const [isMobileView, setIsMobileView] = useState(false);
   const [historialEconomicoColapsado, setHistorialEconomicoColapsado] = useState(true);
@@ -110,6 +113,23 @@ export default function PrestamoPage() {
   useEffect(() => {
     setClienteId("");
   }, [rutaIdForm]);
+
+  useEffect(() => {
+    const id = searchParams.get("clienteId")?.trim();
+    if (!id || loading) return;
+    const cl = clientes.find((c) => c.id === id);
+    if (!cl) return;
+    setRutaIdForm(cl.rutaId ?? "");
+  }, [searchParams, clientes, loading]);
+
+  useEffect(() => {
+    const id = searchParams.get("clienteId")?.trim();
+    if (!id || loading) return;
+    const cl = clientes.find((c) => c.id === id);
+    if (!cl || (cl.rutaId ?? "") !== rutaIdForm) return;
+    setClienteId(id);
+    setShowCreateForm(true);
+  }, [searchParams, clientes, loading, rutaIdForm]);
 
   useEffect(() => {
     const mq = window.matchMedia("(max-width: 768px)");
@@ -217,6 +237,8 @@ export default function PrestamoPage() {
     };
   }, [prestamos]);
 
+  const filtroNombreLower = filtroNombre.trim().toLowerCase();
+
   const prestamosFiltrados = useMemo(() => {
     let list = prestamos;
     if (filtroEstado !== "todos") {
@@ -225,15 +247,29 @@ export default function PrestamoPage() {
     if (isMobileView && soloActivosMobile) {
       list = list.filter((p) => p.estado === "activo");
     }
+    if (filtroNombreLower) {
+      list = list.filter((p) => {
+        const cl = clientePorId[p.clienteId];
+        if (!cl) return false;
+        const nombre = (cl.nombre ?? "").toLowerCase();
+        const codigo = cl.codigo ? formatClienteCodigoRutaYNumero(cl.codigo).toLowerCase() : "";
+        const cedula = (cl.cedula ?? "").toLowerCase();
+        return (
+          nombre.includes(filtroNombreLower) ||
+          codigo.includes(filtroNombreLower) ||
+          cedula.includes(filtroNombreLower)
+        );
+      });
+    }
     return list;
-  }, [prestamos, filtroEstado, isMobileView, soloActivosMobile]);
+  }, [prestamos, filtroEstado, isMobileView, soloActivosMobile, filtroNombreLower, clientePorId]);
 
   const PAGE_SIZE = 15;
   const [pagina, setPagina] = useState(1);
 
   useEffect(() => {
     setPagina(1);
-  }, [filtroEstado, soloActivosMobile]);
+  }, [filtroEstado, soloActivosMobile, filtroNombre]);
 
   /** Grupos por cliente: principal = reciente y activo (activo > mora > pagado, luego por fecha). */
   const gruposPorCliente = useMemo((): GrupoClientePrestamos[] => {
@@ -653,19 +689,45 @@ export default function PrestamoPage() {
           <p className="prestamo-admin-empty">No hay préstamos en el historial.</p>
         ) : (
           <>
-            <div className="prestamo-admin-tabs prestamo-historial-filtros" role="tablist" aria-label="Filtrar por estado">
-              {(["todos", "activo", "mora", "pagado"] as const).map((est) => (
-                <button
-                  key={est}
-                  type="button"
-                  role="tab"
-                  aria-selected={filtroEstado === est}
-                  className={`prestamo-admin-tab${filtroEstado === est ? " prestamo-admin-tab--active" : ""}`}
-                  onClick={() => setFiltroEstado(est)}
-                >
-                  {est === "todos" ? "Todos" : est === "activo" ? "Activos" : est === "mora" ? "En mora" : "Pagados"}
-                </button>
-              ))}
+            <div className="prestamo-admin-filtros-wrap">
+              <div className="prestamo-admin-search-toolbar">
+                <div className="prestamo-admin-search-field">
+                  <span className="prestamo-admin-search-icon" aria-hidden>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="11" cy="11" r="8" />
+                      <path d="m21 21-4.3-4.3" />
+                    </svg>
+                  </span>
+                  <input
+                    id="prestamos-buscador"
+                    className="prestamo-admin-search-input"
+                    type="search"
+                    value={filtroNombre}
+                    onChange={(e) => setFiltroNombre(e.target.value)}
+                    placeholder="Buscar por nombre, código o cédula..."
+                    aria-label="Buscar préstamos por nombre de cliente"
+                  />
+                </div>
+                {filtroNombreLower ? (
+                  <p className="prestamo-admin-search-hint">
+                    {gruposPorCliente.length} cliente{gruposPorCliente.length !== 1 ? "s" : ""} encontrado{gruposPorCliente.length !== 1 ? "s" : ""}
+                  </p>
+                ) : null}
+              </div>
+              <div className="prestamo-admin-tabs prestamo-historial-filtros" role="tablist" aria-label="Filtrar por estado">
+                {(["todos", "activo", "mora", "pagado"] as const).map((est) => (
+                  <button
+                    key={est}
+                    type="button"
+                    role="tab"
+                    aria-selected={filtroEstado === est}
+                    className={`prestamo-admin-tab${filtroEstado === est ? " prestamo-admin-tab--active" : ""}`}
+                    onClick={() => setFiltroEstado(est)}
+                  >
+                    {est === "todos" ? "Todos" : est === "activo" ? "Activos" : est === "mora" ? "En mora" : "Pagados"}
+                  </button>
+                ))}
+              </div>
             </div>
             <div className="table-wrap table-historial-wrap prestamo-admin-hist-table-wrap">
             <table className="table-historial">
@@ -789,9 +851,11 @@ export default function PrestamoPage() {
           )}
           {prestamosFiltrados.length === 0 && (
             <p className="prestamo-admin-filtro-vacio">
-              {isMobileView && soloActivosMobile
-                ? "No hay préstamos activos en el historial."
-                : `No hay préstamos en el historial con estado «${filtroEstado === "todos" ? "todos" : filtroEstado === "activo" ? "activos" : filtroEstado === "mora" ? "en mora" : "pagados"}».`}
+              {filtroNombreLower
+                ? `No hay préstamos que coincidan con «${filtroNombre.trim()}».`
+                : isMobileView && soloActivosMobile
+                  ? "No hay préstamos activos en el historial."
+                  : `No hay préstamos en el historial con estado «${filtroEstado === "todos" ? "todos" : filtroEstado === "activo" ? "activos" : filtroEstado === "mora" ? "en mora" : "pagados"}».`}
             </p>
           )}
           </>

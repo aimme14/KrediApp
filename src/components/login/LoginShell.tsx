@@ -40,9 +40,7 @@ export default function LoginShell({ children }: LoginShellProps) {
 
           <div className={styles.copy}>
             <p className={styles.tagline}>
-              Gestión de préstamos
-              <br />
-              <span className={styles.taglineAccent}>simple, rápido y seguro</span>
+
             </p>
           </div>
         </aside>

@@ -351,6 +351,7 @@ export async function aprobarSolicitudEntregaReporte(
       rutaInversiones,
       rutaGanancias,
       aprobadoEn: new Date(),
+      totalCobrosEfectivoDia: snapshot.totalCobrosEfectivoDia,
     });
     const pdfStoragePath = await uploadReporteCierrePdfBuffer(empresaId, reporteDiaId, pdfBytes);
     await reporteRef.update({

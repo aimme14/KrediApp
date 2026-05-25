@@ -112,15 +112,6 @@ export async function entregarReporteTrabajadorARuta(
     let cajasEmpleados = typeof rd.cajasEmpleados === "number" ? rd.cajasEmpleados : 0;
     const inversiones = typeof rd.inversiones === "number" ? rd.inversiones : 0;
     const perdidas = typeof rd.perdidas === "number" ? rd.perdidas : 0;
-    const capitalTotal =
-      typeof rd.capitalTotal === "number"
-        ? rd.capitalTotal
-        : computeCapitalTotalRutaDesdeSaldos({
-            cajaRuta,
-            cajasEmpleados,
-            inversiones,
-            perdidas,
-          });
 
     const now = new Date();
 
@@ -129,24 +120,27 @@ export async function entregarReporteTrabajadorARuta(
     const cEmp = typeof udx?.cajaEmpleado === "number" ? udx.cajaEmpleado : 0;
     const monto = round2(cEmp);
     if (monto <= 0) throw new Error("No hay efectivo en tu base para entregar");
-    if (cajasEmpleados < monto) throw new Error("Bases empleados de la ruta no coinciden");
 
     cajaRuta = round2(cajaRuta + monto);
-    cajasEmpleados = round2(cajasEmpleados - monto);
-    const suma = computeCapitalTotalRutaDesdeSaldos({
+    cajasEmpleados = round2(Math.max(0, cajasEmpleados - monto));
+    const nuevoCapital = computeCapitalTotalRutaDesdeSaldos({
       cajaRuta,
       cajasEmpleados,
       inversiones,
       perdidas,
     });
-    if (Math.abs(suma - capitalTotal) > 0.02) throw new Error("Capital descuadrado");
 
     montoEntregado = monto;
     tx.update(usuarioRef, {
       cajaEmpleado: 0,
       ultimaActualizacionCapital: now,
     });
-    tx.update(rutaRef, { cajaRuta, cajasEmpleados, ultimaActualizacion: now });
+    tx.update(rutaRef, {
+      cajaRuta,
+      cajasEmpleados,
+      capitalTotal: nuevoCapital,
+      ultimaActualizacion: now,
+    });
   });
 
   const after = await rutaRef.get();

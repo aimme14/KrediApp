@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useAdminDashboard } from "@/context/AdminDashboardContext";
 import { useTrabajadorLista } from "@/context/TrabajadorListaContext";
@@ -22,16 +22,37 @@ export default function ClientePage() {
   const [creating, setCreating] = useState(false);
   const PAGE_SIZE = 15;
   const [pagina, setPagina] = useState(1);
+  const [filtroNombre, setFiltroNombre] = useState("");
+
+  const filtroNombreLower = filtroNombre.trim().toLowerCase();
+
+  const clientesFiltrados = useMemo(() => {
+    if (!filtroNombreLower) return clientes;
+    return clientes.filter((c) => {
+      const nombre = (c.nombre ?? "").toLowerCase();
+      const codigo = c.codigo ? formatClienteCodigoRutaYNumero(c.codigo).toLowerCase() : "";
+      const cedula = (c.cedula ?? "").toLowerCase();
+      return (
+        nombre.includes(filtroNombreLower) ||
+        codigo.includes(filtroNombreLower) ||
+        cedula.includes(filtroNombreLower)
+      );
+    });
+  }, [clientes, filtroNombreLower]);
 
   const clientesPaginados = useMemo(() => {
-    const sorted = [...clientes].sort(
+    const sorted = [...clientesFiltrados].sort(
       (a, b) => (b.fechaCreacion ? new Date(b.fechaCreacion).getTime() : 0) -
                 (a.fechaCreacion ? new Date(a.fechaCreacion).getTime() : 0)
     );
     return sorted.slice(0, pagina * PAGE_SIZE);
-  }, [clientes, pagina]);
+  }, [clientesFiltrados, pagina]);
 
-  const hayMas = clientesPaginados.length < clientes.length;
+  const hayMas = clientesPaginados.length < clientesFiltrados.length;
+
+  useEffect(() => {
+    setPagina(1);
+  }, [filtroNombre]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -170,6 +191,36 @@ export default function ClientePage() {
           <p style={{ color: "var(--text-muted)" }}>No hay clientes. Crea uno con el botón &quot;Nuevo cliente&quot;.</p>
         ) : (
           <>
+            <div className="prestamo-admin-search-toolbar" style={{ marginBottom: "0.85rem" }}>
+              <div className="prestamo-admin-search-field">
+                <span className="prestamo-admin-search-icon" aria-hidden>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="11" cy="11" r="8" />
+                    <path d="m21 21-4.3-4.3" />
+                  </svg>
+                </span>
+                <input
+                  id="clientes-buscador"
+                  className="prestamo-admin-search-input"
+                  type="search"
+                  value={filtroNombre}
+                  onChange={(e) => setFiltroNombre(e.target.value)}
+                  placeholder="Buscar por nombre, código o cédula..."
+                  aria-label="Buscar clientes por nombre, código o cédula"
+                />
+              </div>
+              {filtroNombreLower ? (
+                <p className="prestamo-admin-search-hint">
+                  {clientesFiltrados.length} cliente{clientesFiltrados.length !== 1 ? "s" : ""} encontrado{clientesFiltrados.length !== 1 ? "s" : ""}
+                </p>
+              ) : null}
+            </div>
+            {clientesFiltrados.length === 0 ? (
+              <p className="prestamo-admin-filtro-vacio">
+                No hay clientes que coincidan con «{filtroNombre.trim()}».
+              </p>
+            ) : (
+            <>
             <div className="table-wrap admin-clientes-table-wrap">
               <table className="admin-clientes-table">
               <thead>
@@ -211,6 +262,8 @@ export default function ClientePage() {
               </button>
             </div>
           )}
+            </>
+            )}
           </>
         )}
       </div>

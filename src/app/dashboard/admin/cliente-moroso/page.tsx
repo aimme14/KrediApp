@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useAuth } from "@/context/AuthContext";
 import {
   formatClienteCodigoRutaYNumero,
@@ -19,6 +19,7 @@ export default function ClienteMorosoPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [filtroNombre, setFiltroNombre] = useState("");
 
   const loadClientes = useCallback(async () => {
     if (!user) return;
@@ -50,8 +51,36 @@ export default function ClienteMorosoPage() {
     }
   };
 
-  const morosos = clientes.filter((c) => c.moroso);
-  const noMorosos = clientes.filter((c) => !c.moroso);
+  const filtroNombreLower = filtroNombre.trim().toLowerCase();
+
+  const coincideConFiltro = useCallback(
+    (c: ClienteItem) => {
+      if (!filtroNombreLower) return true;
+      const nombre = (c.nombre ?? "").toLowerCase();
+      const codigo = c.codigo ? formatClienteCodigoRutaYNumero(c.codigo).toLowerCase() : "";
+      const codigoCorto = codigoSinCL(c.codigo).toLowerCase();
+      const cedula = (c.cedula ?? "").toLowerCase();
+      return (
+        nombre.includes(filtroNombreLower) ||
+        codigo.includes(filtroNombreLower) ||
+        codigoCorto.includes(filtroNombreLower) ||
+        cedula.includes(filtroNombreLower)
+      );
+    },
+    [filtroNombreLower]
+  );
+
+  const morosos = useMemo(() => clientes.filter((c) => c.moroso), [clientes]);
+  const noMorosos = useMemo(() => clientes.filter((c) => !c.moroso), [clientes]);
+  const morososFiltrados = useMemo(
+    () => morosos.filter(coincideConFiltro),
+    [morosos, coincideConFiltro]
+  );
+  const noMorososFiltrados = useMemo(
+    () => noMorosos.filter(coincideConFiltro),
+    [noMorosos, coincideConFiltro]
+  );
+  const totalFiltrados = morososFiltrados.length + noMorososFiltrados.length;
 
   if (!profile || profile.role !== "admin") return null;
 
@@ -68,10 +97,40 @@ export default function ClienteMorosoPage() {
         <p>Cargando...</p>
       ) : (
         <>
+          {clientes.length > 0 && (
+            <div className="prestamo-admin-search-toolbar" style={{ marginBottom: "1.25rem" }}>
+              <div className="prestamo-admin-search-field">
+                <span className="prestamo-admin-search-icon" aria-hidden>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="11" cy="11" r="8" />
+                    <path d="m21 21-4.3-4.3" />
+                  </svg>
+                </span>
+                <input
+                  id="clientes-morosos-buscador"
+                  className="prestamo-admin-search-input"
+                  type="search"
+                  value={filtroNombre}
+                  onChange={(e) => setFiltroNombre(e.target.value)}
+                  placeholder="Buscar por nombre, código o cédula..."
+                  aria-label="Buscar clientes morosos por nombre, código o cédula"
+                />
+              </div>
+              {filtroNombreLower ? (
+                <p className="prestamo-admin-search-hint">
+                  {totalFiltrados} cliente{totalFiltrados !== 1 ? "s" : ""} encontrado{totalFiltrados !== 1 ? "s" : ""}
+                </p>
+              ) : null}
+            </div>
+          )}
           <div className="card" style={{ marginBottom: "1.25rem" }}>
             <h3 style={{ marginTop: 0 }}>Clientes marcados como morosos</h3>
             {morosos.length === 0 ? (
               <p style={{ color: "var(--text-muted)" }}>Ningún cliente marcado como moroso.</p>
+            ) : morososFiltrados.length === 0 ? (
+              <p className="prestamo-admin-filtro-vacio">
+                No hay clientes morosos que coincidan con «{filtroNombre.trim()}».
+              </p>
             ) : (
               <div className="table-wrap cliente-moroso-table-wrap">
                 <table className="cliente-moroso-clientes-table">
@@ -86,7 +145,7 @@ export default function ClienteMorosoPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {morosos.map((c) => (
+                    {morososFiltrados.map((c) => (
                       <tr key={c.id}>
                         <td title={c.codigo}>{codigoSinCL(c.codigo)}</td>
                         <td>{c.telefono || "—"}</td>
@@ -122,6 +181,10 @@ export default function ClienteMorosoPage() {
             <h3 style={{ marginTop: 0 }}>Resto de clientes (marcar como moroso)</h3>
             {noMorosos.length === 0 ? (
               <p style={{ color: "var(--text-muted)" }}>No hay más clientes o todos están marcados como morosos.</p>
+            ) : noMorososFiltrados.length === 0 ? (
+              <p className="prestamo-admin-filtro-vacio">
+                No hay clientes que coincidan con «{filtroNombre.trim()}».
+              </p>
             ) : (
               <div className="table-wrap cliente-moroso-table-wrap">
                 <table className="cliente-moroso-clientes-table">
@@ -136,7 +199,7 @@ export default function ClienteMorosoPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {noMorosos.map((c) => (
+                    {noMorososFiltrados.map((c) => (
                       <tr key={c.id}>
                         <td title={c.codigo}>{codigoSinCL(c.codigo)}</td>
                         <td>{c.telefono || "—"}</td>

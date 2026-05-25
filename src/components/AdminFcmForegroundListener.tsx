@@ -13,6 +13,7 @@ function kindFromFcmDataType(t: string | undefined): OperativoFcmKind | null {
   if (t === "gasto_empleado") return "gasto";
   if (t === "cuota_prestamo") return "cuota";
   if (t === "prestamo_empleado") return "cuota";
+  if (t === "solicitud_prestamo") return "cuota";
   if (t === "cliente_empleado") return "gasto";
   return null;
 }
@@ -20,7 +21,7 @@ function kindFromFcmDataType(t: string | undefined): OperativoFcmKind | null {
 // Extrae el ID de negocio del payload FCM (no el messageId de Firebase)
 function businessIdFromData(data: Record<string, string> | undefined): string | null {
   if (!data) return null;
-  return data.gastoId ?? data.pagoId ?? data.clienteId ?? data.prestamoId ?? null;
+  return data.gastoId ?? data.pagoId ?? data.clienteId ?? data.prestamoId ?? data.solicitudId ?? null;
 }
 
 export function AdminFcmForegroundListener() {
@@ -71,6 +72,7 @@ export function AdminFcmForegroundListener() {
         (typeof d.pagoId === "string" && d.pagoId) ||
         (typeof d.clienteId === "string" && d.clienteId) ||
         (typeof d.prestamoId === "string" && d.prestamoId) ||
+        (typeof d.solicitudId === "string" && d.solicitudId) ||
         null;
 
       // Clave compartida con onMessage
@@ -104,6 +106,58 @@ export function AdminFcmForegroundListener() {
       navigator.serviceWorker?.removeEventListener("message", onSwMessage);
       window.removeEventListener("message", onSwMessage);
     };
+  }, [profile?.role, bumpOperativoFromFcm]);
+
+  // ── Notificaciones pendientes en IndexedDB (background sin cliente visible) ─
+  useEffect(() => {
+    if (profile?.role !== "admin") return;
+
+    const leerPendientes = () => {
+      try {
+        const req = indexedDB.open("krediapp_fcm", 1);
+        req.onupgradeneeded = (e) => {
+          (e.target as IDBOpenDBRequest).result.createObjectStore("pendientes", {
+            keyPath: "id",
+          });
+        };
+        req.onsuccess = (e) => {
+          const db = (e.target as IDBOpenDBRequest).result;
+          if (!db.objectStoreNames.contains("pendientes")) return;
+          const tx = db.transaction("pendientes", "readwrite");
+          const store = tx.objectStore("pendientes");
+          const getAll = store.getAll();
+          getAll.onsuccess = () => {
+            const pendientes = getAll.result as Array<{
+              id: string;
+              title: string;
+              body: string;
+              kind: string;
+              at: number;
+            }>;
+            if (pendientes.length === 0) return;
+            const processed = processedIdsRef.current;
+            for (const n of pendientes) {
+              const key = `biz:${n.id}`;
+              if (processed.has(key)) continue;
+              processed.add(key);
+              const kind: OperativoFcmKind = n.kind === "cuota" ? "cuota" : "gasto";
+              bumpOperativoFromFcm(kind, n.title, n.body);
+            }
+            store.clear();
+          };
+        };
+      } catch (e) {
+        console.warn("[FCM] No se pudo leer pendientes:", e);
+      }
+    };
+
+    leerPendientes();
+
+    const onVisible = () => {
+      if (document.visibilityState === "visible") leerPendientes();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
   }, [profile?.role, bumpOperativoFromFcm]);
 
   return null;

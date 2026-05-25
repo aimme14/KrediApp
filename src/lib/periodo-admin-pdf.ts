@@ -40,6 +40,15 @@ function gananciasRutasAdmin(s: PeriodoAdminSnapshot): number {
   return s.rutas.reduce((sum, r) => sum + r.ganancias, 0);
 }
 
+function gastosTotalesRuta(
+  r: PeriodoAdminSnapshot["rutas"][0] | undefined
+): number {
+  if (!r) return 0;
+  if (typeof r.gastosTotales === "number") return r.gastosTotales;
+  const legacy = r as PeriodoAdminSnapshot["rutas"][0] & { gastos?: number };
+  return typeof legacy.gastos === "number" ? legacy.gastos : 0;
+}
+
 function mergeRutas(ap: PeriodoAdminSnapshot, ci: PeriodoAdminSnapshot | null) {
   const ids = new Set<string>();
   for (const r of ap.rutas) ids.add(r.rutaId);
@@ -151,34 +160,47 @@ export async function buildPeriodoAdminPdf(payload: PeriodoAdminPdfPayload): Pro
 
   // ── Resumen ejecutivo (KPIs) ──────────────────────────────────────────────
 
-  const totAp = payload.apertura.rutas.reduce((a, r) => ({
-    capital: a.capital + r.capitalRuta,
-    ganancias: a.ganancias + r.ganancias,
-    gastos: a.gastos + r.gastos,
-    perdidas: a.perdidas + r.perdidas,
-    utilidad: a.utilidad + r.utilidad,
-  }), { capital: 0, ganancias: 0, gastos: 0, perdidas: 0, utilidad: 0 });
+  const totAp = payload.apertura.rutas.reduce(
+    (a, r) => ({
+      capital: a.capital + r.capitalRuta,
+      ganancias: a.ganancias + r.ganancias,
+      gastos: a.gastos + gastosTotalesRuta(r),
+      perdidas: a.perdidas + r.perdidas,
+    }),
+    { capital: 0, ganancias: 0, gastos: 0, perdidas: 0 }
+  );
 
-  const totCi = payload.cierre ? payload.cierre.rutas.reduce((a, r) => ({
-    capital: a.capital + r.capitalRuta,
-    ganancias: a.ganancias + r.ganancias,
-    gastos: a.gastos + r.gastos,
-    perdidas: a.perdidas + r.perdidas,
-    utilidad: a.utilidad + r.utilidad,
-  }), { capital: 0, ganancias: 0, gastos: 0, perdidas: 0, utilidad: 0 }) : null;
+  const totCi = payload.cierre
+    ? payload.cierre.rutas.reduce(
+        (a, r) => ({
+          capital: a.capital + r.capitalRuta,
+          ganancias: a.ganancias + r.ganancias,
+          gastos: a.gastos + gastosTotalesRuta(r),
+          perdidas: a.perdidas + r.perdidas,
+        }),
+        { capital: 0, ganancias: 0, gastos: 0, perdidas: 0 }
+      )
+    : null;
+
+  const utilidadNeta =
+    totCi !== null ? totCi.capital - totAp.capital : totAp.capital;
 
   // 4 KPI cards
   const kpis = [
     { label: "Capital apertura", value: fmtMoney(totAp.capital) },
     { label: "Capital cierre",   value: totCi ? fmtMoney(totCi.capital) : "—" },
-    { label: "Utilidad neta",    value: totCi ? fmtMoney(totCi.utilidad) : fmtMoney(totAp.utilidad), highlight: true },
+    {
+      label: "Utilidad neta",
+      value: totCi ? fmtMoney(utilidadNeta) : "—",
+      highlight: true,
+    },
     { label: "Variacion capital", value: totCi ? fmtDelta(totAp.capital, totCi.capital) : "—", delta: true },
   ];
 
   const kpiW = (CONTENT_W - 12) / 4;
   kpis.forEach((kpi, i) => {
     const kx = ML + i * (kpiW + 4);
-    const isPos = totCi ? (totCi.utilidad >= 0) : true;
+    const isPos = totCi ? utilidadNeta >= 0 : true;
     const cardColor = kpi.highlight
       ? (isPos ? C.success : C.danger)
       : kpi.delta
@@ -221,9 +243,9 @@ export async function buildPeriodoAdminPdf(payload: PeriodoAdminPdfPayload): Pro
     ["Cap. Final", "capCi"],
     ["Variacion",  "variacion"],
     ["Ganancias",  "ganancias"],
-    ["Gastos",     "gastos"],
+    ["Gastos tot.", "gastos"],
     ["Perdidas",   "perdidas"],
-    ["Utilidad",   "utilidad"],
+    ["Util. cap.", "utilidad"],
   ];
   headers.forEach(([label, col]) => {
     txt(label, cols[col].x + 3, y - 12, 7, fontBold, C.headText);
@@ -241,9 +263,10 @@ export async function buildPeriodoAdminPdf(payload: PeriodoAdminPdfPayload): Pro
     const capAp = ra?.capitalRuta ?? 0;
     const capCi = rc?.capitalRuta ?? null;
     const gan   = rc?.ganancias ?? ra?.ganancias ?? 0;
-    const gas   = rc?.gastos ?? ra?.gastos ?? 0;
-    const per   = rc?.perdidas ?? ra?.perdidas ?? 0;
-    const util  = rc?.utilidad ?? ra?.utilidad ?? 0;
+    const gas = gastosTotalesRuta(rc ?? ra);
+    const per = rc?.perdidas ?? ra?.perdidas ?? 0;
+    const util =
+      rc && ra ? rc.capitalRuta - ra.capitalRuta : null;
 
     // Fila alterna
     if (idx % 2 === 0) {
@@ -268,8 +291,12 @@ export async function buildPeriodoAdminPdf(payload: PeriodoAdminPdfPayload): Pro
     txt(fmtMoney(per), cols.perdidas.x + 3,  y - 10, 8, font, C.text);
 
     // Utilidad con color
-    const utilColor = util >= 0 ? C.success : C.danger;
-    txt(fmtMoney(util), cols.utilidad.x + 3, y - 10, 8, fontBold, utilColor);
+    if (util !== null) {
+      const utilColor = util >= 0 ? C.success : C.danger;
+      txt(fmtMoney(util), cols.utilidad.x + 3, y - 10, 8, fontBold, utilColor);
+    } else {
+      txt("—", cols.utilidad.x + 3, y - 10, 8, font, C.muted);
+    }
 
     y -= 16;
   });
@@ -288,7 +315,14 @@ export async function buildPeriodoAdminPdf(payload: PeriodoAdminPdfPayload): Pro
     txt(fmtMoney(totCi?.ganancias ?? totAp.ganancias), cols.ganancias.x + 3, y - 12, 8, fontBold, rgb(1,1,1));
     txt(fmtMoney(totCi?.gastos ?? totAp.gastos), cols.gastos.x + 3, y - 12, 8, fontBold, rgb(1,1,1));
     txt(fmtMoney(totCi?.perdidas ?? totAp.perdidas), cols.perdidas.x + 3, y - 12, 8, fontBold, rgb(1,1,1));
-    txt(totCi ? fmtMoney(totCi.utilidad) : "—", cols.utilidad.x + 3, y - 12, 8, fontBold, rgb(1,1,1));
+    txt(
+      totCi ? fmtMoney(totCi.capital - totAp.capital) : "—",
+      cols.utilidad.x + 3,
+      y - 12,
+      8,
+      fontBold,
+      rgb(1, 1, 1)
+    );
     y -= 20;
   }
 

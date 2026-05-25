@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { useTrabajadorCajaDia } from "@/context/TrabajadorCajaDiaContext";
+import { formatFechaDia } from "@/lib/colombia-day-bounds";
 import { useRuta } from "@/hooks/useRuta";
 import { UMBRAL_INTENTOS_ALERTA, useRutaDia } from "@/hooks/useRutaDia";
 import type { ClienteRutaGrupo, PrioridadClienteRuta } from "@/types/finanzas";
@@ -26,7 +27,9 @@ function getSemaforo(grupo: ClienteRutaGrupo): SemaforoRuta {
   const hasMora = grupo.items.some((i) => i.estado === "mora");
   const allCuotaPagadaHoy =
     grupo.items.length > 0 && grupo.items.every((i) => i.cuotaPagadaHoy);
+  const tieneNoPagoHoy = grupo.items.some((i) => i.noPagoHoy);
   if (hasMora) return "rojo";
+  if (tieneNoPagoHoy) return "naranja";
   if (tieneAlertaNoPago(grupo)) return "naranja";
   if (allCuotaPagadaHoy) return "verde";
   return "amarillo";
@@ -48,11 +51,12 @@ function getSemaforoLabel(semaforo: SemaforoRuta): string {
 }
 
 const FILTROS_OPCIONES: {
-  id: "todos" | "mora" | "pendientes" | "cobrados";
+  id: "todos" | "mora" | "no_pago_hoy" | "pendientes" | "cobrados";
   label: string;
 }[] = [
   { id: "todos", label: "Todos" },
   { id: "mora", label: "En mora" },
+  { id: "no_pago_hoy", label: "No pagaron hoy" },
   { id: "pendientes", label: "Pendientes" },
   { id: "cobrados", label: "Cobrados" },
 ];
@@ -65,27 +69,23 @@ function formatCurrency(value: number): string {
   });
 }
 
-function getBadgeLabel(
-  grupo: ClienteRutaGrupo,
-  prioridad: PrioridadClienteRuta
-): string {
+function getBadgeLabel(grupo: ClienteRutaGrupo, _prioridad: PrioridadClienteRuta): string {
   const hasMora = grupo.items.some((i) => i.estado === "mora");
   const allCuotaPagadaHoy =
     grupo.items.length > 0 && grupo.items.every((i) => i.cuotaPagadaHoy);
+  const tieneNoPagoHoy = grupo.items.some((i) => i.noPagoHoy);
   if (hasMora) return "Mora";
-  if (allCuotaPagadaHoy) return "Pagada hoy";
-  if (tieneAlertaNoPago(grupo)) return "Alerta";
-  if (prioridad === 3) return "Hoy";
-  if (prioridad === 4) return "Mañana";
-  return "Pronto";
+  if (allCuotaPagadaHoy) return "Pagó hoy";
+  if (tieneNoPagoHoy) return "No pagó hoy";
+  return "Pendiente";
 }
 
 export default function RutaDelDiaPage() {
   const { profile } = useAuth();
   const router = useRouter();
-  const { fechaDia, data: cajaDelDiaResumen, loading: loadingCajaDelDia, cajaEmpleadoRT } =
+  const { fechaDia, data: cajaDelDiaResumen, loading: loadingCajaDelDia, tuCajaEfectivo } =
     useTrabajadorCajaDia();
-  const cajaActual = cajaEmpleadoRT ?? cajaDelDiaResumen?.cajaEmpleado ?? 0;
+  const cajaActual = tuCajaEfectivo ?? 0;
   const [filtroExpandido, setFiltroExpandido] = useState(false);
 
   const {
@@ -97,6 +97,8 @@ export default function RutaDelDiaPage() {
     clientes,
     filtro,
     setFiltro,
+    busquedaNombre,
+    setBusquedaNombre,
     clientesFiltrados,
     clientesFiltradosGrouped,
     loading,
@@ -172,6 +174,7 @@ export default function RutaDelDiaPage() {
   const emptySinClientes = clientes.length === 0;
   const emptyFiltro =
     !emptySinClientes && clientesFiltrados.length === 0;
+  const busquedaTrim = busquedaNombre.trim();
 
   return (
     <div className="card ruta-dia-card">
@@ -199,11 +202,13 @@ export default function RutaDelDiaPage() {
             <h3 id="ruta-dia-caja-heading" className="ruta-dia-caja-title">
               caja 
             </h3>
-            <p className="ruta-dia-caja-desc">{cajaDelDiaResumen?.fechaDia ?? fechaDia}</p>
+            <p className="ruta-dia-caja-desc">
+              {formatFechaDia(cajaDelDiaResumen?.fechaDia ?? fechaDia)}
+            </p>
           </div>
           <div className="ruta-dia-caja-monto-wrap">
             <span className="ruta-dia-caja-monto" aria-live="polite">
-              {loadingCajaDelDia && cajaEmpleadoRT == null
+              {loadingCajaDelDia && tuCajaEfectivo == null
                 ? "…"
                 : formatCurrency(cajaActual)}
             </span>
@@ -228,6 +233,41 @@ export default function RutaDelDiaPage() {
       )}
 
       <div className="ruta-dia-toolbar">
+        <div className="ruta-dia-search-field">
+          <span className="ruta-dia-search-icon" aria-hidden>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="11" cy="11" r="8" />
+              <path d="m21 21-4.3-4.3" />
+            </svg>
+          </span>
+          <input
+            id="ruta-dia-buscador"
+            className="ruta-dia-search-input"
+            type="search"
+            value={busquedaNombre}
+            onChange={(e) => setBusquedaNombre(e.target.value)}
+            placeholder="Buscar cliente por nombre..."
+            aria-label="Buscar cliente por nombre"
+            autoComplete="off"
+          />
+          {busquedaTrim ? (
+            <button
+              type="button"
+              className="ruta-dia-search-clear"
+              onClick={() => setBusquedaNombre("")}
+              aria-label="Limpiar búsqueda"
+            >
+              ×
+            </button>
+          ) : null}
+        </div>
+        {busquedaTrim && !loading && !emptySinClientes ? (
+          <p className="ruta-dia-search-hint">
+            {clientesFiltradosGrouped.length} cliente
+            {clientesFiltradosGrouped.length !== 1 ? "s" : ""} encontrado
+            {clientesFiltradosGrouped.length !== 1 ? "s" : ""}
+          </p>
+        ) : null}
         <div className="ruta-dia-filtros-wrap">
           {!filtroExpandido ? (
             <button
@@ -270,7 +310,9 @@ export default function RutaDelDiaPage() {
         </p>
       ) : emptyFiltro ? (
         <p className="ruta-dia-empty">
-          Ningún cliente coincide con {filtroLabel}.
+          {busquedaTrim
+            ? `No hay clientes que coincidan con «${busquedaTrim}».`
+            : `Ningún cliente coincide con ${filtroLabel}.`}
         </p>
       ) : (
         <div className="ruta-dia-list">

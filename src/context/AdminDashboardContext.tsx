@@ -138,6 +138,7 @@ export function AdminDashboardProvider({ children }: { children: ReactNode }) {
             cajasEmpleados,
             inversiones,
             ganancias,
+            perdidas,
             capitalTotal,
             capitalRuta,
           };
@@ -276,7 +277,7 @@ export function AdminDashboardProvider({ children }: { children: ReactNode }) {
       cajaRuta: r.cajaRuta ?? 0,
       cajasEmpleados: r.cajasEmpleados ?? 0,
       ganancias: r.ganancias ?? 0,
-      perdidas: 0,
+      perdidas: r.perdidas ?? 0,
       utilidad: 0,
       capitalRuta: r.capitalRuta,
       adminId: r.adminId,

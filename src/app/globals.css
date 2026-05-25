@@ -2267,6 +2267,72 @@ td {
   outline-offset: 2px;
 }
 
+.prestamo-admin-filtros-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  margin-bottom: 0.85rem;
+}
+
+.prestamo-admin-search-toolbar {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.28rem;
+}
+
+.prestamo-admin-search-field {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  max-width: 26rem;
+  padding: 0.38rem 0.65rem;
+  border-radius: 10px;
+  border: 1px solid var(--input-border);
+  background: var(--input-bg);
+}
+
+.prestamo-admin-search-field:focus-within {
+  border-color: color-mix(in srgb, var(--link) 55%, var(--input-border));
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--link) 18%, transparent);
+}
+
+.prestamo-admin-search-icon {
+  flex-shrink: 0;
+  color: var(--text-muted);
+  display: flex;
+  line-height: 0;
+}
+
+.prestamo-admin-search-input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 0.875rem;
+}
+
+.prestamo-admin-search-input::placeholder {
+  color: var(--text-muted);
+  opacity: 0.85;
+}
+
+.prestamo-admin-search-input:focus {
+  outline: none;
+}
+
+.prestamo-admin-search-hint {
+  margin: 0;
+  padding-left: 0.15rem;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.prestamo-admin-filtros-wrap .prestamo-admin-tabs {
+  margin-bottom: 0;
+}
+
 .prestamo-admin-tabs {
   display: flex;
   flex-wrap: wrap;
@@ -2363,6 +2429,10 @@ td {
 
 /* Móvil: solo Código, Cliente y Monto prestado (oculta expandir, totales, cobro, etc.) */
 @media (max-width: 768px) {
+  .prestamo-admin-search-field {
+    max-width: none;
+  }
+
   .prestamo-admin-movil-filtro-activos {
     display: inline-flex;
     flex-shrink: 0;
@@ -4836,18 +4906,24 @@ a.admin-inicio-link-btn {
 
 .admin-inicio-ruta-stats {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 0.6rem;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.5rem;
   align-items: stretch;
 }
 
-@media (max-width: 960px) {
+@media (max-width: 1100px) {
+  .admin-inicio-ruta-stats {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
   .admin-inicio-ruta-stats {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
-@media (max-width: 520px) {
+@media (max-width: 380px) {
   .admin-inicio-ruta-stats {
     grid-template-columns: 1fr;
   }
@@ -4859,7 +4935,7 @@ a.admin-inicio-link-btn {
   align-items: flex-start;
   gap: 0.55rem;
   min-width: 0;
-  padding: 0.6rem 0.65rem;
+  padding: 0.5rem 0.55rem;
   background: var(--input-bg);
   border: 1px solid var(--card-border);
   border-radius: 10px;
@@ -8484,11 +8560,75 @@ a.admin-inicio-link-btn {
 
 .ruta-dia-toolbar {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.65rem;
   margin-bottom: 1.25rem;
+}
+.ruta-dia-search-field {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  width: 100%;
+  padding: 0.45rem 0.65rem;
+  border-radius: 10px;
+  border: 1px solid var(--input-border);
+  background: var(--input-bg);
+}
+.ruta-dia-search-field:focus-within {
+  border-color: color-mix(in srgb, var(--link) 55%, var(--input-border));
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--link) 18%, transparent);
+}
+.ruta-dia-search-icon {
+  flex-shrink: 0;
+  color: var(--text-muted);
+  display: flex;
+  line-height: 0;
+}
+.ruta-dia-search-input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 0.875rem;
+}
+.ruta-dia-search-input::placeholder {
+  color: var(--text-muted);
+  opacity: 0.85;
+}
+.ruta-dia-search-input:focus {
+  outline: none;
+}
+.ruta-dia-search-clear {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background: var(--card-border);
+  color: var(--text-muted);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.ruta-dia-search-clear:hover {
+  color: var(--text);
+  background: color-mix(in srgb, var(--card-border) 70%, var(--text-muted));
+}
+.ruta-dia-search-hint {
+  margin: -0.25rem 0 0;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+.ruta-dia-search-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
 }
 .ruta-dia-filtros-wrap {
   position: relative;
@@ -8767,13 +8907,27 @@ a.admin-inicio-link-btn {
 }
 .ruta-dia-avatar-check {
   position: absolute;
-  right: 1px;
-  bottom: 1px;
-  width: 10px;
-  height: 10px;
+  right: -3px;
+  bottom: -3px;
+  width: 16px;
+  height: 16px;
   border-radius: 50%;
   background: #16a34a;
-  border: 2px solid var(--card-bg);
+  border: 2.5px solid var(--card-bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ruta-dia-avatar-check::after {
+  content: "";
+  display: block;
+  width: 5px;
+  height: 8px;
+  border: 2px solid #fff;
+  border-top: none;
+  border-left: none;
+  transform: rotate(45deg) translate(-1px, -1px);
 }
 .ruta-dia-item-main {
   flex: 1;

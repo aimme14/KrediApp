@@ -2,6 +2,7 @@
 
 import { useMemo, useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/context/AuthContext";
+import { useTrabajadorCajaDia } from "@/context/TrabajadorCajaDiaContext";
 import { useTrabajadorLista } from "@/context/TrabajadorListaContext";
 import { type ClienteItem, type PrestamoItem } from "@/lib/empresa-api";
 import type {
@@ -10,7 +11,7 @@ import type {
   PrioridadClienteRuta,
 } from "@/types/finanzas";
 
-export type FiltroRutaDia = "todos" | "mora" | "pendientes" | "cobrados";
+export type FiltroRutaDia = "todos" | "mora" | "no_pago_hoy" | "pendientes" | "cobrados";
 
 const VISITADOS_STORAGE_PREFIX = "krediapp-ruta-visitados-";
 
@@ -58,6 +59,8 @@ interface UseRutaDiaState {
   clientesFiltradosGrouped: ClienteRutaGrupo[];
   filtro: FiltroRutaDia;
   setFiltro: (f: FiltroRutaDia) => void;
+  busquedaNombre: string;
+  setBusquedaNombre: (value: string) => void;
   loading: boolean;
   error: string | null;
   refetch: () => void;
@@ -138,13 +141,15 @@ function toDate(value: string | null | undefined): Date | null {
 
 function buildClientesRuta(
   clientes: ClienteItem[],
-  prestamos: PrestamoItem[]
+  prestamos: PrestamoItem[],
+  noPagosHoy: { prestamoId: string }[]
 ): ClienteRuta[] {
   const prestamosPendientes = prestamos.filter(
     (p) => p.estado !== "pagado" && (p.saldoPendiente ?? 0) > 0
   );
   const mapClientesById = new Map(clientes.map((c) => [c.id, c]));
   const visitados = getVisitadosHoy();
+  const noPagoHoySet = new Set(noPagosHoy.map((n) => n.prestamoId));
 
   const map: ClienteRuta[] = [];
   for (const p of prestamosPendientes) {
@@ -175,6 +180,7 @@ function buildClientesRuta(
       prioridad,
       visitado: visitados.has(p.clienteId),
       cuotaPagadaHoy,
+      noPagoHoy: noPagoHoySet.has(p.id),
       moroso: c?.moroso === true,
     });
   }
@@ -192,15 +198,17 @@ export function useRutaDia(): UseRutaDiaState {
     lastFetchedAt,
     refresh,
   } = useTrabajadorLista();
+  const { data: cajaDia } = useTrabajadorCajaDia();
 
   const [filtro, setFiltro] = useState<FiltroRutaDia>("todos");
+  const [busquedaNombre, setBusquedaNombre] = useState("");
   /** Invalida memo de visitados tras markVisitado */
   const [visitadosBump, setVisitadosBump] = useState(0);
 
   const clientesRuta = useMemo(() => {
     if (!user || !profile || profile.role !== "trabajador") return [];
-    return buildClientesRuta(clientes, prestamos);
-  }, [user, profile, clientes, prestamos, visitadosBump]);
+    return buildClientesRuta(clientes, prestamos, cajaDia?.noPagos ?? []);
+  }, [user, profile, clientes, prestamos, visitadosBump, cajaDia?.noPagos]);
 
   const loading =
     Boolean(user && profile?.role === "trabajador") && loadingLista;
@@ -235,8 +243,13 @@ export function useRutaDia(): UseRutaDiaState {
       case "mora":
         lista = lista.filter((c) => c.estado === "mora");
         break;
+      case "no_pago_hoy":
+        lista = lista.filter((c) => c.noPagoHoy);
+        break;
       case "pendientes":
-        lista = lista.filter((c) => !c.cuotaPagadaHoy);
+        lista = lista.filter(
+          (c) => !c.cuotaPagadaHoy && !c.noPagoHoy && c.estado !== "mora"
+        );
         break;
       case "cobrados":
         lista = lista.filter((c) => c.cuotaPagadaHoy);
@@ -246,10 +259,17 @@ export function useRutaDia(): UseRutaDiaState {
         break;
     }
 
+    const q = busquedaNombre.trim().toLowerCase();
+    if (q) {
+      lista = lista.filter((c) =>
+        c.clienteNombre.toLowerCase().includes(q)
+      );
+    }
+
     lista.sort(compareClienteRutaPrioridad);
 
     return lista;
-  }, [clientesRuta, filtro]);
+  }, [clientesRuta, filtro, busquedaNombre]);
 
   const clientesFiltradosGrouped = useMemo((): ClienteRutaGrupo[] => {
     const byClient = new Map<string, ClienteRuta[]>();
@@ -300,6 +320,8 @@ export function useRutaDia(): UseRutaDiaState {
     clientes: clientesRuta,
     filtro,
     setFiltro,
+    busquedaNombre,
+    setBusquedaNombre,
     clientesFiltrados,
     clientesFiltradosGrouped,
     loading,

@@ -578,6 +578,7 @@ function CobrarClientePageContent() {
   if (!profile || (profile.role !== "trabajador" && profile.role !== "admin")) return null;
   const backHref = fromAdmin ? "/dashboard/admin/prestamo" : "/dashboard/trabajador/ruta";
   const backLabel = fromAdmin ? "Volver a Préstamos" : "Ruta del día";
+  const renovarPrestamoHref = `/dashboard/${fromAdmin ? "admin" : "trabajador"}/prestamo?clienteId=${encodeURIComponent(clienteId ?? "")}`;
   if (!clienteId || !prestamoId) {
     return (
       <div className="card">
@@ -771,6 +772,40 @@ function CobrarClientePageContent() {
           </div>
           <Link href={backHref} className="btn btn-secondary">{backLabel}</Link>
         </div>
+        {prestamoSaldado && (
+          <div style={{
+            marginTop: "1rem",
+            paddingTop: "1rem",
+            borderTop: "1px solid var(--card-border)",
+          }}>
+            <p style={{
+              margin: "0 0 0.65rem",
+              fontSize: "0.875rem",
+              color: "var(--text-muted)",
+              fontWeight: 600,
+            }}>
+              Renovación
+            </p>
+            <p style={{
+              margin: "0 0 0.75rem",
+              fontSize: "0.8125rem",
+              color: "var(--text-muted)",
+            }}>
+              El préstamo de {cliente.nombre} quedó saldado. ¿Deseas crear un nuevo préstamo?
+            </p>
+            <Link
+              href={renovarPrestamoHref}
+              className="btn btn-primary"
+              style={{ display: "inline-flex", alignItems: "center", gap: "0.5rem" }}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="12" y1="5" x2="12" y2="19"/>
+                <line x1="5" y1="12" x2="19" y2="12"/>
+              </svg>
+              Renovar préstamo
+            </Link>
+          </div>
+        )}
       </div>
     );
   }
@@ -803,6 +838,10 @@ function CobrarClientePageContent() {
   }
 
   if (showPerdida) {
+    if (profile?.role === "trabajador") {
+      setShowPerdida(false);
+      return null;
+    }
     const cobrarQuery = `clienteId=${clienteId}&prestamoId=${prestamoId}${fromAdmin ? "&from=admin" : ""}`;
     const maxPerdida = prestamo.saldoPendiente ?? 0;
     const montoPerdidaAplicar = Math.min(montoPerdidaNum, maxPerdida);
@@ -933,7 +972,7 @@ function CobrarClientePageContent() {
     );
   }
 
-  const pagosHistorial = ultimosPagos.filter((p) => p.tipo === "pago" || p.tipo === "perdida");
+  const pagosHistorial = ultimosPagos;
   const formatFechaPago = (f: string | null) =>
     f ? new Date(f).toLocaleString("es-CO", { dateStyle: "short", timeStyle: "short" }) : "—";
 
@@ -942,21 +981,23 @@ function CobrarClientePageContent() {
       <div className="cobrar-header">
         <div className="cobrar-header-top">
           <Link href={backHref} className="cobrar-back">← {backLabel}</Link>
-          <button
-            type="button"
-            className="btn btn-secondary cobrar-btn-perdida"
-            onClick={() => {
-              setShowPerdida(true);
-              setMontoPerdidaInput(
-                prestamo.saldoPendiente > 0 ? String(Math.round(prestamo.saldoPendiente)) : ""
-              );
-              setMotivoPerdida("");
-              setNotaPerdida("");
-              setError(null);
-            }}
-          >
-            Pérdida
-          </button>
+          {profile?.role !== "trabajador" && (
+            <button
+              type="button"
+              className="btn btn-secondary cobrar-btn-perdida"
+              onClick={() => {
+                setShowPerdida(true);
+                setMontoPerdidaInput(
+                  prestamo.saldoPendiente > 0 ? String(Math.round(prestamo.saldoPendiente)) : ""
+                );
+                setMotivoPerdida("");
+                setNotaPerdida("");
+                setError(null);
+              }}
+            >
+              Pérdida
+            </button>
+          )}
         </div>
         <h2 className="cobrar-title">{cliente.nombre}</h2>
         <p className="cobrar-subtitle">
@@ -994,12 +1035,28 @@ function CobrarClientePageContent() {
                 <li key={p.id || `p-${idx}`} className="cobrar-historial-li">
                   <span className="cobrar-historial-fecha">{formatFechaPago(p.fecha)}</span>
                   <span className="cobrar-historial-monto">{formatCurrency(p.monto)}</span>
-                  <span className="cobrar-historial-metodo">
+                  <span
+                    className="cobrar-historial-metodo"
+                    style={{
+                      color:
+                        p.tipo === "perdida"
+                          ? "var(--danger, #f87171)"
+                          : p.tipo === "no_pago"
+                            ? "var(--warning, #eab308)"
+                            : "inherit",
+                    }}
+                  >
                     {p.tipo === "perdida"
                       ? "Pérdida"
-                      : p.metodoPago === "transferencia"
-                        ? "Transferencia"
-                        : "Efectivo"}
+                      : p.tipo === "no_pago"
+                        ? `No pagó${
+                            p.motivoNoPago
+                              ? ` — ${MOTIVOS_NO_PAGO.find((m) => m.value === p.motivoNoPago)?.label ?? p.motivoNoPago}`
+                              : ""
+                          }`
+                        : p.metodoPago === "transferencia"
+                          ? "Transferencia"
+                          : "Efectivo"}
                   </span>
                   <span className="cobrar-historial-registrado" title="Registrado por">
                     {p.registradoPorNombre || p.registradoPorUid || "—"}

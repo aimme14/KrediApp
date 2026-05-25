@@ -10,6 +10,7 @@ import type {
   NoPagoDiaItem,
   PrestamoDesembolsoDiaItem,
 } from "@/lib/empresa-api";
+import { formatFechaDia } from "@/lib/colombia-day-bounds";
 import { formatoCuotasRestanteTotal } from "@/lib/cuotas-display";
 
 function formatMonto(value: number): string {
@@ -31,18 +32,6 @@ function formatHora(iso: string | null): string {
   } catch {
     return "—";
   }
-}
-
-function formatFechaDia(yyyyMmDd: string): string {
-  // yyyy-mm-dd → Date en UTC para evitar desplazamientos por zona horaria
-  const date = new Date(`${yyyyMmDd}T00:00:00Z`);
-  if (Number.isNaN(date.getTime())) return yyyyMmDd;
-  return date.toLocaleDateString("es-CO", {
-    timeZone: "America/Bogota",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  });
 }
 
 /** Mismas etiquetas que en cobrar → «No pagó». */
@@ -92,10 +81,21 @@ function IconoOjo(props: { size?: number }) {
   );
 }
 
-function TarjetaResumen(props: { etiqueta: ReactNode; valor: string }) {
-  const { etiqueta, valor } = props;
+function TarjetaResumen(props: {
+  etiqueta: ReactNode;
+  valor: string;
+  dimmed?: boolean;
+}) {
+  const { etiqueta, valor, dimmed } = props;
   return (
-    <div className="card" style={TARJETA_RESUMEN_STYLE}>
+    <div
+      className="card"
+      style={{
+        ...TARJETA_RESUMEN_STYLE,
+        opacity: dimmed ? 0.75 : 1,
+        borderLeft: dimmed ? "3px solid var(--card-border)" : undefined,
+      }}
+    >
       <span
         style={{
           fontSize: "0.7rem",
@@ -108,15 +108,23 @@ function TarjetaResumen(props: { etiqueta: ReactNode; valor: string }) {
       >
         {etiqueta}
       </span>
-      <span style={{ fontSize: "1.05rem", fontWeight: 700 }}>{valor}</span>
+      <span
+        style={{
+          fontSize: dimmed ? "0.95rem" : "1.05rem",
+          fontWeight: 700,
+          color: dimmed ? "var(--text-muted)" : "var(--text)",
+        }}
+      >
+        {valor}
+      </span>
     </div>
   );
 }
 
 export default function CajaDelDiaPage() {
   const { profile } = useAuth();
-  const { fechaDia, data, loading, error, cajaEmpleadoRT } = useTrabajadorCajaDia();
-  const cajaActual = cajaEmpleadoRT ?? data?.cajaEmpleado ?? 0;
+  const { fechaDia, data, loading, error, tuCajaEfectivo } = useTrabajadorCajaDia();
+  const cajaActual = tuCajaEfectivo ?? 0;
   const [evidenciaModalUrl, setEvidenciaModalUrl] = useState<string | null>(null);
   const evidenciaCerrarRef = useRef<HTMLButtonElement>(null);
 
@@ -199,6 +207,10 @@ export default function CajaDelDiaPage() {
               return !esEfectivo && !esTransfer;
             });
 
+            const totalEfectivo = cobrosEfectivo.reduce((s, c) => s + c.monto, 0);
+            const totalTransferencia = cobrosTransferencia.reduce((s, c) => s + c.monto, 0);
+            const totalOtros = cobrosOtros.reduce((s, c) => s + c.monto, 0);
+
             return (
               <>
                 <div
@@ -210,25 +222,49 @@ export default function CajaDelDiaPage() {
                   }}
                 >
                   <TarjetaResumen
-                    etiqueta={`Tu caja del día (${data.fechaDia})`}
+                    etiqueta="Caja actual (efectivo)"
                     valor={formatMonto(cajaActual)}
                   />
                   <TarjetaResumen
-                    etiqueta={`Total cobrado (${data.fechaDia})`}
-                    valor={formatMonto(data.totalCobrosLista)}
+                    etiqueta={`Base asignada (${formatFechaDia(data.fechaDia)})`}
+                    valor={formatMonto(data.totalBaseAsignadaDia)}
                   />
                   <TarjetaResumen
                     etiqueta="Gastos del día"
                     valor={formatMonto(data.totalGastosDia)}
                   />
                   <TarjetaResumen
-                    etiqueta={`Préstamos (${data.fechaDia})`}
+                    etiqueta={`Préstamos (${formatFechaDia(data.fechaDia)})`}
                     valor={formatMonto(data.totalPrestamosDesembolsoDia ?? 0)}
                   />
+                  {(data.totalPerdidasDia ?? 0) > 0 && (
+                    <TarjetaResumen
+                      etiqueta="Pérdidas del día"
+                      valor={formatMonto(data.totalPerdidasDia ?? 0)}
+                      dimmed
+                    />
+                  )}
                   <TarjetaResumen
-                    etiqueta={`Base asignada (${data.fechaDia})`}
-                    valor={formatMonto(data.totalBaseAsignadaDia)}
+                    etiqueta={`Total cobrado (${formatFechaDia(data.fechaDia)})`}
+                    valor={formatMonto(data.totalCobrosLista)}
                   />
+                  <TarjetaResumen
+                    etiqueta="↳ En efectivo"
+                    valor={formatMonto(totalEfectivo)}
+                    dimmed
+                  />
+                  <TarjetaResumen
+                    etiqueta="↳ Transferencia"
+                    valor={formatMonto(totalTransferencia)}
+                    dimmed
+                  />
+                  {totalOtros > 0 && (
+                    <TarjetaResumen
+                      etiqueta="↳ Otros métodos"
+                      valor={formatMonto(totalOtros)}
+                      dimmed
+                    />
+                  )}
                 </div>
 
                 <h3 style={{ fontSize: "1.05rem", marginBottom: "0.5rem" }}>
@@ -468,6 +504,36 @@ export default function CajaDelDiaPage() {
                         <td>{g.motivo || "—"}</td>
                         <td>{g.descripcion || "—"}</td>
                         <td className="col-num">{formatMonto(g.monto)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+
+          {(data.perdidasDelDia ?? []).length > 0 && (
+            <>
+              <h3 style={{ fontSize: "1.05rem", marginTop: "1.25rem", marginBottom: "0.5rem" }}>
+                Pérdidas del día
+              </h3>
+              <div className="table-wrap table-wrap-caja-dia">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Cliente</th>
+                      <th>Motivo</th>
+                      <th className="col-num">Monto</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(data.perdidasDelDia ?? []).map((p) => (
+                      <tr key={p.pagoId}>
+                        <td>{p.clienteNombre}</td>
+                        <td>{p.motivoPerdida ?? "—"}</td>
+                        <td className="col-num" style={{ color: "var(--danger, #f87171)" }}>
+                          {formatMonto(p.monto)}
+                        </td>
                       </tr>
                     ))}
                   </tbody>

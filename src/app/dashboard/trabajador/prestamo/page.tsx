@@ -1,12 +1,19 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
+import { collection, doc, query, where, onSnapshot, limit } from "firebase/firestore";
 import { useAuth } from "@/context/AuthContext";
 import { useTrabajadorLista } from "@/context/TrabajadorListaContext";
-import { useTrabajadorCajaDia } from "@/context/TrabajadorCajaDiaContext";
+import { db } from "@/lib/firebase";
 import {
-  createPrestamo,
+  EMPRESAS_COLLECTION,
+  SOLICITUDES_PRESTAMO_SUBCOLLECTION,
+} from "@/lib/empresas-db";
+import {
+  solicitarPrestamoEmpleado,
   clienteNumFromCodigo,
+  formatClienteCodigoCorto,
   type ClienteItem,
   type PrestamoItem,
 } from "@/lib/empresa-api";
@@ -54,14 +61,13 @@ function ordenarPrestamosParaPrincipal(prestamos: PrestamoItem[]): PrestamoItem[
 
 export default function PrestamoTrabajadorPage() {
   const { user, profile } = useAuth();
+  const searchParams = useSearchParams();
   const {
     clientes,
     prestamos,
     loading,
     error: listaError,
-    refresh,
   } = useTrabajadorLista();
-  const { refresh: refreshCajaDia } = useTrabajadorCajaDia();
   const [error, setError] = useState<string | null>(null);
   const [clienteId, setClienteId] = useState("");
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -71,7 +77,97 @@ export default function PrestamoTrabajadorPage() {
   const [monto, setMonto] = useState("");
   const [creating, setCreating] = useState(false);
   const [confirmarMontoAlto, setConfirmarMontoAlto] = useState(false);
+  const [solicitudPendiente, setSolicitudPendiente] = useState<{
+    id: string;
+    estado: string;
+    clienteNombre: string;
+    monto: number;
+    motivoRechazo: string | null;
+  } | null>(null);
+  const [ultimaResolucion, setUltimaResolucion] = useState<{
+    estado: "aprobada" | "rechazada";
+    clienteNombre: string;
+    monto: number;
+    motivoRechazo: string | null;
+  } | null>(null);
   const [filtroEstado, setFiltroEstado] = useState<"todos" | "activo" | "mora" | "pagado">("todos");
+  const [busquedaNombre, setBusquedaNombre] = useState("");
+
+  useEffect(() => {
+    const id = searchParams.get("clienteId")?.trim();
+    if (!id || loading) return;
+    if (!clientes.some((c) => c.id === id)) return;
+    setClienteId(id);
+    setShowCreateForm(true);
+  }, [searchParams, clientes, loading]);
+
+  useEffect(() => {
+    if (!db || !user || profile?.role !== "trabajador" || !profile?.empresaId) return;
+    const empresaId = profile.empresaId.trim();
+
+    const q = query(
+      collection(db, EMPRESAS_COLLECTION, empresaId, SOLICITUDES_PRESTAMO_SUBCOLLECTION),
+      where("empleadoUid", "==", user.uid),
+      where("estado", "==", "pendiente"),
+      limit(1)
+    );
+
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        const d = snap.docs[0];
+        if (!d) {
+          setSolicitudPendiente(null);
+          return;
+        }
+        const x = d.data();
+        setSolicitudPendiente({
+          id: d.id,
+          estado: x.estado ?? "pendiente",
+          clienteNombre: x.clienteNombre ?? "",
+          monto: typeof x.monto === "number" ? x.monto : 0,
+          motivoRechazo: x.motivoRechazo ?? null,
+        });
+      },
+      (err) => console.warn("[TrabajadorPrestamo] onSnapshot solicitud:", err)
+    );
+
+    return unsub;
+  }, [user?.uid, profile?.role, profile?.empresaId]);
+
+  useEffect(() => {
+    if (!db || !solicitudPendiente?.id || !profile?.empresaId) return;
+    const empresaId = profile.empresaId.trim();
+
+    const docRef = doc(
+      db,
+      EMPRESAS_COLLECTION,
+      empresaId,
+      SOLICITUDES_PRESTAMO_SUBCOLLECTION,
+      solicitudPendiente.id
+    );
+
+    const unsub = onSnapshot(
+      docRef,
+      (snap) => {
+        if (!snap.exists()) return;
+        const x = snap.data();
+        const estado = x.estado as string;
+        if (estado === "aprobada" || estado === "rechazada") {
+          setUltimaResolucion({
+            estado: estado as "aprobada" | "rechazada",
+            clienteNombre: x.clienteNombre ?? "",
+            monto: typeof x.monto === "number" ? x.monto : 0,
+            motivoRechazo: x.motivoRechazo ?? null,
+          });
+          setTimeout(() => setUltimaResolucion(null), 10 * 60 * 1000);
+        }
+      },
+      (err) => console.warn("[TrabajadorPrestamo] onSnapshot doc:", err)
+    );
+
+    return unsub;
+  }, [solicitudPendiente?.id, profile?.empresaId]);
 
   useEffect(() => {
     const mq = window.matchMedia("(max-width: 768px)");
@@ -107,18 +203,22 @@ export default function PrestamoTrabajadorPage() {
       return;
     }
     if (montoNum >= MONTO_CONFIRMAR_ALTO && !confirmarMontoAlto) {
-      setError(`Confirma que deseas crear un préstamo de ${formatMoneda(montoNum)} marcando la casilla`);
+      setError(`Confirma que deseas solicitar un préstamo de ${formatMoneda(montoNum)} marcando la casilla`);
       return;
     }
     if (!clienteId.trim()) {
       setError("Selecciona un cliente");
       return;
     }
+    if (solicitudPendiente) {
+      setError("Ya tienes una solicitud pendiente. Espera la respuesta del administrador.");
+      return;
+    }
     setError(null);
     setCreating(true);
     try {
       const token = await user.getIdToken();
-      await createPrestamo(token, {
+      await solicitarPrestamoEmpleado(token, {
         clienteId: clienteId.trim(),
         monto: montoNum,
         interes: iVal,
@@ -133,10 +233,8 @@ export default function PrestamoTrabajadorPage() {
       setModalidad("mensual");
       setConfirmarMontoAlto(false);
       setShowCreateForm(false);
-      await refresh();
-      void refreshCajaDia();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Error al crear préstamo");
+      setError(e instanceof Error ? e.message : "Error al solicitar préstamo");
     } finally {
       setCreating(false);
     }
@@ -158,10 +256,35 @@ export default function PrestamoTrabajadorPage() {
   const cuotaPorPago = totalAPagar > 0 && nCuotasVal >= 1 ? totalAPagar / nCuotasVal : 0;
   const requiereConfirmarMonto = !isNaN(montoNum) && montoNum >= MONTO_CONFIRMAR_ALTO;
 
+  const busquedaTrim = busquedaNombre.trim();
+  const busquedaLower = busquedaTrim.toLowerCase();
+
   const prestamosFiltrados = useMemo(() => {
-    if (filtroEstado === "todos") return prestamos;
-    return prestamos.filter((p) => p.estado === filtroEstado);
-  }, [prestamos, filtroEstado]);
+    let lista = prestamos;
+    if (filtroEstado !== "todos") {
+      lista = lista.filter((p) => p.estado === filtroEstado);
+    }
+    if (busquedaLower) {
+      lista = lista.filter((p) => {
+        const cl = clientePorId[p.clienteId];
+        if (!cl) return false;
+        const nombre = (cl.nombre ?? "").toLowerCase();
+        const codigo = cl.codigo
+          ? formatClienteCodigoCorto(cl.codigo).toLowerCase()
+          : "";
+        const numCodigo = clienteNumFromCodigo(cl.codigo);
+        const numStr = numCodigo ? `#${numCodigo}` : "";
+        const cedula = (cl.cedula ?? "").toLowerCase();
+        return (
+          nombre.includes(busquedaLower) ||
+          codigo.includes(busquedaLower) ||
+          numStr.includes(busquedaLower) ||
+          cedula.includes(busquedaLower)
+        );
+      });
+    }
+    return lista;
+  }, [prestamos, filtroEstado, busquedaLower, clientePorId]);
 
   const prestamosHistorialOrdenados = useMemo(
     () => ordenarPrestamosParaPrincipal([...prestamosFiltrados]),
@@ -172,10 +295,82 @@ export default function PrestamoTrabajadorPage() {
 
   return (
     <div className="card">
+      {solicitudPendiente && (
+        <div
+          style={{
+            padding: "1rem",
+            marginBottom: "1rem",
+            borderRadius: "var(--radius)",
+            background: "var(--card-bg)",
+            border: "1px solid var(--card-border)",
+          }}
+        >
+          <p style={{ margin: "0 0 0.25rem", fontWeight: 600 }}>
+            Solicitud pendiente de aprobación
+          </p>
+          <p style={{ margin: 0, fontSize: "0.875rem", color: "var(--text-muted)" }}>
+            Préstamo de $ {solicitudPendiente.monto.toLocaleString("es-CO")} para{" "}
+            {solicitudPendiente.clienteNombre} — esperando respuesta del administrador...
+          </p>
+          <div style={{ marginTop: "0.5rem", display: "flex", alignItems: "center", gap: "0.5rem" }}>
+            <span
+              style={{
+                display: "inline-block",
+                width: "8px",
+                height: "8px",
+                borderRadius: "50%",
+                background: "#eab308",
+                animation: "gf-pulse-dot 1.5s ease-in-out infinite",
+              }}
+            />
+            <span style={{ fontSize: "0.8125rem", color: "var(--text-muted)" }}>En espera...</span>
+          </div>
+        </div>
+      )}
+
+      {ultimaResolucion && (
+        <div
+          style={{
+            padding: "1rem",
+            marginBottom: "1rem",
+            borderRadius: "var(--radius)",
+            background: "var(--card-bg)",
+            border: `1px solid ${ultimaResolucion.estado === "aprobada" ? "#16a34a" : "#dc2626"}`,
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.25rem" }}>
+            <span
+              style={{
+                display: "inline-block",
+                width: "10px",
+                height: "10px",
+                borderRadius: "50%",
+                background: ultimaResolucion.estado === "aprobada" ? "#16a34a" : "#dc2626",
+                flexShrink: 0,
+              }}
+            />
+            <p
+              style={{
+                margin: 0,
+                fontWeight: 600,
+                color: ultimaResolucion.estado === "aprobada" ? "#16a34a" : "#dc2626",
+              }}
+            >
+              {ultimaResolucion.estado === "aprobada" ? "✅ Préstamo aprobado" : "❌ Préstamo rechazado"}
+            </p>
+          </div>
+          <p style={{ margin: 0, fontSize: "0.875rem", color: "var(--text-muted)" }}>
+            {ultimaResolucion.estado === "aprobada"
+              ? `El préstamo de $ ${ultimaResolucion.monto.toLocaleString("es-CO")} para ${ultimaResolucion.clienteNombre} fue aprobado.`
+              : `El préstamo para ${ultimaResolucion.clienteNombre} fue rechazado${ultimaResolucion.motivoRechazo ? `: ${ultimaResolucion.motivoRechazo}` : "."}`}
+          </p>
+        </div>
+      )}
+
       {showCreateForm && (
       <form onSubmit={handleSubmit} className="card" style={{ marginBottom: "1.25rem" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "0.75rem", marginBottom: "0.5rem" }}>
-          <h3 style={{ margin: 0 }}>Nuevo préstamo</h3>
+          <h3 style={{ margin: 0 }}>Solicitar préstamo</h3>
           <button
             type="button"
             onClick={() => setShowCreateForm(false)}
@@ -399,6 +594,7 @@ export default function PrestamoTrabajadorPage() {
               <li>Cuota por pago: <strong>{formatMoneda(cuotaPorPago)}</strong></li>
             </ul>
             <p style={{ margin: "0.75rem 0 0", fontSize: "0.8rem", color: "var(--text-muted)", lineHeight: 1.5 }}>
+              El administrador debe aprobar esta solicitud antes de que se cree el préstamo.
             </p>
           </div>
         )}
@@ -424,7 +620,7 @@ export default function PrestamoTrabajadorPage() {
             disabled={creating}
             style={{ flexShrink: 0 }}
           >
-            {creating ? "Creando..." : "Crear préstamo"}
+            {creating ? "Enviando..." : "Solicitar préstamo"}
           </button>
           {requiereConfirmarMonto && (
             <label
@@ -443,7 +639,7 @@ export default function PrestamoTrabajadorPage() {
                 type="checkbox"
                 checked={confirmarMontoAlto}
                 onChange={(e) => setConfirmarMontoAlto(e.target.checked)}
-                aria-label={`Confirmo creación de préstamo por ${formatMoneda(montoNum)}`}
+                aria-label={`Confirmo solicitud de préstamo por ${formatMoneda(montoNum)}`}
                 style={{
                   flexShrink: 0,
                   cursor: "pointer",
@@ -469,8 +665,9 @@ export default function PrestamoTrabajadorPage() {
             type="button"
             className="btn btn-primary"
             onClick={() => setShowCreateForm(true)}
-            aria-label="Crear nuevo préstamo"
-            title="Crear nuevo préstamo"
+            disabled={!!solicitudPendiente}
+            title={solicitudPendiente ? "Tienes una solicitud pendiente" : "Crear nuevo préstamo"}
+            aria-label="Solicitar nuevo préstamo"
             style={{ padding: "0.4rem 0.65rem", minWidth: "auto", lineHeight: 1, flexShrink: 0 }}
           >
             +
@@ -482,6 +679,43 @@ export default function PrestamoTrabajadorPage() {
           <p style={{ color: "var(--text-muted)" }}>No hay préstamos.</p>
         ) : (
           <>
+            <div className="ruta-dia-search-toolbar" style={{ marginBottom: "0.85rem" }}>
+              <div className="ruta-dia-search-field">
+                <span className="ruta-dia-search-icon" aria-hidden>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="11" cy="11" r="8" />
+                    <path d="m21 21-4.3-4.3" />
+                  </svg>
+                </span>
+                <input
+                  id="trabajador-prestamos-buscador"
+                  className="ruta-dia-search-input"
+                  type="search"
+                  value={busquedaNombre}
+                  onChange={(e) => setBusquedaNombre(e.target.value)}
+                  placeholder="Buscar por nombre, código o cédula..."
+                  aria-label="Buscar préstamos por nombre de cliente"
+                  autoComplete="off"
+                />
+                {busquedaTrim ? (
+                  <button
+                    type="button"
+                    className="ruta-dia-search-clear"
+                    onClick={() => setBusquedaNombre("")}
+                    aria-label="Limpiar búsqueda"
+                  >
+                    ×
+                  </button>
+                ) : null}
+              </div>
+              {busquedaTrim ? (
+                <p className="ruta-dia-search-hint">
+                  {prestamosFiltrados.length} préstamo
+                  {prestamosFiltrados.length !== 1 ? "s" : ""} encontrado
+                  {prestamosFiltrados.length !== 1 ? "s" : ""}
+                </p>
+              ) : null}
+            </div>
             <div className="prestamo-historial-filtros prestamo-trabajador-historial-filtros" role="tablist" aria-label="Filtrar por estado">
               {(["todos", "activo", "mora", "pagado"] as const).map((est) => (
                 <button
@@ -532,7 +766,9 @@ export default function PrestamoTrabajadorPage() {
             </div>
           {prestamosFiltrados.length === 0 && (
             <p style={{ color: "var(--text-muted)", fontSize: "0.875rem", marginTop: "0.5rem" }}>
-              No hay préstamos con estado «{filtroEstado === "todos" ? "todos" : filtroEstado === "activo" ? "activos" : filtroEstado === "mora" ? "en mora" : "pagados"}».
+              {busquedaTrim
+                ? `No hay préstamos que coincidan con «${busquedaTrim}».`
+                : `No hay préstamos con estado «${filtroEstado === "todos" ? "todos" : filtroEstado === "activo" ? "activos" : filtroEstado === "mora" ? "en mora" : "pagados"}».`}
             </p>
           )}
           </>

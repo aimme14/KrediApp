@@ -9,17 +9,32 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { doc, onSnapshot } from "firebase/firestore";
+import {
+  doc,
+  onSnapshot,
+  collection,
+  query,
+  where,
+  collectionGroup,
+  Timestamp,
+} from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/context/AuthContext";
-import { fechaDiaColombiaHoy } from "@/lib/colombia-day-bounds";
+import {
+  fechaDiaColombiaHoy,
+  inicioDiaColombiaUtc,
+  finDiaColombiaUtc,
+} from "@/lib/colombia-day-bounds";
+import {
+  EMPRESAS_COLLECTION,
+  USUARIOS_SUBCOLLECTION,
+  ASIGNACIONES_BASE_EMPLEADO_SUBCOLLECTION,
+  GASTOS_EMPLEADO_SUBCOLLECTION,
+} from "@/lib/empresas-db";
 import {
   getCobrosDelDiaEmpleado,
   type CobrosDelDiaEmpleadoResponse,
 } from "@/lib/empresa-api";
-
-const EMPRESAS_COLLECTION = "empresas";
-const USUARIOS_SUBCOLLECTION = "usuarios";
 
 export type TrabajadorCajaDiaContextValue = {
   fechaDia: string;
@@ -28,6 +43,7 @@ export type TrabajadorCajaDiaContextValue = {
   error: string | null;
   refresh: () => Promise<void>;
   cajaEmpleadoRT: number | null;
+  tuCajaEfectivo: number | null;
 };
 
 const TrabajadorCajaDiaContext = createContext<TrabajadorCajaDiaContextValue | null>(null);
@@ -39,6 +55,10 @@ export function TrabajadorCajaDiaProvider({ children }: { children: ReactNode })
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [cajaEmpleadoRT, setCajaEmpleadoRT] = useState<number | null>(null);
+  const [baseAsignadaRT, setBaseAsignadaRT] = useState<number | null>(null);
+  const [cobrosEfectivoRT, setCobrosEfectivoRT] = useState<number | null>(null);
+  const [gastosRT, setGastosRT] = useState<number | null>(null);
+  const [prestamosRT, setPrestamosRT] = useState<number | null>(null);
 
   const refresh = useCallback(async () => {
     if (!user || profile?.role !== "trabajador") {
@@ -93,6 +113,128 @@ export function TrabajadorCajaDiaProvider({ children }: { children: ReactNode })
     return unsub;
   }, [user?.uid, profile?.role, profile?.empresaId]);
 
+  useEffect(() => {
+    if (!db || !user || profile?.role !== "trabajador") return;
+    const empresaId = profile?.empresaId?.trim();
+    const rutaId = profile?.rutaId?.trim();
+    if (!empresaId) return;
+
+    const start = inicioDiaColombiaUtc(fechaDia);
+    const end = finDiaColombiaUtc(fechaDia);
+    if (!start || !end) return;
+
+    const q = query(
+      collection(
+        db,
+        EMPRESAS_COLLECTION,
+        empresaId,
+        USUARIOS_SUBCOLLECTION,
+        user.uid,
+        ASIGNACIONES_BASE_EMPLEADO_SUBCOLLECTION
+      ),
+      where("fecha", ">=", Timestamp.fromDate(start)),
+      where("fecha", "<=", Timestamp.fromDate(end))
+    );
+
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        let total = 0;
+        for (const d of snap.docs) {
+          const x = d.data();
+          if (rutaId && x.rutaId && x.rutaId !== rutaId) continue;
+          const m = typeof x.monto === "number" && x.monto > 0 ? x.monto : 0;
+          total += m;
+        }
+        setBaseAsignadaRT(Math.round(total * 100) / 100);
+      },
+      (err) => {
+        console.warn("[TrabajadorCajaDia] onSnapshot asignacionesBase:", err);
+      }
+    );
+
+    return unsub;
+  }, [user?.uid, profile?.role, profile?.empresaId, profile?.rutaId, fechaDia]);
+
+  useEffect(() => {
+    if (!db || !user || profile?.role !== "trabajador") return;
+    const start = inicioDiaColombiaUtc(fechaDia);
+    const end = finDiaColombiaUtc(fechaDia);
+    if (!start || !end) return;
+
+    const q = query(
+      collectionGroup(db, "pagos"),
+      where("empleadoId", "==", user.uid),
+      where("fecha", ">=", Timestamp.fromDate(start)),
+      where("fecha", "<=", Timestamp.fromDate(end))
+    );
+
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        let efectivo = 0;
+        for (const d of snap.docs) {
+          const x = d.data();
+          if (x.tipo !== "pago") continue;
+          const monto = typeof x.monto === "number" ? x.monto : 0;
+          if (monto <= 0) continue;
+          const metodo = (x.metodoPago ?? "").toLowerCase();
+          if (metodo === "efectivo" || metodo.includes("efect")) {
+            efectivo += monto;
+          }
+        }
+        setCobrosEfectivoRT(Math.round(efectivo * 100) / 100);
+      },
+      (err) => {
+        console.warn("[TrabajadorCajaDia] onSnapshot pagos:", err);
+      }
+    );
+
+    return unsub;
+  }, [user?.uid, profile?.role, fechaDia]);
+
+  useEffect(() => {
+    if (!db || !user || profile?.role !== "trabajador") return;
+    const empresaId = profile?.empresaId?.trim();
+    if (!empresaId) return;
+    const start = inicioDiaColombiaUtc(fechaDia);
+    const end = finDiaColombiaUtc(fechaDia);
+    if (!start || !end) return;
+
+    const q = query(
+      collection(db, EMPRESAS_COLLECTION, empresaId, GASTOS_EMPLEADO_SUBCOLLECTION),
+      where("empleadoId", "==", user.uid),
+      where("fecha", ">=", Timestamp.fromDate(start)),
+      where("fecha", "<=", Timestamp.fromDate(end))
+    );
+
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        let total = 0;
+        for (const d of snap.docs) {
+          const m = typeof d.data().monto === "number" ? d.data().monto : 0;
+          if (m > 0) total += m;
+        }
+        setGastosRT(Math.round(total * 100) / 100);
+      },
+      (err) => {
+        console.warn("[TrabajadorCajaDia] onSnapshot gastos:", err);
+      }
+    );
+
+    return unsub;
+  }, [user?.uid, profile?.role, profile?.empresaId, fechaDia]);
+
+  const tuCajaEfectivo = useMemo(() => {
+    if (!data) return null;
+    const base = baseAsignadaRT ?? data.totalBaseAsignadaDia;
+    const cobrosEfectivo = cobrosEfectivoRT ?? data.totalCobrosEfectivoDia;
+    const gastos = gastosRT ?? data.totalGastosDia;
+    const prestamos = prestamosRT ?? data.totalPrestamosDesembolsoDia ?? 0;
+    return Math.round((cobrosEfectivo + base - gastos - prestamos) * 100) / 100;
+  }, [data, baseAsignadaRT, cobrosEfectivoRT, gastosRT, prestamosRT]);
+
   const value = useMemo(
     (): TrabajadorCajaDiaContextValue => ({
       fechaDia,
@@ -101,8 +243,9 @@ export function TrabajadorCajaDiaProvider({ children }: { children: ReactNode })
       error,
       refresh,
       cajaEmpleadoRT,
+      tuCajaEfectivo,
     }),
-    [fechaDia, data, loading, error, refresh, cajaEmpleadoRT]
+    [fechaDia, data, loading, error, refresh, cajaEmpleadoRT, tuCajaEfectivo]
   );
 
   return (
