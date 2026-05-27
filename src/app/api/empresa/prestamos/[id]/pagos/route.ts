@@ -567,6 +567,7 @@ export async function POST(
         monto: montoAplicar,
         fecha: nowTx,
         empleadoId: apiUser.uid,
+        cobradoPorRol: apiUser.role,
         tipo: "pago",
         metodoPago: metodo,
         evidencia: evidenciaTrim || null,
@@ -577,16 +578,22 @@ export async function POST(
       };
       if (keyTrimmed) pagoData.idempotencyKey = keyTrimmed;
 
-      const empUid =
-        typeof d.empleadoId === "string" && d.empleadoId.trim()
-          ? d.empleadoId.trim()
-          : apiUser.uid;
-      const adminEstaCobrando = apiUser.role === "admin";
-      const usuarioEmpRef = db
-        .collection(EMPRESAS_COLLECTION)
-        .doc(apiUser.empresaId)
-        .collection(USUARIOS_SUBCOLLECTION)
-        .doc(empUid);
+      const empleadoIdPrestamo =
+        typeof d.empleadoId === "string" ? d.empleadoId.trim() : "";
+      const adminIdPrestamo = typeof d.adminId === "string" ? d.adminId.trim() : "";
+      // empUid solo es válido si el empleadoId NO es el mismo que el adminId
+      const empUid: string | null =
+        empleadoIdPrestamo && empleadoIdPrestamo !== adminIdPrestamo
+          ? empleadoIdPrestamo
+          : null; // null = préstamo creado por el admin, no hay empleado titular
+      let adminEstaCobrando = apiUser.role === "admin";
+      const usuarioEmpRef = empUid
+        ? db
+            .collection(EMPRESAS_COLLECTION)
+            .doc(apiUser.empresaId)
+            .collection(USUARIOS_SUBCOLLECTION)
+            .doc(empUid)
+        : null;
 
       const rutaRef =
         rutaIdPrestamo && montoAplicar > 0
@@ -608,8 +615,14 @@ export async function POST(
           throw new Error("RUTA_NOT_FOUND");
         }
         if (!adminEstaCobrando) {
-          uSnap = await tx.get(usuarioEmpRef);
-          if (!uSnap.exists) throw new Error("EMPLEADO_USUARIO_NOT_FOUND");
+          if (!empUid || !usuarioEmpRef) {
+            // Préstamo creado por admin sin empleado asignado — cobro va a cajaRuta
+            // Tratar como si fuera el admin cobrando
+            adminEstaCobrando = true;
+          } else {
+            uSnap = await tx.get(usuarioEmpRef);
+            if (!uSnap.exists) throw new Error("EMPLEADO_USUARIO_NOT_FOUND");
+          }
         }
       }
 
@@ -659,7 +672,7 @@ export async function POST(
             ultimaActualizacion: nowTx,
           });
 
-          if (uSnap?.exists) {
+          if (uSnap?.exists && usuarioEmpRef) {
             const ud = uSnap.data() as Record<string, unknown>;
             const cEmp = typeof ud.cajaEmpleado === "number" ? ud.cajaEmpleado : 0;
             walletBalanceAfter = Math.round((cEmp + montoAcreditarCajaEmpleado) * 100) / 100;
@@ -689,6 +702,7 @@ export async function POST(
         adelantoCuota: adelantoParaGuardar,
         rutaId: rutaIdPrestamo || null,
         empleadoId: empUid,
+        adminEstaCobrando,
         cuotaCapital: parteCapital,
         cuotaGanancia: parteGanancia,
         walletBalanceAfter,
@@ -715,45 +729,87 @@ export async function POST(
 
     try {
       if (result.cuotaCapital > 0) {
-        await recordCreditMovement({
-          db,
-          empresaId: apiUser.empresaId,
-          walletType: "empleado_caja",
-          walletId: result.empleadoId,
-          amount: result.cuotaCapital,
-          eventType: "pago_prestamo_capital",
-          scope: "empleado",
-          createdBy: apiUser.uid,
-          relatedEntityType: "pago",
-          relatedEntityId: result.pagoId,
-          metadata: {
-            prestamoId,
-            rutaId: result.rutaId,
-            metodoPago: metodo,
-          },
-          operationId: `pago_capital:${result.pagoId}`,
-        });
+        if (result.adminEstaCobrando) {
+          await recordCreditMovement({
+            db,
+            empresaId: apiUser.empresaId,
+            walletType: "ruta_caja",
+            walletId: result.rutaId ?? "",
+            amount: result.cuotaCapital,
+            eventType: "pago_prestamo_admin",
+            scope: "ruta",
+            createdBy: apiUser.uid,
+            relatedEntityType: "pago",
+            relatedEntityId: result.pagoId,
+            metadata: {
+              prestamoId,
+              rutaId: result.rutaId,
+              metodoPago: metodo,
+            },
+            operationId: `pago_capital:${result.pagoId}`,
+          });
+        } else if (result.empleadoId) {
+          await recordCreditMovement({
+            db,
+            empresaId: apiUser.empresaId,
+            walletType: "empleado_caja",
+            walletId: result.empleadoId,
+            amount: result.cuotaCapital,
+            eventType: "pago_prestamo_capital",
+            scope: "empleado",
+            createdBy: apiUser.uid,
+            relatedEntityType: "pago",
+            relatedEntityId: result.pagoId,
+            metadata: {
+              prestamoId,
+              rutaId: result.rutaId,
+              metodoPago: metodo,
+            },
+            operationId: `pago_capital:${result.pagoId}`,
+          });
+        }
       }
       if (result.cuotaGanancia > 0) {
-        await recordCreditMovement({
-          db,
-          empresaId: apiUser.empresaId,
-          walletType: "empleado_caja",
-          walletId: result.empleadoId,
-          amount: result.cuotaGanancia,
-          balanceAfter: result.walletBalanceAfter,
-          eventType: "pago_prestamo_interes",
-          scope: "empleado",
-          createdBy: apiUser.uid,
-          relatedEntityType: "pago",
-          relatedEntityId: result.pagoId,
-          metadata: {
-            prestamoId,
-            rutaId: result.rutaId,
-            metodoPago: metodo,
-          },
-          operationId: `pago_interes:${result.pagoId}`,
-        });
+        if (result.adminEstaCobrando) {
+          await recordCreditMovement({
+            db,
+            empresaId: apiUser.empresaId,
+            walletType: "ruta_caja",
+            walletId: result.rutaId ?? "",
+            amount: result.cuotaGanancia,
+            eventType: "pago_prestamo_admin",
+            scope: "ruta",
+            createdBy: apiUser.uid,
+            relatedEntityType: "pago",
+            relatedEntityId: result.pagoId,
+            metadata: {
+              prestamoId,
+              rutaId: result.rutaId,
+              metodoPago: metodo,
+            },
+            operationId: `pago_interes:${result.pagoId}`,
+          });
+        } else if (result.empleadoId) {
+          await recordCreditMovement({
+            db,
+            empresaId: apiUser.empresaId,
+            walletType: "empleado_caja",
+            walletId: result.empleadoId,
+            amount: result.cuotaGanancia,
+            balanceAfter: result.walletBalanceAfter,
+            eventType: "pago_prestamo_interes",
+            scope: "empleado",
+            createdBy: apiUser.uid,
+            relatedEntityType: "pago",
+            relatedEntityId: result.pagoId,
+            metadata: {
+              prestamoId,
+              rutaId: result.rutaId,
+              metodoPago: metodo,
+            },
+            operationId: `pago_interes:${result.pagoId}`,
+          });
+        }
       }
     } catch (e) {
       console.warn("[ledger] No se pudo registrar movimiento de pago", e);
