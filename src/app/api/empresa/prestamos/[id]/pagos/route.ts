@@ -516,16 +516,6 @@ export async function POST(
   if (!prestamoPreRead.exists) {
     return NextResponse.json({ error: "Préstamo no encontrado" }, { status: 404 });
   }
-  const empleadoTitularCobro =
-    prestamoPreRead.exists &&
-    typeof prestamoPreRead.data()?.empleadoId === "string" &&
-    prestamoPreRead.data()!.empleadoId.trim()
-      ? (prestamoPreRead.data()!.empleadoId as string).trim()
-      : apiUser.uid;
-  const rutaIdPreRead =
-    prestamoPreRead.exists && typeof prestamoPreRead.data()?.rutaId === "string"
-      ? (prestamoPreRead.data()!.rutaId as string).trim()
-      : "";
   const keyTrimmed = typeof idempotencyKey === "string" ? idempotencyKey.trim() : "";
 
   try {
@@ -578,21 +568,15 @@ export async function POST(
       };
       if (keyTrimmed) pagoData.idempotencyKey = keyTrimmed;
 
-      const empleadoIdPrestamo =
-        typeof d.empleadoId === "string" ? d.empleadoId.trim() : "";
-      const adminIdPrestamo = typeof d.adminId === "string" ? d.adminId.trim() : "";
-      // empUid solo es válido si el empleadoId NO es el mismo que el adminId
-      const empUid: string | null =
-        empleadoIdPrestamo && empleadoIdPrestamo !== adminIdPrestamo
-          ? empleadoIdPrestamo
-          : null; // null = préstamo creado por el admin, no hay empleado titular
-      let adminEstaCobrando = apiUser.role === "admin";
-      const usuarioEmpRef = empUid
+      /** Destino del cobro según quien cobra (cobradoPorRol), no el titular del préstamo. */
+      const adminEstaCobrando = apiUser.role === "admin";
+      const cobradorEmpleadoUid = adminEstaCobrando ? null : apiUser.uid;
+      const usuarioEmpRef = cobradorEmpleadoUid
         ? db
             .collection(EMPRESAS_COLLECTION)
             .doc(apiUser.empresaId)
             .collection(USUARIOS_SUBCOLLECTION)
-            .doc(empUid)
+            .doc(cobradorEmpleadoUid)
         : null;
 
       const rutaRef =
@@ -614,15 +598,9 @@ export async function POST(
         if (!rutaSnap.exists) {
           throw new Error("RUTA_NOT_FOUND");
         }
-        if (!adminEstaCobrando) {
-          if (!empUid || !usuarioEmpRef) {
-            // Préstamo creado por admin sin empleado asignado — cobro va a cajaRuta
-            // Tratar como si fuera el admin cobrando
-            adminEstaCobrando = true;
-          } else {
-            uSnap = await tx.get(usuarioEmpRef);
-            if (!uSnap.exists) throw new Error("EMPLEADO_USUARIO_NOT_FOUND");
-          }
+        if (!adminEstaCobrando && usuarioEmpRef) {
+          uSnap = await tx.get(usuarioEmpRef);
+          if (!uSnap.exists) throw new Error("EMPLEADO_USUARIO_NOT_FOUND");
         }
       }
 
@@ -701,7 +679,7 @@ export async function POST(
         saldoPendiente: nuevoSaldo,
         adelantoCuota: adelantoParaGuardar,
         rutaId: rutaIdPrestamo || null,
-        empleadoId: empUid,
+        empleadoId: cobradorEmpleadoUid,
         adminEstaCobrando,
         cuotaCapital: parteCapital,
         cuotaGanancia: parteGanancia,

@@ -505,7 +505,7 @@ export type CobrosDelDiaEmpleadoResponse = {
   cajaEmpleado?: number;
   /** Total cobrado en ruta + base − gastos − préstamos desde tu caja (tarjeta «Tu caja del día»). */
   tuCajaDelDia: number;
-  /** Cobros del día que por reglas de negocio ingresan a tu billetera (titular del préstamo o cobrador si no hay titular). */
+  /** Cobros del día registrados por este trabajador (acreditan a su caja según cobradoPorRol empleado). */
   totalCobrosAcreditanTuCaja: number;
   totalGastosDia: number;
   gastosDelDia: GastoDiaItem[];

@@ -396,15 +396,10 @@ export async function buildCierreDiaSnapshot(
 
   cobros.sort((a, b) => (b.fecha ?? "").localeCompare(a.fecha ?? ""));
 
-  let totalCobrosAcreditanTuCaja = 0;
-  for (const row of pagosRaw) {
-    const titular = prestamoMeta.get(row.prestamoId)?.empleadoTitularId ?? "";
-    const vaATuCaja = titular
-      ? titular === empleadoUid
-      : row.empleadoIdRegistro === empleadoUid;
-    if (vaATuCaja) totalCobrosAcreditanTuCaja += row.monto;
-  }
-  totalCobrosAcreditanTuCaja = round2(totalCobrosAcreditanTuCaja);
+  /** Cobros del empleado en el día: el efectivo acredita a quien cobró (pagosRaw ya filtra por cobrador). */
+  const totalCobrosAcreditanTuCaja = round2(
+    pagosRaw.reduce((s, row) => s + row.monto, 0)
+  );
 
   const noPagos: NoPagoDiaSnapshotItem[] = noPagosRaw.map((row) => {
     const meta = prestamoMeta.get(row.prestamoId);
