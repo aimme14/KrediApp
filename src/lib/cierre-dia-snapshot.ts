@@ -396,9 +396,11 @@ export async function buildCierreDiaSnapshot(
 
   cobros.sort((a, b) => (b.fecha ?? "").localeCompare(a.fecha ?? ""));
 
-  /** Cobros del empleado en el día: el efectivo acredita a quien cobró (pagosRaw ya filtra por cobrador). */
+  /** Solo efectivo cobrado por el empleado acredita a su caja; transferencias van a cajaRuta. */
   const totalCobrosAcreditanTuCaja = round2(
-    pagosRaw.reduce((s, row) => s + row.monto, 0)
+    pagosRaw
+      .filter((row) => row.metodoPago === "efectivo")
+      .reduce((s, row) => s + row.monto, 0)
   );
 
   const noPagos: NoPagoDiaSnapshotItem[] = noPagosRaw.map((row) => {

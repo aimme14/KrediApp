@@ -568,9 +568,12 @@ export async function POST(
       };
       if (keyTrimmed) pagoData.idempotencyKey = keyTrimmed;
 
-      /** Destino del cobro según quien cobra (cobradoPorRol), no el titular del préstamo. */
-      const adminEstaCobrando = apiUser.role === "admin";
-      const cobradorEmpleadoUid = adminEstaCobrando ? null : apiUser.uid;
+      /**
+       * Efectivo: admin → cajaRuta; empleado → cajaEmpleado del cobrador.
+       * Transferencia: siempre cajaRuta (no pasa por el bolsillo del empleado).
+       */
+      const acreditaCajaRuta = apiUser.role === "admin" || metodo === "transferencia";
+      const cobradorEmpleadoUid = acreditaCajaRuta ? null : apiUser.uid;
       const usuarioEmpRef = cobradorEmpleadoUid
         ? db
             .collection(EMPRESAS_COLLECTION)
@@ -598,7 +601,7 @@ export async function POST(
         if (!rutaSnap.exists) {
           throw new Error("RUTA_NOT_FOUND");
         }
-        if (!adminEstaCobrando && usuarioEmpRef) {
+        if (!acreditaCajaRuta && usuarioEmpRef) {
           uSnap = await tx.get(usuarioEmpRef);
           if (!uSnap.exists) throw new Error("EMPLEADO_USUARIO_NOT_FOUND");
         }
@@ -616,7 +619,7 @@ export async function POST(
       });
 
       if (rutaRef && rutaSnap?.exists) {
-        if (adminEstaCobrando) {
+        if (acreditaCajaRuta) {
           const rutaData = rutaSnap.data() as Record<string, unknown>;
           const cajaRuta = typeof rutaData.cajaRuta === "number" ? rutaData.cajaRuta : 0;
           const cajasEmpleados =
@@ -680,7 +683,7 @@ export async function POST(
         adelantoCuota: adelantoParaGuardar,
         rutaId: rutaIdPrestamo || null,
         empleadoId: cobradorEmpleadoUid,
-        adminEstaCobrando,
+        acreditaCajaRuta,
         cuotaCapital: parteCapital,
         cuotaGanancia: parteGanancia,
         walletBalanceAfter,
@@ -707,7 +710,7 @@ export async function POST(
 
     try {
       if (result.cuotaCapital > 0) {
-        if (result.adminEstaCobrando) {
+        if (result.acreditaCajaRuta) {
           await recordCreditMovement({
             db,
             empresaId: apiUser.empresaId,
@@ -748,7 +751,7 @@ export async function POST(
         }
       }
       if (result.cuotaGanancia > 0) {
-        if (result.adminEstaCobrando) {
+        if (result.acreditaCajaRuta) {
           await recordCreditMovement({
             db,
             empresaId: apiUser.empresaId,
