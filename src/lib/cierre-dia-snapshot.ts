@@ -326,12 +326,15 @@ export async function buildCierreDiaSnapshot(
           if (tipo !== "pago") continue;
           const monto = typeof pd.monto === "number" && pd.monto > 0 ? pd.monto : 0;
           if (monto <= 0) continue;
+          const empleadoIdRegistro =
+            typeof pd.empleadoId === "string" ? pd.empleadoId.trim() : "";
+          // En el cierre del trabajador solo cuentan cobros registrados por ese trabajador.
+          // Si el admin registra un pago manualmente, no debe sumarse a la entrega del empleado.
+          if (empleadoIdRegistro !== empleadoUid) continue;
           const metodo =
             pd.metodoPago === "transferencia" || pd.metodoPago === "efectivo"
               ? (pd.metodoPago as string)
               : null;
-          const empleadoIdRegistro =
-            typeof pd.empleadoId === "string" ? pd.empleadoId.trim() : "";
           const evidenciaRaw = pd.evidencia;
           const evidencia =
             typeof evidenciaRaw === "string" && evidenciaRaw.trim() ? evidenciaRaw.trim() : null;

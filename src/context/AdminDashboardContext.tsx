@@ -108,6 +108,7 @@ export function AdminDashboardProvider({ children }: { children: ReactNode }) {
           const cajasEmpleados = typeof data.cajasEmpleados === "number" ? data.cajasEmpleados : 0;
           const inversiones = typeof data.inversiones === "number" ? data.inversiones : 0;
           const ganancias = typeof data.ganancias === "number" ? data.ganancias : 0;
+          const gastos = typeof data.gastos === "number" ? data.gastos : 0;
           const perdidas = typeof data.perdidas === "number" ? data.perdidas : 0;
           const capitalTotalRaw =
             typeof data.capitalTotal === "number" ? data.capitalTotal : undefined;
@@ -138,6 +139,7 @@ export function AdminDashboardProvider({ children }: { children: ReactNode }) {
             cajasEmpleados,
             inversiones,
             ganancias,
+            gastos,
             perdidas,
             capitalTotal,
             capitalRuta,
@@ -270,7 +272,7 @@ export function AdminDashboardProvider({ children }: { children: ReactNode }) {
       ubicacion: r.ubicacion,
       ingreso: 0,
       egreso: 0,
-      gastos: 0,
+      gastos: r.gastos ?? 0,
       salidas: 0,
       inversion: r.inversiones ?? 0,
       bolsa: r.ganancias ?? 0,

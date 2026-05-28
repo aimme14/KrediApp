@@ -4718,6 +4718,16 @@ th {
   box-shadow: 0 2px 8px rgba(251, 146, 60, 0.35);
 }
 
+.admin-inicio-metric-icon--amber {
+  background: linear-gradient(145deg, #fbbf24 0%, #b45309 100%);
+  box-shadow: 0 2px 8px rgba(251, 191, 36, 0.35);
+}
+
+.admin-inicio-metric-icon--blue {
+  background: linear-gradient(145deg, #38bdf8 0%, #1d4ed8 100%);
+  box-shadow: 0 2px 8px rgba(56, 189, 248, 0.33);
+}
+
 .admin-inicio-metric-icon--red {
   background: linear-gradient(145deg, #f87171 0%, #b91c1c 100%);
   box-shadow: 0 2px 8px rgba(248, 113, 113, 0.3);
