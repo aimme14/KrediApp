@@ -49,6 +49,76 @@ export function fechaDiaColombiaHoy(): string {
     .slice(0, 10);
 }
 
+const TZ_BOGOTA = "America/Bogota";
+/** Corte diario para notificaciones operativas FCM (hora local Colombia, 0–23). */
+const HORA_CORTE_NOTIF_OPERATIVA_COL = 23;
+
+function ymdYHoraColombia(instant: Date): { ymd: string; hour: number } {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: TZ_BOGOTA,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "numeric",
+    hour12: false,
+  }).formatToParts(instant);
+  const v = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((p) => p.type === type)?.value ?? "";
+  return {
+    ymd: `${v("year")}-${v("month")}-${v("day")}`,
+    hour: Number(v("hour")),
+  };
+}
+
+/**
+ * Notificación operativa vigente: mismo día calendario en Colombia y antes de las 23:00 hora Colombia.
+ */
+export function esDiaActualColombia(timestampMs: number): boolean {
+  const ts = Number(timestampMs);
+  if (!Number.isFinite(ts)) return false;
+  const notif = ymdYHoraColombia(new Date(ts));
+  const ahora = ymdYHoraColombia(new Date());
+  if (notif.ymd !== ahora.ymd) return false;
+  if (ahora.hour >= HORA_CORTE_NOTIF_OPERATIVA_COL) return false;
+  return true;
+}
+
+/**
+ * Misma lógica que `esDiaActualColombia`, como fuente JS para el Service Worker FCM.
+ * Inyectar en `firebase-messaging-sw.js/route.ts` — no editar a mano el cuerpo duplicado.
+ */
+export const ES_DIA_ACTUAL_COLOMBIA_SW_SOURCE = `function esDiaActualColombia(timestampMs) {
+  var ts = Number(timestampMs);
+  if (!Number.isFinite(ts)) return false;
+  var TZ = '${TZ_BOGOTA}';
+  var CORTE = ${HORA_CORTE_NOTIF_OPERATIVA_COL};
+  function ymdYHoraColombia(instant) {
+    var parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: TZ,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: 'numeric',
+      hour12: false,
+    }).formatToParts(instant);
+    var v = function (type) {
+      for (var i = 0; i < parts.length; i++) {
+        if (parts[i].type === type) return parts[i].value;
+      }
+      return '';
+    };
+    return {
+      ymd: v('year') + '-' + v('month') + '-' + v('day'),
+      hour: Number(v('hour')),
+    };
+  }
+  var notif = ymdYHoraColombia(new Date(ts));
+  var ahora = ymdYHoraColombia(new Date());
+  if (notif.ymd !== ahora.ymd) return false;
+  if (ahora.hour >= CORTE) return false;
+  return true;
+}`;
+
 /**
  * Convierte YYYY-MM-DD del cliente en el instante de inicio de ese día en Colombia.
  * Evita guardar medianoche UTC (parse de ISO fecha), que al mostrar en zona local aparece como el día anterior.

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { ES_DIA_ACTUAL_COLOMBIA_SW_SOURCE } from "@/lib/colombia-day-bounds";
 
 /**
  * Service Worker para FCM (web). Debe vivir en la raíz del sitio como `/firebase-messaging-sw.js`.
@@ -34,7 +35,7 @@ importScripts(
 firebase.initializeApp(${cfg});
 const messaging = firebase.messaging();
 
-var TTL_MS = 24 * 60 * 60 * 1000;
+${ES_DIA_ACTUAL_COLOMBIA_SW_SOURCE}
 
 function guardarNotificacionPendiente(payload) {
   try {
@@ -45,19 +46,24 @@ function guardarNotificacionPendiente(payload) {
     db.onsuccess = function (e) {
       const data = payload.data || {};
       const at = Date.now();
-      var existingAt = data.at ? parseInt(data.at, 10) : at;
-      if (!isNaN(existingAt) && at - existingAt >= TTL_MS) return;
-      const store = e.target.result
-        .transaction('pendientes', 'readwrite')
-        .objectStore('pendientes');
-      store.put({
-        id: data.gastoId || data.pagoId || data.clienteId || data.prestamoId || data.solicitudId || Date.now().toString(),
-        title: data.title || 'Notificación',
-        body: data.body || '',
-        type: data.type || '',
-        kind: data.type === 'cuota_prestamo' || data.type === 'prestamo_empleado' || data.type === 'solicitud_prestamo' ? 'cuota' : 'gasto',
-        at: at,
-      });
+      if (!esDiaActualColombia(at)) return;
+      const database = e.target.result;
+      const tx = database.transaction('pendientes', 'readwrite');
+      const store = tx.objectStore('pendientes');
+      const getAll = store.getAll();
+      getAll.onsuccess = function () {
+        (getAll.result || []).forEach(function (n) {
+          if (!esDiaActualColombia(n.at || 0)) store.delete(n.id);
+        });
+        store.put({
+          id: data.gastoId || data.pagoId || data.clienteId || data.prestamoId || data.solicitudId || String(at),
+          title: data.title || 'Notificación',
+          body: data.body || '',
+          type: data.type || '',
+          kind: data.type === 'cuota_prestamo' || data.type === 'prestamo_empleado' || data.type === 'solicitud_prestamo' ? 'cuota' : 'gasto',
+          at: at,
+        });
+      };
     };
   } catch (e) {
     console.warn('[SW] No se pudo guardar notificación pendiente:', e);

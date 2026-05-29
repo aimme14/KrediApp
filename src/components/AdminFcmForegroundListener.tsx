@@ -8,6 +8,7 @@ import {
   useGastoFcmCampanita,
   type OperativoFcmKind,
 } from "@/context/GastoFcmCampanitaContext";
+import { esDiaActualColombia } from "@/lib/colombia-day-bounds";
 
 function kindFromFcmDataType(t: string | undefined): OperativoFcmKind | null {
   if (t === "gasto_empleado") return "gasto";
@@ -23,8 +24,6 @@ function businessIdFromData(data: Record<string, string> | undefined): string | 
   if (!data) return null;
   return data.gastoId ?? data.pagoId ?? data.clienteId ?? data.prestamoId ?? data.solicitudId ?? null;
 }
-
-const TTL_MS = 24 * 60 * 60 * 1000; // 24 horas
 
 export function AdminFcmForegroundListener() {
   const { profile } = useAuth();
@@ -137,9 +136,8 @@ export function AdminFcmForegroundListener() {
               at: number;
             }>;
             if (pendientes.length === 0) return;
-            const ahora = Date.now();
-            const vigentes = pendientes.filter((n) => ahora - (n.at ?? 0) < TTL_MS);
-            const expirados = pendientes.filter((n) => ahora - (n.at ?? 0) >= TTL_MS);
+            const vigentes = pendientes.filter((n) => esDiaActualColombia(n.at ?? 0));
+            const expirados = pendientes.filter((n) => !esDiaActualColombia(n.at ?? 0));
             for (const n of expirados) {
               store.delete(n.id);
             }

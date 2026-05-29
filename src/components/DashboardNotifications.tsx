@@ -13,6 +13,7 @@ import {
   type SolicitudEntregaReporteApi,
   type SolicitudEntregaPendienteAdmin,
 } from "@/lib/empresa-api";
+import { esDiaActualColombia } from "@/lib/colombia-day-bounds";
 
 const EMPRESAS_COLLECTION = "empresas";
 const SOLICITUDES_SUBCOLLECTION = "solicitudesEntregaReporte";
@@ -30,8 +31,6 @@ function BellIcon() {
 const NOTIFICATIONS_PANEL_IDEAL_MAX_PX = 288;
 const NOTIFICATIONS_PANEL_FALLBACK_PX = 200;
 const NOTIFICATIONS_PANEL_VIEWPORT_MARGIN_PX = 10;
-const TTL_MS = 24 * 60 * 60 * 1000; // 24 horas
-
 function formatNotifTime(ms: number): string {
   return new Date(ms).toLocaleTimeString("es-CO", {
     hour: "2-digit",
@@ -114,15 +113,14 @@ function NotifAdminPendientes({
 }
 
 function NotifAdminOperativo({ lines }: { lines: OperativoFcmSessionItem[] }) {
-  const ahora = Date.now();
-  const vigentes = lines.filter((row) => ahora - (row.at ?? 0) < TTL_MS);
+  const vigentes = lines.filter((row) => esDiaActualColombia(row.at ?? Date.now()));
   if (vigentes.length === 0) return null;
   return (
     <>
       <div className="dashboard-notifications-operativo-header">
         <span>Notificaciones de hoy</span>
         <span style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
-          Se borran automáticamente después de 24 h
+          Se borran automáticamente a las 11 PM (hora Colombia)
         </span>
       </div>
       {vigentes.slice(0, 8).map((row) => (
@@ -413,9 +411,8 @@ export default function DashboardNotifications() {
       return 0;
     }
     if (role === "admin") {
-      const ahora = Date.now();
       const operativoUnread = sessionOperativoLines.filter(
-        (l) => !l.read && ahora - (l.at ?? 0) < TTL_MS
+        (l) => !l.read && esDiaActualColombia(l.at ?? Date.now())
       ).length;
       const pendingCount = dismissedSet.has(adminPendingKey) ? 0 : adminPendientes.length;
       return pendingCount + operativoUnread;

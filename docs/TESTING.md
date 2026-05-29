@@ -37,6 +37,8 @@ npm run test:watch
 
 Los tests se re-ejecutan automáticamente cada vez que guardas un archivo.
 
+> Usa `--watchAll` (no `--watch`) para que funcione aunque el proyecto no tenga Git inicializado.
+
 ---
 
 ## Estructura de tests
