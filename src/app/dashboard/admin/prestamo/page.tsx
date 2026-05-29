@@ -69,14 +69,6 @@ function ordenarPrestamosParaPrincipal(prestamos: PrestamoItem[]): PrestamoItem[
 
 type GrupoClientePrestamos = { clienteId: string; prestamos: PrestamoItem[] };
 
-/** Fecha actual en formato dd/mm/aaaa */
-function hoyDDMMAAAA(): string {
-  const d = new Date();
-  const day = String(d.getDate()).padStart(2, "0");
-  const month = String(d.getMonth() + 1).padStart(2, "0");
-  return `${day}/${month}/${d.getFullYear()}`;
-}
-
 export default function PrestamoPage() {
   const { user, profile } = useAuth();
   const searchParams = useSearchParams();
@@ -372,62 +364,80 @@ export default function PrestamoPage() {
             ×
           </button>
         </div>
-        <div className="form-group">
-          <label>Ruta</label>
-          <select
-            value={rutaIdForm}
-            onChange={(e) => setRutaIdForm(e.target.value)}
-            required
-            style={{ width: "100%", padding: "0.5rem" }}
-            aria-label="Seleccionar ruta"
-          >
-            <option value="">Seleccionar ruta</option>
-            {rutas.map((r) => (
-              <option key={r.id} value={r.id}>
-                {r.nombre}
-                {r.ubicacion ? ` · ${r.ubicacion}` : ""}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="form-group">
-          <label>Cliente</label>
-          <select
-            value={clienteId}
-            onChange={(e) => setClienteId(e.target.value)}
-            required={Boolean(rutaIdForm)}
-            disabled={!rutaIdForm}
-            style={{ width: "100%", padding: "0.5rem" }}
-            aria-label="Seleccionar cliente"
-          >
-            <option value="">{rutaIdForm ? "Seleccionar cliente" : "Primero elige una ruta"}</option>
-            {clientesSinPrestamoDeRuta.map((c) => {
-              const codigoPart = c.codigo ? `${formatClienteCodigoRutaYNumero(c.codigo)} · ` : "";
-              const cedulaPart = c.cedula ? ` · ${c.cedula}` : "";
-              return (
-                <option key={c.id} value={c.id}>
-                  {codigoPart}{c.nombre}{cedulaPart}
+        <div className="prestamo-admin-create-row prestamo-admin-create-row--top">
+          <div className="form-group prestamo-admin-create-ruta">
+            <label>Ruta</label>
+            <select
+              value={rutaIdForm}
+              onChange={(e) => setRutaIdForm(e.target.value)}
+              required
+              style={{ width: "100%", padding: "0.5rem" }}
+              aria-label="Seleccionar ruta"
+            >
+              <option value="">Seleccionar ruta</option>
+              {rutas.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.nombre}
+                  {r.ubicacion ? ` · ${r.ubicacion}` : ""}
                 </option>
-              );
-            })}
-            {rutaIdForm && clientesDeRuta.length === 0 && (
-              <option value="" disabled>No hay clientes en esta ruta</option>
-            )}
-            {rutaIdForm && clientesDeRuta.length > 0 && clientesSinPrestamoDeRuta.length === 0 && (
-              <option value="" disabled>Todos los clientes de esta ruta tienen préstamo activo o están marcados como morosos</option>
-            )}
-          </select>
-          {clienteSeleccionado && (
-            <p style={{ fontSize: "0.875rem", color: "var(--text-muted)", marginTop: "0.5rem", marginBottom: 0 }}>
-              Cliente:{" "}
-              {clienteSeleccionado.codigo && (
-                <span className="cliente-code">{formatClienteCodigoRutaYNumero(clienteSeleccionado.codigo)}</span>
+              ))}
+            </select>
+          </div>
+          <div className="form-group prestamo-admin-create-cliente">
+            <label>Cliente</label>
+            <select
+              value={clienteId}
+              onChange={(e) => setClienteId(e.target.value)}
+              required={Boolean(rutaIdForm)}
+              disabled={!rutaIdForm}
+              style={{ width: "100%", padding: "0.5rem" }}
+              aria-label="Seleccionar cliente"
+            >
+              <option value="">{rutaIdForm ? "Seleccionar cliente" : "Primero elige una ruta"}</option>
+              {clientesSinPrestamoDeRuta.map((c) => {
+                const codigoPart = c.codigo ? `${formatClienteCodigoRutaYNumero(c.codigo)} · ` : "";
+                const cedulaPart = c.cedula ? ` · ${c.cedula}` : "";
+                return (
+                  <option key={c.id} value={c.id}>
+                    {codigoPart}{c.nombre}{cedulaPart}
+                  </option>
+                );
+              })}
+              {rutaIdForm && clientesDeRuta.length === 0 && (
+                <option value="" disabled>No hay clientes en esta ruta</option>
               )}
-              {clienteSeleccionado.codigo && " · "}
-              <strong>{clienteSeleccionado.nombre}</strong>
-              {clienteSeleccionado.cedula && <> · Céd. {clienteSeleccionado.cedula}</>}
-            </p>
-          )}
+              {rutaIdForm && clientesDeRuta.length > 0 && clientesSinPrestamoDeRuta.length === 0 && (
+                <option value="" disabled>Todos los clientes de esta ruta tienen préstamo activo o están marcados como morosos</option>
+              )}
+            </select>
+            {clienteSeleccionado && (
+              <p style={{ fontSize: "0.875rem", color: "var(--text-muted)", marginTop: "0.5rem", marginBottom: 0 }}>
+                Cliente:{" "}
+                {clienteSeleccionado.codigo && (
+                  <span className="cliente-code">{formatClienteCodigoRutaYNumero(clienteSeleccionado.codigo)}</span>
+                )}
+                {clienteSeleccionado.codigo && " · "}
+                <strong>{clienteSeleccionado.nombre}</strong>
+                {clienteSeleccionado.cedula && <> · Céd. {clienteSeleccionado.cedula}</>}
+              </p>
+            )}
+          </div>
+          <div className="form-group prestamo-admin-create-monto">
+            <label>Cantidad a prestar</label>
+            <input
+              type="text"
+              inputMode="decimal"
+              value={monto ? formatMontoDecimalCOPDisplay(monto) : ""}
+              onChange={(e) => setMonto(sanitizeMontoDecimalCOP(e.target.value))}
+              required
+              placeholder="0,00"
+            />
+            {rutaIdForm && (
+              <p style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "0.25rem" }}>
+                Base disponible en ruta: <strong>$ {formatMoneda(cajaRuta)}</strong>
+              </p>
+            )}
+          </div>
         </div>
 
         {clienteId && (
@@ -498,18 +508,7 @@ export default function PrestamoPage() {
           </div>
         )}
 
-        <div className="prestamo-admin-create-row">
-          <div className="form-group prestamo-admin-create-fecha">
-            <label>Fecha de creación</label>
-            <input
-              type="text"
-              readOnly
-              value={hoyDDMMAAAA()}
-              aria-label="Fecha de creación (día actual)"
-              className="prestamo-admin-create-fecha-input"
-              style={{ backgroundColor: "var(--bg)", cursor: "default" }}
-            />
-          </div>
+        <div className="prestamo-admin-create-row prestamo-admin-create-row--terms">
           <div className="form-group prestamo-admin-create-freq">
             <label>Frecuencia de pago</label>
             <select
@@ -523,25 +522,6 @@ export default function PrestamoPage() {
                 </option>
               ))}
             </select>
-          </div>
-        </div>
-
-        <div className="prestamo-admin-create-row">
-          <div className="form-group prestamo-admin-create-monto">
-            <label>Cantidad a prestar</label>
-            <input
-              type="text"
-              inputMode="decimal"
-              value={monto ? formatMontoDecimalCOPDisplay(monto) : ""}
-              onChange={(e) => setMonto(sanitizeMontoDecimalCOP(e.target.value))}
-              required
-              placeholder="0,00"
-            />
-            {rutaIdForm && (
-              <p style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "0.25rem" }}>
-                Base disponible en ruta: <strong>$ {formatMoneda(cajaRuta)}</strong>
-              </p>
-            )}
           </div>
           <div className="form-group prestamo-admin-create-cuotas">
             <label>Número de cuotas</label>
@@ -564,12 +544,6 @@ export default function PrestamoPage() {
               aria-label="Número de cuotas"
             />
           </div>
-          <p className="prestamo-admin-create-field-hint prestamo-admin-create-field-hint--cuotas">
-
-          </p>
-        </div>
-
-        <div className="prestamo-admin-create-row">
           <div className="form-group prestamo-admin-create-interes">
             <label>Interés (%)</label>
             <input
@@ -607,9 +581,6 @@ export default function PrestamoPage() {
               style={{ backgroundColor: "var(--bg)", cursor: "default" }}
             />
           </div>
-          <p className="prestamo-admin-create-field-hint prestamo-admin-create-field-hint--cuota">
-            
-          </p>
         </div>
         {totalAPagar > 0 && (
           <div

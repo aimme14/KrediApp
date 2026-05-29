@@ -2049,42 +2049,38 @@ td {
 }
 
 @media (min-width: 769px) {
-  .prestamo-admin-create-form {
-    display: flex;
-    flex-direction: column;
-  }
-
   .prestamo-admin-create-form .prestamo-admin-create-row {
-    display: contents;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem 1rem;
+    margin-bottom: 1rem;
   }
 
-  .prestamo-admin-create-form .prestamo-admin-create-fecha {
-    order: 1;
+  .prestamo-admin-create-form .prestamo-admin-create-row--top {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
-  .prestamo-admin-create-form .prestamo-admin-create-freq {
-    order: 2;
+
+  .prestamo-admin-create-form .prestamo-admin-create-row--terms {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
-  .prestamo-admin-create-form .prestamo-admin-create-interes {
-    order: 3;
-  }
-  .prestamo-admin-create-form .prestamo-admin-create-monto {
-    order: 4;
-  }
-  .prestamo-admin-create-form .prestamo-admin-create-cuotas {
-    order: 5;
-  }
-  .prestamo-admin-create-form .prestamo-admin-create-field-hint--cuotas {
-    order: 6;
-  }
-  .prestamo-admin-create-form .prestamo-admin-create-cuota {
-    order: 7;
-  }
-  .prestamo-admin-create-form .prestamo-admin-create-field-hint--cuota {
-    order: 8;
+
+  .prestamo-admin-create-form .prestamo-admin-create-row .form-group {
+    margin-bottom: 0;
+    min-width: 0;
   }
 
   .prestamo-admin-create-form .prestamo-admin-create-field-hint {
-    margin-bottom: 1rem;
+    grid-column: 1 / -1;
+    margin-bottom: 0;
+  }
+
+  .prestamo-admin-create-form .prestamo-admin-create-fecha-input {
+    max-width: none;
+    width: 100%;
+  }
+
+  .prestamo-admin-create-actions {
+    margin-top: 0.25rem;
   }
 }
 
