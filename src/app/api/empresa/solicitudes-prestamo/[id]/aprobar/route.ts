@@ -8,8 +8,8 @@ import {
   PRESTAMOS_SUBCOLLECTION,
   CLIENTES_SUBCOLLECTION,
   USUARIOS_SUBCOLLECTION,
+  RUTAS_SUBCOLLECTION,
 } from "@/lib/empresas-db";
-import { registrarPrestamoDesdeCajaEmpleado } from "@/lib/ruta-financiera-admin";
 import { recordDebitMovement } from "@/lib/financial-ledger";
 import {
   getNextWorkingDay,
@@ -97,30 +97,6 @@ export async function POST(
   }
 
   let ledgerBalanceAfter: number | undefined;
-  try {
-    await registrarPrestamoDesdeCajaEmpleado(
-      db,
-      apiUser.empresaId,
-      rutaId,
-      empleadoUid,
-      monto
-    );
-    const empSnap = await db
-      .collection(EMPRESAS_COLLECTION)
-      .doc(apiUser.empresaId)
-      .collection(USUARIOS_SUBCOLLECTION)
-      .doc(empleadoUid)
-      .get();
-    const cajaEmp = empSnap.data()?.cajaEmpleado;
-    if (typeof cajaEmp === "number") ledgerBalanceAfter = cajaEmp;
-  } catch (e) {
-    return NextResponse.json(
-      {
-        error: e instanceof Error ? e.message : "Error al desembolsar desde caja del empleado",
-      },
-      { status: 400 }
-    );
-  }
 
   const prestamoRef = db
     .collection(EMPRESAS_COLLECTION)
@@ -128,41 +104,153 @@ export async function POST(
     .collection(PRESTAMOS_SUBCOLLECTION)
     .doc();
 
-  await prestamoRef.set({
-    clienteId,
-    clienteNombre,
-    rutaId,
-    adminId: apiUser.uid,
-    empleadoId: empleadoUid,
-    monto,
-    interes,
-    modalidad,
-    numeroCuotas,
-    totalAPagar,
-    saldoPendiente: totalAPagar,
-    estado: "activo",
-    fechaInicio: inicio,
-    fechaVencimiento,
-    multaMora: 0,
-    adelantoCuota: 0,
-    intentosFallidos: 0,
-    desembolsoDesde: "caja_empleado",
-    creadoEn: FieldValue.serverTimestamp(),
-  });
-
-  await db
+  const clienteRef = db
     .collection(EMPRESAS_COLLECTION)
     .doc(apiUser.empresaId)
     .collection(CLIENTES_SUBCOLLECTION)
-    .doc(clienteId)
-    .update({ prestamo_activo: true });
+    .doc(clienteId);
 
-  await db
+  const adminUsuarioRef = db
     .collection(EMPRESAS_COLLECTION)
     .doc(apiUser.empresaId)
     .collection(USUARIOS_SUBCOLLECTION)
-    .doc(apiUser.uid)
-    .set({ totalPrestamosActivos: FieldValue.increment(1) }, { merge: true });
+    .doc(apiUser.uid);
+
+  const empleadoRef = db
+    .collection(EMPRESAS_COLLECTION)
+    .doc(apiUser.empresaId)
+    .collection(USUARIOS_SUBCOLLECTION)
+    .doc(empleadoUid);
+
+  const rutaRef = db
+    .collection(EMPRESAS_COLLECTION)
+    .doc(apiUser.empresaId)
+    .collection(RUTAS_SUBCOLLECTION)
+    .doc(rutaId);
+
+  try {
+    await db.runTransaction(async (tx) => {
+      const clienteSnapTx = await tx.get(clienteRef);
+      if (!clienteSnapTx.exists) {
+        throw new Error("CLIENTE_NOT_FOUND");
+      }
+      const clienteData = clienteSnapTx.data() as Record<string, unknown>;
+      if (clienteData.moroso === true) {
+        throw new Error("CLIENTE_MOROSO");
+      }
+      if (clienteData.prestamo_activo === true) {
+        throw new Error("CLIENTE_CON_PRESTAMO_ACTIVO");
+      }
+
+      const [empleadoSnap, rutaSnap] = await Promise.all([
+        tx.get(empleadoRef),
+        tx.get(rutaRef),
+      ]);
+
+      if (!empleadoSnap.exists) throw new Error("EMPLEADO_NOT_FOUND");
+      if (!rutaSnap.exists) throw new Error("RUTA_NOT_FOUND");
+
+      const empData = empleadoSnap.data() as Record<string, unknown>;
+      const rutaData = rutaSnap.data() as Record<string, unknown>;
+
+      const cajaEmp = typeof empData.cajaEmpleado === "number" ? empData.cajaEmpleado : 0;
+      if (cajaEmp < monto) throw new Error("SALDO_INSUFICIENTE_EMPLEADO");
+
+      const cajaRuta = typeof rutaData.cajaRuta === "number" ? rutaData.cajaRuta : 0;
+      const cajasEmpleados =
+        typeof rutaData.cajasEmpleados === "number" ? rutaData.cajasEmpleados : 0;
+      const inversiones = typeof rutaData.inversiones === "number" ? rutaData.inversiones : 0;
+
+      const nuevaCajaEmp = Math.round((cajaEmp - monto) * 100) / 100;
+      const nuevaInversiones = Math.round((inversiones + monto) * 100) / 100;
+      const nuevoCajasEmpleados = Math.round((cajasEmpleados - monto) * 100) / 100;
+
+      ledgerBalanceAfter = nuevaCajaEmp;
+
+      tx.update(empleadoRef, {
+        cajaEmpleado: nuevaCajaEmp,
+        ultimaActualizacionCapital: new Date(),
+      });
+      tx.update(rutaRef, {
+        cajasEmpleados: nuevoCajasEmpleados,
+        inversiones: nuevaInversiones,
+        capitalTotal: Math.round((cajaRuta + nuevoCajasEmpleados + nuevaInversiones) * 100) / 100,
+        ultimaActualizacion: new Date(),
+      });
+
+      tx.set(prestamoRef, {
+        clienteId,
+        clienteNombre,
+        rutaId,
+        adminId: apiUser.uid,
+        empleadoId: empleadoUid,
+        monto,
+        interes,
+        modalidad,
+        numeroCuotas,
+        totalAPagar,
+        saldoPendiente: totalAPagar,
+        estado: "activo",
+        fechaInicio: inicio,
+        fechaVencimiento,
+        multaMora: 0,
+        adelantoCuota: 0,
+        intentosFallidos: 0,
+        desembolsoDesde: "caja_empleado",
+        creadoEn: FieldValue.serverTimestamp(),
+      });
+
+      tx.update(clienteRef, { prestamo_activo: true });
+
+      tx.set(
+        adminUsuarioRef,
+        { totalPrestamosActivos: FieldValue.increment(1) },
+        { merge: true }
+      );
+
+      tx.update(solRef, {
+        estado: "aprobada",
+        prestamoId: prestamoRef.id,
+        resueltaEn: FieldValue.serverTimestamp(),
+        resueltaPorUid: apiUser.uid,
+      });
+    });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "";
+    if (msg === "CLIENTE_NOT_FOUND") {
+      return NextResponse.json({ error: "Cliente no encontrado" }, { status: 404 });
+    }
+    if (msg === "CLIENTE_MOROSO") {
+      return NextResponse.json(
+        { error: "No se puede otorgar préstamo a un cliente moroso" },
+        { status: 400 }
+      );
+    }
+    if (msg === "CLIENTE_CON_PRESTAMO_ACTIVO") {
+      return NextResponse.json(
+        {
+          error:
+            "El cliente ya tiene un préstamo activo — la solicitud fue rechazada automáticamente",
+        },
+        { status: 400 }
+      );
+    }
+    if (msg === "EMPLEADO_NOT_FOUND") {
+      return NextResponse.json({ error: "Empleado no encontrado" }, { status: 400 });
+    }
+    if (msg === "RUTA_NOT_FOUND") {
+      return NextResponse.json({ error: "Ruta no encontrada" }, { status: 400 });
+    }
+    if (msg === "SALDO_INSUFICIENTE_EMPLEADO") {
+      return NextResponse.json(
+        {
+          error: "El empleado no tiene saldo suficiente en su caja para este préstamo",
+        },
+        { status: 400 }
+      );
+    }
+    throw e;
+  }
 
   try {
     await recordDebitMovement({
@@ -191,13 +279,6 @@ export async function POST(
   } catch (e) {
     console.warn("[ledger] No se pudo registrar movimiento de desembolso", e);
   }
-
-  await solRef.update({
-    estado: "aprobada",
-    prestamoId: prestamoRef.id,
-    resueltaEn: FieldValue.serverTimestamp(),
-    resueltaPorUid: apiUser.uid,
-  });
 
   void (async () => {
     try {

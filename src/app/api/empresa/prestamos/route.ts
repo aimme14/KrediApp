@@ -143,11 +143,6 @@ export async function POST(request: NextRequest) {
     .collection(CLIENTES_SUBCOLLECTION)
     .doc(clienteId.trim());
   const clienteSnap = await clienteRef.get();
-  if (clienteSnap.exists && clienteSnap.data()?.moroso === true) {
-    return finalize(400, {
-      error: "No se puede otorgar préstamo a un cliente moroso (excluido)",
-    });
-  }
 
   if (typeof monto !== "number" || monto <= 0) {
     return finalize(400, { error: "Monto debe ser un número positivo" });
@@ -260,44 +255,70 @@ export async function POST(request: NextRequest) {
       apiUser.uid;
   }
 
-  await ref.set({
-    clienteId: clienteId.trim(),
-    clienteNombre,
-    rutaId: rutaIdPrestamo,
-    adminId: adminIdPrestamo,
-    empleadoId: empleadoIdPrestamo,
-    monto,
-    interes: interesPct,
-    modalidad: mod,
-    numeroCuotas,
-    totalAPagar,
-    saldoPendiente: totalAPagar,
-    estado: "activo",
-    fechaInicio: inicio,
-    fechaVencimiento,
-    multaMora: typeof multaMora === "number" ? multaMora : 0,
-    adelantoCuota: 0,
-    creadoEn: FieldValue.serverTimestamp(),
-    ...(rutaIdPrestamo
-      ? {
-          desembolsoDesde:
-            apiUser.role === "empleado" ? "caja_empleado" : "caja_ruta",
-        }
-      : {}),
-  });
+  try {
+    await db.runTransaction(async (tx) => {
+      const clienteSnapTx = await tx.get(clienteRef);
+      if (!clienteSnapTx.exists) {
+        throw new Error("CLIENTE_NOT_FOUND");
+      }
+      const clienteData = clienteSnapTx.data() as Record<string, unknown>;
+      if (clienteData.moroso === true) {
+        throw new Error("CLIENTE_MOROSO");
+      }
+      if (clienteData.prestamo_activo === true) {
+        throw new Error("CLIENTE_CON_PRESTAMO_ACTIVO");
+      }
 
-  await db
-    .collection(EMPRESAS_COLLECTION)
-    .doc(apiUser.empresaId)
-    .collection(USUARIOS_SUBCOLLECTION)
-    .doc(adminIdPrestamo)
-    .set(
-      { totalPrestamosActivos: FieldValue.increment(1) },
-      { merge: true }
-    );
+      tx.set(ref, {
+        clienteId: clienteId.trim(),
+        clienteNombre,
+        rutaId: rutaIdPrestamo,
+        adminId: adminIdPrestamo,
+        empleadoId: empleadoIdPrestamo,
+        monto,
+        interes: interesPct,
+        modalidad: mod,
+        numeroCuotas,
+        totalAPagar,
+        saldoPendiente: totalAPagar,
+        estado: "activo",
+        fechaInicio: inicio,
+        fechaVencimiento,
+        multaMora: typeof multaMora === "number" ? multaMora : 0,
+        adelantoCuota: 0,
+        creadoEn: FieldValue.serverTimestamp(),
+        ...(rutaIdPrestamo
+          ? {
+              desembolsoDesde:
+                apiUser.role === "empleado" ? "caja_empleado" : "caja_ruta",
+            }
+          : {}),
+      });
 
-  if (clienteSnap.exists) {
-    await clienteRef.update({ prestamo_activo: true });
+      tx.set(
+        db
+          .collection(EMPRESAS_COLLECTION)
+          .doc(apiUser.empresaId)
+          .collection(USUARIOS_SUBCOLLECTION)
+          .doc(adminIdPrestamo),
+        { totalPrestamosActivos: FieldValue.increment(1) },
+        { merge: true }
+      );
+
+      tx.update(clienteRef, { prestamo_activo: true });
+    });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "";
+    if (msg === "CLIENTE_NOT_FOUND") {
+      return finalize(404, { error: "Cliente no encontrado" });
+    }
+    if (msg === "CLIENTE_MOROSO") {
+      return finalize(400, { error: "No se puede otorgar préstamo a un cliente moroso" });
+    }
+    if (msg === "CLIENTE_CON_PRESTAMO_ACTIVO") {
+      return finalize(400, { error: "El cliente ya tiene un préstamo activo" });
+    }
+    throw e;
   }
 
   if (rutaIdPrestamo && ledgerWalletType && ledgerWalletId) {

@@ -113,15 +113,17 @@ export async function crearSolicitudPrestamo(
     .collection(CLIENTES_SUBCOLLECTION)
     .doc(params.clienteId)
     .get();
+
   if (!clienteSnap.exists) throw new Error("Cliente no encontrado");
-  if (clienteSnap.data()?.moroso === true) {
+  const clienteData = clienteSnap.data() as Record<string, unknown>;
+  if (clienteData.moroso === true) {
     throw new Error("No se puede solicitar préstamo para un cliente moroso");
   }
-  if (clienteSnap.data()?.prestamo_activo === true) {
+  if (clienteData.prestamo_activo === true) {
     throw new Error("El cliente ya tiene un préstamo activo");
   }
-  const clienteNombre = typeof clienteSnap.data()?.nombre === "string"
-    ? clienteSnap.data()!.nombre.trim() : "—";
+  const clienteNombre = typeof clienteData.nombre === "string"
+    ? clienteData.nombre.trim() : "—";
 
   const ref = db
     .collection(EMPRESAS_COLLECTION)
