@@ -14,6 +14,7 @@ import { db } from "@/lib/firebase";
 import { useAuth } from "@/context/AuthContext";
 import {
   EMPRESAS_COLLECTION,
+  GASTOS_ADMIN_SUBCOLLECTION,
   RUTAS_SUBCOLLECTION,
   USUARIOS_SUBCOLLECTION,
   USERS_COLLECTION,
@@ -55,7 +56,10 @@ const AdminDashboardContext = createContext<AdminDashboardContextValue | null>(n
 export function AdminDashboardProvider({ children }: { children: ReactNode }) {
   const { user, profile } = useAuth();
 
-  const [rutas, setRutas] = useState<AdminRutaLive[]>([]);
+  const [rutasBase, setRutasBase] = useState<AdminRutaLive[]>([]);
+  const [gastosAdminPorRuta, setGastosAdminPorRuta] = useState<Map<string, number>>(
+    () => new Map()
+  );
   const [empleadosPorRuta, setEmpleadosPorRuta] = useState<Map<string, AdminEmpleadoLive[]>>(
     () => new Map()
   );
@@ -80,12 +84,12 @@ export function AdminDashboardProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!db) {
       setError("Firestore no está configurado en el cliente");
-      setRutas([]);
+      setRutasBase([]);
       setLoading(false);
       return;
     }
     if (!user || !profile || profile.role !== "admin" || !profile.empresaId) {
-      setRutas([]);
+      setRutasBase([]);
       setLoading(false);
       return;
     }
@@ -146,7 +150,7 @@ export function AdminDashboardProvider({ children }: { children: ReactNode }) {
           };
         });
 
-        setRutas(lista);
+        setRutasBase(lista);
         setLoading(false);
         setError(null);
       },
@@ -158,6 +162,52 @@ export function AdminDashboardProvider({ children }: { children: ReactNode }) {
 
     return () => unsub();
   }, [user, profile, refreshCaja]);
+
+  useEffect(() => {
+    if (!db || !user || !profile || profile.role !== "admin" || !profile.empresaId) {
+      setGastosAdminPorRuta(new Map());
+      return;
+    }
+
+    const gastosCol = collection(
+      db,
+      EMPRESAS_COLLECTION,
+      profile.empresaId,
+      GASTOS_ADMIN_SUBCOLLECTION
+    );
+    const qGastos = query(
+      gastosCol,
+      where("adminId", "==", user.uid),
+      where("alcance", "==", "ruta")
+    );
+
+    const unsub = onSnapshot(
+      qGastos,
+      (snap) => {
+        const map = new Map<string, number>();
+        for (const d of snap.docs) {
+          const data = d.data() as Record<string, unknown>;
+          const rutaId = typeof data.rutaId === "string" ? data.rutaId.trim() : "";
+          if (!rutaId) continue;
+          const monto = typeof data.monto === "number" ? data.monto : 0;
+          map.set(rutaId, (map.get(rutaId) ?? 0) + monto);
+        }
+        setGastosAdminPorRuta(map);
+      },
+      (err) => {
+        console.warn("[AdminDashboardContext] Error al suscribirse a gastos admin por ruta:", err);
+      }
+    );
+
+    return () => unsub();
+  }, [user, profile]);
+
+  const rutas = useMemo((): AdminRutaLive[] => {
+    return rutasBase.map((r) => ({
+      ...r,
+      gastos: (r.gastos ?? 0) + (gastosAdminPorRuta.get(r.id) ?? 0),
+    }));
+  }, [rutasBase, gastosAdminPorRuta]);
 
   useEffect(() => {
     if (!db || !user || !profile || profile.role !== "admin" || !profile.empresaId) {

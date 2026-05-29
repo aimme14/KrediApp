@@ -91,7 +91,10 @@ export async function GET(request: NextRequest) {
     const perdidas = typeof data.perdidas === "number" ? data.perdidas : 0;
 
     const ingreso = prestamosPorRuta.get(rutaId) ?? 0;
-    const gastosRuta = gastosPorRuta.get(rutaId) ?? 0;
+    const gastosEmpleados =
+      typeof data.gastos === "number" ? data.gastos : 0;
+    const gastosAdminRuta = gastosPorRuta.get(rutaId) ?? 0;
+    const gastosRuta = gastosEmpleados + gastosAdminRuta;
     const utilidad = ganancias - gastosRuta - perdidas;
 
     const capitalTotalRaw =
