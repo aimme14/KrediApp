@@ -216,6 +216,75 @@ export async function buildPeriodoAdminPdf(payload: PeriodoAdminPdfPayload): Pro
 
   y -= 56;
 
+  // ── Sección Admin ─────────────────────────────────────────────────────────
+  ensure(50);
+  y -= 6;
+  txt("Posicion del Administrador", ML, y, 10, fontBold, C.brand);
+  y -= 14;
+
+  const adminKpis: {
+    label: string;
+    value: string;
+    delta?: boolean;
+    deltaVal?: number | null;
+  }[] = [
+    {
+      label: "Caja admin apertura",
+      value: fmtMoney(payload.apertura.admin.cajaAdmin),
+    },
+    {
+      label: "Caja admin cierre",
+      value: payload.cierre ? fmtMoney(payload.cierre.admin.cajaAdmin) : "—",
+    },
+    {
+      label: "Capital admin apertura",
+      value: fmtMoney(payload.apertura.admin.capitalAdmin),
+    },
+    {
+      label: "Capital admin cierre",
+      value: payload.cierre ? fmtMoney(payload.cierre.admin.capitalAdmin) : "—",
+    },
+    {
+      label: "Variacion capital admin",
+      value: payload.cierre
+        ? fmtDelta(payload.apertura.admin.capitalAdmin, payload.cierre.admin.capitalAdmin)
+        : "—",
+      delta: true,
+      deltaVal: payload.cierre
+        ? payload.cierre.admin.capitalAdmin - payload.apertura.admin.capitalAdmin
+        : null,
+    },
+    {
+      label: "Ganancias rutas",
+      value: fmtMoney(gananciasRutasAdmin(payload.cierre ?? payload.apertura)),
+    },
+  ];
+
+  const adminKpiW = (CONTENT_W - 20) / 6;
+  adminKpis.forEach((kpi, i) => {
+    const kx = ML + i * (adminKpiW + 4);
+    const cardColor = kpi.delta
+      ? (kpi.deltaVal !== null && kpi.deltaVal !== undefined && kpi.deltaVal >= 0 ? C.success : C.danger)
+      : C.accent;
+
+    page.drawRectangle({ x: kx, y: y - 40, width: adminKpiW, height: 40, color: rgb(0.97, 0.97, 0.98) });
+    page.drawRectangle({ x: kx, y: y - 40, width: 3, height: 40, color: cardColor });
+    txt(kpi.label, kx + 7, y - 12, 6.5, font, C.muted, adminKpiW - 10);
+    txt(
+      kpi.value,
+      kx + 7,
+      y - 27,
+      9,
+      fontBold,
+      kpi.delta && kpi.deltaVal !== null && kpi.deltaVal !== undefined
+        ? (kpi.deltaVal >= 0 ? C.success : C.danger)
+        : C.text,
+      adminKpiW - 10
+    );
+  });
+
+  y -= 52;
+
   // ── Tabla de rutas ────────────────────────────────────────────────────────
 
   ensure(40);
@@ -223,29 +292,34 @@ export async function buildPeriodoAdminPdf(payload: PeriodoAdminPdfPayload): Pro
   txt("Detalle por Ruta", ML, y, 10, fontBold, C.brand);
   y -= 14;
 
-  // Columnas: Ruta | Cap.Ap | Cap.Ci | Variacion | Ganancias | Gastos | Perdidas | Utilidad
   const cols = {
-    nombre:    { x: ML,           w: 130 },
-    capAp:     { x: ML + 134,     w: 82  },
-    capCi:     { x: ML + 220,     w: 82  },
-    variacion: { x: ML + 306,     w: 82  },
-    ganancias: { x: ML + 392,     w: 82  },
-    gastos:    { x: ML + 478,     w: 82  },
-    perdidas:  { x: ML + 564,     w: 72  },
-    utilidad:  { x: ML + 640,     w: 90  },
+    nombre:      { x: ML,       w: 90  },
+    cajaAp:      { x: ML + 94,  w: 68  },
+    cajaCi:      { x: ML + 166, w: 68  },
+    inversiones: { x: ML + 238, w: 68  },
+    capAp:       { x: ML + 310, w: 68  },
+    capCi:       { x: ML + 382, w: 68  },
+    variacion:   { x: ML + 454, w: 68  },
+    ganancias:   { x: ML + 526, w: 62  },
+    gastos:      { x: ML + 592, w: 62  },
+    perdidas:    { x: ML + 658, w: 56  },
+    utilidad:    { x: ML + 718, w: 52  },
   };
 
   // Header de tabla
   page.drawRectangle({ x: ML, y: y - 18, width: CONTENT_W, height: 18, color: C.headBg });
   const headers: [string, keyof typeof cols][] = [
-    ["Ruta",       "nombre"],
-    ["Cap. Inicio","capAp"],
-    ["Cap. Final", "capCi"],
-    ["Variacion",  "variacion"],
-    ["Ganancias",  "ganancias"],
-    ["Gastos tot.", "gastos"],
-    ["Perdidas",   "perdidas"],
-    ["Util. cap.", "utilidad"],
+    ["Ruta",        "nombre"],
+    ["Caja inicio", "cajaAp"],
+    ["Caja final",  "cajaCi"],
+    ["Inversiones", "inversiones"],
+    ["Cap. inicio", "capAp"],
+    ["Cap. final",  "capCi"],
+    ["Variacion",   "variacion"],
+    ["Ganancias",   "ganancias"],
+    ["Gastos",      "gastos"],
+    ["Perdidas",    "perdidas"],
+    ["Utilidad",    "utilidad"],
   ];
   headers.forEach(([label, col]) => {
     txt(label, cols[col].x + 3, y - 12, 7, fontBold, C.headText);
@@ -273,29 +347,32 @@ export async function buildPeriodoAdminPdf(payload: PeriodoAdminPdfPayload): Pro
       page.drawRectangle({ x: ML, y: y - 15, width: CONTENT_W, height: 15, color: C.rowEven });
     }
 
-    txt(nombre,              cols.nombre.x + 3,    y - 10, 8, fontBold, C.text, cols.nombre.w - 4);
-    txt(fmtMoney(capAp),     cols.capAp.x + 3,     y - 10, 8, font, C.text);
-    txt(capCi !== null ? fmtMoney(capCi) : "—", cols.capCi.x + 3, y - 10, 8, font, C.text);
+    txt(nombre, cols.nombre.x + 3, y - 10, 7, fontBold, C.text, cols.nombre.w - 4);
+    txt(fmtMoney(ra?.cajaRuta ?? 0), cols.cajaAp.x + 3, y - 10, 7, font, C.text);
+    txt(rc ? fmtMoney(rc.cajaRuta) : "—", cols.cajaCi.x + 3, y - 10, 7, font, C.text);
+    txt(fmtMoney(rc?.inversiones ?? ra?.inversiones ?? 0), cols.inversiones.x + 3, y - 10, 7, font, C.text);
+    txt(fmtMoney(capAp), cols.capAp.x + 3, y - 10, 7, font, C.text);
+    txt(capCi !== null ? fmtMoney(capCi) : "—", cols.capCi.x + 3, y - 10, 7, font, C.text);
 
     // Variación con color
     if (capCi !== null) {
       const deltaVal = capCi - capAp;
       const deltaColor = deltaVal >= 0 ? C.success : C.danger;
-      txt(fmtDelta(capAp, capCi), cols.variacion.x + 3, y - 10, 8, fontBold, deltaColor);
+      txt(fmtDelta(capAp, capCi), cols.variacion.x + 3, y - 10, 7, fontBold, deltaColor);
     } else {
-      txt("—", cols.variacion.x + 3, y - 10, 8, font, C.muted);
+      txt("—", cols.variacion.x + 3, y - 10, 7, font, C.muted);
     }
 
-    txt(fmtMoney(gan), cols.ganancias.x + 3, y - 10, 8, font, C.text);
-    txt(fmtMoney(gas), cols.gastos.x + 3,    y - 10, 8, font, C.text);
-    txt(fmtMoney(per), cols.perdidas.x + 3,  y - 10, 8, font, C.text);
+    txt(fmtMoney(gan), cols.ganancias.x + 3, y - 10, 7, font, C.text);
+    txt(fmtMoney(gas), cols.gastos.x + 3, y - 10, 7, font, C.text);
+    txt(fmtMoney(per), cols.perdidas.x + 3, y - 10, 7, font, C.text);
 
     // Utilidad con color
     if (util !== null) {
       const utilColor = util >= 0 ? C.success : C.danger;
-      txt(fmtMoney(util), cols.utilidad.x + 3, y - 10, 8, fontBold, utilColor);
+      txt(fmtMoney(util), cols.utilidad.x + 3, y - 10, 7, fontBold, utilColor);
     } else {
-      txt("—", cols.utilidad.x + 3, y - 10, 8, font, C.muted);
+      txt("—", cols.utilidad.x + 3, y - 10, 7, font, C.muted);
     }
 
     y -= 16;
@@ -309,6 +386,32 @@ export async function buildPeriodoAdminPdf(payload: PeriodoAdminPdfPayload): Pro
     const deltaTotal = totCi ? totCi.capital - totAp.capital : null;
 
     txt("TOTAL", cols.nombre.x + 3, y - 12, 8, fontBold, rgb(1,1,1));
+    txt(
+      fmtMoney(payload.apertura.rutas.reduce((s, r) => s + r.cajaRuta, 0)),
+      cols.cajaAp.x + 3,
+      y - 12,
+      7,
+      fontBold,
+      rgb(1, 1, 1)
+    );
+    txt(
+      payload.cierre
+        ? fmtMoney(payload.cierre.rutas.reduce((s, r) => s + r.cajaRuta, 0))
+        : "—",
+      cols.cajaCi.x + 3,
+      y - 12,
+      7,
+      fontBold,
+      rgb(1, 1, 1)
+    );
+    txt(
+      fmtMoney((payload.cierre ?? payload.apertura).rutas.reduce((s, r) => s + r.inversiones, 0)),
+      cols.inversiones.x + 3,
+      y - 12,
+      7,
+      fontBold,
+      rgb(1, 1, 1)
+    );
     txt(fmtMoney(totAp.capital), cols.capAp.x + 3, y - 12, 8, fontBold, rgb(1,1,1));
     txt(totCi ? fmtMoney(totCi.capital) : "—", cols.capCi.x + 3, y - 12, 8, fontBold, rgb(1,1,1));
     txt(deltaTotal !== null ? fmtDelta(totAp.capital, totCi!.capital) : "—", cols.variacion.x + 3, y - 12, 8, fontBold, rgb(1,1,1));

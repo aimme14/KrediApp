@@ -271,12 +271,101 @@ export default function ResumenPage() {
             <p>Cargando...</p>
           ) : detalle && ap ? (
             <>
+              {ap && (
+                <>
+                  <h4 style={{ marginTop: "1.25rem", marginBottom: "0.75rem" }}>
+                    Posición del administrador
+                  </h4>
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+                      gap: "0.75rem",
+                      marginBottom: "1.5rem",
+                    }}
+                  >
+                    {[
+                      {
+                        label: "Caja admin apertura",
+                        valor: fmt(ap.admin.cajaAdmin),
+                        color: "var(--text)",
+                      },
+                      {
+                        label: "Caja admin cierre",
+                        valor: ci ? fmt(ci.admin.cajaAdmin) : "—",
+                        color: "var(--text)",
+                      },
+                      {
+                        label: "Capital admin apertura",
+                        valor: fmt(ap.admin.capitalAdmin),
+                        color: "var(--text)",
+                      },
+                      {
+                        label: "Capital admin cierre",
+                        valor: ci ? fmt(ci.admin.capitalAdmin) : "—",
+                        color: "var(--text)",
+                      },
+                      {
+                        label: "Variación capital admin",
+                        valor: ci
+                          ? `${ci.admin.capitalAdmin - ap.admin.capitalAdmin >= 0 ? "+" : ""}${fmt(ci.admin.capitalAdmin - ap.admin.capitalAdmin)}`
+                          : "—",
+                        color: ci
+                          ? ci.admin.capitalAdmin - ap.admin.capitalAdmin >= 0
+                            ? "var(--success, #16a34a)"
+                            : "var(--danger, #dc2626)"
+                          : "var(--text-muted)",
+                      },
+                      {
+                        label: "Ganancias rutas",
+                        valor: fmt(ci?.admin.gananciasRutas ?? ap.admin.gananciasRutas ?? 0),
+                        color: "var(--success, #16a34a)",
+                      },
+                    ].map((item) => (
+                      <div
+                        key={item.label}
+                        style={{
+                          padding: "0.875rem 1rem",
+                          background: "var(--card-bg)",
+                          border: "1px solid var(--card-border)",
+                          borderRadius: "var(--radius)",
+                        }}
+                      >
+                        <p
+                          style={{
+                            margin: "0 0 0.25rem",
+                            fontSize: "0.75rem",
+                            color: "var(--text-muted)",
+                            textTransform: "uppercase",
+                            letterSpacing: "0.05em",
+                          }}
+                        >
+                          {item.label}
+                        </p>
+                        <p
+                          style={{
+                            margin: 0,
+                            fontSize: "1.1rem",
+                            fontWeight: 700,
+                            color: item.color,
+                          }}
+                        >
+                          $ {item.valor}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
               <h4 style={{ marginTop: "1.25rem", marginBottom: "0.5rem" }}>Rutas</h4>
               <div className="table-wrap">
                 <table>
                   <thead>
                     <tr>
                       <th>Ruta</th>
+                      <th className="col-num">Caja apertura</th>
+                      <th className="col-num">Caja cierre</th>
+                      <th className="col-num">Inversiones</th>
                       <th className="col-num">Capital apertura</th>
                       <th className="col-num">Capital cierre</th>
                       <th className="col-num">Variación</th>
@@ -297,6 +386,9 @@ export default function ResumenPage() {
                       return (
                         <tr key={rid}>
                           <td>{nombre}</td>
+                          <td className="col-num">{fmt(ra?.cajaRuta ?? 0)}</td>
+                          <td className="col-num">{rc ? fmt(rc.cajaRuta) : "—"}</td>
+                          <td className="col-num">{fmt(rc?.inversiones ?? ra?.inversiones ?? 0)}</td>
                           <td className="col-num">{fmt(ra?.capitalRuta ?? 0)}</td>
                           <td className="col-num">{rc ? fmt(rc.capitalRuta) : "—"}</td>
                           <td
@@ -348,6 +440,9 @@ export default function ResumenPage() {
                         <tfoot>
                           <tr style={{ fontWeight: 700, borderTop: "2px solid var(--border)" }}>
                             <td>TOTAL</td>
+                            <td className="col-num">{fmt(totAp?.cajaRuta ?? 0)}</td>
+                            <td className="col-num">{totCi ? fmt(totCi.cajaRuta) : "—"}</td>
+                            <td className="col-num">{fmt(totCi?.inversiones ?? totAp?.inversiones ?? 0)}</td>
                             <td className="col-num">{fmt(totAp?.capitalRuta ?? 0)}</td>
                             <td className="col-num">{totCi ? fmt(totCi.capitalRuta) : "—"}</td>
                             <td
