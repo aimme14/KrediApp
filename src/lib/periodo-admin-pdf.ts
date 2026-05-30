@@ -160,6 +160,10 @@ export async function buildPeriodoAdminPdf(payload: PeriodoAdminPdfPayload): Pro
 
   // ── Resumen ejecutivo (KPIs) ──────────────────────────────────────────────
 
+  const capAdminAp = payload.apertura.admin.capitalAdmin;
+  const capAdminCi = payload.cierre?.admin.capitalAdmin ?? null;
+  const utilidadNeta = capAdminCi !== null ? capAdminCi - capAdminAp : 0;
+
   const totAp = payload.apertura.rutas.reduce(
     (a, r) => ({
       capital: a.capital + r.capitalRuta,
@@ -182,29 +186,29 @@ export async function buildPeriodoAdminPdf(payload: PeriodoAdminPdfPayload): Pro
       )
     : null;
 
-  const utilidadNeta =
-    totCi !== null ? totCi.capital - totAp.capital : totAp.capital;
-
-  // 4 KPI cards
   const kpis = [
-    { label: "Capital apertura", value: fmtMoney(totAp.capital) },
-    { label: "Capital cierre",   value: totCi ? fmtMoney(totCi.capital) : "—" },
+    { label: "Capital apertura", value: fmtMoney(capAdminAp) },
+    { label: "Capital cierre", value: capAdminCi !== null ? fmtMoney(capAdminCi) : "—" },
     {
       label: "Utilidad neta",
-      value: totCi ? fmtMoney(utilidadNeta) : "—",
+      value: capAdminCi !== null ? fmtMoney(utilidadNeta) : "—",
       highlight: true,
     },
-    { label: "Variacion capital", value: totCi ? fmtDelta(totAp.capital, totCi.capital) : "—", delta: true },
+    {
+      label: "Variacion capital",
+      value: capAdminCi !== null ? fmtDelta(capAdminAp, capAdminCi) : "—",
+      delta: true,
+    },
   ];
 
   const kpiW = (CONTENT_W - 12) / 4;
   kpis.forEach((kpi, i) => {
     const kx = ML + i * (kpiW + 4);
-    const isPos = totCi ? utilidadNeta >= 0 : true;
+    const isPos = capAdminCi !== null ? utilidadNeta >= 0 : true;
     const cardColor = kpi.highlight
       ? (isPos ? C.success : C.danger)
       : kpi.delta
-        ? (totCi && totCi.capital >= totAp.capital ? C.success : C.danger)
+        ? (capAdminCi !== null && capAdminCi >= capAdminAp ? C.success : C.danger)
         : C.accent;
 
     page.drawRectangle({ x: kx, y: y - 44, width: kpiW, height: 44, color: rgb(0.97,0.97,0.98) });
@@ -258,9 +262,17 @@ export async function buildPeriodoAdminPdf(payload: PeriodoAdminPdfPayload): Pro
       label: "Ganancias rutas",
       value: fmtMoney(gananciasRutasAdmin(payload.cierre ?? payload.apertura)),
     },
+    {
+      label: "Gastos admin",
+      value: fmtMoney((payload.cierre ?? payload.apertura).admin.gastosAdmin ?? 0),
+    },
+    {
+      label: "Gastos totales",
+      value: fmtMoney((payload.cierre ?? payload.apertura).admin.gastosTotales ?? 0),
+    },
   ];
 
-  const adminKpiW = (CONTENT_W - 20) / 6;
+  const adminKpiW = (CONTENT_W - 28) / 8;
   adminKpis.forEach((kpi, i) => {
     const kx = ML + i * (adminKpiW + 4);
     const cardColor = kpi.delta

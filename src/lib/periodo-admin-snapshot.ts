@@ -17,6 +17,8 @@ export type PeriodoAdminSnapshotAdmin = {
   capitalAdmin: number;
   /** Suma de `ganancias` de todas las rutas del admin (congelada en apertura/cierre). */
   gananciasRutas?: number;
+  gastosAdmin: number;
+  gastosTotales: number;
 };
 
 export type PeriodoAdminSnapshotRuta = {
@@ -148,9 +150,8 @@ export async function buildPeriodoAdminSnapshot(
     sumaCapitalRutas += capitalRuta;
 
     const gastosRuta = round2(gastosRutaPorRuta.get(rutaId) ?? 0);
-    const gastosAdmin = round2(gastosAdminGeneral);
     const gastosEmpleados = round2(gastosEmpleadosPorRuta.get(rutaId) ?? 0);
-    const gastosTotales = round2(gastosRuta + gastosAdmin + gastosEmpleados);
+    const gastosTotales = round2(gastosRuta + gastosEmpleados);
 
     rutas.push({
       rutaId,
@@ -161,7 +162,7 @@ export async function buildPeriodoAdminSnapshot(
       ganancias,
       perdidas,
       gastosRuta,
-      gastosAdmin,
+      gastosAdmin: 0,
       gastosEmpleados,
       gastosTotales,
       capitalRuta: round2(capitalRuta),
@@ -173,12 +174,18 @@ export async function buildPeriodoAdminSnapshot(
   const u = userSnap.data() ?? {};
   const cajaAdmin = typeof u.cajaAdmin === "number" ? u.cajaAdmin : 0;
   const capitalAdmin = round2(cajaAdmin + sumaCapitalRutas);
+  const gastosAdminGeneralRounded = round2(gastosAdminGeneral);
+  const gastosTotalesGeneral = round2(
+    gastosAdminGeneralRounded + rutas.reduce((s, r) => s + r.gastosTotales, 0)
+  );
 
   return {
     admin: {
       cajaAdmin: round2(cajaAdmin),
       capitalAdmin,
       gananciasRutas: round2(rutas.reduce((s, r) => s + r.ganancias, 0)),
+      gastosAdmin: gastosAdminGeneralRounded,
+      gastosTotales: gastosTotalesGeneral,
     },
     rutas,
     fechaSnapshot: new Date().toISOString(),

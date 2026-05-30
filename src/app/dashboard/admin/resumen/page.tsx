@@ -279,7 +279,7 @@ export default function ResumenPage() {
                   <div
                     style={{
                       display: "grid",
-                      gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+                      gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
                       gap: "0.75rem",
                       marginBottom: "1.5rem",
                     }}
@@ -320,6 +320,16 @@ export default function ResumenPage() {
                         label: "Ganancias rutas",
                         valor: fmt(ci?.admin.gananciasRutas ?? ap.admin.gananciasRutas ?? 0),
                         color: "var(--success, #16a34a)",
+                      },
+                      {
+                        label: "Gastos admin",
+                        valor: fmt(ci?.admin.gastosAdmin ?? ap.admin.gastosAdmin ?? 0),
+                        color: "var(--danger, #dc2626)",
+                      },
+                      {
+                        label: "Gastos totales",
+                        valor: fmt(ci?.admin.gastosTotales ?? ap.admin.gastosTotales ?? 0),
+                        color: "var(--danger, #dc2626)",
                       },
                     ].map((item) => (
                       <div
