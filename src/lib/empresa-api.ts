@@ -1128,13 +1128,9 @@ export type PeriodoAdminSnapshotAdmin = {
   capitalAdmin: number;
   /** Suma de ganancias de las rutas del admin (snapshot). Opcional en periodos antiguos. */
   gananciasRutas?: number;
-<<<<<<< HEAD
-  gastosAdmin?: number;
-=======
   /** Gastos generales del admin (no asignados a ruta). Opcional en periodos antiguos. */
   gastosAdmin?: number;
   /** Gastos admin + suma de gastos por ruta/empleado. Opcional en periodos antiguos. */
->>>>>>> a2873a2ea2970ed873aafa7d79d50c188a979af7
   gastosTotales?: number;
 };
 
