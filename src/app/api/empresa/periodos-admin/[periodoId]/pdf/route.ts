@@ -3,11 +3,19 @@ import { getAdminFirestore } from "@/lib/firebase-admin";
 import { getApiUser } from "@/lib/api-auth";
 import { EMPRESAS_COLLECTION, PERIODOS_ADMIN_SUBCOLLECTION, USUARIOS_SUBCOLLECTION } from "@/lib/empresas-db";
 import { buildPeriodoAdminPdf } from "@/lib/periodo-admin-pdf";
+import { enrichSnapshotGastosDelPeriodo } from "@/lib/periodo-admin-gastos";
 import type { PeriodoAdminSnapshot } from "@/lib/periodo-admin-snapshot";
 
 function tsToIso(v: unknown): string | null {
   if (v && typeof (v as { toDate?: () => Date }).toDate === "function") {
     return (v as { toDate: () => Date }).toDate().toISOString();
+  }
+  return null;
+}
+
+function tsToDate(v: unknown): Date | null {
+  if (v && typeof (v as { toDate?: () => Date }).toDate === "function") {
+    return (v as { toDate: () => Date }).toDate();
   }
   return null;
 }
@@ -59,20 +67,31 @@ export async function GET(
     );
   }
 
-  const cierre =
+  const cierreRaw =
     data.cierre?.admin && Array.isArray(data.cierre.rutas)
       ? (data.cierre as PeriodoAdminSnapshot)
       : null;
 
-  if (!cierre) {
+  if (!cierreRaw) {
     return NextResponse.json({ error: "Falta snapshot de cierre para generar el PDF." }, { status: 400 });
   }
 
-  const empresaSnap = await db
-    .collection(EMPRESAS_COLLECTION)
-    .doc(apiUser.empresaId)
-    .get();
-  const nombreEmpresa = (empresaSnap.data()?.nombre as string)?.trim() || "KrediApp";
+  const fechaApertura = tsToDate(data.fechaApertura);
+  const fechaCierre = tsToDate(data.fechaCierre) ?? new Date();
+  let cierre = cierreRaw;
+  if (fechaApertura) {
+    try {
+      cierre = await enrichSnapshotGastosDelPeriodo(
+        db,
+        apiUser.empresaId,
+        apiUser.uid,
+        cierreRaw,
+        { desde: fechaApertura, hasta: fechaCierre }
+      );
+    } catch (e) {
+      console.warn("[periodos-admin/pdf] enrichSnapshotGastosDelPeriodo:", e);
+    }
+  }
 
   const usuarioSnap = await db
     .collection(EMPRESAS_COLLECTION)
@@ -85,25 +104,29 @@ export async function GET(
     (usuarioSnap.data()?.nombre as string)?.trim() ||
     "Administrador";
 
-  const bytes = await buildPeriodoAdminPdf({
-    periodoId: snap.id,
-    nombreEmpresa,
-    nombreAdmin,
-    fechaAperturaIso: tsToIso(data.fechaApertura) ?? "",
-    fechaCierreIso: tsToIso(data.fechaCierre),
-    abiertoPorUid: (data.abiertoPorUid as string) ?? "",
-    cerradoPorUid: (data.cerradoPorUid as string) ?? null,
-    apertura,
-    cierre,
-  });
+  try {
+    const bytes = await buildPeriodoAdminPdf({
+      periodoId: snap.id,
+      nombreAdmin,
+      fechaAperturaIso: tsToIso(data.fechaApertura) ?? "",
+      fechaCierreIso: tsToIso(data.fechaCierre),
+      abiertoPorUid: (data.abiertoPorUid as string) ?? "",
+      cerradoPorUid: (data.cerradoPorUid as string) ?? null,
+      apertura,
+      cierre,
+    });
 
-  const filename = `periodo-admin-${snap.id}.pdf`;
-  const body = Buffer.from(bytes);
-  return new NextResponse(body, {
-    status: 200,
-    headers: {
-      "Content-Type": "application/pdf",
-      "Content-Disposition": `attachment; filename="${filename}"`,
-    },
-  });
+    const filename = `periodo-admin-${snap.id}.pdf`;
+    const body = Buffer.from(bytes);
+    return new NextResponse(body, {
+      status: 200,
+      headers: {
+        "Content-Type": "application/pdf",
+        "Content-Disposition": `attachment; filename="${filename}"`,
+      },
+    });
+  } catch (e) {
+    console.error("[periodos-admin/pdf] buildPeriodoAdminPdf:", e);
+    return NextResponse.json({ error: "Error al generar PDF" }, { status: 500 });
+  }
 }

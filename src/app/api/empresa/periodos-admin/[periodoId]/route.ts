@@ -2,10 +2,19 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAdminFirestore } from "@/lib/firebase-admin";
 import { getApiUser } from "@/lib/api-auth";
 import { EMPRESAS_COLLECTION, PERIODOS_ADMIN_SUBCOLLECTION } from "@/lib/empresas-db";
+import { enrichSnapshotGastosDelPeriodo } from "@/lib/periodo-admin-gastos";
+import type { PeriodoAdminSnapshot } from "@/lib/periodo-admin-snapshot";
 
 function tsToIso(v: unknown): string | null {
   if (v && typeof (v as { toDate?: () => Date }).toDate === "function") {
     return (v as { toDate: () => Date }).toDate().toISOString();
+  }
+  return null;
+}
+
+function tsToDate(v: unknown): Date | null {
+  if (v && typeof (v as { toDate?: () => Date }).toDate === "function") {
+    return (v as { toDate: () => Date }).toDate();
   }
   return null;
 }
@@ -45,6 +54,25 @@ export async function GET(
     return NextResponse.json({ error: "No autorizado" }, { status: 403 });
   }
 
+  let apertura = (data.apertura as PeriodoAdminSnapshot | null) ?? null;
+  let cierre = (data.cierre as PeriodoAdminSnapshot | null) ?? null;
+
+  const fechaApertura = tsToDate(data.fechaApertura);
+  const fechaCierre = tsToDate(data.fechaCierre);
+  if (fechaApertura && cierre) {
+    try {
+      cierre = await enrichSnapshotGastosDelPeriodo(
+        db,
+        apiUser.empresaId,
+        apiUser.uid,
+        cierre,
+        { desde: fechaApertura, hasta: fechaCierre ?? new Date() }
+      );
+    } catch (e) {
+      console.warn("[periodos-admin] enrichSnapshotGastosDelPeriodo:", e);
+    }
+  }
+
   return NextResponse.json({
     id: snap.id,
     estado: (data.estado as string) === "cerrado" ? "cerrado" : "abierto",
@@ -52,7 +80,7 @@ export async function GET(
     fechaCierre: tsToIso(data.fechaCierre),
     abiertoPorUid: (data.abiertoPorUid as string) ?? "",
     cerradoPorUid: (data.cerradoPorUid as string) ?? null,
-    apertura: data.apertura ?? null,
-    cierre: data.cierre ?? null,
+    apertura,
+    cierre,
   });
 }

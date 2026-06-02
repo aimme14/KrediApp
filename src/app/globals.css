@@ -1328,6 +1328,155 @@ td {
   border-color: var(--link);
 }
 
+/* Admin — Resumen económico: comparación apertura / cierre */
+.resumen-comparar-card {
+  padding-top: 1rem;
+}
+.resumen-comparar-header {
+  margin-bottom: 0.75rem;
+  align-items: flex-start;
+}
+.resumen-comparar-meta {
+  margin: 0.2rem 0 0;
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+  line-height: 1.35;
+}
+.resumen-comparar-close-btn {
+  flex-shrink: 0;
+  padding: 0.35rem 0.65rem;
+  font-size: 0.8125rem;
+}
+.resumen-comparar-loading {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.875rem;
+}
+.resumen-comparar-section-label {
+  margin: 0 0 0.5rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+.resumen-comparar-cards {
+  display: none;
+}
+.resumen-comparar-table-wrap {
+  overflow-x: visible;
+  margin: 0;
+  width: 100%;
+}
+.resumen-comparar-table {
+  width: 100%;
+  min-width: 0;
+  table-layout: fixed;
+  font-size: 0.8125rem;
+}
+.resumen-comparar-table th,
+.resumen-comparar-table td {
+  padding: 0.35rem 0.3rem;
+  vertical-align: middle;
+  border-bottom: 1px solid var(--table-border);
+}
+.resumen-comparar-table th {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  letter-spacing: 0.01em;
+  white-space: normal;
+  line-height: 1.25;
+  text-align: center;
+}
+.resumen-comparar-table th.resumen-col-ruta,
+.resumen-comparar-table td.resumen-col-ruta {
+  text-align: left;
+  padding-left: 0.4rem;
+  width: 12%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.resumen-comparar-table th.col-num,
+.resumen-comparar-table td.col-num {
+  width: 17.6%;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  padding-right: 0.35rem;
+  white-space: nowrap;
+  font-size: clamp(0.6875rem, 0.72vw + 0.55rem, 0.8125rem);
+}
+.resumen-comparar-table tbody tr:last-child td {
+  border-bottom: none;
+}
+.resumen-comparar-total-row td {
+  font-weight: 700;
+  border-top: 2px solid var(--border);
+  border-bottom: none !important;
+  padding-top: 0.5rem;
+}
+@media (max-width: 768px) {
+  .resumen-comparar-table-wrap {
+    display: none;
+  }
+  .resumen-comparar-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+  }
+  .resumen-comparar-ruta-card {
+    border: 1px solid var(--table-border);
+    border-radius: 10px;
+    padding: 0.75rem 0.85rem;
+    background: var(--bg, transparent);
+  }
+  [data-theme="dark"] .resumen-comparar-ruta-card {
+    background: rgba(255, 255, 255, 0.02);
+  }
+  .resumen-comparar-ruta-name {
+    margin: 0 0 0.55rem;
+    font-size: 0.9375rem;
+    font-weight: 600;
+  }
+  .resumen-comparar-ruta-card--total {
+    border-color: var(--border);
+    border-width: 2px;
+  }
+  .resumen-comparar-dl {
+    margin: 0;
+    display: grid;
+    gap: 0.35rem;
+  }
+  .resumen-comparar-dl-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.75rem;
+  }
+  .resumen-comparar-dl-row dt {
+    margin: 0;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    font-weight: 500;
+  }
+  .resumen-comparar-dl-row dd {
+    margin: 0;
+    font-size: 0.8125rem;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+    font-weight: 600;
+  }
+}
+@media (min-width: 769px) {
+  .table-wrap.resumen-comparar-table-wrap table.resumen-comparar-table {
+    table-layout: fixed;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+}
+
 /* Card gastos: cabecera e icono de nuevo gasto */
 .gastos-card-header {
   margin-bottom: 0.5rem;

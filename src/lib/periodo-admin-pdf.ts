@@ -1,5 +1,9 @@
 import { PDFDocument, StandardFonts, rgb, type PDFPage, type PDFFont } from "pdf-lib";
 import type { PeriodoAdminSnapshot } from "@/lib/periodo-admin-snapshot";
+import {
+  gastosPersonalesAdminSnapshot,
+  gastosTotalesRutaSnapshot,
+} from "@/lib/periodo-admin-gastos";
 
 // ─── Utilidades ───────────────────────────────────────────────────────────────
 
@@ -21,13 +25,6 @@ function fmtMoney(n: number): string {
   return san(`$ ${raw}`);
 }
 
-function fmtDelta(apertura: number, cierre: number): string {
-  const diff = cierre - apertura;
-  const signo = diff > 0 ? "+" : "";
-  const raw = diff.toLocaleString("es-CO", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
-  return san(`${signo}$ ${raw}`);
-}
-
 function fmtFecha(iso: string): string {
   return san(new Date(iso).toLocaleDateString("es-CO", {
     day: "2-digit", month: "long", year: "numeric",
@@ -38,15 +35,6 @@ function gananciasRutasAdmin(s: PeriodoAdminSnapshot): number {
   const g = s.admin.gananciasRutas;
   if (typeof g === "number") return g;
   return s.rutas.reduce((sum, r) => sum + r.ganancias, 0);
-}
-
-function gastosTotalesRuta(
-  r: PeriodoAdminSnapshot["rutas"][0] | undefined
-): number {
-  if (!r) return 0;
-  if (typeof r.gastosTotales === "number") return r.gastosTotales;
-  const legacy = r as PeriodoAdminSnapshot["rutas"][0] & { gastos?: number };
-  return typeof legacy.gastos === "number" ? legacy.gastos : 0;
 }
 
 function mergeRutas(ap: PeriodoAdminSnapshot, ci: PeriodoAdminSnapshot | null) {
@@ -60,6 +48,31 @@ function mergeRutas(ap: PeriodoAdminSnapshot, ci: PeriodoAdminSnapshot | null) {
     const nb = mapA.get(b)?.nombre ?? mapC.get(b)?.nombre ?? b;
     return na.localeCompare(nb, "es");
   });
+}
+
+type DetalleFila = {
+  nombre: string;
+  capAp: number;
+  capCi: number | null;
+  ganancias: number;
+  gastos: number;
+  perdidas: number;
+};
+
+function buildAdminDetalleFila(
+  nombreAdmin: string,
+  ap: PeriodoAdminSnapshot,
+  ci: PeriodoAdminSnapshot | null
+): DetalleFila {
+  const rc = ci ?? ap;
+  return {
+    nombre: nombreAdmin,
+    capAp: ap.admin.capitalAdmin,
+    capCi: ci?.admin.capitalAdmin ?? null,
+    ganancias: gananciasRutasAdmin(rc),
+    gastos: ci ? gastosPersonalesAdminSnapshot(ci) : 0,
+    perdidas: 0,
+  };
 }
 
 // ─── Colores ──────────────────────────────────────────────────────────────────
@@ -88,7 +101,6 @@ const CONTENT_W = PAGE_W - ML - MR;
 
 export type PeriodoAdminPdfPayload = {
   periodoId: string;
-  nombreEmpresa: string;
   nombreAdmin: string;
   fechaAperturaIso: string;
   fechaCierreIso: string | null;
@@ -144,11 +156,8 @@ export async function buildPeriodoAdminPdf(payload: PeriodoAdminPdfPayload): Pro
     color: C.brand,
   });
 
-  txt(payload.nombreEmpresa, ML, PAGE_H - 30, 18, fontBold, rgb(1,1,1));
-  txt(
-    `Informe de Periodo Contable  |  Administrador: ${payload.nombreAdmin}`,
-    ML, PAGE_H - 44, 8, font, rgb(0.85,0.75,0.65)
-  );
+  txt("Informe de Periodo Contable", ML, PAGE_H - 30, 14, fontBold, rgb(1, 1, 1));
+  txt(`Administrador: ${payload.nombreAdmin}`, ML, PAGE_H - 44, 8, font, rgb(0.85, 0.75, 0.65));
 
   // Fechas en el lado derecho del header
   const fechaAp = fmtFecha(payload.fechaAperturaIso);
@@ -164,7 +173,7 @@ export async function buildPeriodoAdminPdf(payload: PeriodoAdminPdfPayload): Pro
     (a, r) => ({
       capital: a.capital + r.capitalRuta,
       ganancias: a.ganancias + r.ganancias,
-      gastos: a.gastos + gastosTotalesRuta(r),
+      gastos: a.gastos + gastosTotalesRutaSnapshot(r),
       perdidas: a.perdidas + r.perdidas,
     }),
     { capital: 0, ganancias: 0, gastos: 0, perdidas: 0 }
@@ -175,7 +184,7 @@ export async function buildPeriodoAdminPdf(payload: PeriodoAdminPdfPayload): Pro
         (a, r) => ({
           capital: a.capital + r.capitalRuta,
           ganancias: a.ganancias + r.ganancias,
-          gastos: a.gastos + gastosTotalesRuta(r),
+          gastos: a.gastos + gastosTotalesRutaSnapshot(r),
           perdidas: a.perdidas + r.perdidas,
         }),
         { capital: 0, ganancias: 0, gastos: 0, perdidas: 0 }
@@ -185,146 +194,185 @@ export async function buildPeriodoAdminPdf(payload: PeriodoAdminPdfPayload): Pro
   const utilidadNeta =
     totCi !== null ? totCi.capital - totAp.capital : totAp.capital;
 
-  // 4 KPI cards
+  // 3 KPI cards
   const kpis = [
     { label: "Capital apertura", value: fmtMoney(totAp.capital) },
-    { label: "Capital cierre",   value: totCi ? fmtMoney(totCi.capital) : "—" },
+    { label: "Capital cierre", value: totCi ? fmtMoney(totCi.capital) : "—" },
     {
       label: "Utilidad neta",
       value: totCi ? fmtMoney(utilidadNeta) : "—",
       highlight: true,
     },
-    { label: "Variacion capital", value: totCi ? fmtDelta(totAp.capital, totCi.capital) : "—", delta: true },
   ];
 
-  const kpiW = (CONTENT_W - 12) / 4;
+  const kpiW = (CONTENT_W - 8) / 3;
   kpis.forEach((kpi, i) => {
     const kx = ML + i * (kpiW + 4);
     const isPos = totCi ? utilidadNeta >= 0 : true;
-    const cardColor = kpi.highlight
-      ? (isPos ? C.success : C.danger)
-      : kpi.delta
-        ? (totCi && totCi.capital >= totAp.capital ? C.success : C.danger)
-        : C.accent;
+    const cardColor = kpi.highlight ? (isPos ? C.success : C.danger) : C.accent;
 
     page.drawRectangle({ x: kx, y: y - 44, width: kpiW, height: 44, color: rgb(0.97,0.97,0.98) });
     page.drawRectangle({ x: kx, y: y - 44, width: 3, height: 44, color: cardColor });
     txt(kpi.label, kx + 7, y - 14, 7, font, C.muted);
-    txt(kpi.value, kx + 7, y - 30, 10, fontBold,
-      kpi.highlight || kpi.delta ? cardColor : C.text, kpiW - 12);
+    txt(kpi.value, kx + 7, y - 30, 10, fontBold, kpi.highlight ? cardColor : C.text, kpiW - 12);
   });
 
   y -= 56;
 
-  // ── Tabla de rutas ────────────────────────────────────────────────────────
-
-  ensure(40);
-  y -= 6;
-  txt("Detalle por Ruta", ML, y, 10, fontBold, C.brand);
-  y -= 14;
-
-  // Columnas: Ruta | Cap.Ap | Cap.Ci | Variacion | Ganancias | Gastos | Perdidas | Utilidad
-  const cols = {
-    nombre:    { x: ML,           w: 130 },
-    capAp:     { x: ML + 134,     w: 82  },
-    capCi:     { x: ML + 220,     w: 82  },
-    variacion: { x: ML + 306,     w: 82  },
-    ganancias: { x: ML + 392,     w: 82  },
-    gastos:    { x: ML + 478,     w: 82  },
-    perdidas:  { x: ML + 564,     w: 72  },
-    utilidad:  { x: ML + 640,     w: 90  },
+  type ColDef = { x: number; w: number };
+  type DetalleCols = {
+    nombre: ColDef;
+    capAp: ColDef;
+    capCi: ColDef;
+    ganancias: ColDef;
+    gastos: ColDef;
+    utilidad: ColDef;
+    perdidas?: ColDef;
   };
 
-  // Header de tabla
-  page.drawRectangle({ x: ML, y: y - 18, width: CONTENT_W, height: 18, color: C.headBg });
-  const headers: [string, keyof typeof cols][] = [
-    ["Ruta",       "nombre"],
-    ["Cap. Inicio","capAp"],
-    ["Cap. Final", "capCi"],
-    ["Variacion",  "variacion"],
-    ["Ganancias",  "ganancias"],
-    ["Gastos tot.", "gastos"],
-    ["Perdidas",   "perdidas"],
-    ["Util. cap.", "utilidad"],
-  ];
-  headers.forEach(([label, col]) => {
-    txt(label, cols[col].x + 3, y - 12, 7, fontBold, C.headText);
-  });
-  y -= 20;
+  const colsRuta: DetalleCols = {
+    nombre:    { x: ML,           w: 130 },
+    capAp:     { x: ML + 134,     w: 95  },
+    capCi:     { x: ML + 233,     w: 95  },
+    ganancias: { x: ML + 332,     w: 95  },
+    gastos:    { x: ML + 431,     w: 95  },
+    perdidas:  { x: ML + 530,     w: 90  },
+    utilidad:  { x: ML + 624,     w: 106 },
+  };
 
-  // Filas de datos
+  const colsAdmin: DetalleCols = {
+    nombre:    { x: ML,           w: 130 },
+    capAp:     { x: ML + 134,     w: 105 },
+    capCi:     { x: ML + 243,     w: 105 },
+    ganancias: { x: ML + 352,     w: 105 },
+    gastos:    { x: ML + 461,     w: 115 },
+    utilidad:  { x: ML + 580,     w: 150 },
+  };
+
+  const drawDetalleFila = (
+    fila: DetalleFila,
+    rowY: number,
+    cols: DetalleCols,
+    opts?: { zebra?: boolean; total?: boolean; showPerdidas?: boolean }
+  ) => {
+    const capAp = fila.capAp;
+    const capCi = fila.capCi;
+    const util = capCi !== null ? capCi - capAp : null;
+
+    if (opts?.total) {
+      page.drawRectangle({ x: ML, y: rowY - 18, width: CONTENT_W, height: 18, color: C.totalBg });
+    } else if (opts?.zebra) {
+      page.drawRectangle({ x: ML, y: rowY - 15, width: CONTENT_W, height: 15, color: C.rowEven });
+    }
+
+    const nameColor = opts?.total ? rgb(1, 1, 1) : C.text;
+    const valueColor = opts?.total ? rgb(1, 1, 1) : C.text;
+    const nameFont = opts?.total ? fontBold : fontBold;
+    const valueFont = opts?.total ? fontBold : font;
+    const textY = opts?.total ? rowY - 12 : rowY - 10;
+    const sz = 8;
+
+    txt(fila.nombre, cols.nombre.x + 3, textY, sz, nameFont, nameColor, cols.nombre.w - 4);
+    txt(fmtMoney(capAp), cols.capAp.x + 3, textY, sz, valueFont, valueColor);
+    txt(capCi !== null ? fmtMoney(capCi) : "—", cols.capCi.x + 3, textY, sz, valueFont, valueColor);
+    txt(fmtMoney(fila.ganancias), cols.ganancias.x + 3, textY, sz, valueFont, valueColor);
+    txt(fmtMoney(fila.gastos), cols.gastos.x + 3, textY, sz, valueFont, valueColor);
+    if (opts?.showPerdidas !== false && cols.perdidas) {
+      txt(fmtMoney(fila.perdidas), cols.perdidas.x + 3, textY, sz, valueFont, valueColor);
+    }
+
+    if (util !== null) {
+      const utilColor = opts?.total ? rgb(1, 1, 1) : util >= 0 ? C.success : C.danger;
+      txt(fmtMoney(util), cols.utilidad.x + 3, textY, sz, fontBold, utilColor);
+    } else {
+      txt("—", cols.utilidad.x + 3, textY, sz, font, opts?.total ? rgb(1, 1, 1) : C.muted);
+    }
+  };
+
+  const drawDetalleSection = (
+    sectionTitle: string,
+    nombreHeader: string,
+    filas: DetalleFila[],
+    cols: DetalleCols,
+    opts?: { totalFila?: DetalleFila | null; showPerdidas?: boolean }
+  ) => {
+    const showPerdidas = opts?.showPerdidas !== false;
+    ensure(40);
+    y -= 6;
+    txt(sectionTitle, ML, y, 10, fontBold, C.brand);
+    y -= 14;
+
+    page.drawRectangle({ x: ML, y: y - 18, width: CONTENT_W, height: 18, color: C.headBg });
+    const headers: [string, keyof DetalleCols][] = showPerdidas
+      ? [
+          [nombreHeader, "nombre"],
+          ["Cap. Inicio", "capAp"],
+          ["Cap. Final", "capCi"],
+          ["Ganancias", "ganancias"],
+          ["Gastos", "gastos"],
+          ["Perdidas", "perdidas"],
+          ["Util. cap.", "utilidad"],
+        ]
+      : [
+          [nombreHeader, "nombre"],
+          ["Cap. Inicio", "capAp"],
+          ["Cap. Final", "capCi"],
+          ["Ganancias", "ganancias"],
+          ["Gastos", "gastos"],
+          ["Util. cap.", "utilidad"],
+        ];
+    headers.forEach(([label, col]) => {
+      const c = cols[col];
+      if (!c) return;
+      txt(label, c.x + 3, y - 12, 7, fontBold, C.headText);
+    });
+    y -= 20;
+
+    filas.forEach((fila, idx) => {
+      ensure(18);
+      drawDetalleFila(fila, y, cols, { zebra: idx % 2 === 0, showPerdidas });
+      y -= 16;
+    });
+
+    if (opts?.totalFila) {
+      ensure(20);
+      drawDetalleFila(opts.totalFila, y, cols, { total: true, showPerdidas });
+      y -= 20;
+    }
+
+    y -= 8;
+  };
+
+  const adminFila = buildAdminDetalleFila(payload.nombreAdmin, payload.apertura, payload.cierre);
+  drawDetalleSection("Detalle del Admin", "Admin", [adminFila], colsAdmin, { showPerdidas: false });
+
   const rutaIds = mergeRutas(payload.apertura, payload.cierre);
-  rutaIds.forEach((rid, idx) => {
-    ensure(18);
+  const rutaFilas: DetalleFila[] = rutaIds.map((rid) => {
     const ra = payload.apertura.rutas.find((r) => r.rutaId === rid);
     const rc = payload.cierre?.rutas.find((r) => r.rutaId === rid);
-    const nombre = ra?.nombre ?? rc?.nombre ?? rid;
-
-    const capAp = ra?.capitalRuta ?? 0;
-    const capCi = rc?.capitalRuta ?? null;
-    const gan   = rc?.ganancias ?? ra?.ganancias ?? 0;
-    const gas = gastosTotalesRuta(rc ?? ra);
-    const per = rc?.perdidas ?? ra?.perdidas ?? 0;
-    const util =
-      rc && ra ? rc.capitalRuta - ra.capitalRuta : null;
-
-    // Fila alterna
-    if (idx % 2 === 0) {
-      page.drawRectangle({ x: ML, y: y - 15, width: CONTENT_W, height: 15, color: C.rowEven });
-    }
-
-    txt(nombre,              cols.nombre.x + 3,    y - 10, 8, fontBold, C.text, cols.nombre.w - 4);
-    txt(fmtMoney(capAp),     cols.capAp.x + 3,     y - 10, 8, font, C.text);
-    txt(capCi !== null ? fmtMoney(capCi) : "—", cols.capCi.x + 3, y - 10, 8, font, C.text);
-
-    // Variación con color
-    if (capCi !== null) {
-      const deltaVal = capCi - capAp;
-      const deltaColor = deltaVal >= 0 ? C.success : C.danger;
-      txt(fmtDelta(capAp, capCi), cols.variacion.x + 3, y - 10, 8, fontBold, deltaColor);
-    } else {
-      txt("—", cols.variacion.x + 3, y - 10, 8, font, C.muted);
-    }
-
-    txt(fmtMoney(gan), cols.ganancias.x + 3, y - 10, 8, font, C.text);
-    txt(fmtMoney(gas), cols.gastos.x + 3,    y - 10, 8, font, C.text);
-    txt(fmtMoney(per), cols.perdidas.x + 3,  y - 10, 8, font, C.text);
-
-    // Utilidad con color
-    if (util !== null) {
-      const utilColor = util >= 0 ? C.success : C.danger;
-      txt(fmtMoney(util), cols.utilidad.x + 3, y - 10, 8, fontBold, utilColor);
-    } else {
-      txt("—", cols.utilidad.x + 3, y - 10, 8, font, C.muted);
-    }
-
-    y -= 16;
+    return {
+      nombre: ra?.nombre ?? rc?.nombre ?? rid,
+      capAp: ra?.capitalRuta ?? 0,
+      capCi: rc?.capitalRuta ?? null,
+      ganancias: rc?.ganancias ?? ra?.ganancias ?? 0,
+      gastos: gastosTotalesRutaSnapshot(rc ?? ra),
+      perdidas: rc?.perdidas ?? ra?.perdidas ?? 0,
+    };
   });
 
-  // Fila de totales
-  if (rutaIds.length > 1) {
-    ensure(20);
-    page.drawRectangle({ x: ML, y: y - 18, width: CONTENT_W, height: 18, color: C.totalBg });
+  const rutaTotal: DetalleFila | null =
+    rutaIds.length > 1
+      ? {
+          nombre: "TOTAL",
+          capAp: totAp.capital,
+          capCi: totCi?.capital ?? null,
+          ganancias: totCi?.ganancias ?? totAp.ganancias,
+          gastos: totCi?.gastos ?? totAp.gastos,
+          perdidas: totCi?.perdidas ?? totAp.perdidas,
+        }
+      : null;
 
-    const deltaTotal = totCi ? totCi.capital - totAp.capital : null;
-
-    txt("TOTAL", cols.nombre.x + 3, y - 12, 8, fontBold, rgb(1,1,1));
-    txt(fmtMoney(totAp.capital), cols.capAp.x + 3, y - 12, 8, fontBold, rgb(1,1,1));
-    txt(totCi ? fmtMoney(totCi.capital) : "—", cols.capCi.x + 3, y - 12, 8, fontBold, rgb(1,1,1));
-    txt(deltaTotal !== null ? fmtDelta(totAp.capital, totCi!.capital) : "—", cols.variacion.x + 3, y - 12, 8, fontBold, rgb(1,1,1));
-    txt(fmtMoney(totCi?.ganancias ?? totAp.ganancias), cols.ganancias.x + 3, y - 12, 8, fontBold, rgb(1,1,1));
-    txt(fmtMoney(totCi?.gastos ?? totAp.gastos), cols.gastos.x + 3, y - 12, 8, fontBold, rgb(1,1,1));
-    txt(fmtMoney(totCi?.perdidas ?? totAp.perdidas), cols.perdidas.x + 3, y - 12, 8, fontBold, rgb(1,1,1));
-    txt(
-      totCi ? fmtMoney(totCi.capital - totAp.capital) : "—",
-      cols.utilidad.x + 3,
-      y - 12,
-      8,
-      fontBold,
-      rgb(1, 1, 1)
-    );
-    y -= 20;
-  }
+  drawDetalleSection("Detalle por Ruta", "Ruta", rutaFilas, colsRuta, { totalFila: rutaTotal });
 
   // ── Footer ────────────────────────────────────────────────────────────────
 
@@ -332,7 +380,7 @@ export async function buildPeriodoAdminPdf(payload: PeriodoAdminPdfPayload): Pro
   for (let i = 0; i < pageCount; i++) {
     const p = pdf.getPage(i);
     p.drawRectangle({ x: 0, y: 0, width: PAGE_W, height: 24, color: C.brand });
-    p.drawText(san(`${payload.nombreEmpresa} — Informe generado el ${new Date().toLocaleDateString("es-CO")}`), {
+    p.drawText(san(`Informe generado el ${new Date().toLocaleDateString("es-CO")}`), {
       x: ML, y: 8, size: 7, font, color: rgb(0.7, 0.65, 0.60),
     });
     p.drawText(san(`Pagina ${i + 1} de ${pageCount}`), {

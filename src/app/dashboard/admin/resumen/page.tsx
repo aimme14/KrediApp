@@ -31,26 +31,22 @@ function fmt(n: number) {
   return n.toLocaleString("es-CO", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-function fmtDelta(apertura: number, cierre: number | null): {
-  texto: string;
-  positivo: boolean;
-  neutro: boolean;
-} {
-  if (cierre === null) return { texto: "—", positivo: false, neutro: true };
-  const diff = cierre - apertura;
-  const signo = diff > 0 ? "+" : "";
-  return {
-    texto: `${signo}${fmt(diff)}`,
-    positivo: diff > 0,
-    neutro: diff === 0,
-  };
-}
-
 function gastosTotalesRuta(r: PeriodoAdminSnapshotRuta | undefined): number {
   if (!r) return 0;
+  if (typeof r.gastosRuta === "number" || typeof r.gastosEmpleados === "number") {
+    return (r.gastosRuta ?? 0) + (r.gastosEmpleados ?? 0);
+  }
   if (typeof r.gastosTotales === "number") return r.gastosTotales;
   const legacy = r as PeriodoAdminSnapshotRuta & { gastos?: number };
   return typeof legacy.gastos === "number" ? legacy.gastos : 0;
+}
+
+function gastosPeriodoRuta(
+  rc: PeriodoAdminSnapshotRuta | undefined,
+  _ra: PeriodoAdminSnapshotRuta | undefined
+): number {
+  if (rc) return gastosTotalesRuta(rc);
+  return 0;
 }
 
 function calcularTotales(rutas: PeriodoAdminSnapshotRuta[]) {
@@ -169,9 +165,7 @@ export default function ResumenPage() {
       )}
 
       <div className="card">
-        <h3 style={{ marginTop: 0 }}>Periodos contables</h3>
-        <p style={{ color: "var(--text-muted)", fontSize: "0.875rem", marginBottom: "1rem" }}>
-        </p>
+        <h3 style={{ marginTop: 0, marginBottom: "1rem" }}>Periodos contables</h3>
 
         {hayAbierto && (
           <p style={{ marginBottom: "1rem", fontWeight: 600, color: "var(--accent, #5b21b6)" }}>
@@ -255,35 +249,106 @@ export default function ResumenPage() {
       </div>
 
       {(detalle || detalleLoading) && (
-        <div
-          className="card"
-          style={{ marginTop: "1rem", position: "relative" }}
-          role="dialog"
-          aria-label="Comparación de periodo"
-        >
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
-            <h3 style={{ margin: 0 }}>Comparación apertura / cierre</h3>
-            <button type="button" className="btn btn-secondary" onClick={() => setDetalle(null)} disabled={detalleLoading}>
+        <div className="card resumen-comparar-card" style={{ marginTop: "1rem" }} role="region" aria-label="Comparación de periodo">
+          <div className="card-header-row resumen-comparar-header">
+            <div>
+              <h3>Comparación apertura / cierre</h3>
+              {detalle && !detalleLoading && (
+                <p className="resumen-comparar-meta">
+                  {detalle.estado === "abierto" ? "Periodo abierto" : "Periodo cerrado"}
+                  {detalle.fechaApertura
+                    ? ` · Apertura ${new Date(detalle.fechaApertura).toLocaleString("es-CO")}`
+                    : ""}
+                  {detalle.fechaCierre
+                    ? ` · Cierre ${new Date(detalle.fechaCierre).toLocaleString("es-CO")}`
+                    : detalle.estado === "abierto"
+                      ? " · Sin cierre"
+                      : ""}
+                </p>
+              )}
+            </div>
+            <button
+              type="button"
+              className="btn btn-secondary resumen-comparar-close-btn"
+              onClick={() => setDetalle(null)}
+              disabled={detalleLoading}
+            >
               Cerrar
             </button>
           </div>
           {detalleLoading ? (
-            <p>Cargando...</p>
+            <p className="resumen-comparar-loading">Cargando...</p>
           ) : detalle && ap ? (
             <>
-              <h4 style={{ marginTop: "1.25rem", marginBottom: "0.5rem" }}>Rutas</h4>
-              <div className="table-wrap">
-                <table>
+              <p className="resumen-comparar-section-label">Rutas</p>
+              <div className="resumen-comparar-cards" aria-label="Resumen por ruta">
+                {rutaIdsComparar.map((rid) => {
+                  const ra = ap.rutas.find((r) => r.rutaId === rid);
+                  const rc = ci?.rutas.find((r) => r.rutaId === rid);
+                  const nombre = ra?.nombre ?? rc?.nombre ?? rid;
+                  const filas = [
+                    { label: "Cap. apertura", value: fmt(ra?.capitalRuta ?? 0) },
+                    { label: "Cap. cierre", value: rc ? fmt(rc.capitalRuta) : "—" },
+                    { label: "Ganancias", value: fmt(rc?.ganancias ?? ra?.ganancias ?? 0) },
+                    { label: "Gastos", value: fmt(gastosPeriodoRuta(rc, ra)) },
+                    { label: "Pérdidas", value: fmt(rc?.perdidas ?? ra?.perdidas ?? 0) },
+                  ];
+                  return (
+                    <article key={rid} className="resumen-comparar-ruta-card">
+                      <h4 className="resumen-comparar-ruta-name">{nombre}</h4>
+                      <dl className="resumen-comparar-dl">
+                        {filas.map((f) => (
+                          <div key={f.label} className="resumen-comparar-dl-row">
+                            <dt>{f.label}</dt>
+                            <dd>{f.value}</dd>
+                          </div>
+                        ))}
+                      </dl>
+                    </article>
+                  );
+                })}
+                {rutaIdsComparar.length > 1 &&
+                  (() => {
+                    const totAp = calcularTotales(ap.rutas);
+                    const totCi = ci ? calcularTotales(ci.rutas) : null;
+                    const filas = [
+                      { label: "Cap. apertura", value: fmt(totAp.capitalRuta) },
+                      { label: "Cap. cierre", value: totCi ? fmt(totCi.capitalRuta) : "—" },
+                      { label: "Ganancias", value: fmt(totCi?.ganancias ?? totAp.ganancias) },
+                      { label: "Gastos", value: fmt(totCi?.gastosTotales ?? totAp.gastosTotales) },
+                      { label: "Pérdidas", value: fmt(totCi?.perdidas ?? totAp.perdidas) },
+                    ];
+                    return (
+                      <article className="resumen-comparar-ruta-card resumen-comparar-ruta-card--total">
+                        <h4 className="resumen-comparar-ruta-name">TOTAL</h4>
+                        <dl className="resumen-comparar-dl">
+                          {filas.map((f) => (
+                            <div key={f.label} className="resumen-comparar-dl-row">
+                              <dt>{f.label}</dt>
+                              <dd>{f.value}</dd>
+                            </div>
+                          ))}
+                        </dl>
+                      </article>
+                    );
+                  })()}
+              </div>
+              <div className="table-wrap resumen-comparar-table-wrap">
+                <table className="resumen-comparar-table">
                   <thead>
                     <tr>
-                      <th>Ruta</th>
-                      <th className="col-num">Capital apertura</th>
-                      <th className="col-num">Capital cierre</th>
-                      <th className="col-num">Variación</th>
+                      <th className="resumen-col-ruta">Ruta</th>
+                      <th className="col-num" title="Capital apertura">
+                        Cap. apertura
+                      </th>
+                      <th className="col-num" title="Capital cierre">
+                        Cap. cierre
+                      </th>
                       <th className="col-num">Ganancias</th>
-                      <th className="col-num">Gastos totales</th>
+                      <th className="col-num" title="Gastos totales">
+                        Gastos
+                      </th>
                       <th className="col-num">Pérdidas</th>
-                      <th className="col-num">Utilidad (variación capital)</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -291,48 +356,14 @@ export default function ResumenPage() {
                       const ra = ap.rutas.find((r) => r.rutaId === rid);
                       const rc = ci?.rutas.find((r) => r.rutaId === rid);
                       const nombre = ra?.nombre ?? rc?.nombre ?? rid;
-                      const delta = fmtDelta(ra?.capitalRuta ?? 0, rc?.capitalRuta ?? null);
-                      const utilidadReal =
-                        rc && ra ? rc.capitalRuta - ra.capitalRuta : null;
                       return (
                         <tr key={rid}>
-                          <td>{nombre}</td>
+                          <td className="resumen-col-ruta">{nombre}</td>
                           <td className="col-num">{fmt(ra?.capitalRuta ?? 0)}</td>
                           <td className="col-num">{rc ? fmt(rc.capitalRuta) : "—"}</td>
-                          <td
-                            className="col-num"
-                            style={{
-                              color: delta.neutro
-                                ? "var(--text-muted)"
-                                : delta.positivo
-                                  ? "var(--success, #16a34a)"
-                                  : "var(--danger, #dc2626)",
-                              fontWeight: 600,
-                            }}
-                          >
-                            {delta.texto}
-                          </td>
                           <td className="col-num">{fmt(rc?.ganancias ?? ra?.ganancias ?? 0)}</td>
-                          <td className="col-num">
-                            {fmt(gastosTotalesRuta(rc ?? ra))}
-                          </td>
+                          <td className="col-num">{fmt(gastosPeriodoRuta(rc, ra))}</td>
                           <td className="col-num">{fmt(rc?.perdidas ?? ra?.perdidas ?? 0)}</td>
-                          <td
-                            className="col-num"
-                            style={{
-                              fontWeight: 600,
-                              color:
-                                utilidadReal === null
-                                  ? "var(--text-muted)"
-                                  : utilidadReal >= 0
-                                    ? "var(--success, #16a34a)"
-                                    : "var(--danger, #dc2626)",
-                            }}
-                          >
-                            {utilidadReal === null
-                              ? "—"
-                              : `${utilidadReal >= 0 ? "+" : ""}${fmt(utilidadReal)}`}
-                          </td>
                         </tr>
                       );
                     })}
@@ -341,48 +372,15 @@ export default function ResumenPage() {
                     (() => {
                       const totAp = ap ? calcularTotales(ap.rutas) : null;
                       const totCi = ci ? calcularTotales(ci.rutas) : null;
-                      const deltaTotal = fmtDelta(totAp?.capitalRuta ?? 0, totCi?.capitalRuta ?? null);
-                      const utilidadTotal =
-                        totAp && totCi ? totCi.capitalRuta - totAp.capitalRuta : null;
                       return (
                         <tfoot>
-                          <tr style={{ fontWeight: 700, borderTop: "2px solid var(--border)" }}>
-                            <td>TOTAL</td>
+                          <tr className="resumen-comparar-total-row">
+                            <td className="resumen-col-ruta">TOTAL</td>
                             <td className="col-num">{fmt(totAp?.capitalRuta ?? 0)}</td>
                             <td className="col-num">{totCi ? fmt(totCi.capitalRuta) : "—"}</td>
-                            <td
-                              className="col-num"
-                              style={{
-                                color: deltaTotal.neutro
-                                  ? "var(--text-muted)"
-                                  : deltaTotal.positivo
-                                    ? "var(--success, #16a34a)"
-                                    : "var(--danger, #dc2626)",
-                              }}
-                            >
-                              {deltaTotal.texto}
-                            </td>
                             <td className="col-num">{fmt(totCi?.ganancias ?? totAp?.ganancias ?? 0)}</td>
-                            <td className="col-num">
-                              {fmt(totCi?.gastosTotales ?? totAp?.gastosTotales ?? 0)}
-                            </td>
+                            <td className="col-num">{fmt(totCi?.gastosTotales ?? totAp?.gastosTotales ?? 0)}</td>
                             <td className="col-num">{fmt(totCi?.perdidas ?? totAp?.perdidas ?? 0)}</td>
-                            <td
-                              className="col-num"
-                              style={{
-                                fontWeight: 700,
-                                color:
-                                  utilidadTotal === null
-                                    ? "var(--text-muted)"
-                                    : utilidadTotal >= 0
-                                      ? "var(--success, #16a34a)"
-                                      : "var(--danger, #dc2626)",
-                              }}
-                            >
-                              {utilidadTotal === null
-                                ? "—"
-                                : `${utilidadTotal >= 0 ? "+" : ""}${fmt(utilidadTotal)}`}
-                            </td>
                           </tr>
                         </tfoot>
                       );

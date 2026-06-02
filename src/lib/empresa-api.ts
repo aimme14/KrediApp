@@ -1128,6 +1128,8 @@ export type PeriodoAdminSnapshotAdmin = {
   capitalAdmin: number;
   /** Suma de ganancias de las rutas del admin (snapshot). Opcional en periodos antiguos. */
   gananciasRutas?: number;
+  gastosAdmin?: number;
+  gastosTotales?: number;
 };
 
 export type PeriodoAdminSnapshotRuta = {
