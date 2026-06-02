@@ -280,6 +280,7 @@ export default function ResumenPage() {
             <p className="resumen-comparar-loading">Cargando...</p>
           ) : detalle && ap ? (
             <>
+<<<<<<< HEAD
               <p className="resumen-comparar-section-label">Rutas</p>
               <div className="resumen-comparar-cards" aria-label="Resumen por ruta">
                 {rutaIdsComparar.map((rid) => {
@@ -344,6 +345,116 @@ export default function ResumenPage() {
                       <th className="col-num" title="Capital cierre">
                         Cap. cierre
                       </th>
+=======
+              {ap && (
+                <>
+                  <h4 style={{ marginTop: "1.25rem", marginBottom: "0.75rem" }}>
+                    Posición del administrador
+                  </h4>
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+                      gap: "0.75rem",
+                      marginBottom: "1.5rem",
+                    }}
+                  >
+                    {[
+                      {
+                        label: "Caja admin apertura",
+                        valor: fmt(ap.admin.cajaAdmin),
+                        color: "var(--text)",
+                      },
+                      {
+                        label: "Caja admin cierre",
+                        valor: ci ? fmt(ci.admin.cajaAdmin) : "—",
+                        color: "var(--text)",
+                      },
+                      {
+                        label: "Capital admin apertura",
+                        valor: fmt(ap.admin.capitalAdmin),
+                        color: "var(--text)",
+                      },
+                      {
+                        label: "Capital admin cierre",
+                        valor: ci ? fmt(ci.admin.capitalAdmin) : "—",
+                        color: "var(--text)",
+                      },
+                      {
+                        label: "Variación capital admin",
+                        valor: ci
+                          ? `${ci.admin.capitalAdmin - ap.admin.capitalAdmin >= 0 ? "+" : ""}${fmt(ci.admin.capitalAdmin - ap.admin.capitalAdmin)}`
+                          : "—",
+                        color: ci
+                          ? ci.admin.capitalAdmin - ap.admin.capitalAdmin >= 0
+                            ? "var(--success, #16a34a)"
+                            : "var(--danger, #dc2626)"
+                          : "var(--text-muted)",
+                      },
+                      {
+                        label: "Ganancias rutas",
+                        valor: fmt(ci?.admin.gananciasRutas ?? ap.admin.gananciasRutas ?? 0),
+                        color: "var(--success, #16a34a)",
+                      },
+                      {
+                        label: "Gastos admin",
+                        valor: fmt(ci?.admin.gastosAdmin ?? ap.admin.gastosAdmin ?? 0),
+                        color: "var(--danger, #dc2626)",
+                      },
+                      {
+                        label: "Gastos totales",
+                        valor: fmt(ci?.admin.gastosTotales ?? ap.admin.gastosTotales ?? 0),
+                        color: "var(--danger, #dc2626)",
+                      },
+                    ].map((item) => (
+                      <div
+                        key={item.label}
+                        style={{
+                          padding: "0.875rem 1rem",
+                          background: "var(--card-bg)",
+                          border: "1px solid var(--card-border)",
+                          borderRadius: "var(--radius)",
+                        }}
+                      >
+                        <p
+                          style={{
+                            margin: "0 0 0.25rem",
+                            fontSize: "0.75rem",
+                            color: "var(--text-muted)",
+                            textTransform: "uppercase",
+                            letterSpacing: "0.05em",
+                          }}
+                        >
+                          {item.label}
+                        </p>
+                        <p
+                          style={{
+                            margin: 0,
+                            fontSize: "1.1rem",
+                            fontWeight: 700,
+                            color: item.color,
+                          }}
+                        >
+                          $ {item.valor}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+              <h4 style={{ marginTop: "1.25rem", marginBottom: "0.5rem" }}>Rutas</h4>
+              <div className="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Ruta</th>
+                      <th className="col-num">Caja apertura</th>
+                      <th className="col-num">Caja cierre</th>
+                      <th className="col-num">Inversiones</th>
+                      <th className="col-num">Capital apertura</th>
+                      <th className="col-num">Capital cierre</th>
+                      <th className="col-num">Variación</th>
+>>>>>>> a2873a2ea2970ed873aafa7d79d50c188a979af7
                       <th className="col-num">Ganancias</th>
                       <th className="col-num" title="Gastos totales">
                         Gastos
@@ -358,7 +469,14 @@ export default function ResumenPage() {
                       const nombre = ra?.nombre ?? rc?.nombre ?? rid;
                       return (
                         <tr key={rid}>
+<<<<<<< HEAD
                           <td className="resumen-col-ruta">{nombre}</td>
+=======
+                          <td>{nombre}</td>
+                          <td className="col-num">{fmt(ra?.cajaRuta ?? 0)}</td>
+                          <td className="col-num">{rc ? fmt(rc.cajaRuta) : "—"}</td>
+                          <td className="col-num">{fmt(rc?.inversiones ?? ra?.inversiones ?? 0)}</td>
+>>>>>>> a2873a2ea2970ed873aafa7d79d50c188a979af7
                           <td className="col-num">{fmt(ra?.capitalRuta ?? 0)}</td>
                           <td className="col-num">{rc ? fmt(rc.capitalRuta) : "—"}</td>
                           <td className="col-num">{fmt(rc?.ganancias ?? ra?.ganancias ?? 0)}</td>
@@ -374,8 +492,16 @@ export default function ResumenPage() {
                       const totCi = ci ? calcularTotales(ci.rutas) : null;
                       return (
                         <tfoot>
+<<<<<<< HEAD
                           <tr className="resumen-comparar-total-row">
                             <td className="resumen-col-ruta">TOTAL</td>
+=======
+                          <tr style={{ fontWeight: 700, borderTop: "2px solid var(--border)" }}>
+                            <td>TOTAL</td>
+                            <td className="col-num">{fmt(totAp?.cajaRuta ?? 0)}</td>
+                            <td className="col-num">{totCi ? fmt(totCi.cajaRuta) : "—"}</td>
+                            <td className="col-num">{fmt(totCi?.inversiones ?? totAp?.inversiones ?? 0)}</td>
+>>>>>>> a2873a2ea2970ed873aafa7d79d50c188a979af7
                             <td className="col-num">{fmt(totAp?.capitalRuta ?? 0)}</td>
                             <td className="col-num">{totCi ? fmt(totCi.capitalRuta) : "—"}</td>
                             <td className="col-num">{fmt(totCi?.ganancias ?? totAp?.ganancias ?? 0)}</td>

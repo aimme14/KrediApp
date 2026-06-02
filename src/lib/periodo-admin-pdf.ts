@@ -169,6 +169,10 @@ export async function buildPeriodoAdminPdf(payload: PeriodoAdminPdfPayload): Pro
 
   // ── Resumen ejecutivo (KPIs) ──────────────────────────────────────────────
 
+  const capAdminAp = payload.apertura.admin.capitalAdmin;
+  const capAdminCi = payload.cierre?.admin.capitalAdmin ?? null;
+  const utilidadNeta = capAdminCi !== null ? capAdminCi - capAdminAp : 0;
+
   const totAp = payload.apertura.rutas.reduce(
     (a, r) => ({
       capital: a.capital + r.capitalRuta,
@@ -191,6 +195,7 @@ export async function buildPeriodoAdminPdf(payload: PeriodoAdminPdfPayload): Pro
       )
     : null;
 
+<<<<<<< HEAD
   const utilidadNeta =
     totCi !== null ? totCi.capital - totAp.capital : totAp.capital;
 
@@ -198,18 +203,40 @@ export async function buildPeriodoAdminPdf(payload: PeriodoAdminPdfPayload): Pro
   const kpis = [
     { label: "Capital apertura", value: fmtMoney(totAp.capital) },
     { label: "Capital cierre", value: totCi ? fmtMoney(totCi.capital) : "—" },
+=======
+  const kpis = [
+    { label: "Capital apertura", value: fmtMoney(capAdminAp) },
+    { label: "Capital cierre", value: capAdminCi !== null ? fmtMoney(capAdminCi) : "—" },
+>>>>>>> a2873a2ea2970ed873aafa7d79d50c188a979af7
     {
       label: "Utilidad neta",
-      value: totCi ? fmtMoney(utilidadNeta) : "—",
+      value: capAdminCi !== null ? fmtMoney(utilidadNeta) : "—",
       highlight: true,
     },
+<<<<<<< HEAD
+=======
+    {
+      label: "Variacion capital",
+      value: capAdminCi !== null ? fmtDelta(capAdminAp, capAdminCi) : "—",
+      delta: true,
+    },
+>>>>>>> a2873a2ea2970ed873aafa7d79d50c188a979af7
   ];
 
   const kpiW = (CONTENT_W - 8) / 3;
   kpis.forEach((kpi, i) => {
     const kx = ML + i * (kpiW + 4);
+<<<<<<< HEAD
     const isPos = totCi ? utilidadNeta >= 0 : true;
     const cardColor = kpi.highlight ? (isPos ? C.success : C.danger) : C.accent;
+=======
+    const isPos = capAdminCi !== null ? utilidadNeta >= 0 : true;
+    const cardColor = kpi.highlight
+      ? (isPos ? C.success : C.danger)
+      : kpi.delta
+        ? (capAdminCi !== null && capAdminCi >= capAdminAp ? C.success : C.danger)
+        : C.accent;
+>>>>>>> a2873a2ea2970ed873aafa7d79d50c188a979af7
 
     page.drawRectangle({ x: kx, y: y - 44, width: kpiW, height: 44, color: rgb(0.97,0.97,0.98) });
     page.drawRectangle({ x: kx, y: y - 44, width: 3, height: 44, color: cardColor });
@@ -219,6 +246,7 @@ export async function buildPeriodoAdminPdf(payload: PeriodoAdminPdfPayload): Pro
 
   y -= 56;
 
+<<<<<<< HEAD
   type ColDef = { x: number; w: number };
   type DetalleCols = {
     nombre: ColDef;
@@ -345,11 +373,131 @@ export async function buildPeriodoAdminPdf(payload: PeriodoAdminPdfPayload): Pro
 
   const adminFila = buildAdminDetalleFila(payload.nombreAdmin, payload.apertura, payload.cierre);
   drawDetalleSection("Detalle del Admin", "Admin", [adminFila], colsAdmin, { showPerdidas: false });
+=======
+  // ── Sección Admin ─────────────────────────────────────────────────────────
+  ensure(50);
+  y -= 6;
+  txt("Posicion del Administrador", ML, y, 10, fontBold, C.brand);
+  y -= 14;
+
+  const adminKpis: {
+    label: string;
+    value: string;
+    delta?: boolean;
+    deltaVal?: number | null;
+  }[] = [
+    {
+      label: "Caja admin apertura",
+      value: fmtMoney(payload.apertura.admin.cajaAdmin),
+    },
+    {
+      label: "Caja admin cierre",
+      value: payload.cierre ? fmtMoney(payload.cierre.admin.cajaAdmin) : "—",
+    },
+    {
+      label: "Capital admin apertura",
+      value: fmtMoney(payload.apertura.admin.capitalAdmin),
+    },
+    {
+      label: "Capital admin cierre",
+      value: payload.cierre ? fmtMoney(payload.cierre.admin.capitalAdmin) : "—",
+    },
+    {
+      label: "Variacion capital admin",
+      value: payload.cierre
+        ? fmtDelta(payload.apertura.admin.capitalAdmin, payload.cierre.admin.capitalAdmin)
+        : "—",
+      delta: true,
+      deltaVal: payload.cierre
+        ? payload.cierre.admin.capitalAdmin - payload.apertura.admin.capitalAdmin
+        : null,
+    },
+    {
+      label: "Ganancias rutas",
+      value: fmtMoney(gananciasRutasAdmin(payload.cierre ?? payload.apertura)),
+    },
+    {
+      label: "Gastos admin",
+      value: fmtMoney((payload.cierre ?? payload.apertura).admin.gastosAdmin ?? 0),
+    },
+    {
+      label: "Gastos totales",
+      value: fmtMoney((payload.cierre ?? payload.apertura).admin.gastosTotales ?? 0),
+    },
+  ];
+
+  const adminKpiW = (CONTENT_W - 28) / 8;
+  adminKpis.forEach((kpi, i) => {
+    const kx = ML + i * (adminKpiW + 4);
+    const cardColor = kpi.delta
+      ? (kpi.deltaVal !== null && kpi.deltaVal !== undefined && kpi.deltaVal >= 0 ? C.success : C.danger)
+      : C.accent;
+
+    page.drawRectangle({ x: kx, y: y - 40, width: adminKpiW, height: 40, color: rgb(0.97, 0.97, 0.98) });
+    page.drawRectangle({ x: kx, y: y - 40, width: 3, height: 40, color: cardColor });
+    txt(kpi.label, kx + 7, y - 12, 6.5, font, C.muted, adminKpiW - 10);
+    txt(
+      kpi.value,
+      kx + 7,
+      y - 27,
+      9,
+      fontBold,
+      kpi.delta && kpi.deltaVal !== null && kpi.deltaVal !== undefined
+        ? (kpi.deltaVal >= 0 ? C.success : C.danger)
+        : C.text,
+      adminKpiW - 10
+    );
+  });
+
+  y -= 52;
+
+  // ── Tabla de rutas ────────────────────────────────────────────────────────
+
+  ensure(40);
+  y -= 6;
+  txt("Detalle por Ruta", ML, y, 10, fontBold, C.brand);
+  y -= 14;
+
+  const cols = {
+    nombre:      { x: ML,       w: 90  },
+    cajaAp:      { x: ML + 94,  w: 68  },
+    cajaCi:      { x: ML + 166, w: 68  },
+    inversiones: { x: ML + 238, w: 68  },
+    capAp:       { x: ML + 310, w: 68  },
+    capCi:       { x: ML + 382, w: 68  },
+    variacion:   { x: ML + 454, w: 68  },
+    ganancias:   { x: ML + 526, w: 62  },
+    gastos:      { x: ML + 592, w: 62  },
+    perdidas:    { x: ML + 658, w: 56  },
+    utilidad:    { x: ML + 718, w: 52  },
+  };
+
+  // Header de tabla
+  page.drawRectangle({ x: ML, y: y - 18, width: CONTENT_W, height: 18, color: C.headBg });
+  const headers: [string, keyof typeof cols][] = [
+    ["Ruta",        "nombre"],
+    ["Caja inicio", "cajaAp"],
+    ["Caja final",  "cajaCi"],
+    ["Inversiones", "inversiones"],
+    ["Cap. inicio", "capAp"],
+    ["Cap. final",  "capCi"],
+    ["Variacion",   "variacion"],
+    ["Ganancias",   "ganancias"],
+    ["Gastos",      "gastos"],
+    ["Perdidas",    "perdidas"],
+    ["Utilidad",    "utilidad"],
+  ];
+  headers.forEach(([label, col]) => {
+    txt(label, cols[col].x + 3, y - 12, 7, fontBold, C.headText);
+  });
+  y -= 20;
+>>>>>>> a2873a2ea2970ed873aafa7d79d50c188a979af7
 
   const rutaIds = mergeRutas(payload.apertura, payload.cierre);
   const rutaFilas: DetalleFila[] = rutaIds.map((rid) => {
     const ra = payload.apertura.rutas.find((r) => r.rutaId === rid);
     const rc = payload.cierre?.rutas.find((r) => r.rutaId === rid);
+<<<<<<< HEAD
     return {
       nombre: ra?.nombre ?? rc?.nombre ?? rid,
       capAp: ra?.capitalRuta ?? 0,
@@ -358,6 +506,52 @@ export async function buildPeriodoAdminPdf(payload: PeriodoAdminPdfPayload): Pro
       gastos: gastosTotalesRutaSnapshot(rc ?? ra),
       perdidas: rc?.perdidas ?? ra?.perdidas ?? 0,
     };
+=======
+    const nombre = ra?.nombre ?? rc?.nombre ?? rid;
+
+    const capAp = ra?.capitalRuta ?? 0;
+    const capCi = rc?.capitalRuta ?? null;
+    const gan   = rc?.ganancias ?? ra?.ganancias ?? 0;
+    const gas = gastosTotalesRuta(rc ?? ra);
+    const per = rc?.perdidas ?? ra?.perdidas ?? 0;
+    const util =
+      rc && ra ? rc.capitalRuta - ra.capitalRuta : null;
+
+    // Fila alterna
+    if (idx % 2 === 0) {
+      page.drawRectangle({ x: ML, y: y - 15, width: CONTENT_W, height: 15, color: C.rowEven });
+    }
+
+    txt(nombre, cols.nombre.x + 3, y - 10, 7, fontBold, C.text, cols.nombre.w - 4);
+    txt(fmtMoney(ra?.cajaRuta ?? 0), cols.cajaAp.x + 3, y - 10, 7, font, C.text);
+    txt(rc ? fmtMoney(rc.cajaRuta) : "—", cols.cajaCi.x + 3, y - 10, 7, font, C.text);
+    txt(fmtMoney(rc?.inversiones ?? ra?.inversiones ?? 0), cols.inversiones.x + 3, y - 10, 7, font, C.text);
+    txt(fmtMoney(capAp), cols.capAp.x + 3, y - 10, 7, font, C.text);
+    txt(capCi !== null ? fmtMoney(capCi) : "—", cols.capCi.x + 3, y - 10, 7, font, C.text);
+
+    // Variación con color
+    if (capCi !== null) {
+      const deltaVal = capCi - capAp;
+      const deltaColor = deltaVal >= 0 ? C.success : C.danger;
+      txt(fmtDelta(capAp, capCi), cols.variacion.x + 3, y - 10, 7, fontBold, deltaColor);
+    } else {
+      txt("—", cols.variacion.x + 3, y - 10, 7, font, C.muted);
+    }
+
+    txt(fmtMoney(gan), cols.ganancias.x + 3, y - 10, 7, font, C.text);
+    txt(fmtMoney(gas), cols.gastos.x + 3, y - 10, 7, font, C.text);
+    txt(fmtMoney(per), cols.perdidas.x + 3, y - 10, 7, font, C.text);
+
+    // Utilidad con color
+    if (util !== null) {
+      const utilColor = util >= 0 ? C.success : C.danger;
+      txt(fmtMoney(util), cols.utilidad.x + 3, y - 10, 7, fontBold, utilColor);
+    } else {
+      txt("—", cols.utilidad.x + 3, y - 10, 7, font, C.muted);
+    }
+
+    y -= 16;
+>>>>>>> a2873a2ea2970ed873aafa7d79d50c188a979af7
   });
 
   const rutaTotal: DetalleFila | null =
@@ -372,7 +566,55 @@ export async function buildPeriodoAdminPdf(payload: PeriodoAdminPdfPayload): Pro
         }
       : null;
 
+<<<<<<< HEAD
   drawDetalleSection("Detalle por Ruta", "Ruta", rutaFilas, colsRuta, { totalFila: rutaTotal });
+=======
+    const deltaTotal = totCi ? totCi.capital - totAp.capital : null;
+
+    txt("TOTAL", cols.nombre.x + 3, y - 12, 8, fontBold, rgb(1,1,1));
+    txt(
+      fmtMoney(payload.apertura.rutas.reduce((s, r) => s + r.cajaRuta, 0)),
+      cols.cajaAp.x + 3,
+      y - 12,
+      7,
+      fontBold,
+      rgb(1, 1, 1)
+    );
+    txt(
+      payload.cierre
+        ? fmtMoney(payload.cierre.rutas.reduce((s, r) => s + r.cajaRuta, 0))
+        : "—",
+      cols.cajaCi.x + 3,
+      y - 12,
+      7,
+      fontBold,
+      rgb(1, 1, 1)
+    );
+    txt(
+      fmtMoney((payload.cierre ?? payload.apertura).rutas.reduce((s, r) => s + r.inversiones, 0)),
+      cols.inversiones.x + 3,
+      y - 12,
+      7,
+      fontBold,
+      rgb(1, 1, 1)
+    );
+    txt(fmtMoney(totAp.capital), cols.capAp.x + 3, y - 12, 8, fontBold, rgb(1,1,1));
+    txt(totCi ? fmtMoney(totCi.capital) : "—", cols.capCi.x + 3, y - 12, 8, fontBold, rgb(1,1,1));
+    txt(deltaTotal !== null ? fmtDelta(totAp.capital, totCi!.capital) : "—", cols.variacion.x + 3, y - 12, 8, fontBold, rgb(1,1,1));
+    txt(fmtMoney(totCi?.ganancias ?? totAp.ganancias), cols.ganancias.x + 3, y - 12, 8, fontBold, rgb(1,1,1));
+    txt(fmtMoney(totCi?.gastos ?? totAp.gastos), cols.gastos.x + 3, y - 12, 8, fontBold, rgb(1,1,1));
+    txt(fmtMoney(totCi?.perdidas ?? totAp.perdidas), cols.perdidas.x + 3, y - 12, 8, fontBold, rgb(1,1,1));
+    txt(
+      totCi ? fmtMoney(totCi.capital - totAp.capital) : "—",
+      cols.utilidad.x + 3,
+      y - 12,
+      8,
+      fontBold,
+      rgb(1, 1, 1)
+    );
+    y -= 20;
+  }
+>>>>>>> a2873a2ea2970ed873aafa7d79d50c188a979af7
 
   // ── Footer ────────────────────────────────────────────────────────────────
 

@@ -1,6 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<<<<<<< HEAD
 <coverage generated="1780359444951" clover="3.2.0">
   <project timestamp="1780359444951" name="All files">
+=======
+<coverage generated="1780164112358" clover="3.2.0">
+  <project timestamp="1780164112358" name="All files">
+>>>>>>> a2873a2ea2970ed873aafa7d79d50c188a979af7
     <metrics statements="82" coveredstatements="79" conditionals="55" coveredconditionals="44" methods="14" coveredmethods="14" elements="151" coveredelements="137" complexity="0" loc="82" ncloc="82" packages="1" files="3" classes="3"/>
     <file name="capital-formulas.ts" path="C:\Users\Administrator\Music\KrediApp\src\lib\capital-formulas.ts">
       <metrics statements="13" coveredstatements="13" conditionals="2" coveredconditionals="2" methods="6" coveredmethods="6"/>

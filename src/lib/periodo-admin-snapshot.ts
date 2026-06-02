@@ -18,10 +18,15 @@ export type PeriodoAdminSnapshotAdmin = {
   capitalAdmin: number;
   /** Suma de `ganancias` de todas las rutas del admin (congelada en apertura/cierre). */
   gananciasRutas?: number;
+<<<<<<< HEAD
   /** Gastos del admin (alcance administrador) en el periodo. */
   gastosAdmin?: number;
   /** Total de gastos del periodo (admin + rutas). */
   gastosTotales?: number;
+=======
+  gastosAdmin: number;
+  gastosTotales: number;
+>>>>>>> a2873a2ea2970ed873aafa7d79d50c188a979af7
 };
 
 export type PeriodoAdminSnapshotRuta = {
@@ -105,7 +110,15 @@ export async function buildPeriodoAdminSnapshot(
 
     sumaCapitalRutas += capitalRuta;
 
+<<<<<<< HEAD
     rutasBase.push({
+=======
+    const gastosRuta = round2(gastosRutaPorRuta.get(rutaId) ?? 0);
+    const gastosEmpleados = round2(gastosEmpleadosPorRuta.get(rutaId) ?? 0);
+    const gastosTotales = round2(gastosRuta + gastosEmpleados);
+
+    rutas.push({
+>>>>>>> a2873a2ea2970ed873aafa7d79d50c188a979af7
       rutaId,
       nombre,
       cajaRuta,
@@ -113,6 +126,13 @@ export async function buildPeriodoAdminSnapshot(
       inversiones,
       ganancias,
       perdidas,
+<<<<<<< HEAD
+=======
+      gastosRuta,
+      gastosAdmin: 0,
+      gastosEmpleados,
+      gastosTotales,
+>>>>>>> a2873a2ea2970ed873aafa7d79d50c188a979af7
       capitalRuta: round2(capitalRuta),
     });
   }
@@ -122,6 +142,10 @@ export async function buildPeriodoAdminSnapshot(
   const u = userSnap.data() ?? {};
   const cajaAdmin = typeof u.cajaAdmin === "number" ? u.cajaAdmin : 0;
   const capitalAdmin = round2(cajaAdmin + sumaCapitalRutas);
+  const gastosAdminGeneralRounded = round2(gastosAdminGeneral);
+  const gastosTotalesGeneral = round2(
+    gastosAdminGeneralRounded + rutas.reduce((s, r) => s + r.gastosTotales, 0)
+  );
 
   let rutas: PeriodoAdminSnapshotRuta[] = rutasVaciasGastos(rutasBase);
   let gastosAdmin = 0;
@@ -151,8 +175,13 @@ export async function buildPeriodoAdminSnapshot(
       cajaAdmin: round2(cajaAdmin),
       capitalAdmin,
       gananciasRutas: round2(rutas.reduce((s, r) => s + r.ganancias, 0)),
+<<<<<<< HEAD
       gastosAdmin,
       gastosTotales,
+=======
+      gastosAdmin: gastosAdminGeneralRounded,
+      gastosTotales: gastosTotalesGeneral,
+>>>>>>> a2873a2ea2970ed873aafa7d79d50c188a979af7
     },
     rutas,
     fechaSnapshot: new Date().toISOString(),
