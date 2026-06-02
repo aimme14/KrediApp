@@ -3065,6 +3065,56 @@ td {
   margin-top: 0.85rem;
 }
 
+.admin-clientes-filtros-wrap {
+  margin-bottom: 2%;
+}
+
+.admin-clientes-filtros-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.65rem 1rem;
+}
+
+.admin-clientes-filtros-row .admin-clientes-filtro-tabs {
+  flex: 1 1 auto;
+  min-width: min(100%, 16rem);
+}
+
+.admin-clientes-filtro-ruta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.28rem;
+  flex: 0 1 auto;
+  min-width: min(100%, 14rem);
+}
+
+.admin-clientes-filtro-ruta-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.admin-clientes-filtro-ruta-select {
+  width: 100%;
+  min-width: 12rem;
+  padding: 0.42rem 0.65rem;
+  font-size: 0.875rem;
+  border-radius: 10px;
+  border: 1px solid var(--input-border);
+  background: var(--input-bg);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.admin-clientes-filtro-ruta-select:focus {
+  outline: none;
+  border-color: color-mix(in srgb, var(--link) 55%, var(--input-border));
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--link) 18%, transparent);
+}
+
 @media (max-width: 768px) {
   .admin-clientes-table-wrap {
     overflow-x: auto;
