@@ -364,7 +364,8 @@ export async function POST(request: NextRequest) {
             apiUser.empresaId,
             apiUser.uid,
             monto,
-            descripcion.trim()
+            descripcion.trim(),
+            { acumularGastoPeriodo: true }
           );
           ledgerWalletType = "admin_caja";
           ledgerWalletId = apiUser.uid;

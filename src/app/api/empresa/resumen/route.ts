@@ -8,7 +8,6 @@ import {
   PRESTAMOS_SUBCOLLECTION,
   USUARIOS_SUBCOLLECTION,
 } from "@/lib/empresas-db";
-import { listarGastosRutaPorAdmin } from "@/lib/gastos-totals";
 import {
   computeCapitalAdmin,
   computeCapitalRutaFromRutaFields,
@@ -46,13 +45,12 @@ export async function GET(request: NextRequest) {
   const empresaRef = db.collection(EMPRESAS_COLLECTION).doc(apiUser.empresaId);
   const isAdmin = apiUser.role === "admin";
 
-  const [rutasSnap, prestamosSnap, gastosLista, userSnap] = await Promise.all([
+  const [rutasSnap, prestamosSnap, userSnap] = await Promise.all([
     empresaRef.collection(RUTAS_SUBCOLLECTION).get(),
     empresaRef
       .collection(PRESTAMOS_SUBCOLLECTION)
       .where("adminId", "==", apiUser.uid)
       .get(),
-    listarGastosRutaPorAdmin(db, apiUser.empresaId, apiUser.uid),
     isAdmin
       ? empresaRef.collection(USUARIOS_SUBCOLLECTION).doc(apiUser.uid).get()
       : Promise.resolve(null as DocumentSnapshot | null),
@@ -68,11 +66,6 @@ export async function GET(request: NextRequest) {
       typeof data.saldoPendiente === "number" ? data.saldoPendiente : 0;
     const cobrado = totalAPagar - saldoPendiente;
     prestamosPorRuta.set(rutaId, (prestamosPorRuta.get(rutaId) ?? 0) + cobrado);
-  }
-
-  const gastosPorRuta = new Map<string, number>();
-  for (const g of gastosLista) {
-    gastosPorRuta.set(g.rutaId, (gastosPorRuta.get(g.rutaId) ?? 0) + g.monto);
   }
 
   let sumaCapitalRutas = 0;
@@ -91,10 +84,7 @@ export async function GET(request: NextRequest) {
     const perdidas = typeof data.perdidas === "number" ? data.perdidas : 0;
 
     const ingreso = prestamosPorRuta.get(rutaId) ?? 0;
-    const gastosEmpleados =
-      typeof data.gastos === "number" ? data.gastos : 0;
-    const gastosAdminRuta = gastosPorRuta.get(rutaId) ?? 0;
-    const gastosRuta = gastosEmpleados + gastosAdminRuta;
+    const gastosRuta = typeof data.gastos === "number" ? data.gastos : 0;
     const utilidad = ganancias - gastosRuta - perdidas;
 
     const capitalTotalRaw =

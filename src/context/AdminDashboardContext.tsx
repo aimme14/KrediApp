@@ -14,7 +14,6 @@ import { db } from "@/lib/firebase";
 import { useAuth } from "@/context/AuthContext";
 import {
   EMPRESAS_COLLECTION,
-  GASTOS_ADMIN_SUBCOLLECTION,
   RUTAS_SUBCOLLECTION,
   USUARIOS_SUBCOLLECTION,
   USERS_COLLECTION,
@@ -41,6 +40,8 @@ export type AdminDashboardContextValue = {
   rutasConEmpleados: AdminRutaConEmpleados[];
   rutasResumen: ResumenRutaItem[];
   cajaAdmin: number;
+  /** Gastos del periodo desde base admin (sin ruta); se reinicia al cerrar periodo. */
+  gastosAdminPeriodo: number;
   totalClientes: number;
   totalMorosos: number;
   totalPrestamosActivos: number;
@@ -57,9 +58,7 @@ export function AdminDashboardProvider({ children }: { children: ReactNode }) {
   const { user, profile } = useAuth();
 
   const [rutasBase, setRutasBase] = useState<AdminRutaLive[]>([]);
-  const [gastosAdminPorRuta, setGastosAdminPorRuta] = useState<Map<string, number>>(
-    () => new Map()
-  );
+  const [gastosAdminPeriodo, setGastosAdminPeriodo] = useState(0);
   const [empleadosPorRuta, setEmpleadosPorRuta] = useState<Map<string, AdminEmpleadoLive[]>>(
     () => new Map()
   );
@@ -163,55 +162,13 @@ export function AdminDashboardProvider({ children }: { children: ReactNode }) {
     return () => unsub();
   }, [user, profile, refreshCaja]);
 
-  useEffect(() => {
-    if (!db || !user || !profile || profile.role !== "admin" || !profile.empresaId) {
-      setGastosAdminPorRuta(new Map());
-      return;
-    }
-
-    const gastosCol = collection(
-      db,
-      EMPRESAS_COLLECTION,
-      profile.empresaId,
-      GASTOS_ADMIN_SUBCOLLECTION
-    );
-    const qGastos = query(
-      gastosCol,
-      where("adminId", "==", user.uid),
-      where("alcance", "==", "ruta")
-    );
-
-    const unsub = onSnapshot(
-      qGastos,
-      (snap) => {
-        const map = new Map<string, number>();
-        for (const d of snap.docs) {
-          const data = d.data() as Record<string, unknown>;
-          const rutaId = typeof data.rutaId === "string" ? data.rutaId.trim() : "";
-          if (!rutaId) continue;
-          const monto = typeof data.monto === "number" ? data.monto : 0;
-          map.set(rutaId, (map.get(rutaId) ?? 0) + monto);
-        }
-        setGastosAdminPorRuta(map);
-      },
-      (err) => {
-        console.warn("[AdminDashboardContext] Error al suscribirse a gastos admin por ruta:", err);
-      }
-    );
-
-    return () => unsub();
-  }, [user, profile]);
-
-  const rutas = useMemo((): AdminRutaLive[] => {
-    return rutasBase.map((r) => ({
-      ...r,
-      gastos: (r.gastos ?? 0) + (gastosAdminPorRuta.get(r.id) ?? 0),
-    }));
-  }, [rutasBase, gastosAdminPorRuta]);
+  /** Contador de gastos por ruta: solo `ruta.gastos` (se reinicia al cerrar periodo). */
+  const rutas = rutasBase;
 
   useEffect(() => {
     if (!db || !user || !profile || profile.role !== "admin" || !profile.empresaId) {
       setCajaAdmin(0);
+      setGastosAdminPeriodo(0);
       setTotalClientes(0);
       setTotalMorosos(0);
       setTotalPrestamosActivos(0);
@@ -231,6 +188,7 @@ export function AdminDashboardProvider({ children }: { children: ReactNode }) {
       (snap) => {
         if (!snap.exists()) {
           setCajaAdmin(0);
+          setGastosAdminPeriodo(0);
           setTotalClientes(0);
           setTotalMorosos(0);
           setTotalPrestamosActivos(0);
@@ -238,6 +196,7 @@ export function AdminDashboardProvider({ children }: { children: ReactNode }) {
         }
         const d = snap.data() as Record<string, unknown>;
         setCajaAdmin(typeof d.cajaAdmin === "number" ? d.cajaAdmin : 0);
+        setGastosAdminPeriodo(typeof d.gastosAdmin === "number" ? d.gastosAdmin : 0);
         setTotalClientes(typeof d.totalClientes === "number" ? d.totalClientes : 0);
         setTotalMorosos(typeof d.totalMorosos === "number" ? d.totalMorosos : 0);
         setTotalPrestamosActivos(
@@ -352,6 +311,7 @@ export function AdminDashboardProvider({ children }: { children: ReactNode }) {
       rutasConEmpleados,
       rutasResumen,
       cajaAdmin,
+      gastosAdminPeriodo,
       totalClientes,
       totalMorosos,
       totalPrestamosActivos,
@@ -366,6 +326,7 @@ export function AdminDashboardProvider({ children }: { children: ReactNode }) {
       rutasConEmpleados,
       rutasResumen,
       cajaAdmin,
+      gastosAdminPeriodo,
       totalClientes,
       totalMorosos,
       totalPrestamosActivos,

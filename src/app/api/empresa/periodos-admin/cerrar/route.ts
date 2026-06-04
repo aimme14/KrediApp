@@ -6,6 +6,7 @@ import {
   EMPRESAS_COLLECTION,
   PERIODOS_ADMIN_SUBCOLLECTION,
   RUTAS_SUBCOLLECTION,
+  USUARIOS_SUBCOLLECTION,
 } from "@/lib/empresas-db";
 import { buildPeriodoAdminSnapshot } from "@/lib/periodo-admin-snapshot";
 import { upsertCapitalRutaSnapshot } from "@/lib/capital-ruta-snapshot";
@@ -49,10 +50,9 @@ export async function POST(_request: NextRequest) {
     { desde: fechaApertura, hasta: new Date() }
   );
 
-  const rutasCol = db
-    .collection(EMPRESAS_COLLECTION)
-    .doc(apiUser.empresaId)
-    .collection(RUTAS_SUBCOLLECTION);
+  const empresaRef = db.collection(EMPRESAS_COLLECTION).doc(apiUser.empresaId);
+  const rutasCol = empresaRef.collection(RUTAS_SUBCOLLECTION);
+  const adminUsuarioRef = empresaRef.collection(USUARIOS_SUBCOLLECTION).doc(apiUser.uid);
   const nowRuta = new Date();
 
   const batch = db.batch();
@@ -61,6 +61,10 @@ export async function POST(_request: NextRequest) {
     fechaCierre: FieldValue.serverTimestamp(),
     cerradoPorUid: apiUser.uid,
     cierre,
+  });
+  batch.update(adminUsuarioRef, {
+    gastosAdmin: 0,
+    ultimaActualizacionCapital: nowRuta,
   });
   for (const r of cierre.rutas) {
     batch.update(rutasCol.doc(r.rutaId), {

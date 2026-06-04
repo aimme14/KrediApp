@@ -31,7 +31,8 @@ export async function descontarCajaAdmin(
   empresaId: string,
   adminUid: string,
   monto: number,
-  _motivo?: string
+  _motivo?: string,
+  options?: { acumularGastoPeriodo?: boolean }
 ): Promise<number> {
   if (monto <= 0) throw new Error("El monto a descontar debe ser mayor a 0");
 
@@ -42,23 +43,26 @@ export async function descontarCajaAdmin(
     .doc(adminUid);
 
   const snap = await ref.get();
-  const cajaActual = snap.exists && typeof snap.data()?.cajaAdmin === "number"
-    ? snap.data()!.cajaAdmin
-    : 0;
+  const data = snap.exists ? snap.data()! : {};
+  const cajaActual = typeof data.cajaAdmin === "number" ? data.cajaAdmin : 0;
+  const gastosAdminActual =
+    typeof data.gastosAdmin === "number" ? data.gastosAdmin : 0;
 
   if (cajaActual < monto) {
     throw new Error("Saldo insuficiente en base del administrador");
   }
 
-  const nuevaCaja = cajaActual - monto;
+  const nuevaCaja = Math.round((cajaActual - monto) * 100) / 100;
   const now = new Date();
-  await ref.set(
-    {
-      cajaAdmin: nuevaCaja,
-      ultimaActualizacionCapital: now,
-    },
-    { merge: true }
-  );
+  const payload: Record<string, unknown> = {
+    cajaAdmin: nuevaCaja,
+    ultimaActualizacionCapital: now,
+  };
+  if (options?.acumularGastoPeriodo) {
+    payload.gastosAdmin = Math.round((gastosAdminActual + monto) * 100) / 100;
+  }
+
+  await ref.set(payload, { merge: true });
 
   return nuevaCaja;
 }

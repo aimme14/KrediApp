@@ -122,6 +122,7 @@ export async function descontarCajaRutaAdmin(
       typeof rd.cajasEmpleados === "number" ? rd.cajasEmpleados : 0;
     const inversiones = typeof rd.inversiones === "number" ? rd.inversiones : 0;
     const perdidas = typeof rd.perdidas === "number" ? rd.perdidas : 0;
+    const gastos = typeof rd.gastos === "number" ? rd.gastos : 0;
 
     if (cajaRuta < monto) {
       throw new Error("Saldo insuficiente en caja de la ruta");
@@ -137,6 +138,7 @@ export async function descontarCajaRutaAdmin(
 
     tx.update(rutaRef, {
       cajaRuta: nuevaCajaRuta,
+      gastos: round2(gastos + monto),
       capitalTotal: nuevoCapitalTotal,
       ultimaActualizacion: new Date(),
     });

@@ -32,6 +32,8 @@ export interface CapitalHistorialEntry {
 /** Datos financieros del admin. Ubicación: empresas/{empresaId}/usuarios/{adminUid} (campos cajaAdmin) o subcolección. */
 export interface AdminFinanciero {
   cajaAdmin: number;
+  /** Gastos del periodo desde base admin (alcance admin, sin ruta). Se reinicia al cerrar periodo. */
+  gastosAdmin?: number;
   ultimaActualizacion: Timestamp;
 }
 
