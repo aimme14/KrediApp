@@ -330,7 +330,6 @@ export default function GestionFinancieraPage() {
                       MONTO A INVERTIR
                     </label>
                     <div className="gf-capital-input-wrap">
-                      <span className="gf-capital-input-prefix">COP $</span>
                       <input
                         id="gf-invertir-monto"
                         type="text"
@@ -460,7 +459,6 @@ export default function GestionFinancieraPage() {
                       MONTO A INVERTIR
                     </label>
                     <div className="gf-capital-input-wrap">
-                      <span className="gf-capital-input-prefix">COP $</span>
                       <input
                         id="gf-invertir-admin-monto"
                         type="text"
@@ -568,7 +566,7 @@ export default function GestionFinancieraPage() {
               <div className="gf-inversion-confirm-row">
                 <span className="gf-inversion-confirm-label">Monto a invertir</span>
                 <span className="gf-inversion-confirm-value gf-inversion-confirm-value--monto">
-                  COP ${formatMonto(inversionModal.monto)}
+                  ${formatMonto(inversionModal.monto)}
                 </span>
               </div>
             </div>

@@ -7271,18 +7271,9 @@ a.admin-inicio-link-btn {
   width: 100%;
 }
 
-.gf-capital-input-prefix {
-  position: absolute;
-  left: 0.75rem;
-  font-family: var(--font-dm-mono), monospace;
-  font-size: 1rem;
-  color: var(--text-muted);
-  pointer-events: none;
-}
-
 .gf-capital-input {
   width: 100%;
-  padding: 0.5rem 0.75rem 0.5rem 4rem;
+  padding: 0.5rem 0.75rem;
   min-height: 42px;
   border: 1px solid var(--input-border);
   border-radius: 8px;

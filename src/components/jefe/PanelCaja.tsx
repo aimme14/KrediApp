@@ -242,7 +242,6 @@ export function PanelCaja({
                     MONTO
                   </label>
                   <div className="gf-capital-input-wrap" style={{ maxWidth: "14rem" }}>
-                    <span className="gf-capital-input-prefix">COP $</span>
                     <input
                       id="gf-invertir-monto"
                       type="text"
@@ -306,7 +305,6 @@ export function PanelCaja({
                     MONTO
                   </label>
                   <div className="gf-capital-input-wrap" style={{ maxWidth: "14rem" }}>
-                    <span className="gf-capital-input-prefix">COP $</span>
                     <input
                       id="gf-transfer-monto"
                       type="text"
@@ -380,7 +378,6 @@ export function PanelCaja({
                   CUADRAR CAJA — CAJA DE LA EMPRESA
                 </label>
                 <div className="gf-capital-input-wrap">
-                  <span className="gf-capital-input-prefix">COP $</span>
                   <input
                     id="gf-monto"
                     type="text"
@@ -405,7 +402,6 @@ export function PanelCaja({
                   REPITE EL MONTO DE LA CAJA DE LA EMPRESA
                 </label>
                 <div className="gf-capital-input-wrap">
-                  <span className="gf-capital-input-prefix">COP $</span>
                   <input
                     id="gf-monto-confirm"
                     type="text"
