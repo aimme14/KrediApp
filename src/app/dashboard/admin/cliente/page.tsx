@@ -23,22 +23,33 @@ export default function ClientePage() {
   const PAGE_SIZE = 15;
   const [pagina, setPagina] = useState(1);
   const [filtroNombre, setFiltroNombre] = useState("");
+  const [filtroPrestamoActivo, setFiltroPrestamoActivo] = useState<"todos" | "si" | "no">("todos");
+  const [filtroRutaId, setFiltroRutaId] = useState("");
 
   const filtroNombreLower = filtroNombre.trim().toLowerCase();
+  const hayFiltrosActivos =
+    Boolean(filtroNombreLower) ||
+    filtroPrestamoActivo !== "todos" ||
+    Boolean(filtroRutaId);
 
   const clientesFiltrados = useMemo(() => {
-    if (!filtroNombreLower) return clientes;
     return clientes.filter((c) => {
-      const nombre = (c.nombre ?? "").toLowerCase();
-      const codigo = c.codigo ? formatClienteCodigoRutaYNumero(c.codigo).toLowerCase() : "";
-      const cedula = (c.cedula ?? "").toLowerCase();
-      return (
-        nombre.includes(filtroNombreLower) ||
-        codigo.includes(filtroNombreLower) ||
-        cedula.includes(filtroNombreLower)
-      );
+      if (filtroNombreLower) {
+        const nombre = (c.nombre ?? "").toLowerCase();
+        const codigo = c.codigo ? formatClienteCodigoRutaYNumero(c.codigo).toLowerCase() : "";
+        const cedula = (c.cedula ?? "").toLowerCase();
+        const coincideNombre =
+          nombre.includes(filtroNombreLower) ||
+          codigo.includes(filtroNombreLower) ||
+          cedula.includes(filtroNombreLower);
+        if (!coincideNombre) return false;
+      }
+      if (filtroPrestamoActivo === "si" && !c.prestamo_activo) return false;
+      if (filtroPrestamoActivo === "no" && c.prestamo_activo) return false;
+      if (filtroRutaId && (c.rutaId ?? "") !== filtroRutaId) return false;
+      return true;
     });
-  }, [clientes, filtroNombreLower]);
+  }, [clientes, filtroNombreLower, filtroPrestamoActivo, filtroRutaId]);
 
   const clientesPaginados = useMemo(() => {
     const sorted = [...clientesFiltrados].sort(
@@ -52,7 +63,7 @@ export default function ClientePage() {
 
   useEffect(() => {
     setPagina(1);
-  }, [filtroNombre]);
+  }, [filtroNombre, filtroPrestamoActivo, filtroRutaId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -191,33 +202,83 @@ export default function ClientePage() {
           <p style={{ color: "var(--text-muted)" }}>No hay clientes. Crea uno con el botón &quot;Nuevo cliente&quot;.</p>
         ) : (
           <>
-            <div className="prestamo-admin-search-toolbar" style={{ marginBottom: "0.85rem" }}>
-              <div className="prestamo-admin-search-field">
-                <span className="prestamo-admin-search-icon" aria-hidden>
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="11" cy="11" r="8" />
-                    <path d="m21 21-4.3-4.3" />
-                  </svg>
-                </span>
-                <input
-                  id="clientes-buscador"
-                  className="prestamo-admin-search-input"
-                  type="search"
-                  value={filtroNombre}
-                  onChange={(e) => setFiltroNombre(e.target.value)}
-                  placeholder="Buscar por nombre, código o cédula..."
-                  aria-label="Buscar clientes por nombre, código o cédula"
-                />
+            <div className="prestamo-admin-filtros-wrap admin-clientes-filtros-wrap">
+              <div className="prestamo-admin-search-toolbar">
+                <div className="prestamo-admin-search-field">
+                  <span className="prestamo-admin-search-icon" aria-hidden>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="11" cy="11" r="8" />
+                      <path d="m21 21-4.3-4.3" />
+                    </svg>
+                  </span>
+                  <input
+                    id="clientes-buscador"
+                    className="prestamo-admin-search-input"
+                    type="search"
+                    value={filtroNombre}
+                    onChange={(e) => setFiltroNombre(e.target.value)}
+                    placeholder="Buscar por nombre, código o cédula..."
+                    aria-label="Buscar clientes por nombre, código o cédula"
+                  />
+                </div>
+                {hayFiltrosActivos ? (
+                  <p className="prestamo-admin-search-hint">
+                    {clientesFiltrados.length} cliente{clientesFiltrados.length !== 1 ? "s" : ""} encontrado{clientesFiltrados.length !== 1 ? "s" : ""}
+                  </p>
+                ) : null}
               </div>
-              {filtroNombreLower ? (
-                <p className="prestamo-admin-search-hint">
-                  {clientesFiltrados.length} cliente{clientesFiltrados.length !== 1 ? "s" : ""} encontrado{clientesFiltrados.length !== 1 ? "s" : ""}
-                </p>
-              ) : null}
+              <div className="admin-clientes-filtros-row">
+                <div
+                  className="prestamo-admin-tabs admin-clientes-filtro-tabs"
+                  role="tablist"
+                  aria-label="Filtrar por préstamo activo"
+                >
+                  {(
+                    [
+                      { value: "todos", label: "Todos" },
+                      { value: "si", label: "Con préstamo" },
+                      { value: "no", label: "Sin préstamo" },
+                    ] as const
+                  ).map(({ value, label }) => (
+                    <button
+                      key={value}
+                      type="button"
+                      role="tab"
+                      aria-selected={filtroPrestamoActivo === value}
+                      className={`prestamo-admin-tab${filtroPrestamoActivo === value ? " prestamo-admin-tab--active" : ""}`}
+                      onClick={() => setFiltroPrestamoActivo(value)}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                <div className="admin-clientes-filtro-ruta">
+                  <label htmlFor="clientes-filtro-ruta" className="admin-clientes-filtro-ruta-label">
+                    Ruta
+                  </label>
+                  <select
+                    id="clientes-filtro-ruta"
+                    className="admin-clientes-filtro-ruta-select"
+                    value={filtroRutaId}
+                    onChange={(e) => setFiltroRutaId(e.target.value)}
+                    aria-label="Filtrar clientes por ruta"
+                  >
+                    <option value="">Todas las rutas</option>
+                    {rutas.map((r) => (
+                      <option key={r.id} value={r.id}>
+                        {r.nombre}
+                        {r.ubicacion ? ` · ${r.ubicacion}` : ""}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
             </div>
             {clientesFiltrados.length === 0 ? (
               <p className="prestamo-admin-filtro-vacio">
-                No hay clientes que coincidan con «{filtroNombre.trim()}».
+                {filtroNombreLower
+                  ? `No hay clientes que coincidan con «${filtroNombre.trim()}».`
+                  : "No hay clientes que coincidan con los filtros seleccionados."}
               </p>
             ) : (
             <>

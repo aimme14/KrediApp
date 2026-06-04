@@ -187,6 +187,12 @@ function CobrarClientePageContent() {
   const [showShareMenu, setShowShareMenu] = useState(false);
   const shareMenuRef = useRef<HTMLDivElement>(null);
   const idempotencyKeyRef = useRef<string | null>(null);
+  /** Snapshot al confirmar cobro (evita perder datos si Firestore quita el préstamo de la lista activa). */
+  const cobroConfirmadoRef = useRef<{
+    cliente: ClienteItem;
+    prestamo: PrestamoItem;
+    montoAplicar: number;
+  } | null>(null);
 
   /** Nombre de la empresa en el pie del comprobante (evita mostrar la marca genérica). */
   const [empresaComprobanteMeta, setEmpresaComprobanteMeta] = useState<{
@@ -213,6 +219,10 @@ function CobrarClientePageContent() {
       setLoading(false);
       return;
     }
+    if (confirmado) {
+      setLoading(false);
+      return;
+    }
     const esperandoPrimeraCarga =
       listaLoading &&
       clientesLista.length === 0 &&
@@ -231,7 +241,7 @@ function CobrarClientePageContent() {
 
     if (listaError) setError(listaError);
     else if (!c || !p)
-      setError("Cliente o préstamo no encontrado");
+      setError("");
     else setError(null);
     setLoading(false);
   }, [
@@ -242,6 +252,7 @@ function CobrarClientePageContent() {
     prestamosLista,
     listaLoading,
     listaError,
+    confirmado,
   ]);
 
   useEffect(() => {
@@ -395,7 +406,10 @@ function CobrarClientePageContent() {
   }, [generarComprobanteLocal]);
 
   useEffect(() => {
-    if (!confirmado || !prestamo || comprobanteDisplayUrl || !empresaComprobanteMeta.listo) return;
+    if (!confirmado || comprobanteDisplayUrl || !empresaComprobanteMeta.listo) return;
+    const prestamoParaComprobante =
+      prestamo ?? cobroConfirmadoRef.current?.prestamo ?? null;
+    if (!prestamoParaComprobante) return;
     const el = comprobanteRef.current;
     if (!el) return;
     let cancelled = false;
@@ -413,7 +427,13 @@ function CobrarClientePageContent() {
       cancelled = true;
       clearTimeout(t);
     };
-  }, [confirmado, prestamo?.id, comprobanteDisplayUrl, generarComprobanteLocal, empresaComprobanteMeta.listo]);
+  }, [
+    confirmado,
+    prestamo?.id,
+    comprobanteDisplayUrl,
+    generarComprobanteLocal,
+    empresaComprobanteMeta.listo,
+  ]);
 
   const descargarComprobanteDesdeDOM = useCallback(async () => {
     const blobCached = comprobanteBlobRef.current;
@@ -448,6 +468,14 @@ function CobrarClientePageContent() {
   const handleConfirmarCobro = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user || !prestamo || !puedeConfirmar || !profile) return;
+    const prestamoAlCobrar = prestamo;
+    const clienteAlCobrar =
+      cliente ?? clientesLista.find((x) => x.id === clienteId) ?? null;
+    if (!clienteAlCobrar) {
+      setError("Cliente no encontrado");
+      return;
+    }
+    const montoAplicarCobro = montoAplicar;
     setError(null);
     if (evidenciaRequerida && !evidenciaFile) {
       setError("Transferencia: debes adjuntar 1 foto de evidencia.");
@@ -469,19 +497,31 @@ function CobrarClientePageContent() {
       setSubmitStatus("Registrando pago…");
       const token = await user.getIdToken();
       const nombreRegistro = profile.displayName ?? profile.email ?? "";
-      const res = await registrarPago(token, prestamo.id, {
-        monto: montoAplicar,
+      const res = await registrarPago(token, prestamoAlCobrar.id, {
+        monto: montoAplicarCobro,
         metodoPago,
         evidencia: url || undefined,
         registradoPorUid: user.uid,
         registradoPorNombre: nombreRegistro || undefined,
         idempotencyKey,
       });
-      setNuevoSaldoPendiente(res.saldoPendiente);
+      const prestamoActualizado: PrestamoItem = {
+        ...prestamoAlCobrar,
+        saldoPendiente: res.saldoPendiente,
+        estado: res.saldoPendiente <= 0 ? "pagado" : prestamoAlCobrar.estado,
+      };
+      cobroConfirmadoRef.current = {
+        cliente: clienteAlCobrar,
+        prestamo: prestamoActualizado,
+        montoAplicar: montoAplicarCobro,
+      };
       setConfirmado(true);
+      setNuevoSaldoPendiente(res.saldoPendiente);
+      setCliente(clienteAlCobrar);
+      setPrestamo(prestamoActualizado);
       const nuevoPago: PagoItem = {
         id: res.pagoId ?? "",
-        monto: montoAplicar,
+        monto: montoAplicarCobro,
         fecha: new Date().toISOString(),
         tipo: "pago",
         metodoPago: metodoPago,
@@ -595,14 +635,6 @@ function CobrarClientePageContent() {
     );
   }
 
-  if (!cliente || !prestamo) {
-    return (
-      <div className="card">
-        <p>Cliente o préstamo no encontrado. <Link href={backHref}>{backLabel}</Link></p>
-      </div>
-    );
-  }
-
   const saldoTrasCobro = nuevoSaldoPendiente ?? 0;
   const cuotasRestantesTrasCobro =
     totalAPagar > 0 && numeroCuotas > 0
@@ -610,11 +642,35 @@ function CobrarClientePageContent() {
       : 0;
 
   if (confirmado) {
+    const snap = cobroConfirmadoRef.current;
+    const clienteCobro = cliente ?? snap?.cliente ?? null;
+    const prestamoCobro = prestamo ?? snap?.prestamo ?? null;
+
+    if (!clienteCobro || !prestamoCobro) {
+      return (
+        <div className="card cobrar-card cobrar-confirmacion">
+          <h2 className="cobrar-title">Cobro registrado</h2>
+          <p>El pago se guardó correctamente.</p>
+          <Link href={backHref} className="btn btn-primary">{backLabel}</Link>
+        </div>
+      );
+    }
+
+    const montoCobroConfirmado = snap?.montoAplicar ?? montoAplicar;
+    const totalAPagarCobro = prestamoCobro.totalAPagar ?? 0;
+    const numeroCuotasCobro = prestamoCobro.numeroCuotas ?? 0;
+    const cuotasRestantesCobro =
+      totalAPagarCobro > 0 && numeroCuotasCobro > 0
+        ? Math.min(
+            numeroCuotasCobro,
+            Math.ceil((saldoTrasCobro / totalAPagarCobro) * numeroCuotasCobro)
+          )
+        : 0;
     const prestamoSaldado = saldoTrasCobro === 0;
     const marcaComprobante = empresaComprobanteMeta.nombre?.trim() || "Empresa";
     const textoComprobanteWa =
-      `Comprobante ${marcaComprobante} — ${cliente.nombre}\n` +
-      `Monto pagado: ${formatCurrency(montoAplicar)}\n` +
+      `Comprobante ${marcaComprobante} — ${clienteCobro.nombre}\n` +
+      `Monto pagado: ${formatCurrency(montoCobroConfirmado)}\n` +
       `Saldo restante: ${formatCurrency(saldoTrasCobro)}\n` +
       `${new Date().toLocaleString("es-CO")}`;
     const mostrarPlaceholderCarga =
@@ -672,29 +728,29 @@ function CobrarClientePageContent() {
                   </div>
                   <div className="voucher-monto">
                     <span className="voucher-monto-label">Monto pagado</span>
-                    <span className="voucher-monto-value">{formatCurrency(montoAplicar)}</span>
+                    <span className="voucher-monto-value">{formatCurrency(montoCobroConfirmado)}</span>
                   </div>
                   <div className="voucher-rows">
                     <div className="voucher-row">
                       <span className="voucher-row-label">Cliente</span>
-                      <span className="voucher-row-value">{cliente.nombre}</span>
+                      <span className="voucher-row-value">{clienteCobro.nombre}</span>
                     </div>
-                    {cliente.cedula && (
+                    {clienteCobro.cedula && (
                       <div className="voucher-row">
                         <span className="voucher-row-label">Cédula</span>
-                        <span className="voucher-row-value">{cliente.cedula}</span>
+                        <span className="voucher-row-value">{clienteCobro.cedula}</span>
                       </div>
                     )}
-                    {cliente.telefono && (
+                    {clienteCobro.telefono && (
                       <div className="voucher-row">
                         <span className="voucher-row-label">Teléfono</span>
-                        <span className="voucher-row-value">{cliente.telefono}</span>
+                        <span className="voucher-row-value">{clienteCobro.telefono}</span>
                       </div>
                     )}
                     <div className="voucher-row">
                       <span className="voucher-row-label">Cuotas restantes</span>
                       <span className="voucher-row-value">
-                        {cuotasRestantesTrasCobro} de {numeroCuotas}
+                        {cuotasRestantesCobro} de {numeroCuotasCobro}
                       </span>
                     </div>
                     <div className="voucher-row">
@@ -791,7 +847,7 @@ function CobrarClientePageContent() {
               fontSize: "0.8125rem",
               color: "var(--text-muted)",
             }}>
-              El préstamo de {cliente.nombre} quedó saldado. ¿Deseas crear un nuevo préstamo?
+              El préstamo de {clienteCobro.nombre} quedó saldado. ¿Deseas crear un nuevo préstamo?
             </p>
             <Link
               href={renovarPrestamoHref}
@@ -806,6 +862,14 @@ function CobrarClientePageContent() {
             </Link>
           </div>
         )}
+      </div>
+    );
+  }
+
+  if (!cliente || !prestamo) {
+    return (
+      <div className="card">
+        <p> <Link href={backHref}>{backLabel}</Link></p>
       </div>
     );
   }
