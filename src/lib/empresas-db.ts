@@ -63,6 +63,12 @@ export const PERIODOS_ADMIN_SUBCOLLECTION = "periodosAdmin";
  */
 export const INVERSIONES_CAJA_RUTA_SUBCOLLECTION = "inversionesCajaRuta";
 
+/**
+ * Historial de traspasos caja ruta → caja admin.
+ * empresas/{empresaId}/usuarios/{adminUid}/inversionesRutaCajaAdmin/{id}
+ */
+export const INVERSIONES_RUTA_CAJA_ADMIN_SUBCOLLECTION = "inversionesRutaCajaAdmin";
+
 export const USERS_COLLECTION = "users"; // Índice de auth
 
 /** Ledger financiero append-only por empresa. */

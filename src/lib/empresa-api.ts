@@ -1029,6 +1029,43 @@ export async function listInversionesCajaRuta(token: string): Promise<InversionC
   return Array.isArray(data.items) ? data.items : [];
 }
 
+/** Transfiere monto de la base de una ruta a la base del administrador (solo rutas propias). */
+export async function invertirEnCajaAdmin(
+  token: string,
+  params: { rutaId: string; monto: number }
+): Promise<{ cajaAdmin: number; cajaRuta: number; capitalTotal: number }> {
+  const res = await fetchWithAuth("/api/empresa/invertir-caja-admin", token, {
+    method: "POST",
+    body: JSON.stringify(params),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error ?? "Error al invertir en la base del administrador");
+  return {
+    cajaAdmin: typeof data.cajaAdmin === "number" ? data.cajaAdmin : 0,
+    cajaRuta: typeof data.cajaRuta === "number" ? data.cajaRuta : 0,
+    capitalTotal: typeof data.capitalTotal === "number" ? data.capitalTotal : 0,
+  };
+}
+
+export type InversionRutaCajaAdminItem = {
+  id: string;
+  rutaId: string;
+  rutaNombre: string;
+  monto: number;
+  fecha: string | null;
+  invertidoPorUid: string;
+  invertidoPorNombre: string;
+};
+
+export async function listInversionesCajaAdmin(
+  token: string
+): Promise<InversionRutaCajaAdminItem[]> {
+  const res = await fetchWithAuth("/api/empresa/inversiones-caja-admin", token);
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error ?? "Error al cargar historial de inversiones al admin");
+  return Array.isArray(data.items) ? data.items : [];
+}
+
 export type ResumenRutaItem = {
   rutaId: string;
   nombre: string;
