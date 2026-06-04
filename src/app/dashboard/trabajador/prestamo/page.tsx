@@ -24,6 +24,7 @@ import {
   formatMontoDecimalCOPDisplay,
   interiorDecimalCOPToNumber,
 } from "@/lib/monto-input-es";
+import SelectConBusqueda from "@/components/SelectConBusqueda";
 
 const MODALIDADES = [
   { value: "diario", label: "Diario" },
@@ -265,6 +266,36 @@ export default function PrestamoTrabajadorPage() {
   };
 
   const clientesSinPrestamo = clientes.filter((c) => !c.prestamo_activo && !c.moroso);
+
+  const opcionesClientePrestamo = useMemo(
+    () =>
+      clientesSinPrestamo.map((c) => {
+        const num = clienteNumFromCodigo(c.codigo);
+        const codigoPart = num ? `#${num} · ` : "";
+        return {
+          value: c.id,
+          label: `${codigoPart}${c.nombre}`,
+          searchText: [
+            c.nombre,
+            c.codigo,
+            num ? `#${num}` : "",
+            num,
+            formatClienteCodigoCorto(c.codigo),
+            c.cedula,
+          ]
+            .filter(Boolean)
+            .join(" "),
+        };
+      }),
+    [clientesSinPrestamo]
+  );
+
+  const hintClientePrestamo = useMemo(() => {
+    if (clientesSinPrestamo.length === 0 && clientes.length > 0) {
+      return "Todos los clientes tienen préstamo activo o son morosos";
+    }
+    return undefined;
+  }, [clientesSinPrestamo.length, clientes.length]);
   const clientePorId = useMemo(() => {
     const m: Record<string, ClienteItem> = {};
     clientes.forEach((c) => { m[c.id] = c; });
@@ -423,27 +454,15 @@ export default function PrestamoTrabajadorPage() {
         >
           <div className="form-group" style={{ flex: "2 1 0", minWidth: 0, marginBottom: 0 }}>
             <label>Cliente</label>
-            <select
+            <SelectConBusqueda
               value={clienteId}
-              onChange={(e) => setClienteId(e.target.value)}
+              onChange={setClienteId}
+              options={opcionesClientePrestamo}
+              placeholder="Buscar por nombre, # o cédula"
               required
-              style={{ width: "100%", padding: "0.5rem" }}
               aria-label="Seleccionar cliente"
-            >
-              <option value="">Seleccionar cliente</option>
-            {clientesSinPrestamo.map((c) => {
-              const num = clienteNumFromCodigo(c.codigo);
-              const codigoPart = num ? `#${num} · ` : "";
-              return (
-                <option key={c.id} value={c.id}>
-                  {codigoPart}{c.nombre}
-                </option>
-              );
-            })}
-              {clientesSinPrestamo.length === 0 && clientes.length > 0 && (
-                <option value="" disabled>Todos los clientes tienen préstamo activo o son morosos</option>
-              )}
-            </select>
+              hint={hintClientePrestamo}
+            />
           </div>
           <div className="form-group" style={{ flex: "0 0 11rem", minWidth: 0, marginBottom: 0 }}>
             <label>Frecuencia de pago</label>

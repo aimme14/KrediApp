@@ -18,6 +18,7 @@ import {
   formatMontoDecimalCOPDisplay,
   interiorDecimalCOPToNumber,
 } from "@/lib/monto-input-es";
+import SelectConBusqueda from "@/components/SelectConBusqueda";
 
 const MODALIDADES = [
   { value: "diario", label: "Diario" },
@@ -228,6 +229,36 @@ export default function PrestamoPage() {
   const clientesSinPrestamo = clientes.filter((c) => !c.prestamo_activo && !c.moroso);
   const clientesDeRuta = rutaIdForm ? clientes.filter((c) => c.rutaId === rutaIdForm) : [];
   const clientesSinPrestamoDeRuta = clientesSinPrestamo.filter((c) => c.rutaId === rutaIdForm);
+
+  const opcionesClientePrestamo = useMemo(
+    () =>
+      clientesSinPrestamoDeRuta.map((c) => {
+        const codigoPart = c.codigo ? `${formatClienteCodigoRutaYNumero(c.codigo)} · ` : "";
+        const cedulaPart = c.cedula ? ` · ${c.cedula}` : "";
+        return {
+          value: c.id,
+          label: `${codigoPart}${c.nombre}${cedulaPart}`,
+          searchText: [
+            c.nombre,
+            c.codigo,
+            formatClienteCodigoRutaYNumero(c.codigo),
+            c.cedula,
+          ]
+            .filter(Boolean)
+            .join(" "),
+        };
+      }),
+    [clientesSinPrestamoDeRuta]
+  );
+
+  const hintClientePrestamo = useMemo(() => {
+    if (!rutaIdForm) return undefined;
+    if (clientesDeRuta.length === 0) return "No hay clientes en esta ruta";
+    if (clientesSinPrestamoDeRuta.length === 0) {
+      return "Todos los clientes de esta ruta tienen préstamo activo o están marcados como morosos";
+    }
+    return undefined;
+  }, [rutaIdForm, clientesDeRuta.length, clientesSinPrestamoDeRuta.length]);
   const clientePorId = useMemo(() => {
     const m: Record<string, ClienteItem> = {};
     clientes.forEach((c) => { m[c.id] = c; });
@@ -385,31 +416,18 @@ export default function PrestamoPage() {
           </div>
           <div className="form-group prestamo-admin-create-cliente">
             <label>Cliente</label>
-            <select
+            <SelectConBusqueda
               value={clienteId}
-              onChange={(e) => setClienteId(e.target.value)}
-              required={Boolean(rutaIdForm)}
+              onChange={setClienteId}
+              options={opcionesClientePrestamo}
+              placeholder={
+                rutaIdForm ? "Buscar por nombre, código o cédula" : "Primero elige una ruta"
+              }
               disabled={!rutaIdForm}
-              style={{ width: "100%", padding: "0.5rem" }}
+              required={Boolean(rutaIdForm)}
               aria-label="Seleccionar cliente"
-            >
-              <option value="">{rutaIdForm ? "Seleccionar cliente" : "Primero elige una ruta"}</option>
-              {clientesSinPrestamoDeRuta.map((c) => {
-                const codigoPart = c.codigo ? `${formatClienteCodigoRutaYNumero(c.codigo)} · ` : "";
-                const cedulaPart = c.cedula ? ` · ${c.cedula}` : "";
-                return (
-                  <option key={c.id} value={c.id}>
-                    {codigoPart}{c.nombre}{cedulaPart}
-                  </option>
-                );
-              })}
-              {rutaIdForm && clientesDeRuta.length === 0 && (
-                <option value="" disabled>No hay clientes en esta ruta</option>
-              )}
-              {rutaIdForm && clientesDeRuta.length > 0 && clientesSinPrestamoDeRuta.length === 0 && (
-                <option value="" disabled>Todos los clientes de esta ruta tienen préstamo activo o están marcados como morosos</option>
-              )}
-            </select>
+              hint={hintClientePrestamo}
+            />
             {clienteSeleccionado && (
               <p style={{ fontSize: "0.875rem", color: "var(--text-muted)", marginTop: "0.5rem", marginBottom: 0 }}>
                 Cliente:{" "}
