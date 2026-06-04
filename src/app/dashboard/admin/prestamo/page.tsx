@@ -420,9 +420,7 @@ export default function PrestamoPage() {
               value={clienteId}
               onChange={setClienteId}
               options={opcionesClientePrestamo}
-              placeholder={
-                rutaIdForm ? "Buscar por nombre, código o cédula" : "Primero elige una ruta"
-              }
+              placeholder={rutaIdForm ? "Buscar cliente…" : "Primero elige una ruta"}
               disabled={!rutaIdForm}
               required={Boolean(rutaIdForm)}
               aria-label="Seleccionar cliente"

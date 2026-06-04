@@ -146,9 +146,15 @@ export default function SelectConBusqueda({
   return (
     <div
       ref={rootRef}
-      className={`select-busqueda${className ? ` ${className}` : ""}${disabled ? " select-busqueda--disabled" : ""}`}
+      className={`select-busqueda${className ? ` ${className}` : ""}${disabled ? " select-busqueda--disabled" : ""}${open ? " select-busqueda--open" : ""}`}
     >
       <div className={`select-busqueda-field${open ? " select-busqueda-field--open" : ""}`}>
+        <span className="select-busqueda-icon" aria-hidden>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="11" cy="11" r="7" />
+            <path d="M20 20l-3.5-3.5" />
+          </svg>
+        </span>
         <input
           ref={inputRef}
           id={inputId}

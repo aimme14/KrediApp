@@ -442,29 +442,20 @@ export default function PrestamoTrabajadorPage() {
             ×
           </button>
         </div>
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "row",
-            flexWrap: "nowrap",
-            gap: "1rem",
-            alignItems: "flex-start",
-            marginBottom: "1rem",
-          }}
-        >
-          <div className="form-group" style={{ flex: "2 1 0", minWidth: 0, marginBottom: 0 }}>
+        <div className="prestamo-create-top-row">
+          <div className="form-group prestamo-create-cliente">
             <label>Cliente</label>
             <SelectConBusqueda
               value={clienteId}
               onChange={setClienteId}
               options={opcionesClientePrestamo}
-              placeholder="Buscar por nombre, # o cédula"
+              placeholder="Buscar cliente…"
               required
               aria-label="Seleccionar cliente"
               hint={hintClientePrestamo}
             />
           </div>
-          <div className="form-group" style={{ flex: "0 0 11rem", minWidth: 0, marginBottom: 0 }}>
+          <div className="form-group prestamo-create-freq">
             <label>Frecuencia de pago</label>
             <select
               value={modalidad}
