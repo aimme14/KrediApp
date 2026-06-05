@@ -324,11 +324,6 @@ function CobrarClientePageContent() {
       ? Math.min(numeroCuotas, Math.ceil((saldoPendiente / totalAPagar) * numeroCuotas))
       : numeroCuotas;
   const valorCuotaFija = numeroCuotas > 0 ? totalAPagar / numeroCuotas : 0;
-  const adelantoCuota = prestamo?.adelantoCuota ?? 0;
-  const restoAdelantoEnCuota = valorCuotaFija > 0 ? adelantoCuota - Math.floor(adelantoCuota / valorCuotaFija) * valorCuotaFija : 0;
-  let sugerenciaBruta = valorCuotaFija > 0 ? Math.round((valorCuotaFija - restoAdelantoEnCuota) * 100) / 100 : 0;
-  if (sugerenciaBruta <= 0 && valorCuotaFija > 0) sugerenciaBruta = valorCuotaFija;
-  const valorCuotaSugerido = Math.min(sugerenciaBruta, saldoPendiente);
 
   const evidenciaRequerida = metodoPago === "transferencia";
   const puedeConfirmar = montoNum > 0 && metodoPago;
@@ -1145,40 +1140,24 @@ function CobrarClientePageContent() {
           <span className="cobrar-metrica-label">Cuotas pendientes</span>
           <span className="cobrar-metrica-value">{cuotasPendientes}</span>
         </div>
-        <div className="cobrar-metrica cobrar-metrica-sugerencia">
-          <span className="cobrar-metrica-label">Valor de la cuota (sugerencia de pago)</span>
-          <span className="cobrar-metrica-value">{formatCurrency(valorCuotaSugerido)}</span>
-          {adelantoCuota > 0 && (
-            <span className="cobrar-metrica-hint">Cuota fija {formatCurrency(valorCuotaFija)} · Tiene {formatCurrency(adelantoCuota)} de adelanto; solo falta este monto para la próxima cuota.</span>
-          )}
+        <div className="cobrar-metrica">
+          <span className="cobrar-metrica-label">Valor de la cuota</span>
+          <span className="cobrar-metrica-value">
+            {valorCuotaFija > 0 ? formatCurrency(Math.round(valorCuotaFija)) : "—"}
+          </span>
         </div>
       </div>
 
       <form onSubmit={handleConfirmarCobro} className="cobrar-form">
         <div className="form-group">
           <label>Monto a recibir</label>
-          <div className="cobrar-monto-row">
-            <input
-              type="text"
-              inputMode="decimal"
-              value={montoInput ? formatMontoDecimalCOPDisplay(montoInput) : ""}
-              onChange={(e) => setMontoInput(sanitizeMontoDecimalCOP(e.target.value))}
-              placeholder={valorCuotaSugerido > 0 ? formatCurrency(valorCuotaSugerido) : "0"}
-              className="cobrar-input cobrar-input-monto"
-            />
-            {valorCuotaSugerido > 0 && (
-              <button
-                type="button"
-                className="btn btn-secondary cobrar-usar-sugerencia"
-                onClick={() => {
-                  const r = Math.round(valorCuotaSugerido);
-                  setMontoInput(sanitizeMontoDecimalCOP(String(r).replace(".", ",")));
-                }}
-              >
-                Usar sugerencia
-              </button>
-            )}
-          </div>
+          <input
+            type="text"
+            inputMode="decimal"
+            value={montoInput ? formatMontoDecimalCOPDisplay(montoInput) : ""}
+            onChange={(e) => setMontoInput(sanitizeMontoDecimalCOP(e.target.value))}
+            className="cobrar-input cobrar-input-monto"
+          />
         </div>
 
         <div className="form-group">
