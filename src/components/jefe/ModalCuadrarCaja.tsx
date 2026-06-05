@@ -115,9 +115,9 @@ export function ModalCuadrarCaja({
         </h2>
         <p id="gf-modal-desc" className="gf-modal-desc">
           Vas a <strong>cuadrar la caja de la empresa</strong> con saldo{" "}
-          <strong className="gf-modal-monto">${formatMonto(cajaObjetivo)}</strong>. El capital
+          <span className="gf-modal-monto">${formatMonto(cajaObjetivo)}</span>. El capital
           total pasará a{" "}
-          <strong>${formatMonto(cajaObjetivo + sumaCapitalAdmins)}</strong> (caja de la empresa + Σ
+          <span className="gf-modal-monto">${formatMonto(cajaObjetivo + sumaCapitalAdmins)}</span> (caja de la empresa + Σ
           administradores). La caja de la empresa quedará en ese saldo. Escribe tu contraseña dos
           veces para confirmar.
         </p>
