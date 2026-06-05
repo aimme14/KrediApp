@@ -33,6 +33,14 @@ const PAGE_SIZE_PAGADOS = 20;
 
 export type DatosSyncEstado = "synced" | "syncing" | "offline";
 
+/** Con caché persistente, Firestore responde primero desde disco; no esperar confirmación del servidor. */
+function resolveDatosSyncEstado(): DatosSyncEstado {
+  if (typeof navigator !== "undefined" && !navigator.onLine) {
+    return "offline";
+  }
+  return "synced";
+}
+
 export type TrabajadorListaContextValue = {
   clientes: ClienteItem[];
   /** Solo activos y en mora — en tiempo real */
@@ -101,6 +109,17 @@ export function TrabajadorListaProvider({ children }: { children: ReactNode }) {
   }, [user?.uid, profile?.empresaId, profile?.rutaId]);
 
   useEffect(() => {
+    const onOffline = () => setDatosSyncEstado("offline");
+    const onOnline = () => setDatosSyncEstado("synced");
+    window.addEventListener("offline", onOffline);
+    window.addEventListener("online", onOnline);
+    return () => {
+      window.removeEventListener("offline", onOffline);
+      window.removeEventListener("online", onOnline);
+    };
+  }, []);
+
+  useEffect(() => {
     if (!db || !user || !profile) return;
     const empresaId = profile.empresaId?.trim();
     if (!empresaId) return;
@@ -117,13 +136,7 @@ export function TrabajadorListaProvider({ children }: { children: ReactNode }) {
     const unsub = onSnapshot(
       q,
       (snap) => {
-        if (!snap.metadata.fromCache) {
-          setDatosSyncEstado("synced");
-        } else if (typeof navigator !== "undefined" && !navigator.onLine) {
-          setDatosSyncEstado("offline");
-        } else {
-          setDatosSyncEstado("syncing");
-        }
+        setDatosSyncEstado(resolveDatosSyncEstado());
         const list: ClienteItem[] = snap.docs.map((d) => {
           const data = d.data();
           return {
