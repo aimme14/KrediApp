@@ -13,6 +13,7 @@ import {
   type PrestamoItem,
 } from "@/lib/empresa-api";
 import { formatInteresResumenPct, parseInteresPct } from "@/lib/interes-pct";
+import { formatDebeSlashTotalCredito } from "@/lib/prestamo-display";
 import {
   sanitizeMontoDecimalCOP,
   formatMontoDecimalCOPDisplay,
@@ -38,11 +39,6 @@ function formatMoneda(n: number): string {
   const conPuntos = entero.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
   const decTrim = dec.replace(/0+$/, "");
   return decTrim ? `${conPuntos},${decTrim}` : conPuntos;
-}
-
-/** Vista móvil: saldo pendiente / monto prestado (ej. 50.000/100.000). */
-function formatDebeSlashMonto(saldoPendiente: number, monto: number): string {
-  return `${formatMoneda(saldoPendiente)}/${formatMoneda(monto)}`;
 }
 
 /** Cuotas ya pagadas (a partir de saldo y total). Para mostrar como "X / total". */
@@ -813,7 +809,7 @@ export default function PrestamoPage() {
                         <td className="col-num">
                           <span className="prestamo-admin-monto-desktop">{formatMoneda(principal.monto)}</span>
                           <span className="prestamo-admin-monto-mobile">
-                            {formatDebeSlashMonto(principal.saldoPendiente, principal.monto)}
+                            {formatDebeSlashTotalCredito(principal.saldoPendiente, principal)}
                           </span>
                         </td>
                         <td className="col-num">{formatMoneda(principal.totalAPagar)}</td>

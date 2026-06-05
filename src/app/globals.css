@@ -1337,13 +1337,25 @@ td {
 }
 .prestamo-historial-scroll .prestamo-historial-simple th:nth-child(1),
 .prestamo-historial-scroll .prestamo-historial-simple td:nth-child(1) {
-  width: 22%;
+  width: 18%;
   text-align: center;
 }
 .prestamo-historial-scroll .prestamo-historial-simple th:nth-child(2),
 .prestamo-historial-scroll .prestamo-historial-simple td:nth-child(2) {
-  width: 53%;
+  width: 42%;
   text-align: left;
+}
+.prestamo-historial-scroll .prestamo-historial-simple th:nth-child(3),
+.prestamo-historial-scroll .prestamo-historial-simple td:nth-child(3),
+.prestamo-historial-scroll .prestamo-historial-simple .prestamo-histo-col-debe-total {
+  width: 40%;
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+.prestamo-historial-scroll .prestamo-historial-simple .prestamo-histo-col-debe-total {
+  letter-spacing: -0.02em;
+  overflow: visible;
+  text-overflow: clip;
 }
 .prestamo-historial-scroll .prestamo-historial-simple td.prestamo-histo-simple-nombre,
 .prestamo-historial-economico-simple td.prestamo-histo-simple-nombre {
@@ -2703,7 +2715,67 @@ td {
 }
 
 @media (max-width: 768px) {
-  .prestamo-historial-filtros {
+  .prestamo-trabajador-page.card {
+    padding: 0.75rem 0.55rem;
+  }
+
+  .prestamo-trabajador-historial-card.card {
+    padding: 0.65rem 0.45rem;
+    margin-bottom: 0;
+  }
+
+  .prestamo-trabajador-historial-card .prestamo-historial-scroll {
+    margin-left: -0.2rem;
+    margin-right: -0.2rem;
+  }
+
+  .prestamo-historial-scroll .prestamo-historial-simple th:nth-child(1),
+  .prestamo-historial-scroll .prestamo-historial-simple td:nth-child(1) {
+    width: 13%;
+    padding-left: 0.15rem;
+    padding-right: 0.1rem;
+  }
+
+  .prestamo-historial-scroll .prestamo-historial-simple th:nth-child(2),
+  .prestamo-historial-scroll .prestamo-historial-simple td:nth-child(2) {
+    width: 30%;
+    padding-left: 0.2rem;
+    padding-right: 0.15rem;
+  }
+
+  .prestamo-historial-scroll .prestamo-historial-simple th:nth-child(3),
+  .prestamo-historial-scroll .prestamo-historial-simple td:nth-child(3),
+  .prestamo-historial-scroll .prestamo-historial-simple .prestamo-histo-col-debe-total {
+    width: 57%;
+    font-size: 0.6875rem;
+    line-height: 1.2;
+    padding-left: 0.12rem;
+    padding-right: 0.08rem;
+  }
+
+  .prestamo-historial-scroll .prestamo-historial-simple th:nth-child(3) {
+    font-size: 0.625rem;
+  }
+
+  .prestamo-historial-scroll .prestamo-historial-simple .col-num {
+    padding-right: 0.08rem;
+  }
+
+  .prestamo-trabajador-historial-filtros {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+  }
+
+  .prestamo-trabajador-historial-filtros button {
+    width: 100%;
+    text-align: center;
+    padding: 0.5rem 0.65rem !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .prestamo-historial-filtros:not(.prestamo-trabajador-historial-filtros) {
     display: none !important;
   }
 }

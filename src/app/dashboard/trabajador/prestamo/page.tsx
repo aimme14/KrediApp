@@ -25,6 +25,7 @@ import {
   interiorDecimalCOPToNumber,
 } from "@/lib/monto-input-es";
 import SelectConBusqueda from "@/components/SelectConBusqueda";
+import { formatDebeSlashTotalCredito } from "@/lib/prestamo-display";
 
 const MODALIDADES = [
   { value: "diario", label: "Diario" },
@@ -98,7 +99,7 @@ export default function PrestamoTrabajadorPage() {
     monto: number;
     motivoRechazo: string | null;
   } | null>(null);
-  const [filtroEstado, setFiltroEstado] = useState<"todos" | "activo" | "mora" | "pagado">("todos");
+  const [filtroEstado, setFiltroEstado] = useState<"activos" | "noActivos">("activos");
   const [busquedaNombre, setBusquedaNombre] = useState("");
 
   useEffect(() => {
@@ -178,19 +179,9 @@ export default function PrestamoTrabajadorPage() {
   }, [solicitudPendiente?.id, profile?.empresaId]);
 
   useEffect(() => {
-    const mq = window.matchMedia("(max-width: 768px)");
-    const syncFiltro = () => {
-      if (mq.matches) setFiltroEstado("todos");
-    };
-    syncFiltro();
-    mq.addEventListener("change", syncFiltro);
-    return () => mq.removeEventListener("change", syncFiltro);
-  }, []);
-
-  useEffect(() => {
-    if (filtroEstado !== "pagado" && filtroEstado !== "todos") return;
+    if (filtroEstado !== "noActivos") return;
     if (loadingPagados || !hayMasPagados) return;
-    if (filtroEstado === "pagado" && prestamosPagados.length > 0) return;
+    if (prestamosPagados.length > 0) return;
     void cargarMasPagados();
   }, [
     filtroEstado,
@@ -315,11 +306,8 @@ export default function PrestamoTrabajadorPage() {
   const busquedaLower = busquedaTrim.toLowerCase();
 
   const prestamosBase = useMemo(() => {
-    if (filtroEstado === "pagado") return prestamosPagados;
-    if (filtroEstado === "activo" || filtroEstado === "mora") {
-      return prestamos.filter((p) => p.estado === filtroEstado);
-    }
-    return [...prestamos, ...prestamosPagados];
+    if (filtroEstado === "noActivos") return prestamosPagados;
+    return prestamos;
   }, [prestamos, prestamosPagados, filtroEstado]);
 
   const prestamosFiltrados = useMemo(() => {
@@ -354,7 +342,7 @@ export default function PrestamoTrabajadorPage() {
   if (!profile || profile.role !== "trabajador") return null;
 
   return (
-    <div className="card">
+    <div className="card prestamo-trabajador-page">
       {solicitudPendiente && (
         <div
           style={{
@@ -700,7 +688,7 @@ export default function PrestamoTrabajadorPage() {
 
       {!showCreateForm && (
       <>
-        <div className="card">
+        <div className="card prestamo-trabajador-historial-card">
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "0.75rem", marginBottom: "0.75rem" }}>
           <h3 style={{ margin: 0 }}>Historial de préstamos</h3>
           <button
@@ -720,8 +708,8 @@ export default function PrestamoTrabajadorPage() {
         ) : prestamos.length === 0 &&
           prestamosPagados.length === 0 &&
           !loadingPagados &&
-          filtroEstado !== "pagado" ? (
-          <p style={{ color: "var(--text-muted)" }}>No hay préstamos.</p>
+          filtroEstado === "activos" ? (
+          <p style={{ color: "var(--text-muted)" }}>No hay préstamos activos.</p>
         ) : (
           <>
             <div className="ruta-dia-search-toolbar" style={{ marginBottom: "0.85rem" }}>
@@ -761,25 +749,30 @@ export default function PrestamoTrabajadorPage() {
                 </p>
               ) : null}
             </div>
-            <div className="prestamo-historial-filtros prestamo-trabajador-historial-filtros" role="tablist" aria-label="Filtrar por estado">
-              {(["todos", "activo", "mora", "pagado"] as const).map((est) => (
+            <div className="prestamo-trabajador-historial-filtros" role="tablist" aria-label="Filtrar préstamos">
+              {(
+                [
+                  { value: "activos", label: "Activos" },
+                  { value: "noActivos", label: "Historial" },
+                ] as const
+              ).map(({ value, label }) => (
                 <button
-                  key={est}
+                  key={value}
                   type="button"
                   role="tab"
-                  aria-selected={filtroEstado === est}
-                  onClick={() => setFiltroEstado(est)}
+                  aria-selected={filtroEstado === value}
+                  onClick={() => setFiltroEstado(value)}
                   style={{
                     padding: "0.35rem 0.65rem",
                     fontSize: "0.8125rem",
                     border: "1px solid var(--card-border)",
                     borderRadius: "var(--radius)",
-                    background: filtroEstado === est ? "var(--link)" : "var(--card-bg)",
-                    color: filtroEstado === est ? "#fff" : "var(--text)",
+                    background: filtroEstado === value ? "var(--link)" : "var(--card-bg)",
+                    color: filtroEstado === value ? "#fff" : "var(--text)",
                     cursor: "pointer",
                   }}
                 >
-                  {est === "todos" ? "Todos" : est === "activo" ? "Activos" : est === "mora" ? "En mora" : "Pagados"}
+                  {label}
                 </button>
               ))}
             </div>
@@ -789,7 +782,9 @@ export default function PrestamoTrabajadorPage() {
                   <tr>
                     <th>Código</th>
                     <th>Cliente</th>
-                    <th className="col-num">Monto</th>
+                    <th className="col-num" title="Saldo pendiente / total del crédito (con interés)">
+                      Debe/Monto
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -802,26 +797,30 @@ export default function PrestamoTrabajadorPage() {
                       <tr key={p.id}>
                         <td>{codigoDisplay}</td>
                         <td className="prestamo-histo-simple-nombre">{nombre}</td>
-                        <td className="col-num">{formatMoneda(p.monto)}</td>
+                        <td className="col-num prestamo-histo-col-debe-total">
+                          {formatDebeSlashTotalCredito(p.saldoPendiente, p)}
+                        </td>
                       </tr>
                     );
                   })}
                 </tbody>
               </table>
             </div>
-          {loadingPagados && prestamosHistorialOrdenados.length === 0 ? (
+          {loadingPagados && filtroEstado === "noActivos" && prestamosHistorialOrdenados.length === 0 ? (
             <p style={{ color: "var(--text-muted)", fontSize: "0.875rem", marginTop: "0.5rem" }}>
-              Cargando préstamos pagados...
+              Cargando préstamos no activos...
             </p>
           ) : null}
           {prestamosFiltrados.length === 0 && !loadingPagados ? (
             <p style={{ color: "var(--text-muted)", fontSize: "0.875rem", marginTop: "0.5rem" }}>
               {busquedaTrim
                 ? `No hay préstamos que coincidan con «${busquedaTrim}».`
-                : `No hay préstamos con estado «${filtroEstado === "todos" ? "todos" : filtroEstado === "activo" ? "activos" : filtroEstado === "mora" ? "en mora" : "pagados"}».`}
+                : filtroEstado === "activos"
+                  ? "No hay préstamos activos."
+                  : "No hay préstamos no activos."}
             </p>
           ) : null}
-          {(filtroEstado === "pagado" || filtroEstado === "todos") && hayMasPagados ? (
+          {filtroEstado === "noActivos" && hayMasPagados ? (
             <div style={{ marginTop: "0.75rem", textAlign: "center" }}>
               <button
                 type="button"

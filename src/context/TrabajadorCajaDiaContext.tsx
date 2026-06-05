@@ -30,6 +30,7 @@ import {
   USUARIOS_SUBCOLLECTION,
   ASIGNACIONES_BASE_EMPLEADO_SUBCOLLECTION,
   GASTOS_EMPLEADO_SUBCOLLECTION,
+  PRESTAMOS_SUBCOLLECTION,
 } from "@/lib/empresas-db";
 import {
   getCobrosDelDiaEmpleado,
@@ -225,6 +226,43 @@ export function TrabajadorCajaDiaProvider({ children }: { children: ReactNode })
 
     return unsub;
   }, [user?.uid, profile?.role, profile?.empresaId, fechaDia]);
+
+  useEffect(() => {
+    if (!db || !user || profile?.role !== "trabajador") return;
+    const empresaId = profile?.empresaId?.trim();
+    const rutaId = profile?.rutaId?.trim();
+    if (!empresaId || !rutaId) return;
+
+    const start = inicioDiaColombiaUtc(fechaDia);
+    const end = finDiaColombiaUtc(fechaDia);
+    if (!start || !end) return;
+
+    const q = query(
+      collection(db, EMPRESAS_COLLECTION, empresaId, PRESTAMOS_SUBCOLLECTION),
+      where("rutaId", "==", rutaId),
+      where("empleadoId", "==", user.uid),
+      where("desembolsoDesde", "==", "caja_empleado"),
+      where("creadoEn", ">=", Timestamp.fromDate(start)),
+      where("creadoEn", "<=", Timestamp.fromDate(end))
+    );
+
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        let total = 0;
+        for (const d of snap.docs) {
+          const m = typeof d.data().monto === "number" && d.data().monto > 0 ? d.data().monto : 0;
+          total += m;
+        }
+        setPrestamosRT(Math.round(total * 100) / 100);
+      },
+      (err) => {
+        console.warn("[TrabajadorCajaDia] onSnapshot prestamos:", err);
+      }
+    );
+
+    return unsub;
+  }, [user?.uid, profile?.role, profile?.empresaId, profile?.rutaId, fechaDia]);
 
   const tuCajaEfectivo = useMemo(() => {
     if (!data) return null;

@@ -147,6 +147,16 @@
         { "fieldPath": "estado", "order": "ASCENDING" },
         { "fieldPath": "fechaInicio", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "prestamos",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "rutaId", "order": "ASCENDING" },
+        { "fieldPath": "empleadoId", "order": "ASCENDING" },
+        { "fieldPath": "desembolsoDesde", "order": "ASCENDING" },
+        { "fieldPath": "creadoEn", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []
