@@ -13,10 +13,12 @@ import {
 } from "@/lib/empresas-db";
 import {
   solicitarPrestamoEmpleado,
+  evaluarAprobacionPrestamoEmpleado,
   clienteNumFromCodigo,
   formatClienteCodigoCorto,
   type ClienteItem,
   type PrestamoItem,
+  type EvaluacionAprobacionPrestamoApi,
 } from "@/lib/empresa-api";
 import { formatInteresResumenPct, parseInteresPct } from "@/lib/interes-pct";
 import {
@@ -99,6 +101,10 @@ export default function PrestamoTrabajadorPage() {
     monto: number;
     motivoRechazo: string | null;
   } | null>(null);
+  const [evaluacionAprobacion, setEvaluacionAprobacion] =
+    useState<EvaluacionAprobacionPrestamoApi | null>(null);
+  const [evaluandoAprobacion, setEvaluandoAprobacion] = useState(false);
+  const [exitoCreacion, setExitoCreacion] = useState<string | null>(null);
   const [filtroEstado, setFiltroEstado] = useState<"activos" | "noActivos">("activos");
   const [busquedaNombre, setBusquedaNombre] = useState("");
 
@@ -191,6 +197,42 @@ export default function PrestamoTrabajadorPage() {
     cargarMasPagados,
   ]);
 
+  const montoNumPreview = interiorDecimalCOPToNumber(monto);
+
+  useEffect(() => {
+    if (!user || !clienteId.trim()) {
+      setEvaluacionAprobacion(null);
+      return;
+    }
+    if (isNaN(montoNumPreview) || montoNumPreview < MONTO_MIN) {
+      setEvaluacionAprobacion(null);
+      return;
+    }
+
+    let cancelled = false;
+    setEvaluandoAprobacion(true);
+
+    void (async () => {
+      try {
+        const token = await user.getIdToken();
+        const ev = await evaluarAprobacionPrestamoEmpleado(
+          token,
+          clienteId.trim(),
+          montoNumPreview
+        );
+        if (!cancelled) setEvaluacionAprobacion(ev);
+      } catch {
+        if (!cancelled) setEvaluacionAprobacion(null);
+      } finally {
+        if (!cancelled) setEvaluandoAprobacion(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user, clienteId, montoNumPreview]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
@@ -231,10 +273,11 @@ export default function PrestamoTrabajadorPage() {
       return;
     }
     setError(null);
+    setExitoCreacion(null);
     setCreating(true);
     try {
       const token = await user.getIdToken();
-      await solicitarPrestamoEmpleado(token, {
+      const resultado = await solicitarPrestamoEmpleado(token, {
         clienteId: clienteId.trim(),
         monto: montoNum,
         interes: iVal,
@@ -248,9 +291,14 @@ export default function PrestamoTrabajadorPage() {
       setInteres("");
       setModalidad("mensual");
       setConfirmarMontoAlto(false);
+      setEvaluacionAprobacion(null);
       setShowCreateForm(false);
+      if (resultado.tipo === "prestamo_creado") {
+        setExitoCreacion(resultado.mensaje || "Préstamo creado correctamente.");
+        setTimeout(() => setExitoCreacion(null), 10 * 60 * 1000);
+      }
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Error al solicitar préstamo");
+      setError(e instanceof Error ? e.message : "Error al procesar préstamo");
     } finally {
       setCreating(false);
     }
@@ -301,6 +349,8 @@ export default function PrestamoTrabajadorPage() {
     : 0;
   const cuotaPorPago = totalAPagar > 0 && nCuotasVal >= 1 ? totalAPagar / nCuotasVal : 0;
   const requiereConfirmarMonto = !isNaN(montoNum) && montoNum >= MONTO_CONFIRMAR_ALTO;
+  const requiereAprobacionAdmin =
+    evaluacionAprobacion?.requiereAprobacionAdmin ?? true;
 
   const busquedaTrim = busquedaNombre.trim();
   const busquedaLower = busquedaTrim.toLowerCase();
@@ -343,6 +393,20 @@ export default function PrestamoTrabajadorPage() {
 
   return (
     <div className="card prestamo-trabajador-page">
+      {exitoCreacion && (
+        <div
+          style={{
+            padding: "1rem",
+            marginBottom: "1rem",
+            borderRadius: "var(--radius)",
+            background: "var(--card-bg)",
+            border: "1px solid #16a34a",
+          }}
+        >
+          <p style={{ margin: 0, fontWeight: 600, color: "#16a34a" }}>{exitoCreacion}</p>
+        </div>
+      )}
+
       {solicitudPendiente && (
         <div
           style={{
@@ -623,9 +687,6 @@ export default function PrestamoTrabajadorPage() {
               <li>Número de cuotas: <strong>{nCuotasVal}</strong> ({modalidad})</li>
               <li>Cuota por pago: <strong>{formatMoneda(cuotaPorPago)}</strong></li>
             </ul>
-            <p style={{ margin: "0.75rem 0 0", fontSize: "0.8rem", color: "var(--text-muted)", lineHeight: 1.5 }}>
-              El administrador debe aprobar esta solicitud antes de que se cree el préstamo.
-            </p>
           </div>
         )}
 
@@ -650,7 +711,11 @@ export default function PrestamoTrabajadorPage() {
             disabled={creating}
             style={{ flexShrink: 0 }}
           >
-            {creating ? "Enviando..." : "Solicitar préstamo"}
+            {creating
+              ? "Procesando..."
+              : requiereAprobacionAdmin
+                ? "Solicitar aprobación"
+                : "Crear préstamo"}
           </button>
           {requiereConfirmarMonto && (
             <label

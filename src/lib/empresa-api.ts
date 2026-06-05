@@ -357,7 +357,24 @@ export type SolicitudPrestamoApi = {
   resueltaEn: string | null;
 };
 
-/** Trabajador: solicita un préstamo (requiere aprobación del administrador). */
+export type EvaluacionAprobacionPrestamoApi = {
+  requiereAprobacionAdmin: boolean;
+  motivo: "cliente_sin_historial" | "monto_supera_ultimo_prestamo" | "auto_aprobado";
+  montoUltimoPrestamo: number | null;
+  cantidadPrestamosHistoricos: number;
+};
+
+export type ResultadoPrestamoEmpleadoApi = {
+  tipo: "solicitud" | "prestamo_creado";
+  solicitudId?: string;
+  prestamoId?: string;
+  requiereAprobacionAdmin: boolean;
+  montoUltimoPrestamo: number | null;
+  motivo?: EvaluacionAprobacionPrestamoApi["motivo"];
+  mensaje: string;
+};
+
+/** Trabajador: crea préstamo o envía solicitud según historial y monto. */
 export async function solicitarPrestamoEmpleado(
   token: string,
   params: {
@@ -368,16 +385,50 @@ export async function solicitarPrestamoEmpleado(
     numeroCuotas: number;
     fechaInicio?: string;
   }
-): Promise<{ solicitudId: string; mensaje: string }> {
+): Promise<ResultadoPrestamoEmpleadoApi> {
   const res = await fetchWithAuth("/api/empresa/solicitudes-prestamo", token, {
     method: "POST",
     body: JSON.stringify(params),
   });
   const data = await res.json();
-  if (!res.ok) throw new Error(data.error ?? "Error al solicitar préstamo");
+  if (!res.ok) throw new Error(data.error ?? "Error al procesar préstamo");
   return {
-    solicitudId: data.solicitudId ?? "",
+    tipo: data.tipo === "prestamo_creado" ? "prestamo_creado" : "solicitud",
+    solicitudId: typeof data.solicitudId === "string" ? data.solicitudId : undefined,
+    prestamoId: typeof data.prestamoId === "string" ? data.prestamoId : undefined,
+    requiereAprobacionAdmin: data.requiereAprobacionAdmin === true,
+    montoUltimoPrestamo:
+      typeof data.montoUltimoPrestamo === "number" ? data.montoUltimoPrestamo : null,
+    motivo: data.motivo,
     mensaje: typeof data.mensaje === "string" ? data.mensaje : "",
+  };
+}
+
+/** Trabajador: evalúa si el préstamo requiere aprobación del administrador. */
+export async function evaluarAprobacionPrestamoEmpleado(
+  token: string,
+  clienteId: string,
+  monto: number
+): Promise<EvaluacionAprobacionPrestamoApi> {
+  const qs = new URLSearchParams({
+    clienteId: clienteId.trim(),
+    monto: String(monto),
+  });
+  const res = await fetchWithAuth(
+    `/api/empresa/solicitudes-prestamo/evaluar?${qs.toString()}`,
+    token
+  );
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error ?? "Error al evaluar préstamo");
+  return {
+    requiereAprobacionAdmin: data.requiereAprobacionAdmin === true,
+    motivo: data.motivo ?? "cliente_sin_historial",
+    montoUltimoPrestamo:
+      typeof data.montoUltimoPrestamo === "number" ? data.montoUltimoPrestamo : null,
+    cantidadPrestamosHistoricos:
+      typeof data.cantidadPrestamosHistoricos === "number"
+        ? data.cantidadPrestamosHistoricos
+        : 0,
   };
 }
 

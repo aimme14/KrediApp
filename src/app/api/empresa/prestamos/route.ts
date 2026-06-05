@@ -25,6 +25,7 @@ import {
   finishIdempotentOperation,
 } from "@/lib/financial-idempotency";
 import type { ModalidadPago } from "@/types/firestore";
+import { evaluarAprobacionPrestamoEmpleado } from "@/lib/prestamo-aprobacion-empleado";
 
 /** GET: lista préstamos. Empleado: los de su ruta. Admin/Jefe: los suyos */
 export async function GET(request: NextRequest) {
@@ -149,6 +150,29 @@ export async function POST(request: NextRequest) {
   }
   if (typeof numeroCuotas !== "number" || numeroCuotas < 1) {
     return finalize(400, { error: "Número de cuotas debe ser al menos 1" });
+  }
+
+  if (apiUser.role === "empleado") {
+    const evaluacion = await evaluarAprobacionPrestamoEmpleado(
+      db,
+      apiUser.empresaId,
+      clienteId.trim(),
+      monto
+    );
+    if (evaluacion.requiereAprobacionAdmin) {
+      const detalle =
+        evaluacion.motivo === "cliente_sin_historial"
+          ? "Este cliente no tiene historial de préstamos"
+          : evaluacion.montoUltimoPrestamo !== null
+            ? `El monto supera el último préstamo ($${evaluacion.montoUltimoPrestamo.toLocaleString("es-CO")})`
+            : "El monto requiere aprobación del administrador";
+      return finalize(403, {
+        error: `${detalle}. Debes enviar una solicitud para que el administrador la apruebe.`,
+        requiereAprobacionAdmin: true,
+        motivo: evaluacion.motivo,
+        montoUltimoPrestamo: evaluacion.montoUltimoPrestamo,
+      });
+    }
   }
 
   const mod: ModalidadPago = modalidad === "diario" || modalidad === "semanal" ? modalidad : "mensual";
