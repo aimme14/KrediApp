@@ -109,14 +109,14 @@ export function ModalConfirmarInversion({
           {inversion.tipo === "empresa" ? (
             <>
               Vas a registrar una <strong>entrada de liquidez</strong> por{" "}
-              <strong className="gf-modal-monto">${formatMonto(inversion.monto)}</strong>. Aumentarán
+              <span className="gf-modal-monto">${formatMonto(inversion.monto)}</span>. Aumentarán
               la caja de la empresa y el capital total. Para confirmar,{" "}
               <strong>repite el mismo monto</strong> abajo.
             </>
           ) : (
             <>
               Vas a transferir{" "}
-              <strong className="gf-modal-monto">${formatMonto(inversion.monto)}</strong> desde la
+              <span className="gf-modal-monto">${formatMonto(inversion.monto)}</span> desde la
               caja de la empresa hacia <strong>{inversion.adminNombre}</strong>. El capital total no
               cambia. Para confirmar, <strong>repite el mismo monto</strong> abajo.
             </>

@@ -31,6 +31,8 @@ const PRESTAMOS_SUBCOLLECTION = "prestamos";
 const CLIENTES_SUBCOLLECTION = "clientes";
 const PAGE_SIZE_PAGADOS = 20;
 
+export type DatosSyncEstado = "synced" | "syncing" | "offline";
+
 export type TrabajadorListaContextValue = {
   clientes: ClienteItem[];
   /** Solo activos y en mora — en tiempo real */
@@ -43,6 +45,7 @@ export type TrabajadorListaContextValue = {
   loading: boolean;
   error: string | null;
   lastFetchedAt: number;
+  datosSyncEstado: DatosSyncEstado;
   refresh: () => Promise<void>;
 };
 
@@ -82,6 +85,7 @@ export function TrabajadorListaProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastFetchedAt, setLastFetchedAt] = useState(0);
+  const [datosSyncEstado, setDatosSyncEstado] = useState<DatosSyncEstado>("syncing");
   const lastDocPagadosRef = useRef<QueryDocumentSnapshot | null>(null);
 
   const refresh = useCallback(async () => {
@@ -93,6 +97,7 @@ export function TrabajadorListaProvider({ children }: { children: ReactNode }) {
     setPrestamosPagados([]);
     setHayMasPagados(true);
     setLoadingPagados(false);
+    setDatosSyncEstado("syncing");
   }, [user?.uid, profile?.empresaId, profile?.rutaId]);
 
   useEffect(() => {
@@ -112,6 +117,13 @@ export function TrabajadorListaProvider({ children }: { children: ReactNode }) {
     const unsub = onSnapshot(
       q,
       (snap) => {
+        if (!snap.metadata.fromCache) {
+          setDatosSyncEstado("synced");
+        } else if (typeof navigator !== "undefined" && !navigator.onLine) {
+          setDatosSyncEstado("offline");
+        } else {
+          setDatosSyncEstado("syncing");
+        }
         const list: ClienteItem[] = snap.docs.map((d) => {
           const data = d.data();
           return {
@@ -234,6 +246,7 @@ export function TrabajadorListaProvider({ children }: { children: ReactNode }) {
       loading,
       error,
       lastFetchedAt,
+      datosSyncEstado,
       refresh,
     }),
     [
@@ -246,6 +259,7 @@ export function TrabajadorListaProvider({ children }: { children: ReactNode }) {
       loading,
       error,
       lastFetchedAt,
+      datosSyncEstado,
       refresh,
     ]
   );

@@ -1,11 +1,19 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { useAdminDashboard } from "@/context/AdminDashboardContext";
 import { asignarBaseEmpleadoDesdeRuta } from "@/lib/empresa-api";
 import { formatMontoEnteroInput, parseMontoEnteroFormatted } from "@/lib/monto-input-es";
+
+type AsignarBasePendiente = {
+  rutaId: string;
+  empleadoUid: string;
+  empleadoNombre: string;
+  rutaNombre: string;
+  monto: number;
+};
 
 function formatMonto(value: number): string {
   const hasDecimals = Math.round(value * 100) % 100 !== 0;
@@ -30,6 +38,7 @@ export default function RutaDelDiaPage() {
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [montosAsignar, setMontosAsignar] = useState<Record<string, string>>({});
   const [asignandoKey, setAsignandoKey] = useState<string | null>(null);
+  const [confirmModal, setConfirmModal] = useState<AsignarBasePendiente | null>(null);
 
   useEffect(() => {
     if (!successMsg) return;
@@ -39,8 +48,26 @@ export default function RutaDelDiaPage() {
 
   const asignarKey = (rutaId: string, empleadoUid: string) => `${rutaId}:${empleadoUid}`;
 
-  const handleAsignarBase = async (rutaId: string, empleadoUid: string) => {
-    if (!user) return;
+  const cerrarModalConfirmacion = useCallback(() => {
+    if (asignandoKey) return;
+    setConfirmModal(null);
+  }, [asignandoKey]);
+
+  useEffect(() => {
+    if (!confirmModal) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") cerrarModalConfirmacion();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [confirmModal, cerrarModalConfirmacion]);
+
+  const abrirConfirmacionAsignar = (
+    rutaId: string,
+    empleadoUid: string,
+    empleadoNombre: string,
+    rutaNombre: string
+  ) => {
     const key = asignarKey(rutaId, empleadoUid);
     const monto = parseMontoEnteroFormatted(montosAsignar[key] ?? "");
     if (!Number.isFinite(monto) || monto <= 0) {
@@ -49,14 +76,23 @@ export default function RutaDelDiaPage() {
     }
     setError(null);
     setSuccessMsg(null);
+    setConfirmModal({ rutaId, empleadoUid, empleadoNombre, rutaNombre, monto });
+  };
+
+  const ejecutarAsignacionConfirmada = async () => {
+    if (!user || !confirmModal) return;
+    const { rutaId, empleadoUid, monto } = confirmModal;
+    const key = asignarKey(rutaId, empleadoUid);
     setAsignandoKey(key);
     try {
       const token = await user.getIdToken();
       await asignarBaseEmpleadoDesdeRuta(token, rutaId, { empleadoUid, monto });
       setMontosAsignar((prev) => ({ ...prev, [key]: "" }));
       setSuccessMsg("Base asignada correctamente a la caja del trabajador.");
+      setConfirmModal(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al asignar");
+      setConfirmModal(null);
     } finally {
       setAsignandoKey(null);
     }
@@ -67,6 +103,7 @@ export default function RutaDelDiaPage() {
   const displayError = error ?? ctxError;
 
   return (
+    <>
     <div className="ruta-dia-page card">
       <header className="ruta-dia-head">
         <h2 className="ruta-dia-title">Ruta del día</h2>
@@ -178,7 +215,7 @@ export default function RutaDelDiaPage() {
                               inputMode="decimal"
                               placeholder="Ej: 150000"
                               value={montosAsignar[key] ?? ""}
-                              disabled={busy}
+                              disabled={busy || !!confirmModal}
                               onChange={(e) =>
                                 setMontosAsignar((prev) => ({
                                   ...prev,
@@ -190,8 +227,10 @@ export default function RutaDelDiaPage() {
                           <button
                             type="button"
                             className="btn btn-primary ruta-dia-emp-btn"
-                            disabled={busy || (r.cajaRuta ?? 0) <= 0}
-                            onClick={() => handleAsignarBase(r.id, emp.uid)}
+                            disabled={busy || !!confirmModal || (r.cajaRuta ?? 0) <= 0}
+                            onClick={() =>
+                              abrirConfirmacionAsignar(r.id, emp.uid, emp.nombre, r.nombre)
+                            }
                           >
                             {busy ? "Asignando…" : "Asignar a caja del trabajador"}
                           </button>
@@ -206,5 +245,66 @@ export default function RutaDelDiaPage() {
         </div>
       )}
     </div>
+
+    {confirmModal && (
+      <div
+        className="gf-modal-backdrop gf-modal-backdrop--inversion"
+        onClick={cerrarModalConfirmacion}
+        role="presentation"
+      >
+        <div
+          className="gf-modal"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="ruta-dia-asignar-modal-title"
+          aria-describedby="ruta-dia-asignar-modal-desc"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <h2 id="ruta-dia-asignar-modal-title" className="gf-modal-title">
+            ¿Confirmar asignación de base?
+          </h2>
+          <p id="ruta-dia-asignar-modal-desc" className="gf-modal-desc">
+            Se transferirá efectivo desde la caja de la ruta hacia la caja del trabajador. Revisá
+            los datos antes de continuar.
+          </p>
+          <div className="gf-inversion-confirm-resumen">
+            <div className="gf-inversion-confirm-row">
+              <span className="gf-inversion-confirm-label">Ruta</span>
+              <span className="gf-inversion-confirm-value">{confirmModal.rutaNombre}</span>
+            </div>
+            <div className="gf-inversion-confirm-row">
+              <span className="gf-inversion-confirm-label">Trabajador</span>
+              <span className="gf-inversion-confirm-value">{confirmModal.empleadoNombre}</span>
+            </div>
+            <div className="gf-inversion-confirm-row">
+              <span className="gf-inversion-confirm-label">Monto a asignar</span>
+              <span className="gf-inversion-confirm-value gf-inversion-confirm-value--monto">
+                {formatMonto(confirmModal.monto)}
+              </span>
+            </div>
+          </div>
+          <div className="gf-modal-actions gf-modal-actions--inversion">
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={cerrarModalConfirmacion}
+              disabled={!!asignandoKey}
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => void ejecutarAsignacionConfirmada()}
+              disabled={!!asignandoKey}
+              aria-busy={!!asignandoKey}
+            >
+              {asignandoKey ? "Asignando…" : "Confirmar asignación"}
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   );
 }

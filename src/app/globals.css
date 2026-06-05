@@ -4403,6 +4403,18 @@ th {
   color: #5b21b6;
 }
 
+.trabajador-sync-banner {
+  background: var(--card-bg);
+  border-bottom: 1px solid var(--card-border);
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  text-align: center;
+  padding: 0.25rem 1rem;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
 /* Drawer trabajador: iconos y fila activa por color (no afecta panel jefe) */
 .trabajador-dashboard .jefe-drawer-icon {
   background: transparent;
@@ -5894,6 +5906,7 @@ a.admin-inicio-link-btn {
   white-space: nowrap;
   margin-bottom: 0.02rem;
 }
+
 
 @media (max-width: 560px) {
   .ruta-dia-emp-panel {
@@ -7544,7 +7557,8 @@ a.admin-inicio-link-btn {
 
 .gf-modal-monto {
   color: var(--text);
-  font-family: var(--font-dm-mono), monospace;
+  font-family: inherit;
+  font-weight: 400;
 }
 
 .gf-modal-label {
@@ -7619,10 +7633,10 @@ a.admin-inicio-link-btn {
 }
 
 .gf-inversion-confirm-value--monto {
-  font-family: var(--font-dm-mono), monospace;
+  font-family: inherit;
   font-size: 1.125rem;
-  font-weight: 700;
-  color: var(--link);
+  font-weight: 400;
+  color: var(--text);
 }
 
 @media (max-width: 420px) {

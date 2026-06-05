@@ -10,6 +10,7 @@ import { TrabajadorListaProvider } from "@/context/TrabajadorListaContext";
 import { TrabajadorCajaDiaProvider } from "@/context/TrabajadorCajaDiaContext";
 import { TrabajadorActionIcon } from "@/components/trabajador/TrabajadorActionIcon";
 import { TrabajadorFcmRegistration } from "@/components/TrabajadorFcmRegistration";
+import { TrabajadorSyncBanner } from "@/components/TrabajadorSyncBanner";
 
 const NAV_ITEMS = [
   { href: "/dashboard/trabajador", label: "Inicio", icon: "home" as const },
@@ -39,6 +40,15 @@ const PREFETCH_TRABAJADOR_HREFS = [
   "/dashboard/trabajador/cliente",
   "/dashboard/trabajador/prestamo",
 ] as const;
+
+function TrabajadorLayoutInner({ children }: { children: React.ReactNode }) {
+  return (
+    <>
+      <TrabajadorSyncBanner />
+      {children}
+    </>
+  );
+}
 
 export default function TrabajadorLayout({ children }: { children: React.ReactNode }) {
   const { user, profile, loading, isEnabled } = useAuth();
@@ -152,7 +162,9 @@ export default function TrabajadorLayout({ children }: { children: React.ReactNo
           {menuOpen && (
             <button type="button" className="jefe-drawer-backdrop" onClick={() => setMenuOpen(false)} aria-label="Cerrar menú" />
           )}
-          <main className="jefe-main">{children}</main>
+          <main className="jefe-main">
+            <TrabajadorLayoutInner>{children}</TrabajadorLayoutInner>
+          </main>
           {bottomNavHostReady ? createPortal(bottomNav, document.body) : bottomNav}
         </div>
         </TrabajadorCajaDiaProvider>
