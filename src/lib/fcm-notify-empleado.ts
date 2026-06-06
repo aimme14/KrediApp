@@ -24,20 +24,32 @@ export async function notifyEmpleadoSolicitudResuelta(
     ? `El préstamo de $${monto.toLocaleString("es-CO")} para ${clienteNombre} fue aprobado`
     : `El préstamo para ${clienteNombre} fue rechazado${motivoRechazo ? `: ${motivoRechazo}` : ""}`;
 
+  const collapseKey = `solicitud_prestamo_${empleadoUid}`;
+  const type = aprobada ? "prestamo_aprobado" : "prestamo_rechazado";
+
   const message: Message = {
     topic: topicEmpleado(empleadoUid),
     notification: { title, body },
+    android: {
+      collapseKey,
+      notification: {
+        title,
+        body,
+        clickAction: "FLUTTER_NOTIFICATION_CLICK",
+        channelId: "krediapp_default",
+      },
+    },
+    webpush: {
+      headers: { Topic: collapseKey },
+      notification: { title, body },
+    },
     data: {
-      type: aprobada ? "prestamo_aprobado" : "prestamo_rechazado",
+      type,
       clienteNombre,
       monto: String(monto),
       title,
       body,
-    },
-    android: { collapseKey: `solicitud_prestamo_${empleadoUid}` },
-    webpush: {
-      headers: { Topic: `solicitud_prestamo_${empleadoUid}` },
-      notification: { title, body },
+      click_action: "/dashboard/trabajador/prestamo",
     },
   };
 

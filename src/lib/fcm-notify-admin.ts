@@ -3,8 +3,41 @@
  * Envío por topic FCM (misma suscripción que gastos): sin leer tokens por envío.
  */
 
-import type { Messaging } from "firebase-admin/messaging";
+import type { Message, Messaging } from "firebase-admin/messaging";
 import { topicGastosAdmin } from "@/lib/fcm-gasto-topic";
+
+/** Payload FCM con `notification` para bandeja del sistema (background / bloqueado). */
+function buildTopicPushMessage(params: {
+  topic: string;
+  collapseKey: string;
+  title: string;
+  body: string;
+  data: Record<string, string>;
+}): Message {
+  const { topic, collapseKey, title, body, data } = params;
+  return {
+    topic,
+    notification: { title, body },
+    android: {
+      collapseKey,
+      notification: {
+        title,
+        body,
+        clickAction: "FLUTTER_NOTIFICATION_CLICK",
+        channelId: "krediapp_default",
+      },
+    },
+    webpush: {
+      headers: { Topic: collapseKey },
+      notification: { title, body },
+    },
+    data: {
+      title,
+      body,
+      ...data,
+    },
+  };
+}
 
 export type PayloadGastoEmpleadoFcm = {
   adminUid: string;
@@ -37,19 +70,20 @@ export async function notifyAdminGastoEmpleado(
   }`;
 
   try {
-    await messaging.send({
-      topic,
-      android: { collapseKey: `gasto_${gastoId}` },
-      webpush: { headers: { Topic: `gasto_${gastoId}` } },
-      data: {
+    await messaging.send(
+      buildTopicPushMessage({
+        topic,
+        collapseKey: `gasto_${gastoId}`,
         title,
         body,
-        type: "gasto_empleado",
-        gastoId,
-        empresaId,
-        click_action: "/dashboard/admin/gastos",
-      },
-    });
+        data: {
+          type: "gasto_empleado",
+          gastoId,
+          empresaId,
+          click_action: "/dashboard/admin/gastos",
+        },
+      })
+    );
     if (process.env.NODE_ENV === "development") {
       console.info("[fcm] Push gasto empleado enviado al topic:", topic);
     }
@@ -83,19 +117,20 @@ export async function notifyAdminPrestamoEmpleado(
   );
 
   try {
-    await messaging.send({
-      topic,
-      android: { collapseKey: `prestamo_${prestamoId}` },
-      webpush: { headers: { Topic: `prestamo_${prestamoId}` } },
-      data: {
+    await messaging.send(
+      buildTopicPushMessage({
+        topic,
+        collapseKey: `prestamo_${prestamoId}`,
         title,
         body,
-        type: "prestamo_empleado",
-        empresaId,
-        prestamoId,
-        click_action: "/dashboard/admin/prestamo",
-      },
-    });
+        data: {
+          type: "prestamo_empleado",
+          empresaId,
+          prestamoId,
+          click_action: "/dashboard/admin/prestamo",
+        },
+      })
+    );
     if (process.env.NODE_ENV === "development") {
       console.info("[fcm] Push préstamo empleado enviado al topic:", topic);
     }
@@ -124,19 +159,20 @@ export async function notifyAdminClienteEmpleado(
   const body = truncateBody(`${empleadoNombre} · ${clienteNombre}`, 180);
 
   try {
-    await messaging.send({
-      topic,
-      android: { collapseKey: `cliente_${clienteId}` },
-      webpush: { headers: { Topic: `cliente_${clienteId}` } },
-      data: {
+    await messaging.send(
+      buildTopicPushMessage({
+        topic,
+        collapseKey: `cliente_${clienteId}`,
         title,
         body,
-        type: "cliente_empleado",
-        empresaId,
-        clienteId,
-        click_action: "/dashboard/admin/cliente",
-      },
-    });
+        data: {
+          type: "cliente_empleado",
+          empresaId,
+          clienteId,
+          click_action: "/dashboard/admin/cliente",
+        },
+      })
+    );
   } catch (e) {
     console.warn("[fcm] notifyAdminClienteEmpleado falló:", topic, e);
   }
@@ -181,19 +217,20 @@ export async function notifyAdminSolicitudPrestamo(
   );
 
   try {
-    await messaging.send({
-      topic,
-      android: { collapseKey: `sol_prestamo_${solicitudId}` },
-      webpush: { headers: { Topic: `sol_prestamo_${solicitudId}` } },
-      data: {
+    await messaging.send(
+      buildTopicPushMessage({
+        topic,
+        collapseKey: `sol_prestamo_${solicitudId}`,
         title,
         body,
-        type: "solicitud_prestamo",
-        empresaId,
-        solicitudId,
-        click_action: "/dashboard/admin/solicitudes-prestamo",
-      },
-    });
+        data: {
+          type: "solicitud_prestamo",
+          empresaId,
+          solicitudId,
+          click_action: "/dashboard/admin/solicitudes-prestamo",
+        },
+      })
+    );
     if (process.env.NODE_ENV === "development") {
       console.info("[fcm] Push solicitud préstamo enviado al topic:", topic);
     }
@@ -227,19 +264,20 @@ export async function notifyAdminEntregaReporte(
   );
 
   try {
-    await messaging.send({
-      topic,
-      android: { collapseKey: `entrega_${solicitudId}` },
-      webpush: { headers: { Topic: `entrega_${solicitudId}` } },
-      data: {
+    await messaging.send(
+      buildTopicPushMessage({
+        topic,
+        collapseKey: `entrega_${solicitudId}`,
         title,
         body,
-        type: "entrega_reporte",
-        empresaId,
-        solicitudId,
-        click_action: "/dashboard/admin/reportes-dia",
-      },
-    });
+        data: {
+          type: "entrega_reporte",
+          empresaId,
+          solicitudId,
+          click_action: "/dashboard/admin/reportes-dia",
+        },
+      })
+    );
   } catch (e) {
     console.warn("[fcm] notifyAdminEntregaReporte falló:", topic, e);
   }
@@ -322,22 +360,23 @@ export async function notifyAdminCuotaPrestamo(
   const clickPath = `/dashboard/admin/cobrar?${query}`;
 
   try {
-    await messaging.send({
-      topic,
-      android: { collapseKey: `cuota_${pagoId}` },
-      webpush: { headers: { Topic: `cuota_${pagoId}` } },
-      data: {
+    await messaging.send(
+      buildTopicPushMessage({
+        topic,
+        collapseKey: `cuota_${pagoId}`,
         title,
         body,
-        type: "cuota_prestamo",
-        empresaId,
-        prestamoId,
-        pagoId,
-        clienteId: clienteId.trim(),
-        tipoRegistro,
-        click_action: clickPath,
-      },
-    });
+        data: {
+          type: "cuota_prestamo",
+          empresaId,
+          prestamoId,
+          pagoId,
+          clienteId: clienteId.trim(),
+          tipoRegistro,
+          click_action: clickPath,
+        },
+      })
+    );
     console.log("[fcm] Push cuota préstamo ENVIADO. Topic:", topic, "tipo:", tipoRegistro);
   } catch (e) {
     console.error("[fcm] notifyAdminCuotaPrestamo ERROR:", topic, JSON.stringify(e));
