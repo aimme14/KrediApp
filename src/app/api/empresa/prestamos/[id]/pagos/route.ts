@@ -35,12 +35,13 @@ const MAX_PAGOS_LIST = 50;
 
 /** Campos para campanita admin (collectionGroup pagos) y push FCM. */
 function pagoCamposNotifAdmin(
-  apiUser: { uid: string; empresaId: string; role: string },
+  apiUser: { uid: string; empresaId: string; role: string; adminId?: string },
   prestamoFlat: Record<string, unknown>
 ): Record<string, string> {
   if (apiUser.role !== "empleado") return {};
   const adminId =
-    typeof prestamoFlat.adminId === "string" ? prestamoFlat.adminId.trim() : "";
+    (typeof prestamoFlat.adminId === "string" ? prestamoFlat.adminId.trim() : "") ||
+    (typeof apiUser.adminId === "string" ? apiUser.adminId.trim() : "");
   const clienteId =
     typeof prestamoFlat.clienteId === "string" ? prestamoFlat.clienteId.trim() : "";
   const clienteNombre =
@@ -77,7 +78,7 @@ async function resolveClienteNombre(
 /** Solo cuando el registro lo hace un empleado; no bloquea la respuesta HTTP. */
 function scheduleFcmCuotaToAdminIfEmpleado(params: {
   db: Firestore;
-  apiUser: { uid: string; empresaId: string; role: string };
+  apiUser: { uid: string; empresaId: string; role: string; adminId?: string };
   prestamoFlat: Record<string, unknown>;
   prestamoId: string;
   tipoRegistro: "pago" | "no_pago" | "perdida";
@@ -88,9 +89,10 @@ function scheduleFcmCuotaToAdminIfEmpleado(params: {
 }): void {
   if (params.apiUser.role !== "empleado") return;
   const adminUid =
-    typeof params.prestamoFlat.adminId === "string"
+    (typeof params.prestamoFlat.adminId === "string"
       ? params.prestamoFlat.adminId.trim()
-      : "";
+      : "") ||
+    (typeof params.apiUser.adminId === "string" ? params.apiUser.adminId.trim() : "");
   if (!adminUid) {
     console.warn(
       "[pagos] Préstamo sin adminId; no se envía FCM de cuota al administrador."

@@ -233,7 +233,15 @@ export function AdminNotificacionesRealtimeListener() {
           });
           setBucket("pagos", items);
         },
-        (err) => console.warn("[AdminNotifRT] pagos:", err)
+        (err) => {
+          if (err?.code === "permission-denied") {
+            console.error(
+              "[AdminNotifRT] pagos: permiso denegado — revisa firestore.rules (adminId en collectionGroup pagos)"
+            );
+          } else {
+            console.warn("[AdminNotifRT] pagos:", err);
+          }
+        }
       )
     );
 

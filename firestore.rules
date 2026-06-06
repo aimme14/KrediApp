@@ -18,7 +18,8 @@ service cloud.firestore {
     }
     match /{path=**}/pagos/{pagoId} {
       allow read: if request.auth != null
-        && resource.data.empleadoId == request.auth.uid;
+        && (resource.data.empleadoId == request.auth.uid
+            || resource.data.adminId == request.auth.uid);
       allow write: if false;
     }
     // Empresas y todas sus subcolecciones
