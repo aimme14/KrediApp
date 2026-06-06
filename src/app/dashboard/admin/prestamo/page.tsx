@@ -765,14 +765,19 @@ export default function PrestamoPage() {
                   <th>Fecha</th>
                   <th className="col-num">
                     <span className="prestamo-admin-monto-th-desktop">Monto</span>
-                    <span className="prestamo-admin-monto-th-mobile">Debe/Monto</span>
+                    <span className="prestamo-admin-monto-th-mobile">Debe</span>
                   </th>
                   <th className="col-num">Total a pagar</th>
                   <th className="col-num">Saldo</th>
                   <th className="col-num">Cuotas</th>
                   <th>Estado</th>
                   <th>Frecuencia</th>
-                  <th>Acción</th>
+                  <th>
+                    <span className="prestamo-admin-cobro-th-desktop">Acción</span>
+                    <span className="prestamo-admin-cobro-th-mobile" aria-hidden>
+                      Cobrar
+                    </span>
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -805,8 +810,10 @@ export default function PrestamoPage() {
                             <span aria-hidden style={{ display: "inline-block", width: "1.5rem", minHeight: "1.25rem" }} />
                           )}
                         </td>
-                        <td>{codigoDisplay}</td>
-                        <td>{nombre}</td>
+                        <td className="prestamo-admin-col-codigo">{codigoDisplay}</td>
+                        <td className="prestamo-admin-col-cliente" title={nombre}>
+                          {nombre}
+                        </td>
                         <td className="prestamo-histo-col-fecha" title="Fecha de creación">
                           {formatFechaCreacionPrestamo(principal)}
                         </td>
@@ -827,13 +834,14 @@ export default function PrestamoPage() {
                           </span>
                         </td>
                         <td>{principal.modalidad}</td>
-                        <td>
+                        <td className="prestamo-admin-cobro-cell">
                           {(principal.estado === "activo" || principal.estado === "mora") && (
                             <Link
                               href={`/dashboard/admin/cobrar?clienteId=${grupo.clienteId}&prestamoId=${principal.id}`}
                               className="btn btn-primary prestamo-admin-cobro-btn"
                             >
-                              Registrar cobro
+                              <span className="prestamo-admin-cobro-label-desktop">Registrar cobro</span>
+                              <span className="prestamo-admin-cobro-label-mobile">Cobrar</span>
                             </Link>
                           )}
                         </td>

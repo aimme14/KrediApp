@@ -2581,6 +2581,16 @@ td {
   display: none;
 }
 
+.prestamo-admin-cobro-th-mobile,
+.prestamo-admin-cobro-label-mobile {
+  display: none;
+}
+
+.prestamo-admin-cobro-th-desktop,
+.prestamo-admin-cobro-label-desktop {
+  display: inline;
+}
+
 .prestamo-admin-hist-title {
   margin: 0;
   font-size: 1.05rem;
@@ -2856,6 +2866,28 @@ td {
 
 /* Móvil: Código, Cliente, Fecha y Debe/Monto (oculta expandir, totales, cobro, etc.) */
 @media (max-width: 768px) {
+  .prestamo-admin-page.card {
+    padding: 0.5rem 0.35rem;
+  }
+
+  .prestamo-admin-resumen {
+    margin-bottom: 0.65rem;
+  }
+
+  .prestamo-admin-hist-card.card {
+    padding: 0.45rem 0.15rem 0.55rem;
+    margin-bottom: 0;
+    border: none;
+    background: transparent;
+    border-radius: 0;
+  }
+
+  .prestamo-admin-hist-head,
+  .prestamo-admin-filtros-wrap {
+    padding-left: 0.2rem;
+    padding-right: 0.2rem;
+  }
+
   .prestamo-admin-search-field {
     max-width: none;
   }
@@ -2949,71 +2981,148 @@ td {
   }
 
   .table-wrap.prestamo-admin-hist-table-wrap {
-    overflow-x: visible;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    margin-left: -0.1rem;
+    margin-right: -0.1rem;
+    border-left: none;
+    border-right: none;
+    border-radius: 8px;
   }
 
   .prestamo-admin-hist-card .table-historial {
     width: 100%;
     min-width: 0;
     table-layout: fixed;
+    border-collapse: collapse;
   }
 
   .prestamo-admin-hist-card .table-historial thead th:nth-child(1),
   .prestamo-admin-hist-card .table-historial tbody tr td:nth-child(1):not([colspan]),
-  .prestamo-admin-hist-card .table-historial thead th:nth-child(n + 6),
-  .prestamo-admin-hist-card .table-historial tbody tr td:nth-child(n + 6) {
+  .prestamo-admin-hist-card .table-historial thead th:nth-child(n + 6):not(:nth-child(11)),
+  .prestamo-admin-hist-card .table-historial tbody tr td:nth-child(n + 6):not([colspan]):not(:nth-child(11)) {
     display: none !important;
   }
 
-  .prestamo-admin-hist-card .table-historial th:nth-child(2),
-  .prestamo-admin-hist-card .table-historial td:nth-child(2) {
-    width: 18%;
+  .prestamo-admin-cobro-th-desktop,
+  .prestamo-admin-cobro-label-desktop {
+    display: none !important;
+  }
+
+  .prestamo-admin-cobro-th-mobile,
+  .prestamo-admin-cobro-label-mobile {
+    display: inline !important;
+  }
+
+  .prestamo-admin-hist-card .table-historial th:nth-child(3),
+  .prestamo-admin-hist-card .table-historial td.prestamo-admin-col-cliente {
+    width: 26%;
+    max-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
     white-space: nowrap;
+    padding-left: 0 !important;
+    padding-right: 0.15rem !important;
+    margin-left: -0.65rem;
+    text-align: left;
+  }
+
+  .prestamo-admin-hist-card .table-historial th:nth-child(2),
+  .prestamo-admin-hist-card .table-historial td.prestamo-admin-col-codigo {
+    width: 17%;
+    white-space: nowrap;
+    padding-right: 0.05rem !important;
+    padding-left: 0.1rem !important;
+    font-size: 0.625rem;
+    letter-spacing: -0.02em;
   }
 
   .prestamo-admin-hist-card .table-historial th:nth-child(4),
   .prestamo-admin-hist-card .table-historial td:nth-child(4),
   .prestamo-admin-hist-card .table-historial .prestamo-histo-col-fecha {
-    width: 24%;
+    width: 17%;
     white-space: nowrap;
-    font-size: 0.72rem;
+    font-size: 0.6rem;
     font-variant-numeric: tabular-nums;
+    padding-left: 0.1rem !important;
+    padding-right: 0.1rem !important;
   }
 
   .prestamo-admin-hist-card .table-historial th:nth-child(5),
   .prestamo-admin-hist-card .table-historial td:nth-child(5) {
     width: 28%;
     white-space: nowrap;
-    font-size: 0.75rem;
+    font-size: 0.6rem;
+    letter-spacing: -0.03em;
+    font-variant-numeric: tabular-nums;
+    padding-left: 0.1rem !important;
+    padding-right: 0.15rem !important;
   }
 
-  .prestamo-admin-hist-card .table-historial td:nth-child(3) {
-    max-width: none;
-    white-space: normal;
-    word-break: break-word;
-    overflow: visible;
-    text-overflow: clip;
+  .prestamo-admin-hist-card .table-historial th:nth-child(11),
+  .prestamo-admin-hist-card .table-historial td.prestamo-admin-cobro-cell {
+    width: 12%;
+    min-width: 2.6rem;
+    padding-left: 0.1rem !important;
+    padding-right: 0.2rem !important;
+    text-align: center;
+    vertical-align: middle;
+  }
+
+  .prestamo-admin-hist-card .table-historial .prestamo-admin-cobro-btn {
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    width: auto;
+    max-width: 100%;
+    min-width: 2.35rem;
+    padding: 0.24rem 0.28rem !important;
+    font-size: 0.575rem !important;
+    line-height: 1.1 !important;
+    border-radius: 6px !important;
+    white-space: nowrap;
   }
 
   .prestamo-admin-hist-card .table-historial th:nth-child(2),
   .prestamo-admin-hist-card .table-historial th:nth-child(3),
   .prestamo-admin-hist-card .table-historial th:nth-child(4),
-  .prestamo-admin-hist-card .table-historial th:nth-child(5) {
-    font-size: 0.7rem;
-    padding: 0.35rem 0.4rem;
+  .prestamo-admin-hist-card .table-historial th:nth-child(5),
+  .prestamo-admin-hist-card .table-historial th:nth-child(11) {
+    font-size: 0.575rem;
+    padding: 0.32rem 0.15rem;
+    line-height: 1.2;
   }
 
   .prestamo-admin-hist-card .table-historial tbody tr td:nth-child(2),
-  .prestamo-admin-hist-card .table-historial tbody tr td:nth-child(3),
   .prestamo-admin-hist-card .table-historial tbody tr td:nth-child(4),
-  .prestamo-admin-hist-card .table-historial tbody tr td:nth-child(5) {
-    font-size: 0.8125rem;
-    padding: 0.45rem 0.4rem;
-    vertical-align: top;
+  .prestamo-admin-hist-card .table-historial tbody tr td:nth-child(5),
+  .prestamo-admin-hist-card .table-historial tbody tr td.prestamo-admin-cobro-cell {
+    font-size: 0.6875rem;
+    padding: 0.38rem 0.15rem;
+    vertical-align: middle;
+  }
+
+  .prestamo-admin-hist-card .table-historial tbody tr td.prestamo-admin-col-cliente {
+    font-size: 0.6875rem;
+    padding-top: 0.38rem !important;
+    padding-bottom: 0.38rem !important;
+    padding-left: 0 !important;
+    padding-right: 0.15rem !important;
+    margin-left: -0.65rem;
+    vertical-align: middle;
+  }
+
+  .prestamo-admin-hist-card .table-historial th:nth-child(3) {
+    padding-left: 0 !important;
+    margin-left: -0.65rem;
   }
 
   .prestamo-admin-hist-card .table-historial .col-num {
     text-align: right;
+  }
+
+  .prestamo-admin-monto-th-mobile {
+    font-size: 0.575rem;
   }
 }
 
