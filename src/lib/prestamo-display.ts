@@ -22,6 +22,20 @@ export function totalCreditoPrestamo(p: PrestamoTotalCredito): number {
   return Math.round(monto * (1 + interes / 100) * 100) / 100;
 }
 
+type PrestamoFechaCreacion = Pick<PrestamoItem, "creadoEn" | "fechaInicio">;
+
+/** ISO de creación del préstamo: `creadoEn` si existe, si no `fechaInicio`. */
+export function fechaCreacionPrestamoIso(p: PrestamoFechaCreacion): string | null {
+  return p.creadoEn ?? p.fechaInicio ?? null;
+}
+
+/** Fecha corta para listados (ej. 5/06/26). */
+export function formatFechaCreacionPrestamo(p: PrestamoFechaCreacion): string {
+  const iso = fechaCreacionPrestamoIso(p);
+  if (!iso) return "—";
+  return new Date(iso).toLocaleDateString("es-CO", { dateStyle: "short" });
+}
+
 /** Vista compacta: saldo pendiente / total del crédito con interés (ej. 50.000/120.000). */
 export function formatDebeSlashTotalCredito(
   saldoPendiente: number,

@@ -13,7 +13,7 @@ import {
   type PrestamoItem,
 } from "@/lib/empresa-api";
 import { formatInteresResumenPct, parseInteresPct } from "@/lib/interes-pct";
-import { formatDebeSlashTotalCredito } from "@/lib/prestamo-display";
+import { formatDebeSlashTotalCredito, formatFechaCreacionPrestamo } from "@/lib/prestamo-display";
 import {
   sanitizeMontoDecimalCOP,
   formatMontoDecimalCOPDisplay,
@@ -762,6 +762,7 @@ export default function PrestamoPage() {
                   <th aria-label="Expandir historial" />
                   <th>Código</th>
                   <th>Cliente</th>
+                  <th>Fecha</th>
                   <th className="col-num">
                     <span className="prestamo-admin-monto-th-desktop">Monto</span>
                     <span className="prestamo-admin-monto-th-mobile">Debe/Monto</span>
@@ -806,6 +807,9 @@ export default function PrestamoPage() {
                         </td>
                         <td>{codigoDisplay}</td>
                         <td>{nombre}</td>
+                        <td className="prestamo-histo-col-fecha" title="Fecha de creación">
+                          {formatFechaCreacionPrestamo(principal)}
+                        </td>
                         <td className="col-num">
                           <span className="prestamo-admin-monto-desktop">{formatMoneda(principal.monto)}</span>
                           <span className="prestamo-admin-monto-mobile">
@@ -836,13 +840,13 @@ export default function PrestamoPage() {
                       </tr>
                       {tieneMas && expandido && (
                         <tr id={`historial-cliente-${grupo.clienteId}`} aria-labelledby={`btn-expand-${grupo.clienteId}`}>
-                          <td colSpan={10} className="prestamo-admin-expand-panel">
+                          <td colSpan={11} className="prestamo-admin-expand-panel">
                             <div className="historial-prestamos-list" style={{ fontSize: "0.8125rem", color: "var(--text-muted)" }}>
                               <span style={{ fontWeight: 600, color: "var(--text)", marginBottom: "0.35rem", display: "block" }}>Otros préstamos</span>
                               <ul>
                                 {otros.map((p) => (
                                     <li key={p.id} style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
-                                      {formatMoneda(p.monto)} · {p.estado} · {p.numeroCuotas} cuotas
+                                      {formatMoneda(p.monto)} · {formatFechaCreacionPrestamo(p)} · {p.estado} · {p.numeroCuotas} cuotas
                                       {(p.estado === "activo" || p.estado === "mora") && (
                                         <Link
                                           href={`/dashboard/admin/cobrar?clienteId=${grupo.clienteId}&prestamoId=${p.id}`}

@@ -27,7 +27,7 @@ import {
   interiorDecimalCOPToNumber,
 } from "@/lib/monto-input-es";
 import SelectConBusqueda from "@/components/SelectConBusqueda";
-import { formatDebeSlashTotalCredito } from "@/lib/prestamo-display";
+import { formatDebeSlashTotalCredito, formatFechaCreacionPrestamo } from "@/lib/prestamo-display";
 
 const MODALIDADES = [
   { value: "diario", label: "Diario" },
@@ -847,6 +847,7 @@ export default function PrestamoTrabajadorPage() {
                   <tr>
                     <th>Código</th>
                     <th>Cliente</th>
+                    <th>Fecha</th>
                     <th className="col-num" title="Saldo pendiente / total del crédito (con interés)">
                       Debe/Monto
                     </th>
@@ -862,6 +863,9 @@ export default function PrestamoTrabajadorPage() {
                       <tr key={p.id}>
                         <td>{codigoDisplay}</td>
                         <td className="prestamo-histo-simple-nombre">{nombre}</td>
+                        <td className="prestamo-histo-col-fecha" title="Fecha de creación">
+                          {formatFechaCreacionPrestamo(p)}
+                        </td>
                         <td className="col-num prestamo-histo-col-debe-total">
                           {formatDebeSlashTotalCredito(p.saldoPendiente, p)}
                         </td>

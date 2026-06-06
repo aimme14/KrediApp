@@ -58,6 +58,7 @@ export async function GET(request: NextRequest) {
       estado: data.estado ?? "activo",
       fechaInicio: data.fechaInicio?.toDate?.()?.toISOString?.() ?? null,
       fechaVencimiento: data.fechaVencimiento?.toDate?.()?.toISOString?.() ?? null,
+      creadoEn: data.creadoEn?.toDate?.()?.toISOString?.() ?? null,
       multaMora: data.multaMora ?? 0,
       /** Adelanto aplicado a la(s) siguiente(s) cuota(s). Si > 0, la próxima sugerencia es valorCuota - (adelanto % valorCuota). */
       adelantoCuota: data.adelantoCuota ?? 0,

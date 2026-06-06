@@ -1337,18 +1337,26 @@ td {
 }
 .prestamo-historial-scroll .prestamo-historial-simple th:nth-child(1),
 .prestamo-historial-scroll .prestamo-historial-simple td:nth-child(1) {
-  width: 18%;
+  width: 15%;
   text-align: center;
 }
 .prestamo-historial-scroll .prestamo-historial-simple th:nth-child(2),
 .prestamo-historial-scroll .prestamo-historial-simple td:nth-child(2) {
-  width: 42%;
+  width: 32%;
   text-align: left;
 }
 .prestamo-historial-scroll .prestamo-historial-simple th:nth-child(3),
 .prestamo-historial-scroll .prestamo-historial-simple td:nth-child(3),
+.prestamo-historial-scroll .prestamo-historial-simple .prestamo-histo-col-fecha {
+  width: 22%;
+  font-size: 0.75rem;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.prestamo-historial-scroll .prestamo-historial-simple th:nth-child(4),
+.prestamo-historial-scroll .prestamo-historial-simple td:nth-child(4),
 .prestamo-historial-scroll .prestamo-historial-simple .prestamo-histo-col-debe-total {
-  width: 40%;
+  width: 31%;
   font-size: 0.75rem;
   white-space: nowrap;
 }
@@ -2731,29 +2739,39 @@ td {
 
   .prestamo-historial-scroll .prestamo-historial-simple th:nth-child(1),
   .prestamo-historial-scroll .prestamo-historial-simple td:nth-child(1) {
-    width: 13%;
+    width: 12%;
     padding-left: 0.15rem;
     padding-right: 0.1rem;
   }
 
   .prestamo-historial-scroll .prestamo-historial-simple th:nth-child(2),
   .prestamo-historial-scroll .prestamo-historial-simple td:nth-child(2) {
-    width: 30%;
+    width: 26%;
     padding-left: 0.2rem;
     padding-right: 0.15rem;
   }
 
   .prestamo-historial-scroll .prestamo-historial-simple th:nth-child(3),
   .prestamo-historial-scroll .prestamo-historial-simple td:nth-child(3),
+  .prestamo-historial-scroll .prestamo-historial-simple .prestamo-histo-col-fecha {
+    width: 24%;
+    font-size: 0.625rem;
+    line-height: 1.2;
+    padding-left: 0.1rem;
+    padding-right: 0.1rem;
+  }
+
+  .prestamo-historial-scroll .prestamo-historial-simple th:nth-child(4),
+  .prestamo-historial-scroll .prestamo-historial-simple td:nth-child(4),
   .prestamo-historial-scroll .prestamo-historial-simple .prestamo-histo-col-debe-total {
-    width: 57%;
+    width: 38%;
     font-size: 0.6875rem;
     line-height: 1.2;
     padding-left: 0.12rem;
     padding-right: 0.08rem;
   }
 
-  .prestamo-historial-scroll .prestamo-historial-simple th:nth-child(3) {
+  .prestamo-historial-scroll .prestamo-historial-simple th:nth-child(4) {
     font-size: 0.625rem;
   }
 
@@ -2830,7 +2848,13 @@ td {
   white-space: nowrap;
 }
 
-/* Móvil: solo Código, Cliente y Monto prestado (oculta expandir, totales, cobro, etc.) */
+.prestamo-admin-hist-card .table-historial .prestamo-histo-col-fecha {
+  white-space: nowrap;
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Móvil: Código, Cliente, Fecha y Debe/Monto (oculta expandir, totales, cobro, etc.) */
 @media (max-width: 768px) {
   .prestamo-admin-search-field {
     max-width: none;
@@ -2936,20 +2960,29 @@ td {
 
   .prestamo-admin-hist-card .table-historial thead th:nth-child(1),
   .prestamo-admin-hist-card .table-historial tbody tr td:nth-child(1):not([colspan]),
-  .prestamo-admin-hist-card .table-historial thead th:nth-child(n + 5),
-  .prestamo-admin-hist-card .table-historial tbody tr td:nth-child(n + 5) {
+  .prestamo-admin-hist-card .table-historial thead th:nth-child(n + 6),
+  .prestamo-admin-hist-card .table-historial tbody tr td:nth-child(n + 6) {
     display: none !important;
   }
 
   .prestamo-admin-hist-card .table-historial th:nth-child(2),
   .prestamo-admin-hist-card .table-historial td:nth-child(2) {
-    width: 22%;
+    width: 18%;
     white-space: nowrap;
   }
 
   .prestamo-admin-hist-card .table-historial th:nth-child(4),
-  .prestamo-admin-hist-card .table-historial td:nth-child(4) {
-    width: 36%;
+  .prestamo-admin-hist-card .table-historial td:nth-child(4),
+  .prestamo-admin-hist-card .table-historial .prestamo-histo-col-fecha {
+    width: 24%;
+    white-space: nowrap;
+    font-size: 0.72rem;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .prestamo-admin-hist-card .table-historial th:nth-child(5),
+  .prestamo-admin-hist-card .table-historial td:nth-child(5) {
+    width: 28%;
     white-space: nowrap;
     font-size: 0.75rem;
   }
@@ -2964,14 +2997,16 @@ td {
 
   .prestamo-admin-hist-card .table-historial th:nth-child(2),
   .prestamo-admin-hist-card .table-historial th:nth-child(3),
-  .prestamo-admin-hist-card .table-historial th:nth-child(4) {
+  .prestamo-admin-hist-card .table-historial th:nth-child(4),
+  .prestamo-admin-hist-card .table-historial th:nth-child(5) {
     font-size: 0.7rem;
     padding: 0.35rem 0.4rem;
   }
 
   .prestamo-admin-hist-card .table-historial tbody tr td:nth-child(2),
   .prestamo-admin-hist-card .table-historial tbody tr td:nth-child(3),
-  .prestamo-admin-hist-card .table-historial tbody tr td:nth-child(4) {
+  .prestamo-admin-hist-card .table-historial tbody tr td:nth-child(4),
+  .prestamo-admin-hist-card .table-historial tbody tr td:nth-child(5) {
     font-size: 0.8125rem;
     padding: 0.45rem 0.4rem;
     vertical-align: top;

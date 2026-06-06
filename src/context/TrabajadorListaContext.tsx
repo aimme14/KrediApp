@@ -76,6 +76,7 @@ function mapPrestamo(d: QueryDocumentSnapshot): PrestamoItem {
     estado: data.estado ?? "activo",
     fechaInicio: data.fechaInicio?.toDate?.()?.toISOString?.() ?? null,
     fechaVencimiento: data.fechaVencimiento?.toDate?.()?.toISOString?.() ?? null,
+    creadoEn: data.creadoEn?.toDate?.()?.toISOString?.() ?? null,
     multaMora: data.multaMora ?? 0,
     adelantoCuota: data.adelantoCuota ?? 0,
     ultimoPagoFecha: data.ultimoPagoFecha?.toDate?.()?.toISOString?.() ?? null,

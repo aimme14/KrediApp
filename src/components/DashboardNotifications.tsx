@@ -47,7 +47,7 @@ function NotifAdminPendientes({
 }) {
   if (pendientes.length === 0 || dismissed) {
     return (
-      <p className="dashboard-notifications-empty">No hay solicitudes de entrega pendientes.</p>
+      <p className="dashboard-notifications-empty"></p>
     );
   }
   return (
@@ -111,7 +111,7 @@ function NotifAdminOperativo({ lines }: { lines: OperativoFcmSessionItem[] }) {
       <div className="dashboard-notifications-operativo-header">
         <span>Notificaciones de hoy</span>
         <span style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
-          Se borran automáticamente a las 11 PM (hora Colombia)
+          
         </span>
       </div>
       {vigentes.slice(0, 8).map((row) => (

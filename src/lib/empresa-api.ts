@@ -96,6 +96,8 @@ export type PrestamoItem = {
   estado: string;
   fechaInicio: string | null;
   fechaVencimiento: string | null;
+  /** Timestamp de creación del documento (ISO). Fallback visual: fechaInicio. */
+  creadoEn?: string | null;
   multaMora: number;
   /** Adelanto aplicado a la(s) siguiente(s) cuota(s). La próxima sugerencia es valorCuota - (adelanto % valorCuota). */
   adelantoCuota?: number;
