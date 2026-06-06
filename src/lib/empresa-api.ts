@@ -44,6 +44,9 @@ export type ClienteItem = {
   fechaCreacion: string | null;
   /** Código legible (ej. CL-001-002-045). Id técnico sigue siendo id. */
   codigo?: string;
+  creadoPorRol?: string;
+  creadoPorNombre?: string;
+  creadoPorUid?: string;
 };
 
 /**

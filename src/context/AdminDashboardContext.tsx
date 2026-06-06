@@ -160,7 +160,7 @@ export function AdminDashboardProvider({ children }: { children: ReactNode }) {
     );
 
     return () => unsub();
-  }, [user, profile, refreshCaja]);
+  }, [user?.uid, profile?.role, profile?.empresaId, refreshCaja]);
 
   /** Contador de gastos por ruta: solo `ruta.gastos` (se reinicia al cerrar periodo). */
   const rutas = rutasBase;

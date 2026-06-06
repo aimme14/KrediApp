@@ -101,7 +101,10 @@ function NotifAdminPendientes({
 }
 
 function NotifAdminOperativo({ lines }: { lines: OperativoFcmSessionItem[] }) {
-  const vigentes = lines.filter((row) => esDiaActualColombia(row.at ?? Date.now()));
+  const vigentes = lines
+    .filter((row) => esDiaActualColombia(row.at ?? Date.now()))
+    .sort((a, b) => (b.at ?? 0) - (a.at ?? 0));
+
   if (vigentes.length === 0) return null;
   return (
     <>

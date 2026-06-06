@@ -152,6 +152,10 @@ export function TrabajadorListaProvider({ children }: { children: ReactNode }) {
             moroso: data.moroso === true,
             fechaCreacion: data.fechaCreacion?.toDate?.()?.toISOString?.() ?? null,
             codigo: data.codigo ?? undefined,
+            creadoPorRol: typeof data.creadoPorRol === "string" ? data.creadoPorRol : undefined,
+            creadoPorNombre:
+              typeof data.creadoPorNombre === "string" ? data.creadoPorNombre : undefined,
+            creadoPorUid: typeof data.creadoPorUid === "string" ? data.creadoPorUid : undefined,
           };
         });
         list.sort(

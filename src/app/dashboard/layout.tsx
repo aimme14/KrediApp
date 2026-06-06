@@ -8,7 +8,6 @@ import { roleLabel } from "@/types/roles";
 import DashboardNotifications from "@/components/DashboardNotifications";
 import DashboardSettings from "@/components/DashboardSettings";
 import InactivityLock from "@/components/InactivityLock";
-import { AdminNotificacionesRealtimeListener } from "@/components/AdminNotificacionesRealtimeListener";
 import { DashboardHeaderProvider } from "@/context/DashboardHeaderContext";
 import { GastoFcmCampanitaProvider } from "@/context/GastoFcmCampanitaContext";
 import { getEmpresa } from "@/lib/empresa";
@@ -101,7 +100,6 @@ export default function DashboardLayout({
   return (
     <InactivityLock>
       <GastoFcmCampanitaProvider>
-        <AdminNotificacionesRealtimeListener />
         <DashboardHeaderProvider value={setHeaderLeftSlot}>
           <div
             className={`container container-dashboard${isGastosPage ? " dashboard-page-gastos" : ""}${isDashboardShellFluid ? " container-dashboard--fluid" : ""}`}

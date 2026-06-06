@@ -13,11 +13,11 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/context/AuthContext";
+import { useTrabajadorLista } from "@/context/TrabajadorListaContext";
 import { useGastoFcmCampanita } from "@/context/GastoFcmCampanitaContext";
 import {
   EMPRESAS_COLLECTION,
   GASTOS_EMPLEADO_SUBCOLLECTION,
-  CLIENTES_SUBCOLLECTION,
   PRESTAMOS_SUBCOLLECTION,
   SOLICITUDES_PRESTAMO_SUBCOLLECTION,
 } from "@/lib/empresas-db";
@@ -36,17 +36,25 @@ const USERS_COLLECTION = "users";
 
 /**
  * Campanita admin alimentada por Firestore en tiempo real (onSnapshot).
- * El push FCM (PWA cerrada) sigue en AdminFcmRegistration + service worker.
+ * Vive dentro del layout admin para reutilizar TrabajadorLista (clientes) y evitar
+ * listeners duplicados que provocan INTERNAL ASSERTION en el SDK de Firestore.
  */
 export function AdminNotificacionesRealtimeListener() {
   const { user, profile } = useAuth();
-  const { syncOperativoFromFirestore } = useGastoFcmCampanita();
+  const { clientes } = useTrabajadorLista();
+  const { syncOperativoFromFirestore, setSolicitudesPrestamoPendientesCount } =
+    useGastoFcmCampanita();
   const bucketsRef = useRef<Record<string, AdminOperativoNotifItem[]>>({});
   const nombresRef = useRef<Map<string, string>>(new Map());
+  const syncRef = useRef(syncOperativoFromFirestore);
+  const setSolicitudesCountRef = useRef(setSolicitudesPrestamoPendientesCount);
+
+  syncRef.current = syncOperativoFromFirestore;
+  setSolicitudesCountRef.current = setSolicitudesPrestamoPendientesCount;
 
   const recompute = () => {
     const merged = mergeAdminOperativoNotifs(Object.values(bucketsRef.current));
-    syncOperativoFromFirestore(merged);
+    syncRef.current(merged);
   };
 
   const setBucket = (key: string, items: AdminOperativoNotifItem[]) => {
@@ -73,7 +81,40 @@ export function AdminNotificacionesRealtimeListener() {
   };
 
   useEffect(() => {
-    if (!db || !user || profile?.role !== "admin" || !profile.empresaId) return;
+    let cancelled = false;
+
+    void (async () => {
+      const items: AdminOperativoNotifItem[] = [];
+      for (const c of clientes) {
+        if (c.creadoPorRol !== "empleado") continue;
+        const empleadoNombre =
+          (c.creadoPorNombre?.trim()) ||
+          (c.creadoPorUid ? await resolveNombre(c.creadoPorUid) : "Trabajador");
+        if (cancelled) return;
+        const item = mapClienteEmpleadoNotif(
+          c.id,
+          {
+            creadoPorRol: c.creadoPorRol,
+            fechaCreacion: c.fechaCreacion,
+            nombre: c.nombre,
+          },
+          empleadoNombre
+        );
+        if (item) items.push(item);
+      }
+      if (!cancelled) setBucket("clientes", items);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [clientes]);
+
+  useEffect(() => {
+    if (!db || !user || profile?.role !== "admin" || !profile.empresaId) {
+      setSolicitudesCountRef.current(0);
+      return;
+    }
 
     const empresaId = profile.empresaId.trim();
     const adminUid = user.uid;
@@ -84,9 +125,9 @@ export function AdminNotificacionesRealtimeListener() {
     if (!inicioDia) return;
     const inicioTs = Timestamp.fromDate(inicioDia);
 
+    let cancelled = false;
     const unsubs: Array<() => void> = [];
 
-    // Gastos de trabajadores (hoy)
     const qGastos = query(
       collection(db, EMPRESAS_COLLECTION, empresaId, GASTOS_EMPLEADO_SUBCOLLECTION),
       where("adminId", "==", adminUid),
@@ -96,6 +137,7 @@ export function AdminNotificacionesRealtimeListener() {
       onSnapshot(
         qGastos,
         (snap) => {
+          if (cancelled) return;
           const items: AdminOperativoNotifItem[] = [];
           snap.docs.forEach((d) => {
             const item = mapGastoEmpleadoNotif(d.id, d.data() as Record<string, unknown>);
@@ -107,36 +149,6 @@ export function AdminNotificacionesRealtimeListener() {
       )
     );
 
-    // Clientes creados hoy por trabajadores
-    const qClientes = query(
-      collection(db, EMPRESAS_COLLECTION, empresaId, CLIENTES_SUBCOLLECTION),
-      where("adminId", "==", adminUid)
-    );
-    unsubs.push(
-      onSnapshot(
-        qClientes,
-        (snap) => {
-          void (async () => {
-            const items: AdminOperativoNotifItem[] = [];
-            for (const d of snap.docs) {
-              const data = d.data() as Record<string, unknown>;
-              if (data.creadoPorRol !== "empleado") continue;
-              const empleadoNombre =
-                (typeof data.creadoPorNombre === "string" && data.creadoPorNombre.trim()) ||
-                (typeof data.creadoPorUid === "string"
-                  ? await resolveNombre(data.creadoPorUid)
-                  : "Trabajador");
-              const item = mapClienteEmpleadoNotif(d.id, data, empleadoNombre);
-              if (item) items.push(item);
-            }
-            setBucket("clientes", items);
-          })();
-        },
-        (err) => console.warn("[AdminNotifRT] clientes:", err)
-      )
-    );
-
-    // Préstamos desembolsados hoy por trabajadores
     const qPrestamos = query(
       collection(db, EMPRESAS_COLLECTION, empresaId, PRESTAMOS_SUBCOLLECTION),
       where("adminId", "==", adminUid)
@@ -145,6 +157,7 @@ export function AdminNotificacionesRealtimeListener() {
       onSnapshot(
         qPrestamos,
         (snap) => {
+          if (cancelled) return;
           void (async () => {
             const items: AdminOperativoNotifItem[] = [];
             for (const d of snap.docs) {
@@ -156,17 +169,17 @@ export function AdminNotificacionesRealtimeListener() {
                 (typeof data.empleadoNombre === "string" &&
                   data.empleadoNombre.trim()) ||
                 (empleadoUid ? await resolveNombre(empleadoUid) : "Trabajador");
+              if (cancelled) return;
               const item = mapPrestamoEmpleadoNotif(d.id, data, empleadoNombre);
               if (item) items.push(item);
             }
-            setBucket("prestamos", items);
+            if (!cancelled) setBucket("prestamos", items);
           })();
         },
         (err) => console.warn("[AdminNotifRT] prestamos:", err)
       )
     );
 
-    // Solicitudes de préstamo pendientes (hoy)
     const qSolicitudes = query(
       collection(
         db,
@@ -181,6 +194,8 @@ export function AdminNotificacionesRealtimeListener() {
       onSnapshot(
         qSolicitudes,
         (snap) => {
+          if (cancelled) return;
+          setSolicitudesCountRef.current(snap.size);
           const items: AdminOperativoNotifItem[] = [];
           snap.docs.forEach((d) => {
             const data = d.data() as Record<string, unknown>;
@@ -197,7 +212,6 @@ export function AdminNotificacionesRealtimeListener() {
       )
     );
 
-    // Cobros / no pagos / pérdidas de trabajadores (hoy)
     const qPagos = query(
       collectionGroup(db, "pagos"),
       where("adminId", "==", adminUid),
@@ -207,6 +221,7 @@ export function AdminNotificacionesRealtimeListener() {
       onSnapshot(
         qPagos,
         (snap) => {
+          if (cancelled) return;
           const items: AdminOperativoNotifItem[] = [];
           snap.docs.forEach((d) => {
             const data = d.data() as Record<string, unknown>;
@@ -223,10 +238,12 @@ export function AdminNotificacionesRealtimeListener() {
     );
 
     return () => {
+      cancelled = true;
       unsubs.forEach((u) => u());
       bucketsRef.current = {};
+      setSolicitudesCountRef.current(0);
     };
-  }, [user?.uid, profile?.role, profile?.empresaId, syncOperativoFromFirestore]);
+  }, [user?.uid, profile?.role, profile?.empresaId]);
 
   return null;
 }
