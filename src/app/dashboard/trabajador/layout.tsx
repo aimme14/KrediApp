@@ -9,7 +9,6 @@ import { TrabajadorRutaProvider } from "@/context/TrabajadorRutaContext";
 import { TrabajadorListaProvider } from "@/context/TrabajadorListaContext";
 import { TrabajadorCajaDiaProvider } from "@/context/TrabajadorCajaDiaContext";
 import { TrabajadorActionIcon } from "@/components/trabajador/TrabajadorActionIcon";
-import { TrabajadorFcmRegistration } from "@/components/TrabajadorFcmRegistration";
 import { TrabajadorSyncBanner } from "@/components/TrabajadorSyncBanner";
 
 const NAV_ITEMS = [
@@ -138,7 +137,6 @@ export default function TrabajadorLayout({ children }: { children: React.ReactNo
     <TrabajadorRutaProvider>
       <TrabajadorListaProvider>
         <TrabajadorCajaDiaProvider>
-        <TrabajadorFcmRegistration />
         <div className="jefe-wrapper trabajador-dashboard trabajador-dashboard-has-bottom-nav">
           <aside className={`jefe-drawer ${menuOpen ? "jefe-drawer-open" : ""}`} aria-hidden={!menuOpen}>
             <div className="jefe-drawer-inner">

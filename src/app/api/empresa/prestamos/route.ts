@@ -299,6 +299,9 @@ export async function POST(request: NextRequest) {
         rutaId: rutaIdPrestamo,
         adminId: adminIdPrestamo,
         empleadoId: empleadoIdPrestamo,
+        ...(apiUser.role === "empleado" && empleadoNombre
+          ? { empleadoNombre }
+          : {}),
         monto,
         interes: interesPct,
         modalidad: mod,

@@ -202,6 +202,49 @@ export async function notifyAdminSolicitudPrestamo(
   }
 }
 
+export type PayloadEntregaReporteFcm = {
+  adminUid: string;
+  empresaId: string;
+  empleadoNombre: string;
+  monto: number;
+  solicitudId: string;
+  rutaNombre: string;
+};
+
+export async function notifyAdminEntregaReporte(
+  messaging: Messaging,
+  payload: PayloadEntregaReporteFcm
+): Promise<void> {
+  const { adminUid, empresaId, empleadoNombre, monto, solicitudId, rutaNombre } =
+    payload;
+  if (!adminUid.trim() || !empresaId.trim()) return;
+
+  const topic = topicGastosAdmin(empresaId, adminUid);
+  const title = "Entrega de reporte pendiente";
+  const body = truncateBody(
+    `${empleadoNombre} · ${rutaNombre || "Ruta"} — ${formatMontoCOP(monto)}`,
+    180
+  );
+
+  try {
+    await messaging.send({
+      topic,
+      android: { collapseKey: `entrega_${solicitudId}` },
+      webpush: { headers: { Topic: `entrega_${solicitudId}` } },
+      data: {
+        title,
+        body,
+        type: "entrega_reporte",
+        empresaId,
+        solicitudId,
+        click_action: "/dashboard/admin/reportes-dia",
+      },
+    });
+  } catch (e) {
+    console.warn("[fcm] notifyAdminEntregaReporte falló:", topic, e);
+  }
+}
+
 export type PayloadCuotaPrestamoFcm = {
   adminUid: string;
   empresaId: string;

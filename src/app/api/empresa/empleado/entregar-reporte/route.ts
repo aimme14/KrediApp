@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAdminFirestore } from "@/lib/firebase-admin";
+import { getAdminFirestore, getAdminMessaging } from "@/lib/firebase-admin";
 import { getApiUser } from "@/lib/api-auth";
 import { crearSolicitudEntregaReporte } from "@/lib/solicitud-entrega-reporte-admin";
+import { notifyAdminEntregaReporte } from "@/lib/fcm-notify-admin";
 
 const MAX_COMENTARIO_REPORTE = 2000;
 
@@ -42,6 +43,24 @@ export async function POST(request: NextRequest) {
       apiUser.uid,
       comentarioTrimmed
     );
+
+    void (async () => {
+      try {
+        if (result.adminId?.trim()) {
+          await notifyAdminEntregaReporte(getAdminMessaging(), {
+            adminUid: result.adminId,
+            empresaId: apiUser.empresaId,
+            empleadoNombre: result.empleadoNombre ?? "Trabajador",
+            monto: result.montoAlSolicitar,
+            solicitudId: result.solicitudId,
+            rutaNombre: result.rutaNombre ?? "",
+          });
+        }
+      } catch (e) {
+        console.warn("[fcm] notify admin entrega reporte:", e);
+      }
+    })();
+
     return NextResponse.json({
       ok: true,
       solicitudId: result.solicitudId,

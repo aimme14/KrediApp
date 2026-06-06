@@ -222,6 +222,9 @@ export async function POST(request: NextRequest) {
     moroso: false,
     fechaCreacion: now,
     codigo,
+    creadoPorUid: apiUser.uid,
+    creadoPorRol: apiUser.role,
+    creadoPorNombre: creadoPorNombre,
   });
 
   const usuarioRef = db

@@ -9,14 +9,9 @@ import {
   type OperativoFcmSessionItem,
 } from "@/context/GastoFcmCampanitaContext";
 import { db } from "@/lib/firebase";
-import {
-  type SolicitudEntregaReporteApi,
-  type SolicitudEntregaPendienteAdmin,
-} from "@/lib/empresa-api";
+import { type SolicitudEntregaPendienteAdmin } from "@/lib/empresa-api";
 import { esDiaActualColombia } from "@/lib/colombia-day-bounds";
-
-const EMPRESAS_COLLECTION = "empresas";
-const SOLICITUDES_SUBCOLLECTION = "solicitudesEntregaReporte";
+import { EMPRESAS_COLLECTION, SOLICITUDES_ENTREGA_REPORTE_SUBCOLLECTION } from "@/lib/empresas-db";
 
 function BellIcon() {
   return (
@@ -27,23 +22,16 @@ function BellIcon() {
   );
 }
 
-/** Ancho máximo deseado del panel (más chico que antes para que no invada la pantalla). */
 const NOTIFICATIONS_PANEL_IDEAL_MAX_PX = 288;
 const NOTIFICATIONS_PANEL_FALLBACK_PX = 200;
 const NOTIFICATIONS_PANEL_VIEWPORT_MARGIN_PX = 10;
+
 function formatNotifTime(ms: number): string {
   return new Date(ms).toLocaleTimeString("es-CO", {
     hour: "2-digit",
     minute: "2-digit",
     timeZone: "America/Bogota",
   });
-}
-
-function formatMonto(value: number): string {
-  return `$ ${value.toLocaleString("es-CO", {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  })}`;
 }
 
 function NotifAdminPendientes({
@@ -143,24 +131,21 @@ function NotifAdminOperativo({ lines }: { lines: OperativoFcmSessionItem[] }) {
 
 export default function DashboardNotifications() {
   const { user, profile } = useAuth();
-  const {
-    sessionOperativoLines,
-    markAllAsRead,
-  } = useGastoFcmCampanita();
+  const { sessionOperativoLines, markAllAsRead } = useGastoFcmCampanita();
   const [open, setOpen] = useState(false);
   const [panelMaxWidthPx, setPanelMaxWidthPx] = useState<number | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
+  const role = profile?.role;
+
   const measurePanelMaxWidth = useCallback(() => {
     const root = containerRef.current;
     if (!root) return;
-    /** Rect del botón: el wrapper puede estar encogido por flex (`min-width:0`) y dar un ancho casi nulo. */
     const trigger = root.querySelector<HTMLButtonElement>(".dashboard-notifications-trigger");
     const r = (trigger ?? root).getBoundingClientRect();
     const m = NOTIFICATIONS_PANEL_VIEWPORT_MARGIN_PX;
     const vw = window.visualViewport?.width ?? window.innerWidth;
     const byViewport = Math.max(0, vw - m * 2);
-    /** Panel anclado a la derecha del wrapper; no debe sobresalir a la izquierda del margen del viewport. */
     const byTriggerRight = Math.max(0, r.right - m);
     const w = Math.floor(
       Math.min(NOTIFICATIONS_PANEL_IDEAL_MAX_PX, byViewport, byTriggerRight)
@@ -183,14 +168,9 @@ export default function DashboardNotifications() {
     };
   }, [open, measurePanelMaxWidth]);
 
-  const [pendienteTrabajador, setPendienteTrabajador] =
-    useState<SolicitudEntregaReporteApi | null>(null);
-  const [rechazadaTrabajador, setRechazadaTrabajador] =
-    useState<SolicitudEntregaReporteApi | null>(null);
   const [adminPendientes, setAdminPendientes] = useState<SolicitudEntregaPendienteAdmin[]>([]);
   const [dismissedKeys, setDismissedKeys] = useState<string[]>([]);
 
-  const role = profile?.role;
   const storageKey = useMemo(() => {
     if (!user?.uid || !role) return null;
     return `kredi:dismissed-notifications:${role}:${user.uid}`;
@@ -201,8 +181,6 @@ export default function DashboardNotifications() {
     setDismissedKeys((prev) => (prev.includes(key) ? prev : [...prev, key]));
   };
 
-  const workerPendingKey = pendienteTrabajador ? `worker-pending-${pendienteTrabajador.id}` : null;
-  const workerRejectedKey = rechazadaTrabajador ? `worker-rejected-${rechazadaTrabajador.id}` : null;
   const adminPendingKey = "admin-pending-batch";
 
   useEffect(() => {
@@ -237,109 +215,13 @@ export default function DashboardNotifications() {
   }, [storageKey, dismissedKeys]);
 
   useEffect(() => {
-    if (!db || !user || role !== "trabajador" || !profile?.empresaId) return;
-
-    const empresaId = profile.empresaId.trim();
-    if (!empresaId) return;
-
-    const qPendiente = query(
-      collection(db, EMPRESAS_COLLECTION, empresaId, SOLICITUDES_SUBCOLLECTION),
-      where("empleadoUid", "==", user.uid),
-      where("estado", "==", "pendiente")
-    );
-
-    const qRechazada = query(
-      collection(db, EMPRESAS_COLLECTION, empresaId, SOLICITUDES_SUBCOLLECTION),
-      where("empleadoUid", "==", user.uid),
-      where("estado", "==", "rechazada")
-    );
-
-    const unsubPendiente = onSnapshot(
-      qPendiente,
-      (snap) => {
-        if (snap.empty) {
-          setPendienteTrabajador(null);
-        } else {
-          const d = snap.docs[0];
-          const data = d.data();
-          setPendienteTrabajador({
-            id: d.id,
-            empleadoUid: data.empleadoUid ?? "",
-            empleadoNombre: data.empleadoNombre ?? "",
-            rutaId: data.rutaId ?? "",
-            rutaNombre: data.rutaNombre ?? "",
-            adminId: data.adminId ?? "",
-            estado: data.estado ?? "",
-            comentarioTrabajador: data.comentarioTrabajador ?? null,
-            montoAlSolicitar: typeof data.montoAlSolicitar === "number" ? data.montoAlSolicitar : 0,
-            creadaEn: data.creadaEn?.toDate?.()?.toISOString?.() ?? null,
-            resueltaEn: data.resueltaEn?.toDate?.()?.toISOString?.() ?? null,
-            resueltaPorUid: data.resueltaPorUid ?? null,
-            motivoRechazo: data.motivoRechazo ?? null,
-            montoEntregadoEfectivo: data.montoEntregadoEfectivo ?? null,
-          });
-          setRechazadaTrabajador(null);
-        }
-      },
-      (err) => {
-        console.warn("[DashboardNotifications] onSnapshot pendiente trabajador:", err);
-      }
-    );
-
-    const unsubRechazada = onSnapshot(
-      qRechazada,
-      (snap) => {
-        setPendienteTrabajador((pendiente) => {
-          if (pendiente) return pendiente;
-          if (snap.empty) {
-            setRechazadaTrabajador(null);
-          } else {
-            const docs = snap.docs.sort((a, b) => {
-              const ta = a.data().creadaEn?.toMillis?.() ?? 0;
-              const tb = b.data().creadaEn?.toMillis?.() ?? 0;
-              return tb - ta;
-            });
-            const d = docs[0];
-            const data = d.data();
-            setRechazadaTrabajador({
-              id: d.id,
-              empleadoUid: data.empleadoUid ?? "",
-              empleadoNombre: data.empleadoNombre ?? "",
-              rutaId: data.rutaId ?? "",
-              rutaNombre: data.rutaNombre ?? "",
-              adminId: data.adminId ?? "",
-              estado: data.estado ?? "",
-              comentarioTrabajador: data.comentarioTrabajador ?? null,
-              montoAlSolicitar: typeof data.montoAlSolicitar === "number" ? data.montoAlSolicitar : 0,
-              creadaEn: data.creadaEn?.toDate?.()?.toISOString?.() ?? null,
-              resueltaEn: data.resueltaEn?.toDate?.()?.toISOString?.() ?? null,
-              resueltaPorUid: data.resueltaPorUid ?? null,
-              motivoRechazo: data.motivoRechazo ?? null,
-              montoEntregadoEfectivo: data.montoEntregadoEfectivo ?? null,
-            });
-          }
-          return pendiente;
-        });
-      },
-      (err) => {
-        console.warn("[DashboardNotifications] onSnapshot rechazada trabajador:", err);
-      }
-    );
-
-    return () => {
-      unsubPendiente();
-      unsubRechazada();
-    };
-  }, [user?.uid, role, profile?.empresaId]);
-
-  useEffect(() => {
     if (!db || !user || role !== "admin" || !profile?.empresaId) return;
 
     const empresaId = profile.empresaId.trim();
     if (!empresaId) return;
 
     const q = query(
-      collection(db, EMPRESAS_COLLECTION, empresaId, SOLICITUDES_SUBCOLLECTION),
+      collection(db, EMPRESAS_COLLECTION, empresaId, SOLICITUDES_ENTREGA_REPORTE_SUBCOLLECTION),
       where("adminId", "==", user.uid),
       where("estado", "==", "pendiente")
     );
@@ -390,7 +272,6 @@ export default function DashboardNotifications() {
   }, [open]);
 
   const campanitaWasOpen = useRef(false);
-  /** Al abrir Avisos (transición cerrado → abierto), marcar notificaciones operativas como leídas. */
   useEffect(() => {
     if (role !== "admin") return;
     if (open && !campanitaWasOpen.current) {
@@ -400,16 +281,6 @@ export default function DashboardNotifications() {
   }, [open, role, markAllAsRead]);
 
   const badgeCount = useMemo(() => {
-    if (role === "trabajador") {
-      const visiblePendiente =
-        !!pendienteTrabajador && !!workerPendingKey && !dismissedSet.has(workerPendingKey);
-      const visibleRechazada =
-        !!rechazadaTrabajador && !!workerRejectedKey && !dismissedSet.has(workerRejectedKey);
-      // Priorizamos "pendiente": si existe, no contamos rechazo histórico.
-      if (visiblePendiente) return 1;
-      if (visibleRechazada) return 1;
-      return 0;
-    }
     if (role === "admin") {
       const operativoUnread = sessionOperativoLines.filter(
         (l) => !l.read && esDiaActualColombia(l.at ?? Date.now())
@@ -420,10 +291,6 @@ export default function DashboardNotifications() {
     return 0;
   }, [
     role,
-    pendienteTrabajador,
-    rechazadaTrabajador,
-    workerPendingKey,
-    workerRejectedKey,
     dismissedSet,
     adminPendingKey,
     adminPendientes.length,
@@ -432,6 +299,11 @@ export default function DashboardNotifications() {
 
   const badgeLabel =
     badgeCount > 9 ? "9+" : badgeCount > 0 ? String(badgeCount) : null;
+
+  /** Trabajador: sin campanita por ahora. */
+  if (role === "trabajador") {
+    return null;
+  }
 
   return (
     <div className="dashboard-notifications" ref={containerRef}>
@@ -467,68 +339,6 @@ export default function DashboardNotifications() {
           }
         >
           <div className="dashboard-notifications-panel-title">Avisos</div>
-
-          {role === "trabajador" && (
-            <>
-              {pendienteTrabajador && workerPendingKey && !dismissedSet.has(workerPendingKey) && (
-                <div className="dashboard-notifications-alert dashboard-notifications-alert-warning" role="status">
-                  <button
-                    type="button"
-                    className="dashboard-notifications-close"
-                    onClick={() => dismissNotification(workerPendingKey)}
-                    aria-label="Cerrar notificación"
-                    title="Cerrar"
-                  >
-                    ×
-                  </button>
-                  <strong>Entrega de reporte pendiente</strong>
-                  <p className="dashboard-notifications-alert-text">
-                    Pediste entregar aproximadamente {formatMonto(pendienteTrabajador.montoAlSolicitar)}. El
-                    administrador debe confirmar para que el efectivo pase a la caja de la ruta.
-                  </p>
-                  <Link
-                    href="/dashboard/trabajador/resumen"
-                    className="dashboard-notifications-link"
-                    onClick={() => setOpen(false)}
-                  >
-                    Ver entrega de reporte
-                  </Link>
-                </div>
-              )}
-              {rechazadaTrabajador && workerRejectedKey && !dismissedSet.has(workerRejectedKey) && (
-                <div className="dashboard-notifications-alert dashboard-notifications-alert-danger" role="alert">
-                  <button
-                    type="button"
-                    className="dashboard-notifications-close"
-                    onClick={() => dismissNotification(workerRejectedKey)}
-                    aria-label="Cerrar notificación"
-                    title="Cerrar"
-                  >
-                    ×
-                  </button>
-                  <strong>Solicitud rechazada</strong>
-                  <p className="dashboard-notifications-alert-text">
-                    {rechazadaTrabajador.motivoRechazo?.trim()
-                      ? rechazadaTrabajador.motivoRechazo
-                      : "Sin motivo indicado por el administrador."}
-                  </p>
-                  <Link
-                    href="/dashboard/trabajador/resumen"
-                    className="dashboard-notifications-link"
-                    onClick={() => setOpen(false)}
-                  >
-                    Ir a entrega de reporte
-                  </Link>
-                </div>
-              )}
-              {(!pendienteTrabajador ||
-                (workerPendingKey ? dismissedSet.has(workerPendingKey) : false)) &&
-                (!rechazadaTrabajador ||
-                  (workerRejectedKey ? dismissedSet.has(workerRejectedKey) : false)) && (
-                <p className="dashboard-notifications-empty">No tenés avisos por ahora.</p>
-              )}
-            </>
-          )}
 
           {role === "admin" && (
             <>

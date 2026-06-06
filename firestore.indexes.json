@@ -107,6 +107,14 @@
       ]
     },
     {
+      "collectionGroup": "pagos",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "adminId", "order": "ASCENDING" },
+        { "fieldPath": "fecha", "order": "ASCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "reportesDia",
       "queryScope": "COLLECTION",
       "fields": [

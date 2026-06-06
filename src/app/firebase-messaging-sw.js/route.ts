@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { ES_DIA_ACTUAL_COLOMBIA_SW_SOURCE } from "@/lib/colombia-day-bounds";
 
 /**
  * Service Worker para FCM (web). Debe vivir en la raíz del sitio como `/firebase-messaging-sw.js`.
@@ -35,92 +34,47 @@ importScripts(
 firebase.initializeApp(${cfg});
 const messaging = firebase.messaging();
 
-${ES_DIA_ACTUAL_COLOMBIA_SW_SOURCE}
-
-function guardarNotificacionPendiente(payload) {
-  try {
-    const db = indexedDB.open('krediapp_fcm', 1);
-    db.onupgradeneeded = function (e) {
-      e.target.result.createObjectStore('pendientes', { keyPath: 'id' });
-    };
-    db.onsuccess = function (e) {
-      const data = payload.data || {};
-      const at = Date.now();
-      if (!esDiaActualColombia(at)) return;
-      const database = e.target.result;
-      const tx = database.transaction('pendientes', 'readwrite');
-      const store = tx.objectStore('pendientes');
-      const getAll = store.getAll();
-      getAll.onsuccess = function () {
-        (getAll.result || []).forEach(function (n) {
-          if (!esDiaActualColombia(n.at || 0)) store.delete(n.id);
-        });
-        store.put({
-          id: data.gastoId || data.pagoId || data.clienteId || data.prestamoId || data.solicitudId || String(at),
-          title: data.title || 'Notificación',
-          body: data.body || '',
-          type: data.type || '',
-          kind: data.type === 'cuota_prestamo' || data.type === 'prestamo_empleado' || data.type === 'solicitud_prestamo' ? 'cuota' : 'gasto',
-          at: at,
-        });
-      };
-    };
-  } catch (e) {
-    console.warn('[SW] No se pudo guardar notificación pendiente:', e);
-  }
-}
-
 messaging.onBackgroundMessage(function (payload) {
-  guardarNotificacionPendiente(payload);
-  const data = payload.data || {};
-  const title = data.title || payload.notification?.title || 'angry birds';
-  const body = data.body || payload.notification?.body || '';
+  var data = payload.data || {};
+  var title = data.title || payload.notification?.title || 'KrediApp';
+  var body = data.body || payload.notification?.body || '';
+  var clickPath = data.click_action || '/dashboard/admin';
 
-  self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function (clients) {
-    const hasVisibleClient = clients.some(function (c) {
+  return self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function (clients) {
+    var hasVisible = clients.some(function (c) {
       return c.visibilityState === 'visible';
     });
+    if (hasVisible) return;
 
-    if (hasVisibleClient) {
-      clients.forEach(function (client) {
-        if (client.visibilityState === 'visible') {
-          if (data.type === 'gasto_empleado' || data.type === 'cuota_prestamo' || data.type === 'cliente_empleado' || data.type === 'solicitud_prestamo') {
-            client.postMessage({
-              type: 'KREDI_FCM_OPERATIVO',
-              kind: data.type === 'cuota_prestamo' || data.type === 'solicitud_prestamo' ? 'cuota' : 'gasto',
-              title: title,
-              body: body,
-              messageId: payload.messageId || data.gastoId || data.pagoId || data.clienteId || data.prestamoId || data.solicitudId || '',
-              gastoId: data.gastoId || '',
-              pagoId: data.pagoId || '',
-              clienteId: data.clienteId || '',
-              prestamoId: data.prestamoId || '',
-              solicitudId: data.solicitudId || '',
-            });
-          } else if (data.type === 'prestamo_empleado') {
-            client.postMessage({
-              type: 'KREDI_FCM_PRESTAMO',
-              title: title,
-              body: body,
-              messageId: payload.messageId || data.gastoId || data.pagoId || data.clienteId || data.prestamoId || '',
-              gastoId: data.gastoId || '',
-              pagoId: data.pagoId || '',
-              clienteId: data.clienteId || '',
-              prestamoId: data.prestamoId || '',
-            });
-          }
-        }
-      });
-      return;
-    }
-
+    var tag = data.gastoId || data.pagoId || data.clienteId || data.prestamoId || data.solicitudId || '';
     return self.registration.showNotification(title, {
       body: body,
       icon: '/icon-192.png',
       badge: '/icon-192.png',
-      data: data,
+      tag: tag || undefined,
+      data: Object.assign({}, data, { click_action: clickPath }),
     });
   });
+});
+
+self.addEventListener('notificationclick', function (event) {
+  event.notification.close();
+  var raw = (event.notification.data && event.notification.data.click_action) || '/dashboard/admin';
+  var url = raw.indexOf('http') === 0 ? raw : (self.location.origin + (raw.charAt(0) === '/' ? raw : '/' + raw));
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function (clientList) {
+      for (var i = 0; i < clientList.length; i++) {
+        var client = clientList[i];
+        if ('focus' in client) {
+          if ('navigate' in client && typeof client.navigate === 'function') {
+            return client.navigate(url).then(function () { return client.focus(); });
+          }
+          return client.focus();
+        }
+      }
+      if (self.clients.openWindow) return self.clients.openWindow(url);
+    })
+  );
 });
 `;
 

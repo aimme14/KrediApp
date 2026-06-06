@@ -166,6 +166,9 @@ export type CrearSolicitudEntregaResult = {
   solicitudId: string;
   montoAlSolicitar: number;
   rutaId: string;
+  adminId: string;
+  empleadoNombre: string;
+  rutaNombre: string;
 };
 
 export async function crearSolicitudEntregaReporte(
@@ -210,6 +213,9 @@ export async function crearSolicitudEntregaReporte(
     solicitudId: ref.id,
     montoAlSolicitar: preview.monto,
     rutaId: preview.rutaId,
+    adminId: preview.adminId,
+    empleadoNombre: preview.empleadoNombre,
+    rutaNombre: preview.rutaNombre,
   };
 }
 

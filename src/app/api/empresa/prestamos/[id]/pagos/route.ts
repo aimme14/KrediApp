@@ -33,6 +33,29 @@ const MOTIVOS_PERDIDA = [
 ] as const;
 const MAX_PAGOS_LIST = 50;
 
+/** Campos para campanita admin (collectionGroup pagos) y push FCM. */
+function pagoCamposNotifAdmin(
+  apiUser: { uid: string; empresaId: string; role: string },
+  prestamoFlat: Record<string, unknown>
+): Record<string, string> {
+  if (apiUser.role !== "empleado") return {};
+  const adminId =
+    typeof prestamoFlat.adminId === "string" ? prestamoFlat.adminId.trim() : "";
+  const clienteId =
+    typeof prestamoFlat.clienteId === "string" ? prestamoFlat.clienteId.trim() : "";
+  const clienteNombre =
+    typeof prestamoFlat.clienteNombre === "string"
+      ? prestamoFlat.clienteNombre.trim()
+      : "";
+  return {
+    adminId,
+    empresaId: apiUser.empresaId,
+    cobradoPorRol: apiUser.role,
+    clienteId,
+    clienteNombre,
+  };
+}
+
 async function resolveClienteNombre(
   db: Firestore,
   empresaId: string,
@@ -270,6 +293,7 @@ export async function POST(
           nota: (nota ?? "").trim() || null,
           registradoPorUid: uidRegistro,
           registradoPorNombre: nombreRegistro,
+          ...pagoCamposNotifAdmin(apiUser, pr as Record<string, unknown>),
         });
 
         const prevFallos =
@@ -387,6 +411,7 @@ export async function POST(
           registradoPorNombre: nombreRegistro,
           parteCapitalPerdida: parteCapital,
           parteGananciaPerdida: parteGanancia,
+          ...pagoCamposNotifAdmin(apiUser, d as Record<string, unknown>),
         });
 
         tx.update(prestamoRef, {
@@ -565,6 +590,7 @@ export async function POST(
         registradoPorNombre: nombreRegistro,
         cuotaCapital: parteCapital,
         cuotaGanancia: parteGanancia,
+        ...pagoCamposNotifAdmin(apiUser, d as Record<string, unknown>),
       };
       if (keyTrimmed) pagoData.idempotencyKey = keyTrimmed;
 
