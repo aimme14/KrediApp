@@ -2,6 +2,7 @@ import {
   computeRutaCamposTrasCobroPrestamo,
   computeRutaCamposTrasCobroPrestamoCobroEnEmpleado,
   computeRutaCamposTrasPerdidaPrestamo,
+  computeSaldosTrasDesembolsoPrestamoDesdeCajaEmpleado,
   splitMontoPagoEnCapitalYGanancia,
   round2,
 } from "@/lib/ruta-financiera-compute";
@@ -308,5 +309,46 @@ describe("computeRutaCamposTrasPerdidaPrestamo — casos borde", () => {
     );
     expect(result.inversiones).toBe(0);
     expect(result.inversiones).toBeGreaterThanOrEqual(0);
+  });
+});
+
+describe("computeSaldosTrasDesembolsoPrestamoDesdeCajaEmpleado", () => {
+  const base = {
+    cajaRuta: 500_000,
+    cajasEmpleados: 300_000,
+    inversiones: 200_000,
+    cajaEmp: 150_000,
+  };
+
+  it("descuenta caja empleado y mueve a inversiones sin cambiar capital total", () => {
+    const monto = 100_000;
+    const result = computeSaldosTrasDesembolsoPrestamoDesdeCajaEmpleado({
+      ...base,
+      monto,
+    });
+    expect(result.nuevaCajaEmp).toBe(50_000);
+    expect(result.nuevaCajasEmpleados).toBe(200_000);
+    expect(result.nuevaInversiones).toBe(300_000);
+    expect(result.nuevoCapital).toBe(1_000_000);
+  });
+
+  it("lanza SALDO_INSUFICIENTE_EMPLEADO si cajaEmp < monto", () => {
+    expect(() =>
+      computeSaldosTrasDesembolsoPrestamoDesdeCajaEmpleado({
+        ...base,
+        cajaEmp: 50_000,
+        monto: 100_000,
+      })
+    ).toThrow("SALDO_INSUFICIENTE_EMPLEADO");
+  });
+
+  it("lanza SALDO_INSUFICIENTE_RUTA si cajasEmpleados < monto", () => {
+    expect(() =>
+      computeSaldosTrasDesembolsoPrestamoDesdeCajaEmpleado({
+        ...base,
+        cajasEmpleados: 50_000,
+        monto: 100_000,
+      })
+    ).toThrow("SALDO_INSUFICIENTE_RUTA");
   });
 });

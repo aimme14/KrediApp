@@ -189,3 +189,56 @@ export function computeRutaCamposTrasPerdidaPrestamo(
     capitalTotal: nuevoCapitalTotal,
   };
 }
+
+export type DesembolsoEmpleadoSaldosResult = {
+  nuevaCajaEmp: number;
+  nuevaCajasEmpleados: number;
+  nuevaInversiones: number;
+  nuevoCapital: number;
+};
+
+/**
+ * Saldos tras desembolsar un préstamo desde caja del empleado (cajasEmpleados → inversiones).
+ * Sin Firebase — compartido por helper transaccional y tests.
+ */
+export function computeSaldosTrasDesembolsoPrestamoDesdeCajaEmpleado(params: {
+  cajaEmp: number;
+  cajaRuta: number;
+  cajasEmpleados: number;
+  inversiones: number;
+  monto: number;
+  perdidas?: number;
+}): DesembolsoEmpleadoSaldosResult {
+  const { cajaEmp, cajaRuta, cajasEmpleados, inversiones, monto, perdidas = 0 } = params;
+
+  if (cajaEmp < monto) throw new Error("SALDO_INSUFICIENTE_EMPLEADO");
+  if (cajasEmpleados < monto) throw new Error("SALDO_INSUFICIENTE_RUTA");
+
+  const capitalTotal = computeCapitalTotalRutaDesdeSaldos({
+    cajaRuta,
+    cajasEmpleados,
+    inversiones,
+    perdidas,
+  });
+
+  const nuevaCajaEmp = round2(cajaEmp - monto);
+  const nuevaCajasEmpleados = round2(cajasEmpleados - monto);
+  const nuevaInversiones = round2(inversiones + monto);
+  const nuevoCapital = computeCapitalTotalRutaDesdeSaldos({
+    cajaRuta,
+    cajasEmpleados: nuevaCajasEmpleados,
+    inversiones: nuevaInversiones,
+    perdidas,
+  });
+
+  if (Math.abs(nuevoCapital - capitalTotal) > 0.02) {
+    throw new Error("Capital descuadrado — revisar operación");
+  }
+
+  return {
+    nuevaCajaEmp,
+    nuevaCajasEmpleados,
+    nuevaInversiones,
+    nuevoCapital,
+  };
+}

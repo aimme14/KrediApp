@@ -10,10 +10,11 @@ import {
   USERS_COLLECTION,
   USUARIOS_SUBCOLLECTION,
 } from "@/lib/empresas-db";
+import { registrarPrestamoEnRuta } from "@/lib/ruta-financiera-admin";
 import {
-  registrarPrestamoDesdeCajaEmpleado,
-  registrarPrestamoEnRuta,
-} from "@/lib/ruta-financiera-admin";
+  crearPrestamoEmpleado,
+  mapCrearPrestamoEmpleadoError,
+} from "@/lib/crear-prestamo-empleado";
 import { recordDebitMovement } from "@/lib/financial-ledger";
 import {
   getNextWorkingDay,
@@ -154,6 +155,10 @@ export async function POST(request: NextRequest) {
   }
 
   if (apiUser.role === "empleado") {
+    const modEmp: ModalidadPago =
+      modalidad === "diario" || modalidad === "semanal" ? modalidad : "mensual";
+    const interesPctEmp = typeof interes === "number" ? interes : 0;
+
     const evaluacion = await evaluarAprobacionPrestamoEmpleado(
       db,
       apiUser.empresaId,
@@ -173,6 +178,105 @@ export async function POST(request: NextRequest) {
         motivo: evaluacion.motivo,
         montoUltimoPrestamo: evaluacion.montoUltimoPrestamo,
       });
+    }
+
+    const rutaIdEmp =
+      (rutaId ?? "").trim() ||
+      (apiUser.rutaId?.trim() ?? "") ||
+      (clienteSnap.exists
+        ? ((clienteSnap.data()?.rutaId as string) ?? "").trim()
+        : "");
+    if (!rutaIdEmp) {
+      return finalize(400, { error: "No tienes ruta asignada" });
+    }
+
+    const rutaSnapEmp = await db
+      .collection(EMPRESAS_COLLECTION)
+      .doc(apiUser.empresaId)
+      .collection(RUTAS_SUBCOLLECTION)
+      .doc(rutaIdEmp)
+      .get();
+    if (!rutaSnapEmp.exists) {
+      return finalize(400, { error: "Ruta no encontrada" });
+    }
+    const adminIdEmp =
+      typeof rutaSnapEmp.data()?.adminId === "string"
+        ? rutaSnapEmp.data()!.adminId.trim()
+        : "";
+    if (!adminIdEmp) {
+      return finalize(400, { error: "La ruta no tiene administrador" });
+    }
+
+    const clienteNombreEmp =
+      typeof clienteSnap.data()?.nombre === "string"
+        ? (clienteSnap.data()!.nombre as string).trim()
+        : "";
+
+    try {
+      const result = await crearPrestamoEmpleado(db, {
+        empresaId: apiUser.empresaId,
+        empleadoUid: apiUser.uid,
+        adminId: adminIdEmp,
+        rutaId: rutaIdEmp,
+        clienteId: clienteId.trim(),
+        clienteNombre: clienteNombreEmp,
+        monto,
+        interes: interesPctEmp,
+        modalidad: modEmp,
+        numeroCuotas,
+        fechaInicio:
+          typeof fechaInicio === "string" && fechaInicio.trim()
+            ? fechaInicio.trim()
+            : new Date().toISOString().slice(0, 10),
+        multaMora: typeof multaMora === "number" ? multaMora : 0,
+        aprobacionTipo: "automatica",
+        aprobadoPorAdmin: null,
+        montoUltimoPrestamoReferencia: evaluacion.montoUltimoPrestamo,
+      });
+
+      void (async () => {
+        try {
+          const userSnap = await db.collection(USERS_COLLECTION).doc(apiUser.uid).get();
+          const empleadoNombre =
+            (typeof userSnap.data()?.displayName === "string" &&
+              userSnap.data()!.displayName.trim()) ||
+            (typeof userSnap.data()?.email === "string" &&
+              userSnap.data()!.email.trim()) ||
+            apiUser.uid;
+          const { getAdminMessaging } = await import("@/lib/firebase-admin");
+          const { notifyAdminPrestamoEmpleado } = await import("@/lib/fcm-notify-admin");
+          await notifyAdminPrestamoEmpleado(getAdminMessaging(), {
+            adminUid: adminIdEmp,
+            empresaId: apiUser.empresaId,
+            empleadoNombre,
+            clienteNombre: clienteNombreEmp || "Cliente",
+            monto,
+            prestamoId: result.prestamoId,
+          });
+        } catch (e) {
+          console.warn("[fcm] notify admin prestamo:", e);
+        }
+      })();
+
+      return finalize(200, { id: result.prestamoId });
+    } catch (e) {
+      const raw = e instanceof Error ? e.message : "Error al crear préstamo";
+      const msg = mapCrearPrestamoEmpleadoError(raw);
+      const status =
+        raw === "CLIENTE_NOT_FOUND"
+          ? 404
+          : msg.includes("moroso") ||
+              msg.includes("préstamo activo") ||
+              msg.includes("ruta") ||
+              msg.includes("Cliente") ||
+              msg.includes("saldo") ||
+              msg.includes("caja") ||
+              msg.includes("Capital") ||
+              msg.includes("descuadrado") ||
+              msg.includes("Trabajador")
+            ? 400
+            : 500;
+      return finalize(status, { error: msg });
     }
   }
 
@@ -202,9 +306,9 @@ export async function POST(request: NextRequest) {
     .collection(PRESTAMOS_SUBCOLLECTION)
     .doc();
 
-  const adminIdPrestamo = apiUser.role === "empleado" && apiUser.adminId ? apiUser.adminId : apiUser.uid;
-  const empleadoIdPrestamo = apiUser.role === "empleado" ? apiUser.uid : (empleadoId ?? apiUser.uid).toString().trim();
-  let rutaIdPrestamo = (rutaId ?? "").trim() || (apiUser.role === "empleado" && apiUser.rutaId ? apiUser.rutaId : "");
+  const adminIdPrestamo = apiUser.uid;
+  const empleadoIdPrestamo = (empleadoId ?? apiUser.uid).toString().trim();
+  let rutaIdPrestamo = (rutaId ?? "").trim();
   if (!rutaIdPrestamo && clienteSnap.exists) {
     rutaIdPrestamo = (clienteSnap.data()?.rutaId as string) ?? "";
   }
@@ -216,42 +320,19 @@ export async function POST(request: NextRequest) {
 
   if (rutaIdPrestamo) {
     try {
-      if (apiUser.role === "empleado") {
-        await registrarPrestamoDesdeCajaEmpleado(
-          db,
-          apiUser.empresaId,
-          rutaIdPrestamo,
-          empleadoIdPrestamo,
-          monto
-        );
-        ledgerWalletType = "empleado_caja";
-        ledgerWalletId = empleadoIdPrestamo;
-        ledgerEventType = "prestamo_desembolso_empleado";
-        const empSnap = await db
-          .collection(EMPRESAS_COLLECTION)
-          .doc(apiUser.empresaId)
-          .collection(USUARIOS_SUBCOLLECTION)
-          .doc(empleadoIdPrestamo)
-          .get();
-        const cajaEmp = empSnap.data()?.cajaEmpleado;
-        if (typeof cajaEmp === "number") {
-          ledgerBalanceAfter = cajaEmp;
-        }
-      } else {
-        await registrarPrestamoEnRuta(db, apiUser.empresaId, rutaIdPrestamo, monto);
-        ledgerWalletType = "ruta_caja";
-        ledgerWalletId = rutaIdPrestamo;
-        ledgerEventType = "prestamo_desembolso_ruta";
-        const rutaSnap = await db
-          .collection(EMPRESAS_COLLECTION)
-          .doc(apiUser.empresaId)
-          .collection(RUTAS_SUBCOLLECTION)
-          .doc(rutaIdPrestamo)
-          .get();
-        const cajaRuta = rutaSnap.data()?.cajaRuta;
-        if (typeof cajaRuta === "number") {
-          ledgerBalanceAfter = cajaRuta;
-        }
+      await registrarPrestamoEnRuta(db, apiUser.empresaId, rutaIdPrestamo, monto);
+      ledgerWalletType = "ruta_caja";
+      ledgerWalletId = rutaIdPrestamo;
+      ledgerEventType = "prestamo_desembolso_ruta";
+      const rutaSnap = await db
+        .collection(EMPRESAS_COLLECTION)
+        .doc(apiUser.empresaId)
+        .collection(RUTAS_SUBCOLLECTION)
+        .doc(rutaIdPrestamo)
+        .get();
+      const cajaRuta = rutaSnap.data()?.cajaRuta;
+      if (typeof cajaRuta === "number") {
+        ledgerBalanceAfter = cajaRuta;
       }
     } catch (e) {
       return finalize(400, {
@@ -264,21 +345,6 @@ export async function POST(request: NextRequest) {
     typeof clienteSnap.data()?.nombre === "string"
       ? (clienteSnap.data()!.nombre as string).trim()
       : "";
-
-  let empleadoNombre = "";
-  if (apiUser.role === "empleado") {
-    const userSnapEmpleado = await db
-      .collection(USERS_COLLECTION)
-      .doc(apiUser.uid)
-      .get();
-    const userDataEmpleado = userSnapEmpleado.data();
-    empleadoNombre =
-      (typeof userDataEmpleado?.displayName === "string" &&
-        userDataEmpleado.displayName.trim()) ||
-      (typeof userDataEmpleado?.email === "string" &&
-        userDataEmpleado.email.trim()) ||
-      apiUser.uid;
-  }
 
   try {
     await db.runTransaction(async (tx) => {
@@ -300,9 +366,6 @@ export async function POST(request: NextRequest) {
         rutaId: rutaIdPrestamo,
         adminId: adminIdPrestamo,
         empleadoId: empleadoIdPrestamo,
-        ...(apiUser.role === "empleado" && empleadoNombre
-          ? { empleadoNombre }
-          : {}),
         monto,
         interes: interesPct,
         modalidad: mod,
@@ -315,12 +378,7 @@ export async function POST(request: NextRequest) {
         multaMora: typeof multaMora === "number" ? multaMora : 0,
         adelantoCuota: 0,
         creadoEn: FieldValue.serverTimestamp(),
-        ...(rutaIdPrestamo
-          ? {
-              desembolsoDesde:
-                apiUser.role === "empleado" ? "caja_empleado" : "caja_ruta",
-            }
-          : {}),
+        ...(rutaIdPrestamo ? { desembolsoDesde: "caja_ruta" as const } : {}),
       });
 
       tx.set(
@@ -378,32 +436,5 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  const payload = { id: ref.id };
-  const res = await finalize(200, payload);
-
-  if (apiUser.role === "empleado") {
-    const adminUid = adminIdPrestamo;
-    if (adminUid) {
-      void (async () => {
-        try {
-          const { getAdminMessaging } = await import("@/lib/firebase-admin");
-          const { notifyAdminPrestamoEmpleado } = await import(
-            "@/lib/fcm-notify-admin"
-          );
-          await notifyAdminPrestamoEmpleado(getAdminMessaging(), {
-            adminUid,
-            empresaId: apiUser.empresaId,
-            empleadoNombre: empleadoNombre.trim() || apiUser.uid,
-            clienteNombre: clienteNombre.trim() || "Cliente",
-            monto,
-            prestamoId: ref.id,
-          });
-        } catch (e) {
-          console.warn("[fcm] notify admin prestamo:", e);
-        }
-      })();
-    }
-  }
-
-  return res;
+  return finalize(200, { id: ref.id });
 }

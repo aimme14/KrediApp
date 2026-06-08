@@ -298,7 +298,10 @@ export async function POST(request: NextRequest) {
       msg.includes("ruta") ||
       msg.includes("Cliente") ||
       msg.includes("saldo") ||
-      msg.includes("caja")
+      msg.includes("caja") ||
+      msg.includes("Capital") ||
+      msg.includes("descuadrado") ||
+      msg.includes("Trabajador")
         ? 400
         : 500;
     return NextResponse.json({ error: msg }, { status });

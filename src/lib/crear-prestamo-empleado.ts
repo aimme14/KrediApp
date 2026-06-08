@@ -4,9 +4,11 @@ import {
   EMPRESAS_COLLECTION,
   CLIENTES_SUBCOLLECTION,
   PRESTAMOS_SUBCOLLECTION,
+  RUTAS_SUBCOLLECTION,
   USUARIOS_SUBCOLLECTION,
 } from "@/lib/empresas-db";
-import { registrarPrestamoDesdeCajaEmpleado } from "@/lib/ruta-financiera-admin";
+import { applyDesembolsoPrestamoDesdeCajaEmpleadoEnTx } from "@/lib/ruta-financiera-admin";
+import { upsertCapitalRutaSnapshot } from "@/lib/capital-ruta-snapshot";
 import { recordDebitMovement } from "@/lib/financial-ledger";
 import {
   getNextWorkingDay,
@@ -111,28 +113,51 @@ export async function crearPrestamoEmpleado(
     .collection(CLIENTES_SUBCOLLECTION)
     .doc(clienteId.trim());
 
-  let ledgerBalanceAfter: number | undefined;
+  const rutaRef = db
+    .collection(EMPRESAS_COLLECTION)
+    .doc(empresaId)
+    .collection(RUTAS_SUBCOLLECTION)
+    .doc(rutaId);
 
-  await registrarPrestamoDesdeCajaEmpleado(db, empresaId, rutaId, empleadoUid, monto);
-
-  const empSnap = await db
+  const empleadoRef = db
     .collection(EMPRESAS_COLLECTION)
     .doc(empresaId)
     .collection(USUARIOS_SUBCOLLECTION)
-    .doc(empleadoUid)
-    .get();
-  const cajaEmp = empSnap.data()?.cajaEmpleado;
-  if (typeof cajaEmp === "number") {
-    ledgerBalanceAfter = cajaEmp;
-  }
+    .doc(empleadoUid);
+
+  const adminRef = db
+    .collection(EMPRESAS_COLLECTION)
+    .doc(empresaId)
+    .collection(USUARIOS_SUBCOLLECTION)
+    .doc(adminId);
+
+  let ledgerBalanceAfter: number | undefined;
+  const now = new Date();
 
   await db.runTransaction(async (tx) => {
-    const clienteSnapTx = await tx.get(clienteRef);
+    const [rutaSnap, empleadoSnap, clienteSnapTx] = await Promise.all([
+      tx.get(rutaRef),
+      tx.get(empleadoRef),
+      tx.get(clienteRef),
+    ]);
+
     if (!clienteSnapTx.exists) {
       throw new Error("CLIENTE_NOT_FOUND");
     }
-    const clienteData = clienteSnapTx.data() as Record<string, unknown>;
-    validarClienteElegibleParaPrestamo(clienteData);
+    validarClienteElegibleParaPrestamo(
+      clienteSnapTx.data() as Record<string, unknown>
+    );
+
+    const { nuevaCajaEmp } = applyDesembolsoPrestamoDesdeCajaEmpleadoEnTx(tx, {
+      rutaSnap,
+      empleadoSnap,
+      empleadoRef,
+      rutaRef,
+      monto,
+      now,
+    });
+
+    ledgerBalanceAfter = nuevaCajaEmp;
 
     tx.set(prestamoRef, {
       clienteId: clienteId.trim(),
@@ -162,16 +187,7 @@ export async function crearPrestamoEmpleado(
       creadoEn: FieldValue.serverTimestamp(),
     });
 
-    tx.set(
-      db
-        .collection(EMPRESAS_COLLECTION)
-        .doc(empresaId)
-        .collection(USUARIOS_SUBCOLLECTION)
-        .doc(adminId),
-      { totalPrestamosActivos: FieldValue.increment(1) },
-      { merge: true }
-    );
-
+    tx.set(adminRef, { totalPrestamosActivos: FieldValue.increment(1) }, { merge: true });
     tx.update(clienteRef, { prestamo_activo: true });
   });
 
@@ -203,11 +219,32 @@ export async function crearPrestamoEmpleado(
     console.warn("[ledger] No se pudo registrar movimiento de desembolso", e);
   }
 
+  try {
+    const rutaAfter = await rutaRef.get();
+    if (rutaAfter.exists) {
+      await upsertCapitalRutaSnapshot(db, empresaId, rutaId, rutaAfter.data()!);
+    }
+  } catch (e) {
+    console.warn("[capital-snapshot] No se pudo actualizar snapshot", e);
+  }
+
   return { prestamoId: prestamoRef.id, ledgerBalanceAfter };
 }
 
 export function mapCrearPrestamoEmpleadoError(msg: string): string {
   if (msg === "CLIENTE_NOT_FOUND") return "Cliente no encontrado";
+  if (msg === "RUTA_NOT_FOUND") return "Ruta no encontrada";
+  if (msg === "EMPLEADO_NOT_FOUND") return "Trabajador no encontrado";
+  if (msg === "USUARIO_NO_ES_EMPLEADO") return "El usuario no es trabajador";
+  if (msg === "SALDO_INSUFICIENTE_EMPLEADO") {
+    return "Saldo insuficiente en la base del trabajador";
+  }
+  if (msg === "SALDO_INSUFICIENTE_RUTA") {
+    return "Saldo insuficiente en bases de empleados de la ruta";
+  }
+  if (msg.includes("Capital descuadrado")) {
+    return "Capital descuadrado — revisar operación";
+  }
   if (msg === "CLIENTE_MOROSO" || msg.includes("moroso")) {
     return "No se puede otorgar préstamo a un cliente moroso";
   }

@@ -3,7 +3,13 @@
  * La lógica pura compartida con el cliente está en `ruta-financiera-compute.ts`.
  */
 
-import { FieldValue, type Firestore } from "firebase-admin/firestore";
+import {
+  FieldValue,
+  type DocumentReference,
+  type DocumentSnapshot,
+  type Firestore,
+  type Transaction,
+} from "firebase-admin/firestore";
 import {
   EMPRESAS_COLLECTION,
   RUTAS_SUBCOLLECTION,
@@ -11,7 +17,10 @@ import {
 } from "@/lib/empresas-db";
 import { computeCapitalTotalRutaDesdeSaldos } from "@/lib/capital-formulas";
 import { upsertCapitalRutaSnapshot } from "@/lib/capital-ruta-snapshot";
-import { round2 } from "./ruta-financiera-compute";
+import {
+  computeSaldosTrasDesembolsoPrestamoDesdeCajaEmpleado,
+  round2,
+} from "./ruta-financiera-compute";
 
 /** Reexporta la única fuente de verdad para splits y efectos en ruta (comparte con cliente vía `ruta-financiera-compute`). */
 export {
@@ -155,6 +164,86 @@ export async function descontarCajaRutaAdmin(
   return result;
 }
 
+export type DesembolsoEmpleadoEnTxResult = {
+  nuevaCajaEmp: number;
+  nuevaCajasEmpleados: number;
+  nuevaInversiones: number;
+  nuevoCapital: number;
+};
+
+/** Mensajes en español para códigos de error del desembolso desde caja empleado. */
+export function mapDesembolsoPrestamoDesdeCajaEmpleadoError(msg: string): string {
+  if (msg === "RUTA_NOT_FOUND") return "Ruta no encontrada";
+  if (msg === "EMPLEADO_NOT_FOUND") return "Trabajador no encontrado";
+  if (msg === "USUARIO_NO_ES_EMPLEADO") return "El usuario no es trabajador";
+  if (msg === "SALDO_INSUFICIENTE_EMPLEADO") {
+    return "Saldo insuficiente en la base del trabajador";
+  }
+  if (msg === "SALDO_INSUFICIENTE_RUTA") {
+    return "Saldo insuficiente en bases de empleados de la ruta";
+  }
+  if (msg.includes("Capital descuadrado")) {
+    return "Capital descuadrado — revisar operación";
+  }
+  return msg;
+}
+
+/**
+ * Desembolso de préstamo desde caja del empleado dentro de una transacción existente.
+ * Requiere snapshots ya leídos con tx.get (lecturas antes de escrituras).
+ */
+export function applyDesembolsoPrestamoDesdeCajaEmpleadoEnTx(
+  tx: Transaction,
+  ctx: {
+    rutaSnap: DocumentSnapshot;
+    empleadoSnap: DocumentSnapshot;
+    empleadoRef: DocumentReference;
+    rutaRef: DocumentReference;
+    monto: number;
+    now: Date;
+  }
+): DesembolsoEmpleadoEnTxResult {
+  const { rutaSnap, empleadoSnap, empleadoRef, rutaRef, monto, now } = ctx;
+
+  if (!rutaSnap.exists) throw new Error("RUTA_NOT_FOUND");
+  if (!empleadoSnap.exists) throw new Error("EMPLEADO_NOT_FOUND");
+
+  const rd = rutaSnap.data() as Record<string, unknown>;
+  const ud = empleadoSnap.data() as Record<string, unknown>;
+
+  if ((ud.rol as string) !== "empleado") throw new Error("USUARIO_NO_ES_EMPLEADO");
+
+  const cajaEmp = typeof ud.cajaEmpleado === "number" ? ud.cajaEmpleado : 0;
+  const cajaRuta = typeof rd.cajaRuta === "number" ? rd.cajaRuta : 0;
+  const cajasEmpleados = typeof rd.cajasEmpleados === "number" ? rd.cajasEmpleados : 0;
+  const inversiones = typeof rd.inversiones === "number" ? rd.inversiones : 0;
+  const perdidas = typeof rd.perdidas === "number" ? rd.perdidas : 0;
+
+  const saldos = computeSaldosTrasDesembolsoPrestamoDesdeCajaEmpleado({
+    cajaEmp,
+    cajaRuta,
+    cajasEmpleados,
+    inversiones,
+    monto,
+    perdidas,
+  });
+
+  tx.update(empleadoRef, {
+    cajaEmpleado: saldos.nuevaCajaEmp,
+    ultimaActualizacionCapital: now,
+  });
+
+  tx.update(rutaRef, {
+    cajasEmpleados: saldos.nuevaCajasEmpleados,
+    inversiones: saldos.nuevaInversiones,
+    capitalTotal: saldos.nuevoCapital,
+    totalPrestado: FieldValue.increment(monto),
+    ultimaActualizacion: now,
+  });
+
+  return saldos;
+}
+
 /**
  * Préstamo desde la caja del trabajador: descuenta `cajaEmpleado` y mueve a inversiones.
  * cajaRuta no cambia; capitalTotal no cambia.
@@ -180,60 +269,26 @@ export async function registrarPrestamoDesdeCajaEmpleado(
     .collection(USUARIOS_SUBCOLLECTION)
     .doc(empleadoUid);
 
-  await db.runTransaction(async (tx) => {
-    const rutaSnap = await tx.get(rutaRef);
-    if (!rutaSnap.exists) throw new Error("Ruta no encontrada");
-    const rd = rutaSnap.data() as Record<string, unknown>;
-
-    let cajaRuta = typeof rd.cajaRuta === "number" ? rd.cajaRuta : 0;
-    let cajasEmpleados = typeof rd.cajasEmpleados === "number" ? rd.cajasEmpleados : 0;
-    let inversiones = typeof rd.inversiones === "number" ? rd.inversiones : 0;
-    const perdidas = typeof rd.perdidas === "number" ? rd.perdidas : 0;
-    const capitalTotal = computeCapitalTotalRutaDesdeSaldos({
-      cajaRuta,
-      cajasEmpleados,
-      inversiones,
-      perdidas,
+  try {
+    await db.runTransaction(async (tx) => {
+      const now = new Date();
+      const [rutaSnap, empleadoSnap] = await Promise.all([
+        tx.get(rutaRef),
+        tx.get(usuarioRef),
+      ]);
+      applyDesembolsoPrestamoDesdeCajaEmpleadoEnTx(tx, {
+        rutaSnap,
+        empleadoSnap,
+        empleadoRef: usuarioRef,
+        rutaRef,
+        monto,
+        now,
+      });
     });
-
-    const uSnap = await tx.get(usuarioRef);
-    if (!uSnap.exists) throw new Error("Trabajador no encontrado");
-    const ud = uSnap.data() as Record<string, unknown>;
-    if ((ud.rol as string) !== "empleado") throw new Error("El usuario no es trabajador");
-    const cajaEmp = typeof ud.cajaEmpleado === "number" ? ud.cajaEmpleado : 0;
-    if (cajaEmp < monto) throw new Error("Saldo insuficiente en la base del trabajador");
-
-    if (cajasEmpleados < monto) {
-      throw new Error("Saldo insuficiente en bases de empleados de la ruta");
-    }
-
-    cajasEmpleados = round2(cajasEmpleados - monto);
-    inversiones = round2(inversiones + monto);
-
-    const suma = computeCapitalTotalRutaDesdeSaldos({
-      cajaRuta,
-      cajasEmpleados,
-      inversiones,
-      perdidas,
-    });
-    if (Math.abs(suma - capitalTotal) > 0.02) {
-      throw new Error("Capital descuadrado — revisar operación");
-    }
-
-    const now = new Date();
-
-    tx.update(usuarioRef, {
-      cajaEmpleado: round2(cajaEmp - monto),
-      ultimaActualizacionCapital: now,
-    });
-
-    tx.update(rutaRef, {
-      cajasEmpleados,
-      inversiones,
-      totalPrestado: FieldValue.increment(monto),
-      ultimaActualizacion: now,
-    });
-  });
+  } catch (e) {
+    const raw = e instanceof Error ? e.message : String(e);
+    throw new Error(mapDesembolsoPrestamoDesdeCajaEmpleadoError(raw));
+  }
 
   const after = await rutaRef.get();
   if (after.exists) {

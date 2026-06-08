@@ -338,6 +338,12 @@ export async function POST(
   }
 
   if (tipo === "perdida") {
+    if (apiUser.role === "empleado") {
+      return finalize(403, {
+        error: "Solo el administrador puede registrar pérdidas",
+      });
+    }
+
     const rawMonto =
       typeof monto === "number" ? monto : Number(String(monto ?? "").replace(/,/g, ""));
     if (Number.isNaN(rawMonto) || rawMonto <= 0) {
