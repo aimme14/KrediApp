@@ -32,6 +32,64 @@ export function AdminRutaStatsGrid({ ruta, className }: AdminRutaStatsGridProps)
   return (
     <div className={gridClass} aria-label="Resumen financiero de la ruta">
       <div className="admin-inicio-ruta-stat">
+        <span className="admin-inicio-ruta-stat-icon admin-inicio-metric-icon--violet" aria-hidden>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+          </svg>
+        </span>
+        <div className="admin-inicio-ruta-stat-body">
+          <span className="admin-inicio-ruta-stat-label">Capital</span>
+          <span className="admin-inicio-ruta-stat-value">{formatMoneda(ruta.capitalRuta ?? 0)}</span>
+          <span className="admin-inicio-ruta-stat-hint">total ruta</span>
+        </div>
+      </div>
+      <div className="admin-inicio-ruta-stat">
+        <span className="admin-inicio-ruta-stat-icon admin-inicio-metric-icon--green" aria-hidden>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <polyline points="23 6 13.5 15.5 8.5 10.5 1 18" />
+            <polyline points="17 6 23 6 23 12" />
+          </svg>
+        </span>
+        <div className="admin-inicio-ruta-stat-body">
+          <span className="admin-inicio-ruta-stat-label">Ganancias</span>
+          <span
+            className={`admin-inicio-ruta-stat-value ${
+              g < 0 ? "admin-inicio-ruta-stat-value--neg" : g > 0 ? "admin-inicio-ruta-stat-value--pos" : ""
+            }`}
+          >
+            {formatMoneda(g)}
+          </span>
+          <span className="admin-inicio-ruta-stat-hint">registradas</span>
+        </div>
+      </div>
+      <div className="admin-inicio-ruta-stat">
+        <span className="admin-inicio-ruta-stat-icon admin-inicio-metric-icon--blue" aria-hidden>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <line x1="12" y1="1" x2="12" y2="23" />
+            <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+          </svg>
+        </span>
+        <div className="admin-inicio-ruta-stat-body">
+          <span className="admin-inicio-ruta-stat-label">Total invertido</span>
+          <span className="admin-inicio-ruta-stat-value">{formatMoneda(ruta.totalPrestado ?? 0)}</span>
+          <span className="admin-inicio-ruta-stat-hint">periodo actual</span>
+        </div>
+      </div>
+      <div className="admin-inicio-ruta-stat">
+        <span className="admin-inicio-ruta-stat-icon admin-inicio-metric-icon--orange" aria-hidden>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="12" cy="12" r="10" />
+            <line x1="12" y1="8" x2="12" y2="16" />
+            <line x1="8" y1="12" x2="16" y2="12" />
+          </svg>
+        </span>
+        <div className="admin-inicio-ruta-stat-body">
+          <span className="admin-inicio-ruta-stat-label">Inversiones</span>
+          <span className="admin-inicio-ruta-stat-value">{formatMoneda(ruta.inversiones ?? 0)}</span>
+          <span className="admin-inicio-ruta-stat-hint">acumulado</span>
+        </div>
+      </div>
+      <div className="admin-inicio-ruta-stat">
         <span className="admin-inicio-ruta-stat-icon admin-inicio-metric-icon--purple" aria-hidden>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <rect x="2" y="7" width="20" height="14" rx="2" ry="2" />
@@ -60,45 +118,6 @@ export function AdminRutaStatsGrid({ ruta, className }: AdminRutaStatsGridProps)
         </div>
       </div>
       <div className="admin-inicio-ruta-stat">
-        <span className="admin-inicio-ruta-stat-icon admin-inicio-metric-icon--violet" aria-hidden>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-          </svg>
-        </span>
-        <div className="admin-inicio-ruta-stat-body">
-          <span className="admin-inicio-ruta-stat-label">Capital</span>
-          <span className="admin-inicio-ruta-stat-value">{formatMoneda(ruta.capitalRuta ?? 0)}</span>
-          <span className="admin-inicio-ruta-stat-hint">total ruta</span>
-        </div>
-      </div>
-      <div className="admin-inicio-ruta-stat">
-        <span className="admin-inicio-ruta-stat-icon admin-inicio-metric-icon--orange" aria-hidden>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <circle cx="12" cy="12" r="10" />
-            <line x1="12" y1="8" x2="12" y2="16" />
-            <line x1="8" y1="12" x2="16" y2="12" />
-          </svg>
-        </span>
-        <div className="admin-inicio-ruta-stat-body">
-          <span className="admin-inicio-ruta-stat-label">Inversiones</span>
-          <span className="admin-inicio-ruta-stat-value">{formatMoneda(ruta.inversiones ?? 0)}</span>
-          <span className="admin-inicio-ruta-stat-hint">acumulado</span>
-        </div>
-      </div>
-      <div className="admin-inicio-ruta-stat">
-        <span className="admin-inicio-ruta-stat-icon admin-inicio-metric-icon--blue" aria-hidden>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <line x1="12" y1="1" x2="12" y2="23" />
-            <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-          </svg>
-        </span>
-        <div className="admin-inicio-ruta-stat-body">
-          <span className="admin-inicio-ruta-stat-label">Total invertido</span>
-          <span className="admin-inicio-ruta-stat-value">{formatMoneda(ruta.totalPrestado ?? 0)}</span>
-          <span className="admin-inicio-ruta-stat-hint">periodo actual</span>
-        </div>
-      </div>
-      <div className="admin-inicio-ruta-stat">
         <span className="admin-inicio-ruta-stat-icon admin-inicio-metric-icon--amber" aria-hidden>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M3 3h18v4H3z" />
@@ -117,25 +136,6 @@ export function AdminRutaStatsGrid({ ruta, className }: AdminRutaStatsGridProps)
             {formatMoneda(ruta.gastos ?? 0)}
           </span>
           <span className="admin-inicio-ruta-stat-hint">periodo actual</span>
-        </div>
-      </div>
-      <div className="admin-inicio-ruta-stat">
-        <span className="admin-inicio-ruta-stat-icon admin-inicio-metric-icon--green" aria-hidden>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <polyline points="23 6 13.5 15.5 8.5 10.5 1 18" />
-            <polyline points="17 6 23 6 23 12" />
-          </svg>
-        </span>
-        <div className="admin-inicio-ruta-stat-body">
-          <span className="admin-inicio-ruta-stat-label">Ganancias</span>
-          <span
-            className={`admin-inicio-ruta-stat-value ${
-              g < 0 ? "admin-inicio-ruta-stat-value--neg" : g > 0 ? "admin-inicio-ruta-stat-value--pos" : ""
-            }`}
-          >
-            {formatMoneda(g)}
-          </span>
-          <span className="admin-inicio-ruta-stat-hint">registradas</span>
         </div>
       </div>
       <div className="admin-inicio-ruta-stat">

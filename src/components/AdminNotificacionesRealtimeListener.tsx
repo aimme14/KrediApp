@@ -130,8 +130,7 @@ export function AdminNotificacionesRealtimeListener() {
 
     const qGastos = query(
       collection(db, EMPRESAS_COLLECTION, empresaId, GASTOS_EMPLEADO_SUBCOLLECTION),
-      where("adminId", "==", adminUid),
-      where("fecha", ">=", inicioTs)
+      where("adminId", "==", adminUid)
     );
     unsubs.push(
       onSnapshot(

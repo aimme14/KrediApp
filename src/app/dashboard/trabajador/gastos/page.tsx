@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { collection, query, where, orderBy, onSnapshot } from "firebase/firestore";
 import { useAuth } from "@/context/AuthContext";
 import { useTrabajadorCajaDia } from "@/context/TrabajadorCajaDiaContext";
@@ -16,6 +16,8 @@ import {
   fechaDiaColombiaHoy,
   formatoFechaGastoColombia,
 } from "@/lib/colombia-day-bounds";
+import { filtrarGastosPorPeriodo, type GastosPeriodoVista } from "@/lib/gastos-periodo-filter";
+import { GastosPeriodoFilter, mensajeGastosVaciosPeriodo } from "@/components/GastosPeriodoFilter";
 
 const TIPOS = [
   { value: "transporte", label: "Transporte", icon: "transporte" },
@@ -120,6 +122,7 @@ export default function GastosTrabajadorPage() {
   const [evidenciaPreview, setEvidenciaPreview] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [motivoOverlay, setMotivoOverlay] = useState<string | null>(null);
+  const [periodoVista, setPeriodoVista] = useState<GastosPeriodoVista>("hoy");
   const [searchQuery, setSearchQuery] = useState("");
   const [showCamera, setShowCamera] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
@@ -127,9 +130,14 @@ export default function GastosTrabajadorPage() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
+  const gastosPorPeriodo = useMemo(
+    () => filtrarGastosPorPeriodo(gastos, periodoVista),
+    [gastos, periodoVista]
+  );
+
   const searchLower = searchQuery.trim().toLowerCase();
   const gastosFiltrados = searchLower
-    ? gastos.filter((g) => {
+    ? gastosPorPeriodo.filter((g) => {
         const motivo = (g.descripcion ?? "").toLowerCase();
         const tipo = (g.tipo ?? "").toLowerCase();
         const montoStr = (g.monto ?? 0).toFixed(2);
@@ -141,7 +149,7 @@ export default function GastosTrabajadorPage() {
           fechaStr.includes(searchLower)
         );
       })
-    : gastos;
+    : gastosPorPeriodo;
 
   const gastosOrdenados = [...gastosFiltrados].sort((a, b) => {
     const timeA = new Date(a.fecha ?? 0).getTime();
@@ -485,6 +493,7 @@ export default function GastosTrabajadorPage() {
         ) : (
           <>
             <div className="gastos-buscador-wrap">
+              <GastosPeriodoFilter value={periodoVista} onChange={setPeriodoVista} />
               <input
                 id="gastos-buscador-trabajador"
                 type="search"
@@ -500,7 +509,9 @@ export default function GastosTrabajadorPage() {
               )}
             </div>
             {gastosOrdenados.length === 0 ? (
-              <p className="gastos-empty-msg">No hay gastos que coincidan con la búsqueda.</p>
+              <p className="gastos-empty-msg">
+                {mensajeGastosVaciosPeriodo(periodoVista, !!searchQuery.trim())}
+              </p>
             ) : (
             <>
           <div className="table-wrap gastos-table-wrap">

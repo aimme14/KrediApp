@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, type ReactNode } from "react";
+import { useState, useEffect, useRef, useMemo, type ReactNode } from "react";
 import { collection, query, where, onSnapshot } from "firebase/firestore";
 import { useAuth } from "@/context/AuthContext";
 import { useAdminDashboard } from "@/context/AdminDashboardContext";
@@ -19,6 +19,8 @@ import {
   fechaDiaColombiaHoy,
   formatoFechaGastoColombia,
 } from "@/lib/colombia-day-bounds";
+import { filtrarGastosPorPeriodo, type GastosPeriodoVista } from "@/lib/gastos-periodo-filter";
+import { GastosPeriodoFilter, mensajeGastosVaciosPeriodo } from "@/components/GastosPeriodoFilter";
 
 const EMPRESAS_COLLECTION = "empresas";
 const GASTOS_ADMIN_SUBCOLLECTION = "gastosAdministrador";
@@ -137,6 +139,7 @@ export default function GastosPage() {
   const [creating, setCreating] = useState(false);
   const [motivoOverlay, setMotivoOverlay] = useState<string | null>(null);
   const [gastoDetalle, setGastoDetalle] = useState<GastoItem | null>(null);
+  const [periodoVista, setPeriodoVista] = useState<GastosPeriodoVista>("hoy");
   const [searchQuery, setSearchQuery] = useState("");
   const [alcanceGasto, setAlcanceGasto] = useState<"admin" | "ruta">("admin");
   const [rutaIdGasto, setRutaIdGasto] = useState("");
@@ -146,9 +149,14 @@ export default function GastosPage() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
+  const gastosPorPeriodo = useMemo(
+    () => filtrarGastosPorPeriodo(gastos, periodoVista),
+    [gastos, periodoVista]
+  );
+
   const searchLower = searchQuery.trim().toLowerCase();
   const gastosFiltrados = searchLower
-    ? gastos.filter((g) => {
+    ? gastosPorPeriodo.filter((g) => {
         const motivo = (g.descripcion ?? "").toLowerCase();
         const tipo = (g.tipo ?? "").toLowerCase();
         const hechoPor = (g.creadoPorNombre ?? "").toLowerCase();
@@ -162,7 +170,7 @@ export default function GastosPage() {
           fechaStr.includes(searchLower)
         );
       })
-    : gastos;
+    : gastosPorPeriodo;
 
   const gastosOrdenados = [...gastosFiltrados].sort((a, b) => {
     const timeA = new Date(a.fecha ?? 0).getTime();
@@ -670,6 +678,7 @@ export default function GastosPage() {
         ) : (
           <>
             <div className="gastos-admin-toolbar">
+              <GastosPeriodoFilter value={periodoVista} onChange={setPeriodoVista} />
               <div className="gastos-admin-search-field">
                 <span className="gastos-admin-search-icon" aria-hidden>
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -694,7 +703,9 @@ export default function GastosPage() {
               ) : null}
             </div>
             {gastosOrdenados.length === 0 ? (
-              <p className="gastos-empty-msg">No hay gastos que coincidan con la búsqueda.</p>
+              <p className="gastos-empty-msg">
+                {mensajeGastosVaciosPeriodo(periodoVista, !!searchQuery.trim())}
+              </p>
             ) : (
             <>
             <div className="gastos-admin-mobile-list" role="list" aria-label="Lista de gastos">

@@ -29,6 +29,21 @@ export function fechaCreacionPrestamoIso(p: PrestamoFechaCreacion): string | nul
   return p.creadoEn ?? p.fechaInicio ?? null;
 }
 
+function claveFechaLocal(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+/** Préstamo creado en el día local del navegador. */
+export function esPrestamoCreadoHoy(p: PrestamoFechaCreacion): boolean {
+  const iso = fechaCreacionPrestamoIso(p);
+  if (!iso) return false;
+  const hoy = claveFechaLocal(new Date());
+  return claveFechaLocal(new Date(iso)) === hoy;
+}
+
 /** Fecha corta para listados (ej. 5/06/26). */
 export function formatFechaCreacionPrestamo(p: PrestamoFechaCreacion): string {
   const iso = fechaCreacionPrestamoIso(p);

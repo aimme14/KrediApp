@@ -10,7 +10,7 @@ import {
 } from "@/context/GastoFcmCampanitaContext";
 import { db } from "@/lib/firebase";
 import { type SolicitudEntregaPendienteAdmin } from "@/lib/empresa-api";
-import { esDiaActualColombia } from "@/lib/colombia-day-bounds";
+import { fechaDiaColombiaHoy } from "@/lib/colombia-day-bounds";
 import { EMPRESAS_COLLECTION, SOLICITUDES_ENTREGA_REPORTE_SUBCOLLECTION } from "@/lib/empresas-db";
 
 function BellIcon() {
@@ -32,6 +32,20 @@ function formatNotifTime(ms: number): string {
     minute: "2-digit",
     timeZone: "America/Bogota",
   });
+}
+
+function formatNotifWhen(ms: number): string {
+  const dia = new Date(ms)
+    .toLocaleDateString("en-CA", { timeZone: "America/Bogota" })
+    .slice(0, 10);
+  const hora = formatNotifTime(ms);
+  if (dia === fechaDiaColombiaHoy()) return hora;
+  const etiqueta = new Date(ms).toLocaleDateString("es-CO", {
+    timeZone: "America/Bogota",
+    day: "numeric",
+    month: "short",
+  });
+  return `${etiqueta} · ${hora}`;
 }
 
 function NotifAdminPendientes({
@@ -100,21 +114,27 @@ function NotifAdminPendientes({
   );
 }
 
-function NotifAdminOperativo({ lines }: { lines: OperativoFcmSessionItem[] }) {
-  const vigentes = lines
-    .filter((row) => esDiaActualColombia(row.at ?? Date.now()))
-    .sort((a, b) => (b.at ?? 0) - (a.at ?? 0));
+const NOTIF_OPERATIVO_PANEL_MAX = 16;
+
+function NotifAdminOperativo({
+  lines,
+  onClose,
+}: {
+  lines: OperativoFcmSessionItem[];
+  onClose: () => void;
+}) {
+  const vigentes = [...lines].sort((a, b) => (b.at ?? 0) - (a.at ?? 0));
 
   if (vigentes.length === 0) return null;
   return (
     <>
       <div className="dashboard-notifications-operativo-header">
-        <span>Notificaciones de hoy</span>
+        <span>Actividad y pendientes</span>
         <span style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
           
         </span>
       </div>
-      {vigentes.slice(0, 8).map((row) => (
+      {vigentes.slice(0, NOTIF_OPERATIVO_PANEL_MAX).map((row) => (
         <div
           key={row.id}
           className="dashboard-notifications-alert dashboard-notifications-alert-warning dashboard-notifications-alert-gasto-fcm"
@@ -124,8 +144,19 @@ function NotifAdminOperativo({ lines }: { lines: OperativoFcmSessionItem[] }) {
           <p className="dashboard-notifications-admin-label">{row.title}</p>
           <p className="dashboard-notifications-admin-name">{row.body}</p>
           <span className="dashboard-notifications-admin-meta notif-time">
-            {formatNotifTime(row.at)}
+            {formatNotifWhen(row.at)}
           </span>
+          {row.href ? (
+            <Link
+              href={row.href}
+              className="dashboard-notifications-link"
+              onClick={onClose}
+            >
+              {row.id.startsWith("solicitud-")
+                ? "Ir a solicitudes de préstamo"
+                : "Ver detalle"}
+            </Link>
+          ) : null}
         </div>
       ))}
     </>
@@ -285,9 +316,7 @@ export default function DashboardNotifications() {
 
   const badgeCount = useMemo(() => {
     if (role === "admin") {
-      const operativoUnread = sessionOperativoLines.filter(
-        (l) => !l.read && esDiaActualColombia(l.at ?? Date.now())
-      ).length;
+      const operativoUnread = sessionOperativoLines.filter((l) => !l.read).length;
       const pendingCount = dismissedSet.has(adminPendingKey) ? 0 : adminPendientes.length;
       return pendingCount + operativoUnread;
     }
@@ -351,7 +380,10 @@ export default function DashboardNotifications() {
                 onDismiss={() => dismissNotification(adminPendingKey)}
                 onClose={() => setOpen(false)}
               />
-              <NotifAdminOperativo lines={sessionOperativoLines} />
+              <NotifAdminOperativo
+                lines={sessionOperativoLines}
+                onClose={() => setOpen(false)}
+              />
             </>
           )}
 

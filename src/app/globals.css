@@ -1749,6 +1749,48 @@ td {
   }
 }
 
+/* Filtro Hoy / Historial — gastos operativos */
+.gastos-periodo-filter {
+  display: inline-flex;
+  align-items: stretch;
+  gap: 0.25rem;
+  padding: 0.2rem;
+  border-radius: 10px;
+  border: 1px solid var(--input-border);
+  background: color-mix(in srgb, var(--input-bg) 92%, transparent);
+}
+.gastos-periodo-btn {
+  min-width: 5.5rem;
+  padding: 0.38rem 0.85rem;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+}
+.gastos-periodo-btn:hover:not(.gastos-periodo-btn-active) {
+  color: var(--text);
+  background: color-mix(in srgb, var(--input-bg) 70%, var(--text) 5%);
+}
+.gastos-periodo-btn:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--link) 55%, transparent);
+  outline-offset: 1px;
+}
+.gastos-periodo-btn-active {
+  color: var(--text);
+  background: var(--card-bg);
+  box-shadow: 0 1px 3px color-mix(in srgb, var(--text) 12%, transparent);
+}
+.gastos-admin-toolbar .gastos-periodo-filter {
+  margin-bottom: 0.15rem;
+}
+.gastos-buscador-wrap .gastos-periodo-filter {
+  margin-bottom: 0.55rem;
+}
+
 /* Buscador gastos: compacto */
 .gastos-buscador-wrap {
   margin-bottom: 0.75rem;

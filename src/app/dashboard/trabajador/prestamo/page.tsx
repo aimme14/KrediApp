@@ -27,7 +27,11 @@ import {
   interiorDecimalCOPToNumber,
 } from "@/lib/monto-input-es";
 import SelectConBusqueda from "@/components/SelectConBusqueda";
-import { formatDebeSlashTotalCredito, formatFechaCreacionPrestamo } from "@/lib/prestamo-display";
+import {
+  esPrestamoCreadoHoy,
+  formatDebeSlashTotalCredito,
+  formatFechaCreacionPrestamo,
+} from "@/lib/prestamo-display";
 
 const MODALIDADES = [
   { value: "diario", label: "Diario" },
@@ -105,7 +109,7 @@ export default function PrestamoTrabajadorPage() {
     useState<EvaluacionAprobacionPrestamoApi | null>(null);
   const [evaluandoAprobacion, setEvaluandoAprobacion] = useState(false);
   const [exitoCreacion, setExitoCreacion] = useState<string | null>(null);
-  const [filtroEstado, setFiltroEstado] = useState<"activos" | "noActivos">("activos");
+  const [filtroEstado, setFiltroEstado] = useState<"hoy" | "activos" | "noActivos">("hoy");
   const [busquedaNombre, setBusquedaNombre] = useState("");
 
   useEffect(() => {
@@ -185,7 +189,7 @@ export default function PrestamoTrabajadorPage() {
   }, [solicitudPendiente?.id, profile?.empresaId]);
 
   useEffect(() => {
-    if (filtroEstado !== "noActivos") return;
+    if (filtroEstado !== "noActivos" && filtroEstado !== "hoy") return;
     if (loadingPagados || !hayMasPagados) return;
     if (prestamosPagados.length > 0) return;
     void cargarMasPagados();
@@ -357,6 +361,15 @@ export default function PrestamoTrabajadorPage() {
 
   const prestamosBase = useMemo(() => {
     if (filtroEstado === "noActivos") return prestamosPagados;
+    if (filtroEstado === "hoy") {
+      const merged = [...prestamos, ...prestamosPagados];
+      const seen = new Set<string>();
+      return merged.filter((p) => {
+        if (seen.has(p.id)) return false;
+        seen.add(p.id);
+        return esPrestamoCreadoHoy(p);
+      });
+    }
     return prestamos;
   }, [prestamos, prestamosPagados, filtroEstado]);
 
@@ -817,6 +830,7 @@ export default function PrestamoTrabajadorPage() {
             <div className="prestamo-trabajador-historial-filtros" role="tablist" aria-label="Filtrar préstamos">
               {(
                 [
+                  { value: "hoy", label: "Hoy" },
                   { value: "activos", label: "Activos" },
                   { value: "noActivos", label: "Historial" },
                 ] as const
@@ -884,9 +898,11 @@ export default function PrestamoTrabajadorPage() {
             <p style={{ color: "var(--text-muted)", fontSize: "0.875rem", marginTop: "0.5rem" }}>
               {busquedaTrim
                 ? `No hay préstamos que coincidan con «${busquedaTrim}».`
-                : filtroEstado === "activos"
-                  ? "No hay préstamos activos."
-                  : "No hay préstamos no activos."}
+                : filtroEstado === "hoy"
+                  ? "No hay préstamos creados hoy."
+                  : filtroEstado === "activos"
+                    ? "No hay préstamos activos."
+                    : "No hay préstamos no activos."}
             </p>
           ) : null}
           {filtroEstado === "noActivos" && hayMasPagados ? (

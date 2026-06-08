@@ -40,6 +40,8 @@ export type OperativoFcmSessionItem = {
 
   read: boolean;
 
+  href?: string;
+
 };
 
 
@@ -65,6 +67,8 @@ type GastoFcmCampanitaContextValue = {
       body: string;
 
       at: number;
+
+      href?: string;
 
     }>
 
@@ -139,6 +143,8 @@ export function GastoFcmCampanitaProvider({
         body: string;
 
         at: number;
+
+        href?: string;
 
       }>
 

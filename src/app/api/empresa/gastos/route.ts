@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Timestamp } from "firebase-admin/firestore";
 import { getAdminFirestore, getAdminMessaging } from "@/lib/firebase-admin";
 import { notifyAdminGastoEmpleado } from "@/lib/fcm-notify-admin";
 import { getApiUser } from "@/lib/api-auth";
@@ -217,6 +218,7 @@ export async function POST(request: NextRequest) {
   const tipoValido: TipoGasto =
     tipo === "transporte" || tipo === "alimentacion" ? tipo : "otro";
   const fechaDate = fecha ? fechaGastoDesdeStringCliente(fecha) : new Date();
+  const creadoEn = Timestamp.now();
 
   const db = getAdminFirestore();
   const empresaRef = db.collection(EMPRESAS_COLLECTION).doc(apiUser.empresaId);
@@ -273,6 +275,7 @@ export async function POST(request: NextRequest) {
       descripcion: descripcion.trim(),
       monto,
       fecha: fechaDate,
+      creadoEn,
       tipo: tipoValido,
       creadoPor: apiUser.uid,
       creadoPorNombre: creadoPorNombre.trim() || apiUser.uid,
@@ -390,6 +393,7 @@ export async function POST(request: NextRequest) {
       descripcion: descripcion.trim(),
       monto,
       fecha: fechaDate,
+      creadoEn,
       tipo: tipoValido,
       creadoPor: apiUser.uid,
       creadoPorNombre: creadoPorNombre.trim() || apiUser.uid,
@@ -469,6 +473,7 @@ export async function POST(request: NextRequest) {
     descripcion: descripcion.trim(),
     monto,
     fecha: fechaDate,
+    creadoEn,
     tipo: tipoValido,
     creadoPor: apiUser.uid,
     creadoPorNombre: creadoPorNombre.trim() || apiUser.uid,

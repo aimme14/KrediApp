@@ -4,7 +4,15 @@
  */
 
 import type { OperativoFcmKind } from "@/context/GastoFcmCampanitaContext";
-import { esDiaActualColombia } from "@/lib/colombia-day-bounds";
+import {
+  esDiaActualColombia,
+  fechaDiaCalendarioDesdeISO,
+  fechaDiaColombiaHoy,
+  inicioDiaColombiaUtc,
+} from "@/lib/colombia-day-bounds";
+
+export const HREF_ADMIN_SOLICITUDES_PRESTAMO =
+  "/dashboard/admin/solicitudes-prestamo";
 
 export type AdminOperativoNotifItem = {
   id: string;
@@ -12,6 +20,8 @@ export type AdminOperativoNotifItem = {
   title: string;
   body: string;
   at: number;
+  /** Enlace al abrir desde la campanita (p. ej. solicitudes pendientes). */
+  href?: string;
 };
 
 function formatMontoCOP(monto: number): string {
@@ -40,6 +50,58 @@ function tsFromFirestore(value: unknown): number {
   return Date.now();
 }
 
+function fechaIsoDesdeFirestore(value: unknown): string | null {
+  const ms = tsFromFirestore(value);
+  if (!Number.isFinite(ms)) return null;
+  return new Date(ms).toISOString();
+}
+
+/** Gasto de hoy: por `creadoEn` o por día calendario de `fecha` (incluye legado medianoche UTC). */
+function esGastoOperativoHoy(data: Record<string, unknown>): boolean {
+  if (data.creadoEn != null) {
+    return esDiaActualColombia(tsFromFirestore(data.creadoEn));
+  }
+  const dia = fechaDiaCalendarioDesdeISO(fechaIsoDesdeFirestore(data.fecha));
+  return dia != null && dia === fechaDiaColombiaHoy();
+}
+
+/**
+ * Hora para ordenar/mostrar en campanita.
+ * Sin `creadoEn`, evita medianoche (todos al fondo o filtrados) con offset estable por id.
+ */
+function atGastoParaCampanita(
+  gastoId: string,
+  data: Record<string, unknown>
+): number {
+  if (data.creadoEn != null) {
+    return tsFromFirestore(data.creadoEn);
+  }
+  const fechaMs = tsFromFirestore(data.fecha);
+  const hoy = fechaDiaColombiaHoy();
+  const inicioHoy = inicioDiaColombiaUtc(hoy)?.getTime();
+  if (inicioHoy == null) return fechaMs;
+
+  const esSoloDia =
+    fechaMs === inicioHoy ||
+    (() => {
+      const d = new Date(fechaMs);
+      return (
+        d.getUTCHours() === 0 &&
+        d.getUTCMinutes() === 0 &&
+        d.getUTCSeconds() === 0 &&
+        d.getUTCMilliseconds() === 0
+      );
+    })();
+
+  if (!esSoloDia) return fechaMs;
+
+  let h = 0;
+  for (let i = 0; i < gastoId.length; i++) {
+    h = (h * 33 + gastoId.charCodeAt(i)) >>> 0;
+  }
+  return inicioHoy + 8 * 60 * 60 * 1000 + (h % (10 * 60 * 60 * 1000));
+}
+
 const LABEL_NO_PAGO: Record<string, string> = {
   sin_fondos: "Sin fondos",
   no_estaba: "No estaba",
@@ -58,8 +120,8 @@ export function mapGastoEmpleadoNotif(
   gastoId: string,
   data: Record<string, unknown>
 ): AdminOperativoNotifItem | null {
-  const at = tsFromFirestore(data.fecha);
-  if (!esDiaActualColombia(at)) return null;
+  if (!esGastoOperativoHoy(data)) return null;
+  const at = atGastoParaCampanita(gastoId, data);
   const empleadoNombre =
     (typeof data.creadoPorNombre === "string" && data.creadoPorNombre.trim()) ||
     "Trabajador";
@@ -125,7 +187,6 @@ export function mapSolicitudPrestamoNotif(
   empleadoNombre: string
 ): AdminOperativoNotifItem | null {
   const at = tsFromFirestore(data.creadaEn);
-  if (!esDiaActualColombia(at)) return null;
   const clienteNombre =
     (typeof data.clienteNombre === "string" && data.clienteNombre.trim()) ||
     "Cliente";
@@ -139,6 +200,7 @@ export function mapSolicitudPrestamoNotif(
       180
     ),
     at,
+    href: HREF_ADMIN_SOLICITUDES_PRESTAMO,
   };
 }
 
