@@ -3,11 +3,9 @@
 import { useEffect, useRef } from "react";
 import {
   collection,
-  collectionGroup,
   query,
   where,
   onSnapshot,
-  Timestamp,
   doc,
   getDoc,
 } from "firebase/firestore";
@@ -17,17 +15,11 @@ import { useTrabajadorLista } from "@/context/TrabajadorListaContext";
 import { useGastoFcmCampanita } from "@/context/GastoFcmCampanitaContext";
 import {
   EMPRESAS_COLLECTION,
-  GASTOS_EMPLEADO_SUBCOLLECTION,
-  PRESTAMOS_SUBCOLLECTION,
   SOLICITUDES_PRESTAMO_SUBCOLLECTION,
 } from "@/lib/empresas-db";
-import { fechaDiaColombiaHoy, inicioDiaColombiaUtc } from "@/lib/colombia-day-bounds";
 import {
-  mapGastoEmpleadoNotif,
   mapClienteEmpleadoNotif,
-  mapPrestamoEmpleadoNotif,
   mapSolicitudPrestamoNotif,
-  mapPagoEmpleadoNotif,
   mergeAdminOperativoNotifs,
   type AdminOperativoNotifItem,
 } from "@/lib/admin-notificaciones-operativas";
@@ -35,9 +27,8 @@ import {
 const USERS_COLLECTION = "users";
 
 /**
- * Campanita admin alimentada por Firestore en tiempo real (onSnapshot).
- * Vive dentro del layout admin para reutilizar TrabajadorLista (clientes) y evitar
- * listeners duplicados que provocan INTERNAL ASSERTION en el SDK de Firestore.
+ * Campanita admin: solicitudes pendientes y clientes vía Firestore;
+ * gastos, cuotas y préstamos llegan por FCM foreground (AdminFcmRegistration).
  */
 export function AdminNotificacionesRealtimeListener() {
   const { user, profile } = useAuth();
@@ -88,7 +79,7 @@ export function AdminNotificacionesRealtimeListener() {
       for (const c of clientes) {
         if (c.creadoPorRol !== "empleado") continue;
         const empleadoNombre =
-          (c.creadoPorNombre?.trim()) ||
+          c.creadoPorNombre?.trim() ||
           (c.creadoPorUid ? await resolveNombre(c.creadoPorUid) : "Trabajador");
         if (cancelled) return;
         const item = mapClienteEmpleadoNotif(
@@ -120,64 +111,7 @@ export function AdminNotificacionesRealtimeListener() {
     const adminUid = user.uid;
     if (!empresaId) return;
 
-    const hoy = fechaDiaColombiaHoy();
-    const inicioDia = inicioDiaColombiaUtc(hoy);
-    if (!inicioDia) return;
-    const inicioTs = Timestamp.fromDate(inicioDia);
-
     let cancelled = false;
-    const unsubs: Array<() => void> = [];
-
-    const qGastos = query(
-      collection(db, EMPRESAS_COLLECTION, empresaId, GASTOS_EMPLEADO_SUBCOLLECTION),
-      where("adminId", "==", adminUid)
-    );
-    unsubs.push(
-      onSnapshot(
-        qGastos,
-        (snap) => {
-          if (cancelled) return;
-          const items: AdminOperativoNotifItem[] = [];
-          snap.docs.forEach((d) => {
-            const item = mapGastoEmpleadoNotif(d.id, d.data() as Record<string, unknown>);
-            if (item) items.push(item);
-          });
-          setBucket("gastos", items);
-        },
-        (err) => console.warn("[AdminNotifRT] gastos:", err)
-      )
-    );
-
-    const qPrestamos = query(
-      collection(db, EMPRESAS_COLLECTION, empresaId, PRESTAMOS_SUBCOLLECTION),
-      where("adminId", "==", adminUid)
-    );
-    unsubs.push(
-      onSnapshot(
-        qPrestamos,
-        (snap) => {
-          if (cancelled) return;
-          void (async () => {
-            const items: AdminOperativoNotifItem[] = [];
-            for (const d of snap.docs) {
-              const data = d.data() as Record<string, unknown>;
-              if (data.desembolsoDesde !== "caja_empleado") continue;
-              const empleadoUid =
-                typeof data.empleadoId === "string" ? data.empleadoId : "";
-              const empleadoNombre =
-                (typeof data.empleadoNombre === "string" &&
-                  data.empleadoNombre.trim()) ||
-                (empleadoUid ? await resolveNombre(empleadoUid) : "Trabajador");
-              if (cancelled) return;
-              const item = mapPrestamoEmpleadoNotif(d.id, data, empleadoNombre);
-              if (item) items.push(item);
-            }
-            if (!cancelled) setBucket("prestamos", items);
-          })();
-        },
-        (err) => console.warn("[AdminNotifRT] prestamos:", err)
-      )
-    );
 
     const qSolicitudes = query(
       collection(
@@ -189,64 +123,30 @@ export function AdminNotificacionesRealtimeListener() {
       where("adminId", "==", adminUid),
       where("estado", "==", "pendiente")
     );
-    unsubs.push(
-      onSnapshot(
-        qSolicitudes,
-        (snap) => {
-          if (cancelled) return;
-          setSolicitudesCountRef.current(snap.size);
-          const items: AdminOperativoNotifItem[] = [];
-          snap.docs.forEach((d) => {
-            const data = d.data() as Record<string, unknown>;
-            const empleadoNombre =
-              (typeof data.empleadoNombre === "string" &&
-                data.empleadoNombre.trim()) ||
-              "Trabajador";
-            const item = mapSolicitudPrestamoNotif(d.id, data, empleadoNombre);
-            if (item) items.push(item);
-          });
-          setBucket("solicitudes", items);
-        },
-        (err) => console.warn("[AdminNotifRT] solicitudes:", err)
-      )
-    );
 
-    const qPagos = query(
-      collectionGroup(db, "pagos"),
-      where("adminId", "==", adminUid),
-      where("fecha", ">=", inicioTs)
-    );
-    unsubs.push(
-      onSnapshot(
-        qPagos,
-        (snap) => {
-          if (cancelled) return;
-          const items: AdminOperativoNotifItem[] = [];
-          snap.docs.forEach((d) => {
-            const data = d.data() as Record<string, unknown>;
-            if (data.empresaId && data.empresaId !== empresaId) return;
-            if (data.cobradoPorRol === "admin") return;
-            if (!data.adminId) return;
-            const item = mapPagoEmpleadoNotif(d.id, data);
-            if (item) items.push(item);
-          });
-          setBucket("pagos", items);
-        },
-        (err) => {
-          if (err?.code === "permission-denied") {
-            console.error(
-              "[AdminNotifRT] pagos: permiso denegado — revisa firestore.rules (adminId en collectionGroup pagos)"
-            );
-          } else {
-            console.warn("[AdminNotifRT] pagos:", err);
-          }
-        }
-      )
+    const unsub = onSnapshot(
+      qSolicitudes,
+      (snap) => {
+        if (cancelled) return;
+        setSolicitudesCountRef.current(snap.size);
+        const items: AdminOperativoNotifItem[] = [];
+        snap.docs.forEach((d) => {
+          const data = d.data() as Record<string, unknown>;
+          const empleadoNombre =
+            (typeof data.empleadoNombre === "string" &&
+              data.empleadoNombre.trim()) ||
+            "Trabajador";
+          const item = mapSolicitudPrestamoNotif(d.id, data, empleadoNombre);
+          if (item) items.push(item);
+        });
+        setBucket("solicitudes", items);
+      },
+      (err) => console.warn("[AdminNotifRT] solicitudes:", err)
     );
 
     return () => {
       cancelled = true;
-      unsubs.forEach((u) => u());
+      unsub();
       bucketsRef.current = {};
       setSolicitudesCountRef.current(0);
     };

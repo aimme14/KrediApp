@@ -272,7 +272,5 @@ export function mergeAdminOperativoNotifs(
       byId.set(item.id, item);
     }
   }
-  return Array.from(byId.values())
-    .sort((a, b) => b.at - a.at)
-    .slice(0, 16);
+  return Array.from(byId.values()).sort((a, b) => b.at - a.at);
 }

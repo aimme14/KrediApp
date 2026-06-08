@@ -206,6 +206,7 @@ function CobrarClientePageContent() {
   const [motivoNoPago, setMotivoNoPago] = useState<MotivoNoPago | "">("");
   const [notaNoPago, setNotaNoPago] = useState("");
   const [submittingNoPago, setSubmittingNoPago] = useState(false);
+  const [showModalNoPago, setShowModalNoPago] = useState(false);
   const [noPagoRegistrado, setNoPagoRegistrado] = useState(false);
 
   const [showPerdida, setShowPerdida] = useState(false);
@@ -549,7 +550,13 @@ function CobrarClientePageContent() {
     }
   };
 
-  const handleRegistrarNoPago = async () => {
+  const handleRevisarNoPago = () => {
+    if (!motivoNoPago || !user || !prestamoId || !profile) return;
+    setError(null);
+    setShowModalNoPago(true);
+  };
+
+  const handleEjecutarNoPago = async () => {
     if (!motivoNoPago || !user || !prestamoId || !profile) return;
     setSubmittingNoPago(true);
     setError(null);
@@ -562,6 +569,7 @@ function CobrarClientePageContent() {
         registradoPorUid: user.uid,
         registradoPorNombre: nombreRegistro || undefined,
       });
+      setShowModalNoPago(false);
       setNoPagoRegistrado(true);
       await refreshLista();
       void refreshCajaDia();
@@ -992,11 +1000,12 @@ function CobrarClientePageContent() {
   }
 
   if (showNoPago) {
-    const cobrarQuery = `clienteId=${clienteId}&prestamoId=${prestamoId}${fromAdmin ? "&from=admin" : ""}`;
+    const motivoNoPagoLabel =
+      MOTIVOS_NO_PAGO.find((m) => m.value === motivoNoPago)?.label ?? motivoNoPago;
+    const notaNoPagoTrim = notaNoPago.trim();
     return (
       <div className="card cobrar-card">
         <div className="cobrar-header">
-          <Link href={fromAdmin ? `/dashboard/admin/cobrar?${cobrarQuery}` : `/dashboard/trabajador/cobrar?${cobrarQuery}`} className="cobrar-back">← Volver</Link>
           <h2 className="cobrar-title">No pagó</h2>
           <p className="cobrar-subtitle">{cliente.nombre}</p>
         </div>
@@ -1029,19 +1038,47 @@ function CobrarClientePageContent() {
           <button
             type="button"
             className="btn btn-secondary"
-            onClick={() => setShowNoPago(false)}
+            onClick={() => {
+              setShowModalNoPago(false);
+              setShowNoPago(false);
+            }}
           >
             Cancelar
           </button>
           <button
             type="button"
             className="btn btn-primary"
-            disabled={!motivoNoPago || submittingNoPago}
-            onClick={handleRegistrarNoPago}
+            disabled={!motivoNoPago || submittingNoPago || showModalNoPago}
+            onClick={handleRevisarNoPago}
           >
-            {submittingNoPago ? "Registrando..." : "Confirmar no pago"}
+            Confirmar no pago
           </button>
         </div>
+
+        {showModalNoPago && (
+          <ModalConfirmar
+            titulo="Confirmar no pago"
+            labelConfirmar="Sí, registrar no pago"
+            confirmando={submittingNoPago}
+            onCancelar={() => {
+              if (submittingNoPago) return;
+              setShowModalNoPago(false);
+            }}
+            onConfirmar={() => { void handleEjecutarNoPago(); }}
+          >
+            <p>
+              ¿Confirmas registrar que <strong>{cliente.nombre}</strong> no realizó el pago en esta visita?
+            </p>
+            <p>
+              Motivo: <strong>{motivoNoPagoLabel}</strong>
+            </p>
+            {notaNoPagoTrim && (
+              <p>
+                Nota: <strong>{notaNoPagoTrim}</strong>
+              </p>
+            )}
+          </ModalConfirmar>
+        )}
       </div>
     );
   }

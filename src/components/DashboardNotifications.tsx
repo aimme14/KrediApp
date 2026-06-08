@@ -87,7 +87,7 @@ function NotifAdminPendientes({
         Hay trabajadores esperando que confirmes que recibiste el efectivo del reporte diario.
       </p>
       <div className="dashboard-notifications-admin-inner">
-        {pendientes.slice(0, 8).map((s, idx) => (
+        {pendientes.map((s, idx) => (
           <div
             key={s.id}
             className={`dashboard-notifications-admin-item${idx > 0 ? " dashboard-notifications-admin-item-divider" : ""}`}
@@ -98,11 +98,6 @@ function NotifAdminPendientes({
           </div>
         ))}
       </div>
-      {pendientes.length > 8 && (
-        <p className="dashboard-notifications-admin-extra">
-          … y {pendientes.length - 8} más (ver en reportes del día)
-        </p>
-      )}
       <Link
         href="/dashboard/admin/reportes-dia"
         className="dashboard-notifications-link"
@@ -113,8 +108,6 @@ function NotifAdminPendientes({
     </div>
   );
 }
-
-const NOTIF_OPERATIVO_PANEL_MAX = 16;
 
 function NotifAdminOperativo({
   lines,
@@ -134,7 +127,7 @@ function NotifAdminOperativo({
           
         </span>
       </div>
-      {vigentes.slice(0, NOTIF_OPERATIVO_PANEL_MAX).map((row) => (
+      {vigentes.map((row) => (
         <div
           key={row.id}
           className="dashboard-notifications-alert dashboard-notifications-alert-warning dashboard-notifications-alert-gasto-fcm"

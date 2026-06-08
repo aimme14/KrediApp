@@ -1,25 +1,41 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { getMessaging, getToken, isSupported } from "firebase/messaging";
+import { getMessaging, getToken, isSupported, onMessage } from "firebase/messaging";
 import { app } from "@/lib/firebase";
 import { useAuth } from "@/context/AuthContext";
+import {
+  useGastoFcmCampanita,
+  type OperativoFcmKind,
+} from "@/context/GastoFcmCampanitaContext";
 
 const LOG = "[angry birds FCM]";
 
+const TIPOS_OPERATIVOS_FCM = [
+  "gasto_empleado",
+  "prestamo_empleado",
+  "cliente_empleado",
+  "cuota_prestamo",
+] as const;
+
 /**
  * Solicita permiso de notificaciones, registra token FCM y suscribe al topic de gastos (vía API).
- * Sin VAPID (.env) este componente sale sin hacer fetch — por eso no verás /api/user/fcm-token en Red.
+ * En foreground, alimenta la campanita con avisos operativos efímeros (sin lecturas extra en Firestore).
  */
 export function AdminFcmRegistration() {
   const { user, profile } = useAuth();
+  const { addFcmItem } = useGastoFcmCampanita();
   const lock = useRef(false);
+  const addFcmItemRef = useRef(addFcmItem);
+
+  addFcmItemRef.current = addFcmItem;
 
   useEffect(() => {
     if (!app || !user || profile?.role !== "admin") return;
     if (typeof window === "undefined" || !("serviceWorker" in navigator)) return;
 
     let cancelled = false;
+    let unsubMessage: (() => void) | undefined;
 
     const run = async () => {
       if (lock.current) return;
@@ -49,7 +65,9 @@ export function AdminFcmRegistration() {
       try {
         const perm = await Notification.requestPermission();
         if (perm !== "granted") {
-          console.warn(`${LOG} Permiso de notificaciones: "${perm}". Actívalo en la configuración del sitio (icono candado).`);
+          console.warn(
+            `${LOG} Permiso de notificaciones: "${perm}". Actívalo en la configuración del sitio (icono candado).`
+          );
           return;
         }
 
@@ -79,7 +97,11 @@ export function AdminFcmRegistration() {
         }
 
         if (!token || cancelled) {
-          if (!token) console.warn(`${LOG} getToken devolvió vacío (revisa Service Worker y proyecto Firebase).`);
+          if (!token) {
+            console.warn(
+              `${LOG} getToken devolvió vacío (revisa Service Worker y proyecto Firebase).`
+            );
+          }
           return;
         }
 
@@ -111,8 +133,52 @@ export function AdminFcmRegistration() {
             data.topic ?? "(vacío)"
           );
         } else {
-          console.info(`${LOG} Registro OK. Topic:`, data.topic ?? "—", "subscribedTopic:", data.subscribedTopic);
+          console.info(
+            `${LOG} Registro OK. Topic:`,
+            data.topic ?? "—",
+            "subscribedTopic:",
+            data.subscribedTopic
+          );
         }
+
+        if (cancelled) return;
+
+        unsubMessage = onMessage(messaging, (payload) => {
+          const data = payload.data ?? {};
+          const type = data.type ?? "";
+
+          if (
+            !TIPOS_OPERATIVOS_FCM.includes(
+              type as (typeof TIPOS_OPERATIVOS_FCM)[number]
+            )
+          ) {
+            return;
+          }
+
+          const kind: OperativoFcmKind =
+            type === "gasto_empleado" || type === "cliente_empleado"
+              ? "gasto"
+              : "cuota";
+
+          const entityId =
+            data.gastoId ??
+            data.prestamoId ??
+            data.pagoId ??
+            data.clienteId ??
+            crypto.randomUUID();
+
+          const title = data.title ?? payload.notification?.title ?? "Notificación";
+          const body = data.body ?? payload.notification?.body ?? "";
+
+          addFcmItemRef.current({
+            id: `fcm-${entityId}`,
+            kind,
+            title,
+            body,
+            at: Date.now(),
+            href: data.click_action ?? undefined,
+          });
+        });
       } catch (e) {
         console.warn(`${LOG}`, e);
       } finally {
@@ -123,6 +189,7 @@ export function AdminFcmRegistration() {
     void run();
     return () => {
       cancelled = true;
+      unsubMessage?.();
     };
   }, [user, profile?.role]);
 
