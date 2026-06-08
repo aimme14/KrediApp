@@ -24,6 +24,7 @@ import { computeCapitalRutaFromRutaFields } from "@/lib/capital-formulas";
 
 export type AdminRutaLive = RutaItem & {
   capitalRuta: number;
+  totalPrestado: number;
 };
 
 export type AdminEmpleadoLive = {
@@ -113,6 +114,7 @@ export function AdminDashboardProvider({ children }: { children: ReactNode }) {
           const ganancias = typeof data.ganancias === "number" ? data.ganancias : 0;
           const gastos = typeof data.gastos === "number" ? data.gastos : 0;
           const perdidas = typeof data.perdidas === "number" ? data.perdidas : 0;
+          const totalPrestado = typeof data.totalPrestado === "number" ? data.totalPrestado : 0;
           const capitalTotalRaw =
             typeof data.capitalTotal === "number" ? data.capitalTotal : undefined;
 
@@ -144,6 +146,7 @@ export function AdminDashboardProvider({ children }: { children: ReactNode }) {
             ganancias,
             gastos,
             perdidas,
+            totalPrestado,
             capitalTotal,
             capitalRuta,
           };

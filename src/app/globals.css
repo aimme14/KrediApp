@@ -3276,19 +3276,15 @@ td {
   border-color: color-mix(in srgb, var(--card-border) 85%, #4c1d95 15%);
 }
 
-.rutas-admin-ruta-head-btn {
+.rutas-admin-ruta-head {
   width: 100%;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem 0.75rem;
-  background: none;
-  border: none;
-  cursor: pointer;
   padding: 0;
   color: var(--text);
-  text-align: left;
 }
 
 .rutas-admin-ruta-head-main {
@@ -3305,13 +3301,6 @@ td {
   letter-spacing: -0.02em;
 }
 
-.rutas-admin-ruta-head-meta {
-  display: flex;
-  align-items: center;
-  gap: 0.45rem;
-  flex-shrink: 0;
-}
-
 .rutas-admin-ruta-ubic {
   font-size: 0.8rem;
   color: var(--text-muted);
@@ -3319,28 +3308,11 @@ td {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  flex-shrink: 0;
 }
 
-.rutas-admin-ruta-chevron {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 1.75rem;
-  height: 1.75rem;
-  border-radius: 8px;
-  background: var(--input-bg);
-  border: 1px solid var(--card-border);
-  color: var(--text-muted);
-  transition: transform 0.2s ease, background 0.15s ease;
-}
-
-.rutas-admin-ruta-head-btn:hover .rutas-admin-ruta-chevron {
-  background: var(--btn-secondary-hover);
-  color: var(--text);
-}
-
-.rutas-admin-ruta-chevron--open {
-  transform: rotate(90deg);
+.rutas-admin-ruta-stats {
+  margin-top: 0.85rem;
 }
 
 .rutas-admin-kpi-grid {
@@ -3428,26 +3400,6 @@ td {
 .rutas-admin-kpi-icon--ganancias {
   background: linear-gradient(145deg, #4ade80 0%, #15803d 100%);
   box-shadow: 0 2px 8px rgba(74, 222, 128, 0.28);
-}
-
-.rutas-admin-clientes-panel {
-  margin-top: 1rem;
-  padding-top: 1rem;
-  border-top: 1px solid var(--card-border);
-}
-
-.rutas-admin-clientes-title {
-  margin: 0 0 0.55rem;
-  font-size: 0.95rem;
-  font-weight: 700;
-  color: var(--text);
-}
-
-.rutas-admin-clientes-table-wrap {
-  margin-top: 0.35rem;
-  border-radius: 10px;
-  border: 1px solid var(--table-border);
-  overflow: hidden;
 }
 
 .rutas-admin-muted {

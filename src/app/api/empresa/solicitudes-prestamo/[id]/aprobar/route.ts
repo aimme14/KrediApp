@@ -175,6 +175,7 @@ export async function POST(
         cajasEmpleados: nuevoCajasEmpleados,
         inversiones: nuevaInversiones,
         capitalTotal: Math.round((cajaRuta + nuevoCajasEmpleados + nuevaInversiones) * 100) / 100,
+        totalPrestado: FieldValue.increment(monto),
         ultimaActualizacion: new Date(),
       });
 

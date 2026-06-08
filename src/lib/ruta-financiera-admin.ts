@@ -3,7 +3,7 @@
  * La lógica pura compartida con el cliente está en `ruta-financiera-compute.ts`.
  */
 
-import type { Firestore } from "firebase-admin/firestore";
+import { FieldValue, type Firestore } from "firebase-admin/firestore";
 import {
   EMPRESAS_COLLECTION,
   RUTAS_SUBCOLLECTION,
@@ -77,6 +77,7 @@ export async function registrarPrestamoEnRuta(
   await rutaRef.update({
     cajaRuta,
     inversiones,
+    totalPrestado: FieldValue.increment(monto),
     ultimaActualizacion: new Date(),
   });
 
@@ -229,6 +230,7 @@ export async function registrarPrestamoDesdeCajaEmpleado(
     tx.update(rutaRef, {
       cajasEmpleados,
       inversiones,
+      totalPrestado: FieldValue.increment(monto),
       ultimaActualizacion: now,
     });
   });

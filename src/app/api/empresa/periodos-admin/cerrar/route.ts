@@ -71,6 +71,7 @@ export async function POST(_request: NextRequest) {
       ganancias: 0,
       gastos: 0,
       perdidas: 0,
+      totalPrestado: 0,
       ultimaActualizacion: nowRuta,
     });
   }
