@@ -32,6 +32,7 @@ import {
   formatDebeSlashTotalCredito,
   formatFechaCreacionPrestamo,
 } from "@/lib/prestamo-display";
+import { ModalConfirmar } from "@/components/trabajador/ModalConfirmar";
 
 const MODALIDADES = [
   { value: "diario", label: "Diario" },
@@ -82,7 +83,6 @@ export default function PrestamoTrabajadorPage() {
   const { cajaEmpleadoRT, data: cajaDia } = useTrabajadorCajaDia();
   const cajaEmpleado = cajaEmpleadoRT ?? cajaDia?.cajaEmpleado ?? 0;
   const MONTO_MAX = cajaEmpleado > 0 ? cajaEmpleado : 50_000_000;
-  const MONTO_CONFIRMAR_ALTO = 1_000_000;
   const [error, setError] = useState<string | null>(null);
   const [clienteId, setClienteId] = useState("");
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -91,7 +91,7 @@ export default function PrestamoTrabajadorPage() {
   const [interes, setInteres] = useState("");
   const [monto, setMonto] = useState("");
   const [creating, setCreating] = useState(false);
-  const [confirmarMontoAlto, setConfirmarMontoAlto] = useState(false);
+  const [showModalPrestamo, setShowModalPrestamo] = useState(false);
   const [solicitudPendiente, setSolicitudPendiente] = useState<{
     id: string;
     estado: string;
@@ -237,7 +237,7 @@ export default function PrestamoTrabajadorPage() {
     };
   }, [user, clienteId, montoNumPreview]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleRevisarPrestamo = (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
     const montoNum = interiorDecimalCOPToNumber(monto);
@@ -264,10 +264,6 @@ export default function PrestamoTrabajadorPage() {
       setError(`El interés debe estar entre 0 y ${INTERES_MAX}%`);
       return;
     }
-    if (montoNum >= MONTO_CONFIRMAR_ALTO && !confirmarMontoAlto) {
-      setError(`Confirma que deseas solicitar un préstamo de ${formatMoneda(montoNum)} marcando la casilla`);
-      return;
-    }
     if (!clienteId.trim()) {
       setError("Selecciona un cliente");
       return;
@@ -276,6 +272,16 @@ export default function PrestamoTrabajadorPage() {
       setError("Ya tienes una solicitud pendiente. Espera la respuesta del administrador.");
       return;
     }
+    setError(null);
+    setShowModalPrestamo(true);
+  };
+
+  const handleEjecutarPrestamo = async () => {
+    if (!user) return;
+    const montoNum = interiorDecimalCOPToNumber(monto);
+    const nCuotas = Math.max(1, parseInt(numeroCuotas, 10) || 1);
+    const iVal = parseInteresPct(interes);
+
     setError(null);
     setExitoCreacion(null);
     setCreating(true);
@@ -294,8 +300,8 @@ export default function PrestamoTrabajadorPage() {
       setNumeroCuotas("");
       setInteres("");
       setModalidad("mensual");
-      setConfirmarMontoAlto(false);
       setEvaluacionAprobacion(null);
+      setShowModalPrestamo(false);
       setShowCreateForm(false);
       if (resultado.tipo === "prestamo_creado") {
         setExitoCreacion(resultado.mensaje || "Préstamo creado correctamente.");
@@ -352,9 +358,10 @@ export default function PrestamoTrabajadorPage() {
     ? montoNum * (1 + iVal / 100)
     : 0;
   const cuotaPorPago = totalAPagar > 0 && nCuotasVal >= 1 ? totalAPagar / nCuotasVal : 0;
-  const requiereConfirmarMonto = !isNaN(montoNum) && montoNum >= MONTO_CONFIRMAR_ALTO;
   const requiereAprobacionAdmin =
     evaluacionAprobacion?.requiereAprobacionAdmin ?? true;
+  const modalidadLabel =
+    MODALIDADES.find((m) => m.value === modalidad)?.label ?? modalidad;
 
   const busquedaTrim = busquedaNombre.trim();
   const busquedaLower = busquedaTrim.toLowerCase();
@@ -493,7 +500,7 @@ export default function PrestamoTrabajadorPage() {
       )}
 
       {showCreateForm && (
-      <form onSubmit={handleSubmit} className="card" style={{ marginBottom: "1.25rem" }}>
+      <form onSubmit={handleRevisarPrestamo} className="card" style={{ marginBottom: "1.25rem" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "0.75rem", marginBottom: "0.5rem" }}>
           <h3 style={{ margin: 0 }}>Solicitar préstamo</h3>
           <button
@@ -721,45 +728,11 @@ export default function PrestamoTrabajadorPage() {
           <button
             type="submit"
             className="btn btn-primary"
-            disabled={creating}
+            disabled={creating || showModalPrestamo}
             style={{ flexShrink: 0 }}
           >
-            {creating
-              ? "Procesando..."
-              : requiereAprobacionAdmin
-                ? "Solicitar aprobación"
-                : "Crear préstamo"}
+            {requiereAprobacionAdmin ? "Solicitar aprobación" : "Crear préstamo"}
           </button>
-          {requiereConfirmarMonto && (
-            <label
-              className="prestamo-nuevo-confirm-label"
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "0.65rem",
-                cursor: "pointer",
-                margin: 0,
-                flexShrink: 0,
-                lineHeight: 1.2,
-              }}
-            >
-              <input
-                type="checkbox"
-                checked={confirmarMontoAlto}
-                onChange={(e) => setConfirmarMontoAlto(e.target.checked)}
-                aria-label={`Confirmo solicitud de préstamo por ${formatMoneda(montoNum)}`}
-                style={{
-                  flexShrink: 0,
-                  cursor: "pointer",
-                  margin: "0 0.2rem",
-                  transform: "scale(1.5)",
-                  transformOrigin: "center",
-                  accentColor: "var(--link, #6366f1)",
-                }}
-              />
-              <span style={{ fontSize: "1.05rem" }}>Confirmo</span>
-            </label>
-          )}
         </div>
       </form>
       )}
@@ -921,6 +894,46 @@ export default function PrestamoTrabajadorPage() {
         )}
         </div>
       </>
+      )}
+
+      {showModalPrestamo && (
+        <ModalConfirmar
+          titulo={requiereAprobacionAdmin ? "Solicitar aprobación" : "Confirmar préstamo"}
+          labelConfirmar={requiereAprobacionAdmin ? "Sí, solicitar" : "Sí, crear préstamo"}
+          confirmando={creating}
+          onCancelar={() => {
+            if (creating) return;
+            setShowModalPrestamo(false);
+          }}
+          onConfirmar={() => { void handleEjecutarPrestamo(); }}
+        >
+          <p>
+            Cliente: <strong>{clienteSeleccionado?.nombre ?? "—"}</strong>
+          </p>
+          <p>
+            Monto: <strong>$ {formatMoneda(montoNum)}</strong>
+          </p>
+          <p>
+            Interés: <strong>{formatInteresResumenPct(iVal)}%</strong>
+          </p>
+          <p>
+            Cuotas: <strong>{nCuotasVal} ({modalidadLabel})</strong>
+          </p>
+          <p>
+            Total a pagar: <strong>$ {formatMoneda(totalAPagar)}</strong>
+          </p>
+          <p>
+            Cuota: <strong>$ {formatMoneda(cuotaPorPago)}</strong>
+          </p>
+          <p>
+            Se descontará de tu base: <strong>$ {formatMoneda(montoNum)}</strong>
+          </p>
+          {requiereAprobacionAdmin && (
+            <p style={{ color: "var(--warning, #eab308)" }}>
+              Este préstamo requiere aprobación del administrador.
+            </p>
+          )}
+        </ModalConfirmar>
       )}
     </div>
   );

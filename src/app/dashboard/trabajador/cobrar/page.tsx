@@ -23,6 +23,7 @@ import {
   formatMontoDecimalCOPDisplay,
   interiorDecimalCOPToNumber,
 } from "@/lib/monto-input-es";
+import { ModalConfirmar } from "@/components/trabajador/ModalConfirmar";
 
 /** Escala de captura: mínimo 2× para nitidez en móviles; tope para no disparar memoria ni el límite de subida. */
 function getComprobanteCaptureScale(): number {
@@ -176,6 +177,7 @@ function CobrarClientePageContent() {
   const [submitting, setSubmitting] = useState(false);
   /** Texto auxiliar durante envío (subidas en paralelo + API). */
   const [submitStatus, setSubmitStatus] = useState<string | null>(null);
+  const [showModalCobro, setShowModalCobro] = useState(false);
   const [confirmado, setConfirmado] = useState(false);
   const comprobanteRef = useRef<HTMLDivElement>(null);
   const comprobanteBlobRef = useRef<Blob | null>(null);
@@ -327,6 +329,8 @@ function CobrarClientePageContent() {
 
   const evidenciaRequerida = metodoPago === "transferencia";
   const puedeConfirmar = montoNum > 0 && metodoPago;
+  const clienteCobro =
+    cliente ?? clientesLista.find((x) => x.id === clienteId) ?? null;
 
   const setEvidencia = (file: File | null) => {
     setEvidenciaFile(file);
@@ -460,22 +464,32 @@ function CobrarClientePageContent() {
     }
   }, []);
 
-  const handleConfirmarCobro = async (e: React.FormEvent) => {
+  const handleRevisarCobro = (e: React.FormEvent) => {
     e.preventDefault();
     if (!user || !prestamo || !puedeConfirmar || !profile) return;
-    const prestamoAlCobrar = prestamo;
-    const clienteAlCobrar =
-      cliente ?? clientesLista.find((x) => x.id === clienteId) ?? null;
-    if (!clienteAlCobrar) {
+    if (!clienteCobro) {
       setError("Cliente no encontrado");
       return;
     }
-    const montoAplicarCobro = montoAplicar;
-    setError(null);
     if (evidenciaRequerida && !evidenciaFile) {
       setError("Transferencia: debes adjuntar 1 foto de evidencia.");
       return;
     }
+    setError(null);
+    setShowModalCobro(true);
+  };
+
+  const handleEjecutarCobro = async () => {
+    if (!user || !prestamo || !puedeConfirmar || !profile) return;
+    const prestamoAlCobrar = prestamo;
+    const clienteAlCobrar = clienteCobro;
+    if (!clienteAlCobrar) {
+      setError("Cliente no encontrado");
+      setShowModalCobro(false);
+      return;
+    }
+    const montoAplicarCobro = montoAplicar;
+    setError(null);
     setSubmitting(true);
     setSubmitStatus(null);
     const idempotencyKey = idempotencyKeyRef.current ?? crypto.randomUUID();
@@ -510,6 +524,7 @@ function CobrarClientePageContent() {
         prestamo: prestamoActualizado,
         montoAplicar: montoAplicarCobro,
       };
+      setShowModalCobro(false);
       setConfirmado(true);
       setNuevoSaldoPendiente(res.saldoPendiente);
       setCliente(clienteAlCobrar);
@@ -1148,7 +1163,7 @@ function CobrarClientePageContent() {
         </div>
       </div>
 
-      <form onSubmit={handleConfirmarCobro} className="cobrar-form">
+      <form onSubmit={handleRevisarCobro} className="cobrar-form">
         <div className="form-group">
           <label>Monto a recibir</label>
           <input
@@ -1298,12 +1313,34 @@ function CobrarClientePageContent() {
           <button
             type="submit"
             className="btn btn-primary"
-            disabled={!puedeConfirmar || submitting}
+            disabled={!puedeConfirmar || submitting || showModalCobro}
           >
-            {submitting ? submitStatus ?? "Registrando…" : "Confirmar cobro"}
+            Confirmar cobro
           </button>
         </div>
       </form>
+
+      {showModalCobro && prestamo && clienteCobro && (
+        <ModalConfirmar
+          titulo="Confirmar cobro"
+          labelConfirmar="Sí, registrar cobro"
+          confirmando={submitting}
+          onCancelar={() => setShowModalCobro(false)}
+          onConfirmar={() => { void handleEjecutarCobro(); }}
+        >
+          <p>
+            ¿Confirmas el cobro de <strong>{formatCurrency(montoAplicar)}</strong> a{" "}
+            <strong>{clienteCobro.nombre}</strong>?
+          </p>
+          <p>
+            Método: <strong>{metodoPago === "efectivo" ? "Efectivo" : "Transferencia"}</strong>
+          </p>
+          <p>
+            Saldo restante tras el cobro:{" "}
+            <strong>{formatCurrency(Math.max(0, saldoPendiente - montoAplicar))}</strong>
+          </p>
+        </ModalConfirmar>
+      )}
     </div>
   );
 }

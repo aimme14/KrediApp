@@ -18,12 +18,22 @@ import {
 } from "@/lib/colombia-day-bounds";
 import { filtrarGastosPorPeriodo, type GastosPeriodoVista } from "@/lib/gastos-periodo-filter";
 import { GastosPeriodoFilter, mensajeGastosVaciosPeriodo } from "@/components/GastosPeriodoFilter";
+import { ModalConfirmar } from "@/components/trabajador/ModalConfirmar";
 
 const TIPOS = [
   { value: "transporte", label: "Transporte", icon: "transporte" },
   { value: "alimentacion", label: "Alimentación", icon: "alimentacion" },
   { value: "otro", label: "Otro", icon: "otro" },
 ] as const;
+
+type TipoGasto = (typeof TIPOS)[number]["value"];
+
+type PendingGastoData = {
+  monto: number;
+  tipo: TipoGasto;
+  motivo: string;
+  conEvidencia: boolean;
+};
 
 function TransporteIcon() {
   return (
@@ -121,6 +131,8 @@ export default function GastosTrabajadorPage() {
   const [evidenciaFile, setEvidenciaFile] = useState<File | null>(null);
   const [evidenciaPreview, setEvidenciaPreview] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+  const [showModalGasto, setShowModalGasto] = useState(false);
+  const [pendingGastoData, setPendingGastoData] = useState<PendingGastoData | null>(null);
   const [motivoOverlay, setMotivoOverlay] = useState<string | null>(null);
   const [periodoVista, setPeriodoVista] = useState<GastosPeriodoVista>("hoy");
   const [searchQuery, setSearchQuery] = useState("");
@@ -282,14 +294,31 @@ export default function GastosTrabajadorPage() {
     setCameraError(null);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleRevisarGasto = (e: React.FormEvent) => {
     e.preventDefault();
     if (!user || !profile) return;
     const montoNum = interiorDecimalCOPToNumber(monto);
-    if (isNaN(montoNum) || montoNum < 0) {
-      setError("Monto debe ser un número mayor o igual a 0");
+    if (isNaN(montoNum) || montoNum <= 0) {
+      setError("El monto debe ser mayor a 0");
       return;
     }
+    const motivoTrim = motivo.trim();
+    if (!motivoTrim) {
+      setError("El motivo es obligatorio");
+      return;
+    }
+    setError(null);
+    setPendingGastoData({
+      monto: montoNum,
+      tipo,
+      motivo: motivoTrim,
+      conEvidencia: !!evidenciaFile,
+    });
+    setShowModalGasto(true);
+  };
+
+  const handleEjecutarGasto = async (data: PendingGastoData) => {
+    if (!user || !profile) return;
     setError(null);
     setCreating(true);
     try {
@@ -305,10 +334,10 @@ export default function GastosTrabajadorPage() {
       }
       const token = await user.getIdToken();
       await createGasto(token, {
-        descripcion: motivo.trim(),
-        monto: montoNum,
+        descripcion: data.motivo,
+        monto: data.monto,
         fecha: fechaDiaColombiaHoy(),
-        tipo,
+        tipo: data.tipo,
         evidencia: evidenciaUrl || undefined,
       });
       setMotivo("");
@@ -316,6 +345,8 @@ export default function GastosTrabajadorPage() {
       setTipo("otro");
       setEvidenciaFile(null);
       setEvidenciaPreview(null);
+      setPendingGastoData(null);
+      setShowModalGasto(false);
       setShowForm(false);
       void refreshCajaDia();
     } catch (e) {
@@ -345,7 +376,7 @@ export default function GastosTrabajadorPage() {
               <CloseIcon />
             </button>
           </div>
-          <form onSubmit={handleSubmit} className="gastos-form" noValidate>
+          <form onSubmit={handleRevisarGasto} className="gastos-form" noValidate>
             <div className="form-group">
               <label htmlFor="gastos-t-monto">Monto <span className="form-required" aria-hidden>*</span></label>
               <input id="gastos-t-monto" type="text" inputMode="decimal" value={monto ? formatMontoDecimalCOPDisplay(monto) : ""} onChange={(e) => setMonto(sanitizeMontoDecimalCOP(e.target.value))} required placeholder="Ej: 15000" aria-required="true" aria-invalid={error ? true : undefined} />
@@ -459,8 +490,8 @@ export default function GastosTrabajadorPage() {
             {error && <p className="error-msg" role="alert">{error}</p>}
             <p className="form-required-hint" aria-hidden>* Campos requeridos</p>
             <div className="gastos-form-actions">
-              <button type="submit" className="btn btn-primary" disabled={creating} aria-busy={creating}>
-                {creating ? "Guardando..." : "Registrar gasto"}
+              <button type="submit" className="btn btn-primary" disabled={creating || showModalGasto} aria-busy={creating}>
+                Registrar gasto
               </button>
               <button type="button" className="btn btn-secondary" onClick={() => setShowForm(false)} aria-label="Cancelar y cerrar formulario">
                 Cancelar
@@ -567,6 +598,33 @@ export default function GastosTrabajadorPage() {
             </button>
           </div>
         </div>
+      )}
+
+      {showModalGasto && pendingGastoData && (
+        <ModalConfirmar
+          titulo="Confirmar gasto"
+          labelConfirmar="Sí, registrar gasto"
+          confirmando={creating}
+          onCancelar={() => {
+            if (creating) return;
+            setShowModalGasto(false);
+            setPendingGastoData(null);
+          }}
+          onConfirmar={() => { void handleEjecutarGasto(pendingGastoData); }}
+        >
+          <p>
+            Tipo: <strong>{tipoLabel(pendingGastoData.tipo)}</strong>
+          </p>
+          <p>
+            Monto: <strong>{formatMoneda(pendingGastoData.monto)}</strong>
+          </p>
+          <p>
+            Motivo: <strong>{pendingGastoData.motivo}</strong>
+          </p>
+          <p>
+            Evidencia: <strong>{pendingGastoData.conEvidencia ? "Con foto adjunta" : "Sin evidencia"}</strong>
+          </p>
+        </ModalConfirmar>
       )}
     </div>
   );
