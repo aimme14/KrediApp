@@ -61,6 +61,9 @@ type DetalleFila = {
   nombre: string;
   capAp: number;
   capCi: number | null;
+  baseAp: number;
+  baseCi: number | null;
+  totalInvertido: number;
   ganancias: number;
   gastos: number;
   perdidas: number;
@@ -76,6 +79,9 @@ function buildAdminDetalleFila(
     nombre: nombreAdmin,
     capAp: ap.admin.capitalAdmin,
     capCi: ci?.admin.capitalAdmin ?? null,
+    baseAp: ap.admin.cajaAdmin,
+    baseCi: ci?.admin.cajaAdmin ?? null,
+    totalInvertido: 0,
     ganancias: gananciasRutasAdmin(rc),
     gastos: ci ? gastosPersonalesAdminSnapshot(ci) : 0,
     perdidas: 0,
@@ -179,6 +185,8 @@ export async function buildPeriodoAdminPdf(payload: PeriodoAdminPdfPayload): Pro
   const snapResumen = payload.cierre ?? payload.apertura;
   const capAdminAp = payload.apertura.admin.capitalAdmin;
   const capAdminCi = payload.cierre?.admin.capitalAdmin ?? null;
+  const baseAdminAp = payload.apertura.admin.cajaAdmin;
+  const baseAdminCi = payload.cierre?.admin.cajaAdmin ?? null;
   const utilidadNeta = capAdminCi !== null ? capAdminCi - capAdminAp : 0;
   const gananciasRutas = gananciasRutasAdmin(snapResumen);
   const gastosTotales = gastosTotalesAdmin(snapResumen);
@@ -186,22 +194,26 @@ export async function buildPeriodoAdminPdf(payload: PeriodoAdminPdfPayload): Pro
   const totAp = payload.apertura.rutas.reduce(
     (a, r) => ({
       capital: a.capital + r.capitalRuta,
+      base: a.base + r.cajaRuta,
+      totalInvertido: a.totalInvertido + (r.totalPrestado ?? 0),
       ganancias: a.ganancias + r.ganancias,
       gastos: a.gastos + gastosTotalesRutaSnapshot(r),
       perdidas: a.perdidas + r.perdidas,
     }),
-    { capital: 0, ganancias: 0, gastos: 0, perdidas: 0 }
+    { capital: 0, base: 0, totalInvertido: 0, ganancias: 0, gastos: 0, perdidas: 0 }
   );
 
   const totCi = payload.cierre
     ? payload.cierre.rutas.reduce(
         (a, r) => ({
           capital: a.capital + r.capitalRuta,
+          base: a.base + r.cajaRuta,
+          totalInvertido: a.totalInvertido + (r.totalPrestado ?? 0),
           ganancias: a.ganancias + r.ganancias,
           gastos: a.gastos + gastosTotalesRutaSnapshot(r),
           perdidas: a.perdidas + r.perdidas,
         }),
-        { capital: 0, ganancias: 0, gastos: 0, perdidas: 0 }
+        { capital: 0, base: 0, totalInvertido: 0, ganancias: 0, gastos: 0, perdidas: 0 }
       )
     : null;
 
@@ -224,6 +236,18 @@ export async function buildPeriodoAdminPdf(payload: PeriodoAdminPdfPayload): Pro
       value: fmtMoney(gastosTotales),
       barColor: C.danger,
       valueColor: C.danger,
+    },
+    {
+      label: "Base apertura",
+      value: fmtMoney(baseAdminAp),
+      barColor: rgb(0.35, 0.28, 0.55),
+      valueColor: C.text,
+    },
+    {
+      label: "Base cierre",
+      value: baseAdminCi !== null ? fmtMoney(baseAdminCi) : "—",
+      barColor: rgb(0.35, 0.28, 0.55),
+      valueColor: C.text,
     },
     {
       label: "Capital apertura",
@@ -259,34 +283,73 @@ export async function buildPeriodoAdminPdf(payload: PeriodoAdminPdfPayload): Pro
   y -= 56;
 
   type ColDef = { x: number; w: number };
-  type DetalleCols = {
-    nombre: ColDef;
-    capAp: ColDef;
-    capCi: ColDef;
-    ganancias: ColDef;
-    gastos: ColDef;
-    utilidad: ColDef;
-    perdidas?: ColDef;
+  type DetalleColKey =
+    | "nombre"
+    | "capAp"
+    | "capCi"
+    | "baseAp"
+    | "baseCi"
+    | "totalInvertido"
+    | "ganancias"
+    | "gastos"
+    | "utilidad"
+    | "perdidas";
+  type DetalleCols = Record<DetalleColKey, ColDef>;
+
+  const COL_GAP = 3;
+
+  const buildCols = (widths: Partial<Record<DetalleColKey, number>>): DetalleCols => {
+    const order: DetalleColKey[] = [
+      "nombre",
+      "capAp",
+      "capCi",
+      "baseAp",
+      "baseCi",
+      "totalInvertido",
+      "ganancias",
+      "gastos",
+      "perdidas",
+      "utilidad",
+    ];
+    let x = ML;
+    const cols = {} as DetalleCols;
+    for (const key of order) {
+      const w = widths[key] ?? 0;
+      if (w > 0) {
+        cols[key] = { x, w };
+        x += w + COL_GAP;
+      } else {
+        cols[key] = { x: 0, w: 0 };
+      }
+    }
+    return cols;
   };
 
-  const colsRuta: DetalleCols = {
-    nombre:    { x: ML,           w: 130 },
-    capAp:     { x: ML + 134,     w: 95  },
-    capCi:     { x: ML + 233,     w: 95  },
-    ganancias: { x: ML + 332,     w: 95  },
-    gastos:    { x: ML + 431,     w: 95  },
-    perdidas:  { x: ML + 530,     w: 90  },
-    utilidad:  { x: ML + 624,     w: 106 },
-  };
+  const colsRuta = buildCols({
+    nombre: 82,
+    capAp: 68,
+    capCi: 68,
+    baseAp: 68,
+    baseCi: 68,
+    totalInvertido: 72,
+    ganancias: 68,
+    gastos: 68,
+    perdidas: 62,
+    utilidad: 75,
+  });
 
-  const colsAdmin: DetalleCols = {
-    nombre:    { x: ML,           w: 130 },
-    capAp:     { x: ML + 134,     w: 105 },
-    capCi:     { x: ML + 243,     w: 105 },
-    ganancias: { x: ML + 352,     w: 105 },
-    gastos:    { x: ML + 461,     w: 115 },
-    utilidad:  { x: ML + 580,     w: 150 },
-  };
+  const colsAdmin = buildCols({
+    nombre: 90,
+    capAp: 82,
+    capCi: 82,
+    baseAp: 82,
+    baseCi: 82,
+    totalInvertido: 0,
+    ganancias: 82,
+    gastos: 82,
+    perdidas: 0,
+    utilidad: 90,
+  });
 
   const drawDetalleFila = (
     fila: DetalleFila,
@@ -311,13 +374,21 @@ export async function buildPeriodoAdminPdf(payload: PeriodoAdminPdfPayload): Pro
     const textY = opts?.total ? rowY - 12 : rowY - 10;
     const sz = 8;
 
-    txt(fila.nombre, cols.nombre.x + 3, textY, sz, nameFont, nameColor, cols.nombre.w - 4);
-    txt(fmtMoney(capAp), cols.capAp.x + 3, textY, sz, valueFont, valueColor);
-    txt(capCi !== null ? fmtMoney(capCi) : "—", cols.capCi.x + 3, textY, sz, valueFont, valueColor);
-    txt(fmtMoney(fila.ganancias), cols.ganancias.x + 3, textY, sz, valueFont, valueColor);
-    txt(fmtMoney(fila.gastos), cols.gastos.x + 3, textY, sz, valueFont, valueColor);
-    if (opts?.showPerdidas !== false && cols.perdidas) {
-      txt(fmtMoney(fila.perdidas), cols.perdidas.x + 3, textY, sz, valueFont, valueColor);
+    const drawMoney = (col: ColDef | undefined, value: number | null) => {
+      if (!col || col.w <= 0) return;
+      txt(value !== null ? fmtMoney(value) : "—", col.x + 2, textY, sz, valueFont, valueColor, col.w - 3);
+    };
+
+    txt(fila.nombre, cols.nombre.x + 2, textY, sz, nameFont, nameColor, cols.nombre.w - 3);
+    drawMoney(cols.capAp, capAp);
+    drawMoney(cols.capCi, capCi);
+    drawMoney(cols.baseAp, fila.baseAp);
+    drawMoney(cols.baseCi, fila.baseCi);
+    drawMoney(cols.totalInvertido, fila.totalInvertido);
+    drawMoney(cols.ganancias, fila.ganancias);
+    drawMoney(cols.gastos, fila.gastos);
+    if (opts?.showPerdidas !== false && cols.perdidas.w > 0) {
+      drawMoney(cols.perdidas, fila.perdidas);
     }
 
     if (util !== null) {
@@ -342,11 +413,14 @@ export async function buildPeriodoAdminPdf(payload: PeriodoAdminPdfPayload): Pro
     y -= 14;
 
     page.drawRectangle({ x: ML, y: y - 18, width: CONTENT_W, height: 18, color: C.headBg });
-    const headers: [string, keyof DetalleCols][] = showPerdidas
+    const headers: [string, DetalleColKey][] = showPerdidas
       ? [
           [nombreHeader, "nombre"],
           ["Cap. Inicio", "capAp"],
           ["Cap. Final", "capCi"],
+          ["Base Inicio", "baseAp"],
+          ["Base Final", "baseCi"],
+          ["Tot. Inv.", "totalInvertido"],
           ["Ganancias", "ganancias"],
           ["Gastos", "gastos"],
           ["Perdidas", "perdidas"],
@@ -356,14 +430,16 @@ export async function buildPeriodoAdminPdf(payload: PeriodoAdminPdfPayload): Pro
           [nombreHeader, "nombre"],
           ["Cap. Inicio", "capAp"],
           ["Cap. Final", "capCi"],
+          ["Base Inicio", "baseAp"],
+          ["Base Final", "baseCi"],
           ["Ganancias", "ganancias"],
           ["Gastos", "gastos"],
           ["Util. cap.", "utilidad"],
         ];
-    headers.forEach(([label, col]) => {
-      const c = cols[col];
-      if (!c) return;
-      txt(label, c.x + 3, y - 12, 7, fontBold, C.headText);
+    headers.forEach(([label, colKey]) => {
+      const c = cols[colKey];
+      if (!c || c.w <= 0) return;
+      txt(label, c.x + 2, y - 12, 6.5, fontBold, C.headText, c.w - 3);
     });
     y -= 20;
 
@@ -393,6 +469,9 @@ export async function buildPeriodoAdminPdf(payload: PeriodoAdminPdfPayload): Pro
       nombre: ra?.nombre ?? rc?.nombre ?? rid,
       capAp: ra?.capitalRuta ?? 0,
       capCi: rc?.capitalRuta ?? null,
+      baseAp: ra?.cajaRuta ?? 0,
+      baseCi: rc?.cajaRuta ?? null,
+      totalInvertido: rc?.totalPrestado ?? ra?.totalPrestado ?? 0,
       ganancias: rc?.ganancias ?? ra?.ganancias ?? 0,
       gastos: gastosTotalesRutaSnapshot(rc ?? ra),
       perdidas: rc?.perdidas ?? ra?.perdidas ?? 0,
@@ -405,6 +484,9 @@ export async function buildPeriodoAdminPdf(payload: PeriodoAdminPdfPayload): Pro
           nombre: "TOTAL",
           capAp: totAp.capital,
           capCi: totCi?.capital ?? null,
+          baseAp: totAp.base,
+          baseCi: totCi?.base ?? null,
+          totalInvertido: totCi?.totalInvertido ?? totAp.totalInvertido,
           ganancias: totCi?.ganancias ?? totAp.ganancias,
           gastos: totCi?.gastos ?? totAp.gastos,
           perdidas: totCi?.perdidas ?? totAp.perdidas,

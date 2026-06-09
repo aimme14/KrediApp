@@ -30,6 +30,8 @@ export type PeriodoAdminSnapshotRuta = {
   cajaRuta: number;
   cajasEmpleados: number;
   inversiones: number;
+  /** Préstamos desembolsados en el periodo (se reinicia al cerrar). */
+  totalPrestado?: number;
   ganancias: number;
   perdidas: number;
   gastosRuta: number;
@@ -95,6 +97,8 @@ export async function buildPeriodoAdminSnapshot(
     const cajasEmpleados =
       typeof data.cajasEmpleados === "number" ? data.cajasEmpleados : 0;
     const inversiones = typeof data.inversiones === "number" ? data.inversiones : 0;
+    const totalPrestado =
+      typeof data.totalPrestado === "number" ? data.totalPrestado : 0;
     const ganancias = typeof data.ganancias === "number" ? data.ganancias : 0;
     const perdidas = typeof data.perdidas === "number" ? data.perdidas : 0;
 
@@ -111,6 +115,7 @@ export async function buildPeriodoAdminSnapshot(
       cajaRuta,
       cajasEmpleados,
       inversiones,
+      totalPrestado: round2(totalPrestado),
       ganancias,
       perdidas,
       capitalRuta: round2(capitalRuta),

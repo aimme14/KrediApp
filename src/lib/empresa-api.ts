@@ -1233,6 +1233,8 @@ export type PeriodoAdminSnapshotRuta = {
   cajaRuta: number;
   cajasEmpleados: number;
   inversiones: number;
+  /** Préstamos desembolsados en el periodo (se reinicia al cerrar). */
+  totalPrestado?: number;
   ganancias: number;
   perdidas: number;
   gastosRuta: number;
