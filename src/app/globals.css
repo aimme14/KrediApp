@@ -1626,6 +1626,45 @@ td {
   letter-spacing: 0.02em;
   text-transform: uppercase;
 }
+.resumen-comparar-admin-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+.resumen-comparar-admin-stat {
+  padding: 0.875rem 1rem;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius);
+  min-width: 0;
+}
+.resumen-comparar-admin-label {
+  margin: 0 0 0.25rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  line-height: 1.25;
+}
+.resumen-comparar-admin-value {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.resumen-comparar-admin-value--positive {
+  color: var(--success, #16a34a);
+}
+.resumen-comparar-admin-value--negative {
+  color: var(--danger, #dc2626);
+}
+.resumen-comparar-admin-value--muted {
+  color: var(--text-muted);
+}
 .resumen-comparar-cards {
   display: none;
 }
@@ -1682,13 +1721,14 @@ td {
   border-bottom: none !important;
   padding-top: 0.5rem;
 }
-@media (max-width: 768px) {
+/* Tablet y móvil: tarjetas por ruta (la tabla se comprime demasiado) */
+@media (max-width: 1024px) {
   .resumen-comparar-table-wrap {
     display: none;
   }
   .resumen-comparar-cards {
-    display: flex;
-    flex-direction: column;
+    display: grid;
+    grid-template-columns: 1fr;
     gap: 0.65rem;
   }
   .resumen-comparar-ruta-card {
@@ -1696,6 +1736,7 @@ td {
     border-radius: 10px;
     padding: 0.75rem 0.85rem;
     background: var(--bg, transparent);
+    min-width: 0;
   }
   [data-theme="dark"] .resumen-comparar-ruta-card {
     background: rgba(255, 255, 255, 0.02);
@@ -1725,6 +1766,7 @@ td {
     font-size: 0.75rem;
     color: var(--text-muted);
     font-weight: 500;
+    flex-shrink: 0;
   }
   .resumen-comparar-dl-row dd {
     margin: 0;
@@ -1732,9 +1774,45 @@ td {
     font-variant-numeric: tabular-nums;
     text-align: right;
     font-weight: 600;
+    overflow-wrap: anywhere;
+    word-break: break-word;
   }
 }
-@media (min-width: 769px) {
+/* Tablet: dos columnas de rutas cuando hay espacio */
+@media (min-width: 600px) and (max-width: 1024px) {
+  .resumen-comparar-cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem;
+  }
+  .resumen-comparar-ruta-card--total {
+    grid-column: 1 / -1;
+  }
+}
+/* Móvil: posición del administrador en 2 columnas legibles */
+@media (max-width: 767px) {
+  .resumen-comparar-admin-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.5rem;
+    margin-bottom: 1.25rem;
+  }
+  .resumen-comparar-admin-stat {
+    padding: 0.65rem 0.7rem;
+  }
+  .resumen-comparar-admin-label {
+    font-size: 0.625rem;
+    letter-spacing: 0.04em;
+  }
+  .resumen-comparar-admin-value {
+    font-size: 0.875rem;
+    line-height: 1.3;
+  }
+}
+@media (max-width: 400px) {
+  .resumen-comparar-admin-grid {
+    grid-template-columns: 1fr;
+  }
+}
+@media (min-width: 1025px) {
   .table-wrap.resumen-comparar-table-wrap table.resumen-comparar-table {
     table-layout: fixed;
     width: 100%;

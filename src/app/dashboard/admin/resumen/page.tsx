@@ -281,68 +281,42 @@ export default function ResumenPage() {
           ) : detalle && ap ? (
             <>
               <p className="resumen-comparar-section-label">Posición del administrador</p>
-              <div
-                className="resumen-comparar-admin-grid"
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
-                  gap: "0.75rem",
-                  marginBottom: "1.5rem",
-                }}
-              >
+              <div className="resumen-comparar-admin-grid">
                 {[
-                  { label: "Caja admin apertura", valor: fmt(ap.admin.cajaAdmin), color: "var(--text)" },
-                  { label: "Caja admin cierre", valor: ci ? fmt(ci.admin.cajaAdmin) : "—", color: "var(--text)" },
-                  { label: "Capital admin apertura", valor: fmt(ap.admin.capitalAdmin), color: "var(--text)" },
-                  { label: "Capital admin cierre", valor: ci ? fmt(ci.admin.capitalAdmin) : "—", color: "var(--text)" },
+                  { label: "Caja admin apertura", valor: fmt(ap.admin.cajaAdmin), tone: "neutral" as const },
+                  { label: "Caja admin cierre", valor: ci ? fmt(ci.admin.cajaAdmin) : "—", tone: "neutral" as const },
+                  { label: "Capital admin apertura", valor: fmt(ap.admin.capitalAdmin), tone: "neutral" as const },
+                  { label: "Capital admin cierre", valor: ci ? fmt(ci.admin.capitalAdmin) : "—", tone: "neutral" as const },
                   {
                     label: "Variación capital admin",
                     valor: ci
                       ? `${ci.admin.capitalAdmin - ap.admin.capitalAdmin >= 0 ? "+" : ""}${fmt(ci.admin.capitalAdmin - ap.admin.capitalAdmin)}`
                       : "—",
-                    color: ci
+                    tone: ci
                       ? ci.admin.capitalAdmin - ap.admin.capitalAdmin >= 0
-                        ? "var(--success, #16a34a)"
-                        : "var(--danger, #dc2626)"
-                      : "var(--text-muted)",
+                        ? ("positive" as const)
+                        : ("negative" as const)
+                      : ("muted" as const),
                   },
                   {
                     label: "Ganancias rutas",
                     valor: fmt(ci?.admin.gananciasRutas ?? ap.admin.gananciasRutas ?? 0),
-                    color: "var(--success, #16a34a)",
+                    tone: "positive" as const,
                   },
                   {
                     label: "Gastos admin",
                     valor: fmt(ci?.admin.gastosAdmin ?? ap.admin.gastosAdmin ?? 0),
-                    color: "var(--danger, #dc2626)",
+                    tone: "negative" as const,
                   },
                   {
                     label: "Gastos totales",
                     valor: fmt(ci?.admin.gastosTotales ?? ap.admin.gastosTotales ?? 0),
-                    color: "var(--danger, #dc2626)",
+                    tone: "negative" as const,
                   },
                 ].map((item) => (
-                  <div
-                    key={item.label}
-                    style={{
-                      padding: "0.875rem 1rem",
-                      background: "var(--card-bg)",
-                      border: "1px solid var(--card-border)",
-                      borderRadius: "var(--radius)",
-                    }}
-                  >
-                    <p
-                      style={{
-                        margin: "0 0 0.25rem",
-                        fontSize: "0.75rem",
-                        color: "var(--text-muted)",
-                        textTransform: "uppercase",
-                        letterSpacing: "0.05em",
-                      }}
-                    >
-                      {item.label}
-                    </p>
-                    <p style={{ margin: 0, fontSize: "1.1rem", fontWeight: 700, color: item.color }}>
+                  <div key={item.label} className="resumen-comparar-admin-stat">
+                    <p className="resumen-comparar-admin-label">{item.label}</p>
+                    <p className={`resumen-comparar-admin-value resumen-comparar-admin-value--${item.tone}`}>
                       $ {item.valor}
                     </p>
                   </div>
@@ -354,9 +328,21 @@ export default function ResumenPage() {
                   const ra = ap.rutas.find((r) => r.rutaId === rid);
                   const rc = ci?.rutas.find((r) => r.rutaId === rid);
                   const nombre = ra?.nombre ?? rc?.nombre ?? rid;
+                  const variacion =
+                    rc && ra ? rc.capitalRuta - ra.capitalRuta : null;
                   const filas = [
+                    { label: "Caja apertura", value: fmt(ra?.cajaRuta ?? 0) },
+                    { label: "Caja cierre", value: rc ? fmt(rc.cajaRuta) : "—" },
+                    { label: "Inversiones", value: fmt(rc?.inversiones ?? ra?.inversiones ?? 0) },
                     { label: "Cap. apertura", value: fmt(ra?.capitalRuta ?? 0) },
                     { label: "Cap. cierre", value: rc ? fmt(rc.capitalRuta) : "—" },
+                    {
+                      label: "Variación",
+                      value:
+                        variacion !== null
+                          ? `${variacion >= 0 ? "+" : ""}${fmt(variacion)}`
+                          : "—",
+                    },
                     { label: "Ganancias", value: fmt(rc?.ganancias ?? ra?.ganancias ?? 0) },
                     { label: "Gastos", value: fmt(gastosPeriodoRuta(rc, ra)) },
                     { label: "Pérdidas", value: fmt(rc?.perdidas ?? ra?.perdidas ?? 0) },
@@ -379,9 +365,21 @@ export default function ResumenPage() {
                   (() => {
                     const totAp = calcularTotales(ap.rutas);
                     const totCi = ci ? calcularTotales(ci.rutas) : null;
+                    const variacionTotal =
+                      totCi && totAp ? totCi.capitalRuta - totAp.capitalRuta : null;
                     const filas = [
+                      { label: "Caja apertura", value: fmt(totAp.cajaRuta) },
+                      { label: "Caja cierre", value: totCi ? fmt(totCi.cajaRuta) : "—" },
+                      { label: "Inversiones", value: fmt(totCi?.inversiones ?? totAp.inversiones) },
                       { label: "Cap. apertura", value: fmt(totAp.capitalRuta) },
                       { label: "Cap. cierre", value: totCi ? fmt(totCi.capitalRuta) : "—" },
+                      {
+                        label: "Variación",
+                        value:
+                          variacionTotal !== null
+                            ? `${variacionTotal >= 0 ? "+" : ""}${fmt(variacionTotal)}`
+                            : "—",
+                      },
                       { label: "Ganancias", value: fmt(totCi?.ganancias ?? totAp.ganancias) },
                       { label: "Gastos", value: fmt(totCi?.gastosTotales ?? totAp.gastosTotales) },
                       { label: "Pérdidas", value: fmt(totCi?.perdidas ?? totAp.perdidas) },
