@@ -3342,6 +3342,22 @@ td {
   filter: brightness(1.06);
 }
 
+/* Vista Morosos: badge "activo" y botón cobro en rojo */
+.prestamo-admin-hist-card--moroso .prestamo-admin-estado--activo {
+  background: color-mix(in srgb, #f87171 20%, transparent);
+  color: #fecaca;
+  border: 1px solid color-mix(in srgb, #f87171 40%, transparent);
+}
+
+[data-theme="light"] .prestamo-admin-hist-card--moroso .prestamo-admin-estado--activo {
+  color: #b91c1c;
+}
+
+.prestamo-admin-hist-card--moroso .prestamo-admin-cobro-btn.btn-primary {
+  background: linear-gradient(145deg, #ef4444 0%, #dc2626 100%);
+  box-shadow: 0 1px 4px rgba(220, 38, 38, 0.35);
+}
+
 .prestamo-admin-cobro-btn--sm {
   padding: 0.22rem 0.45rem !important;
   font-size: 0.72rem !important;

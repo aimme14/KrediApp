@@ -664,7 +664,7 @@ export default function PrestamoPage() {
             </div>
           </div>
         )}
-        <div className="card prestamo-admin-hist-card">
+        <div className={`card prestamo-admin-hist-card${filtroEstado === "moroso" ? " prestamo-admin-hist-card--moroso" : ""}`}>
         <div className="prestamo-admin-hist-head">
           <h3 className="prestamo-admin-hist-title">Historial de préstamos</h3>
           <button
