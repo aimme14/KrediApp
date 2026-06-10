@@ -1,12 +1,101 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<coverage generated="1780678269402" clover="3.2.0">
-  <project timestamp="1780678269402" name="All files">
-    <metrics statements="82" coveredstatements="79" conditionals="55" coveredconditionals="44" methods="14" coveredmethods="14" elements="151" coveredelements="137" complexity="0" loc="82" ncloc="82" packages="1" files="3" classes="3"/>
-    <file name="capital-formulas.ts" path="C:\Users\JOSUE.WIN-88BHFO68NK9\Documents\KrediApp\src\lib\capital-formulas.ts">
+<coverage generated="1781124952019" clover="3.2.0">
+  <project timestamp="1781124952019" name="All files">
+    <metrics statements="254" coveredstatements="208" conditionals="236" coveredconditionals="127" methods="46" coveredmethods="40" elements="536" coveredelements="375" complexity="0" loc="254" ncloc="254" packages="1" files="6" classes="6"/>
+    <file name="admin-notificaciones-operativas.ts" path="C:\Users\Administrator\Music\KrediApp\src\lib\admin-notificaciones-operativas.ts">
+      <metrics statements="86" coveredstatements="63" conditionals="105" coveredconditionals="43" methods="14" coveredmethods="12"/>
+      <line num="7" count="1" type="stmt"/>
+      <line num="14" count="1" type="stmt"/>
+      <line num="28" count="6" type="stmt"/>
+      <line num="29" count="6" type="stmt"/>
+      <line num="33" count="3" type="stmt"/>
+      <line num="34" count="3" type="cond" truecount="1" falsecount="1"/>
+      <line num="38" count="9" type="cond" truecount="5" falsecount="0"/>
+      <line num="39" count="7" type="stmt"/>
+      <line num="40" count="7" type="cond" truecount="1" falsecount="1"/>
+      <line num="42" count="2" type="cond" truecount="1" falsecount="1"/>
+      <line num="43" count="0" type="stmt"/>
+      <line num="44" count="0" type="cond" truecount="0" falsecount="2"/>
+      <line num="46" count="2" type="cond" truecount="2" falsecount="2"/>
+      <line num="47" count="2" type="stmt"/>
+      <line num="48" count="2" type="cond" truecount="1" falsecount="1"/>
+      <line num="50" count="0" type="stmt"/>
+      <line num="54" count="1" type="stmt"/>
+      <line num="55" count="1" type="cond" truecount="1" falsecount="1"/>
+      <line num="56" count="1" type="stmt"/>
+      <line num="61" count="3" type="cond" truecount="2" falsecount="0"/>
+      <line num="62" count="2" type="stmt"/>
+      <line num="64" count="1" type="stmt"/>
+      <line num="65" count="1" type="cond" truecount="2" falsecount="0"/>
+      <line num="76" count="3" type="cond" truecount="2" falsecount="0"/>
+      <line num="77" count="2" type="stmt"/>
+      <line num="79" count="1" type="stmt"/>
+      <line num="80" count="1" type="stmt"/>
+      <line num="81" count="1" type="cond" truecount="3" falsecount="1"/>
+      <line num="82" count="1" type="cond" truecount="1" falsecount="1"/>
+      <line num="85" count="1" type="cond" truecount="2" falsecount="0"/>
+      <line num="87" count="1" type="stmt"/>
+      <line num="88" count="1" type="stmt"/>
+      <line num="96" count="1" type="cond" truecount="1" falsecount="1"/>
+      <line num="98" count="1" type="stmt"/>
+      <line num="99" count="1" type="stmt"/>
+      <line num="100" count="8" type="stmt"/>
+      <line num="102" count="1" type="stmt"/>
+      <line num="105" count="1" type="stmt"/>
+      <line num="112" count="1" type="stmt"/>
+      <line num="119" count="1" type="stmt"/>
+      <line num="123" count="3" type="cond" truecount="1" falsecount="1"/>
+      <line num="124" count="3" type="stmt"/>
+      <line num="126" count="3" type="cond" truecount="2" falsecount="1"/>
+      <line num="128" count="3" type="cond" truecount="1" falsecount="1"/>
+      <line num="130" count="3" type="cond" truecount="2" falsecount="1"/>
+      <line num="133" count="3" type="cond" truecount="1" falsecount="1"/>
+      <line num="134" count="3" type="stmt"/>
+      <line num="143" count="1" type="stmt"/>
+      <line num="148" count="0" type="stmt"/>
+      <line num="149" count="0" type="cond" truecount="0" falsecount="2"/>
+      <line num="151" count="0" type="cond" truecount="0" falsecount="3"/>
+      <line num="152" count="0" type="stmt"/>
+      <line num="161" count="1" type="stmt"/>
+      <line num="166" count="2" type="stmt"/>
+      <line num="167" count="2" type="cond" truecount="1" falsecount="1"/>
+      <line num="169" count="2" type="cond" truecount="2" falsecount="1"/>
+      <line num="171" count="2" type="cond" truecount="1" falsecount="1"/>
+      <line num="172" count="2" type="stmt"/>
+      <line num="184" count="1" type="stmt"/>
+      <line num="189" count="1" type="stmt"/>
+      <line num="191" count="1" type="cond" truecount="2" falsecount="1"/>
+      <line num="193" count="1" type="cond" truecount="1" falsecount="1"/>
+      <line num="194" count="1" type="stmt"/>
+      <line num="207" count="1" type="stmt"/>
+      <line num="211" count="0" type="stmt"/>
+      <line num="212" count="0" type="cond" truecount="0" falsecount="2"/>
+      <line num="215" count="0" type="cond" truecount="0" falsecount="3"/>
+      <line num="217" count="0" type="cond" truecount="0" falsecount="2"/>
+      <line num="219" count="0" type="cond" truecount="0" falsecount="2"/>
+      <line num="220" count="0" type="cond" truecount="0" falsecount="2"/>
+      <line num="222" count="0" type="cond" truecount="0" falsecount="2"/>
+      <line num="223" count="0" type="stmt"/>
+      <line num="235" count="0" type="cond" truecount="0" falsecount="2"/>
+      <line num="237" count="0" type="cond" truecount="0" falsecount="8"/>
+      <line num="238" count="0" type="stmt"/>
+      <line num="247" count="0" type="cond" truecount="0" falsecount="2"/>
+      <line num="248" count="0" type="cond" truecount="0" falsecount="2"/>
+      <line num="250" count="0" type="cond" truecount="0" falsecount="8"/>
+      <line num="251" count="0" type="stmt"/>
+      <line num="263" count="0" type="stmt"/>
+      <line num="266" count="1" type="stmt"/>
+      <line num="269" count="1" type="stmt"/>
+      <line num="270" count="1" type="stmt"/>
+      <line num="271" count="2" type="stmt"/>
+      <line num="272" count="3" type="stmt"/>
+      <line num="275" count="2" type="stmt"/>
+    </file>
+    <file name="capital-formulas.ts" path="C:\Users\Administrator\Music\KrediApp\src\lib\capital-formulas.ts">
       <metrics statements="13" coveredstatements="13" conditionals="2" coveredconditionals="2" methods="6" coveredmethods="6"/>
-      <line num="7" count="21" type="stmt"/>
+      <line num="7" count="23" type="stmt"/>
       <line num="15" count="2" type="stmt"/>
-      <line num="21" count="19" type="stmt"/>
+      <line num="21" count="21" type="stmt"/>
       <line num="28" count="2" type="stmt"/>
       <line num="32" count="3" type="stmt"/>
       <line num="41" count="2" type="stmt"/>
@@ -18,11 +107,91 @@
       <line num="68" count="2" type="stmt"/>
       <line num="76" count="2" type="stmt"/>
     </file>
-    <file name="ruta-financiera-compute.ts" path="C:\Users\JOSUE.WIN-88BHFO68NK9\Documents\KrediApp\src\lib\ruta-financiera-compute.ts">
-      <metrics statements="63" coveredstatements="60" conditionals="49" coveredconditionals="41" methods="5" coveredmethods="5"/>
+    <file name="colombia-day-bounds.ts" path="C:\Users\Administrator\Music\KrediApp\src\lib\colombia-day-bounds.ts">
+      <metrics statements="66" coveredstatements="47" conditionals="63" coveredconditionals="30" methods="13" coveredmethods="9"/>
+      <line num="6" count="2" type="stmt"/>
+      <line num="7" count="14" type="cond" truecount="1" falsecount="1"/>
+      <line num="8" count="14" type="stmt"/>
+      <line num="9" count="14" type="stmt"/>
+      <line num="10" count="14" type="stmt"/>
+      <line num="11" count="14" type="stmt"/>
+      <line num="12" count="14" type="cond" truecount="4" falsecount="1"/>
+      <line num="13" count="14" type="cond" truecount="5" falsecount="1"/>
+      <line num="14" count="14" type="stmt"/>
+      <line num="18" count="2" type="stmt"/>
+      <line num="19" count="14" type="stmt"/>
+      <line num="20" count="14" type="cond" truecount="1" falsecount="1"/>
+      <line num="21" count="14" type="stmt"/>
+      <line num="22" count="14" type="stmt"/>
+      <line num="26" count="2" type="stmt"/>
+      <line num="27" count="0" type="stmt"/>
+      <line num="28" count="0" type="cond" truecount="0" falsecount="2"/>
+      <line num="29" count="0" type="stmt"/>
+      <line num="33" count="2" type="stmt"/>
+      <line num="34" count="0" type="cond" truecount="0" falsecount="2"/>
+      <line num="35" count="0" type="stmt"/>
+      <line num="36" count="0" type="cond" truecount="0" falsecount="2"/>
+      <line num="37" count="0" type="stmt"/>
+      <line num="46" count="2" type="stmt"/>
+      <line num="47" count="2" type="stmt"/>
+      <line num="52" count="2" type="stmt"/>
+      <line num="54" count="2" type="stmt"/>
+      <line num="57" count="8" type="stmt"/>
+      <line num="65" count="8" type="stmt"/>
+      <line num="66" count="128" type="cond" truecount="6" falsecount="2"/>
+      <line num="67" count="8" type="stmt"/>
+      <line num="76" count="2" type="stmt"/>
+      <line num="77" count="4" type="stmt"/>
+      <line num="78" count="4" type="cond" truecount="1" falsecount="1"/>
+      <line num="79" count="4" type="stmt"/>
+      <line num="80" count="4" type="stmt"/>
+      <line num="81" count="4" type="cond" truecount="1" falsecount="1"/>
+      <line num="82" count="4" type="cond" truecount="1" falsecount="1"/>
+      <line num="83" count="4" type="stmt"/>
+      <line num="90" count="2" type="stmt"/>
+      <line num="126" count="2" type="stmt"/>
+      <line num="127" count="0" type="cond" truecount="0" falsecount="6"/>
+      <line num="128" count="0" type="stmt"/>
+      <line num="129" count="0" type="cond" truecount="0" falsecount="2"/>
+      <line num="130" count="0" type="cond" truecount="0" falsecount="4"/>
+      <line num="132" count="0" type="stmt"/>
+      <line num="136" count="9" type="stmt"/>
+      <line num="147" count="2" type="stmt"/>
+      <line num="148" count="0" type="cond" truecount="0" falsecount="2"/>
+      <line num="149" count="0" type="stmt"/>
+      <line num="150" count="0" type="stmt"/>
+      <line num="151" count="0" type="cond" truecount="0" falsecount="2"/>
+      <line num="152" count="0" type="cond" truecount="0" falsecount="2"/>
+      <line num="153" count="0" type="stmt"/>
+      <line num="155" count="0" type="stmt"/>
+      <line num="159" count="2" type="stmt"/>
+      <line num="160" count="14" type="cond" truecount="2" falsecount="0"/>
+      <line num="161" count="10" type="stmt"/>
+      <line num="162" count="10" type="stmt"/>
+      <line num="163" count="10" type="cond" truecount="2" falsecount="0"/>
+      <line num="164" count="9" type="cond" truecount="2" falsecount="0"/>
+      <line num="165" count="3" type="stmt"/>
+      <line num="166" count="3" type="stmt"/>
+      <line num="167" count="3" type="stmt"/>
+      <line num="168" count="3" type="stmt"/>
+      <line num="170" count="6" type="stmt"/>
+    </file>
+    <file name="gastos-periodo-filter.ts" path="C:\Users\Administrator\Music\KrediApp\src\lib\gastos-periodo-filter.ts">
+      <metrics statements="8" coveredstatements="8" conditionals="6" coveredconditionals="4" methods="4" coveredmethods="4"/>
+      <line num="1" count="1" type="stmt"/>
+      <line num="12" count="1" type="stmt"/>
+      <line num="16" count="13" type="stmt"/>
+      <line num="17" count="13" type="cond" truecount="2" falsecount="0"/>
+      <line num="21" count="1" type="stmt"/>
+      <line num="26" count="2" type="cond" truecount="2" falsecount="0"/>
+      <line num="27" count="3" type="stmt"/>
+      <line num="29" count="3" type="stmt"/>
+    </file>
+    <file name="ruta-financiera-compute.ts" path="C:\Users\Administrator\Music\KrediApp\src\lib\ruta-financiera-compute.ts">
+      <metrics statements="75" coveredstatements="71" conditionals="56" coveredconditionals="47" methods="6" coveredmethods="6"/>
       <line num="5" count="1" type="stmt"/>
       <line num="7" count="1" type="stmt"/>
-      <line num="8" count="136" type="stmt"/>
+      <line num="8" count="139" type="stmt"/>
       <line num="15" count="1" type="stmt"/>
       <line num="20" count="17" type="cond" truecount="2" falsecount="0"/>
       <line num="21" count="15" type="cond" truecount="1" falsecount="1"/>
@@ -83,8 +252,20 @@
       <line num="182" count="5" type="cond" truecount="1" falsecount="1"/>
       <line num="183" count="0" type="stmt"/>
       <line num="186" count="5" type="stmt"/>
+      <line num="204" count="1" type="stmt"/>
+      <line num="212" count="3" type="cond" truecount="1" falsecount="0"/>
+      <line num="214" count="3" type="cond" truecount="2" falsecount="0"/>
+      <line num="215" count="2" type="cond" truecount="2" falsecount="0"/>
+      <line num="217" count="1" type="stmt"/>
+      <line num="224" count="1" type="stmt"/>
+      <line num="225" count="1" type="stmt"/>
+      <line num="226" count="1" type="stmt"/>
+      <line num="227" count="1" type="stmt"/>
+      <line num="234" count="1" type="cond" truecount="1" falsecount="1"/>
+      <line num="235" count="0" type="stmt"/>
+      <line num="238" count="1" type="stmt"/>
     </file>
-    <file name="tu-caja-del-dia.ts" path="C:\Users\JOSUE.WIN-88BHFO68NK9\Documents\KrediApp\src\lib\tu-caja-del-dia.ts">
+    <file name="tu-caja-del-dia.ts" path="C:\Users\Administrator\Music\KrediApp\src\lib\tu-caja-del-dia.ts">
       <metrics statements="6" coveredstatements="6" conditionals="4" coveredconditionals="1" methods="3" coveredmethods="3"/>
       <line num="6" count="1" type="stmt"/>
       <line num="12" count="7" type="stmt"/>

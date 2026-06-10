@@ -9,6 +9,16 @@ import { inicioDiaColombiaUtc } from "@/lib/colombia-day-bounds";
 
 const HOY = "2026-06-08";
 
+beforeAll(() => {
+  jest.useFakeTimers();
+  const inicio = inicioDiaColombiaUtc(HOY)!.getTime();
+  jest.setSystemTime(inicio + 12 * 60 * 60 * 1000);
+});
+
+afterAll(() => {
+  jest.useRealTimers();
+});
+
 function tsAtColombiaHour(hour: number, minute = 0): number {
   const start = inicioDiaColombiaUtc(HOY)!.getTime();
   return start + hour * 60 * 60 * 1000 + minute * 60 * 1000;
