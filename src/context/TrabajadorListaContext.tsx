@@ -24,7 +24,12 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/context/AuthContext";
-import { type ClienteItem, type PrestamoItem } from "@/lib/empresa-api";
+import {
+  esPrestamoDeClienteMoroso,
+  syncMorosoPrestamos,
+  type ClienteItem,
+  type PrestamoItem,
+} from "@/lib/empresa-api";
 
 const EMPRESAS_COLLECTION = "empresas";
 const PRESTAMOS_SUBCOLLECTION = "prestamos";
@@ -59,6 +64,16 @@ export type TrabajadorListaContextValue = {
 
 const TrabajadorListaContext = createContext<TrabajadorListaContextValue | null>(null);
 
+function enriquecerMorosoPrestamo(
+  p: PrestamoItem,
+  morosoPorCliente: Map<string, boolean>
+): PrestamoItem {
+  return {
+    ...p,
+    moroso: esPrestamoDeClienteMoroso(p, morosoPorCliente.get(p.clienteId)),
+  };
+}
+
 function mapPrestamo(d: QueryDocumentSnapshot): PrestamoItem {
   const data = d.data();
   return {
@@ -77,10 +92,10 @@ function mapPrestamo(d: QueryDocumentSnapshot): PrestamoItem {
     fechaInicio: data.fechaInicio?.toDate?.()?.toISOString?.() ?? null,
     fechaVencimiento: data.fechaVencimiento?.toDate?.()?.toISOString?.() ?? null,
     creadoEn: data.creadoEn?.toDate?.()?.toISOString?.() ?? null,
-    multaMora: data.multaMora ?? 0,
     adelantoCuota: data.adelantoCuota ?? 0,
     ultimoPagoFecha: data.ultimoPagoFecha?.toDate?.()?.toISOString?.() ?? null,
     intentosFallidos: typeof data.intentosFallidos === "number" ? data.intentosFallidos : 0,
+    moroso: data.moroso === true,
   };
 }
 
@@ -96,10 +111,27 @@ export function TrabajadorListaProvider({ children }: { children: ReactNode }) {
   const [lastFetchedAt, setLastFetchedAt] = useState(0);
   const [datosSyncEstado, setDatosSyncEstado] = useState<DatosSyncEstado>("syncing");
   const lastDocPagadosRef = useRef<QueryDocumentSnapshot | null>(null);
+  const syncMorosoHechoRef = useRef(false);
 
   const refresh = useCallback(async () => {
     // onSnapshot actualiza automáticamente
   }, []);
+
+  useEffect(() => {
+    syncMorosoHechoRef.current = false;
+  }, [user?.uid, profile?.empresaId]);
+
+  useEffect(() => {
+    if (!user || !profile) return;
+    const canUse = profile.role === "trabajador" || profile.role === "admin";
+    if (!canUse || syncMorosoHechoRef.current) return;
+
+    syncMorosoHechoRef.current = true;
+    void user
+      .getIdToken()
+      .then((token) => syncMorosoPrestamos(token))
+      .catch((e) => console.warn("[TrabajadorLista] sync moroso:", e));
+  }, [user, profile?.role, profile?.empresaId]);
 
   useEffect(() => {
     lastDocPagadosRef.current = null;
@@ -253,11 +285,29 @@ export function TrabajadorListaProvider({ children }: { children: ReactNode }) {
     }
   }, [user, profile, loadingPagados, hayMasPagados]);
 
+  const morosoPorCliente = useMemo(() => {
+    const m = new Map<string, boolean>();
+    for (const c of clientes) {
+      if (c.moroso) m.set(c.id, true);
+    }
+    return m;
+  }, [clientes]);
+
+  const prestamosConMoroso = useMemo(
+    () => prestamos.map((p) => enriquecerMorosoPrestamo(p, morosoPorCliente)),
+    [prestamos, morosoPorCliente]
+  );
+
+  const prestamosPagadosConMoroso = useMemo(
+    () => prestamosPagados.map((p) => enriquecerMorosoPrestamo(p, morosoPorCliente)),
+    [prestamosPagados, morosoPorCliente]
+  );
+
   const value = useMemo(
     (): TrabajadorListaContextValue => ({
       clientes,
-      prestamos,
-      prestamosPagados,
+      prestamos: prestamosConMoroso,
+      prestamosPagados: prestamosPagadosConMoroso,
       loadingPagados,
       hayMasPagados,
       cargarMasPagados,
@@ -269,8 +319,8 @@ export function TrabajadorListaProvider({ children }: { children: ReactNode }) {
     }),
     [
       clientes,
-      prestamos,
-      prestamosPagados,
+      prestamosConMoroso,
+      prestamosPagadosConMoroso,
       loadingPagados,
       hayMasPagados,
       cargarMasPagados,

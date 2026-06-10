@@ -98,7 +98,8 @@ export interface PrestamoDoc {
   estado: EstadoPrestamo;
   fechaInicio: Date;
   fechaVencimiento: Date;
-  multaMora: number; // porcentaje
+  /** Copia de cliente.moroso — sincronizado al marcar/desmarcar moroso. */
+  moroso?: boolean;
 }
 
 /** Tipo de pago / registro en subcolección pagos */

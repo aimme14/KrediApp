@@ -98,13 +98,14 @@ export type PrestamoItem = {
   fechaVencimiento: string | null;
   /** Timestamp de creación del documento (ISO). Fallback visual: fechaInicio. */
   creadoEn?: string | null;
-  multaMora: number;
   /** Adelanto aplicado a la(s) siguiente(s) cuota(s). La próxima sugerencia es valorCuota - (adelanto % valorCuota). */
   adelantoCuota?: number;
   /** Fecha del último pago (ISO). Para semáforo "cuota del día pagada" en ruta del día. */
   ultimoPagoFecha?: string | null;
   /** Veces que se registró «no pago» consecutivo (informativo; no cambia mora automáticamente). */
   intentosFallidos?: number;
+  /** Cliente marcado moroso por administrador (sincronizado desde cliente.moroso). */
+  moroso?: boolean;
 };
 
 export type GastoItem = {
@@ -921,6 +922,33 @@ export async function listPrestamos(token: string): Promise<PrestamoItem[]> {
   return data.prestamos ?? [];
 }
 
+/** Sincroniza moroso de clientes hacia sus préstamos en Firestore. */
+export async function syncMorosoPrestamos(token: string): Promise<void> {
+  const res = await fetchWithAuth("/api/empresa/prestamos/sync-moroso", token, {
+    method: "POST",
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error ?? "Error al sincronizar moroso");
+}
+
+/** True si el préstamo o su cliente están marcados morosos. */
+export function esPrestamoDeClienteMoroso(
+  prestamo: PrestamoItem,
+  clienteMoroso?: boolean
+): boolean {
+  return prestamo.moroso === true || clienteMoroso === true;
+}
+
+/** Moroso con saldo pendiente: activo/mora, no pagado. */
+export function esPrestamoMorosoPendiente(
+  prestamo: PrestamoItem,
+  clienteMoroso?: boolean
+): boolean {
+  if (!esPrestamoDeClienteMoroso(prestamo, clienteMoroso)) return false;
+  if (prestamo.estado === "pagado") return false;
+  return (prestamo.saldoPendiente ?? 0) > 0;
+}
+
 /** Lista los últimos pagos de un préstamo (para historial). */
 export async function listPagos(token: string, prestamoId: string): Promise<PagoItem[]> {
   const res = await fetchWithAuth(`/api/empresa/prestamos/${encodeURIComponent(prestamoId)}/pagos`, token);
@@ -1023,7 +1051,6 @@ export async function createPrestamo(
     modalidad?: "diario" | "semanal" | "mensual";
     numeroCuotas: number;
     fechaInicio?: string;
-    multaMora?: number;
   }
 ): Promise<string> {
   const res = await fetchWithAuth("/api/empresa/prestamos", token, {

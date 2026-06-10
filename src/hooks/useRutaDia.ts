@@ -181,7 +181,7 @@ function buildClientesRuta(
       visitado: visitados.has(p.clienteId),
       cuotaPagadaHoy,
       noPagoHoy: noPagoHoySet.has(p.id),
-      moroso: c?.moroso === true,
+      moroso: p.moroso === true || c?.moroso === true,
     });
   }
 

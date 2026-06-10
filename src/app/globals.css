@@ -2981,14 +2981,20 @@ td {
 @media (max-width: 768px) {
   .prestamo-admin-historial-filtros {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 0.5rem;
   }
 
   .prestamo-admin-historial-filtros .prestamo-admin-tab {
     width: 100%;
+    min-width: 0;
     text-align: center;
-    padding: 0.5rem 0.65rem;
+    padding: 0.5rem 0.4rem;
+    font-size: 0.8125rem;
+  }
+
+  .prestamo-admin-historial-filtros .prestamo-admin-tab:nth-child(5) {
+    grid-column: 1 / -1;
   }
 }
 

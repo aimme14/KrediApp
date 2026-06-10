@@ -183,7 +183,16 @@ export async function aprobarSolicitudPrestamo(
   const totalAPagar = Math.round(monto * (1 + interes / 100) * 100) / 100;
 
   const now = Timestamp.now();
+  const clienteRef = db
+    .collection(EMPRESAS_COLLECTION)
+    .doc(empresaId)
+    .collection(CLIENTES_SUBCOLLECTION)
+    .doc(sol.clienteId as string);
+
   await db.runTransaction(async (tx) => {
+    const clienteSnap = await tx.get(clienteRef);
+    const clienteMoroso = clienteSnap.data()?.moroso === true;
+
     tx.set(prestamoRef, {
       clienteId: sol.clienteId,
       clienteNombre: sol.clienteNombre,
@@ -198,17 +207,13 @@ export async function aprobarSolicitudPrestamo(
       totalAPagar,
       saldoPendiente: totalAPagar,
       estado: "activo",
+      moroso: clienteMoroso,
       adelantoCuota: 0,
       intentosFallidos: 0,
       creadoEn: now,
       updatedAt: now,
     });
 
-    const clienteRef = db
-      .collection(EMPRESAS_COLLECTION)
-      .doc(empresaId)
-      .collection(CLIENTES_SUBCOLLECTION)
-      .doc(sol.clienteId as string);
     tx.update(clienteRef, { prestamo_activo: true });
 
     tx.update(solRef, {

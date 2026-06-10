@@ -60,7 +60,6 @@ export type CrearPrestamoEmpleadoParams = {
   modalidad: ModalidadPago;
   numeroCuotas: number;
   fechaInicio?: string;
-  multaMora?: number;
   aprobacionTipo: "automatica" | "admin";
   aprobadoPorAdmin?: string | null;
   montoUltimoPrestamoReferencia?: number | null;
@@ -87,7 +86,6 @@ export async function crearPrestamoEmpleado(
     modalidad,
     numeroCuotas,
     fechaInicio,
-    multaMora,
     aprobacionTipo,
     aprobadoPorAdmin,
     montoUltimoPrestamoReferencia,
@@ -159,6 +157,8 @@ export async function crearPrestamoEmpleado(
 
     ledgerBalanceAfter = nuevaCajaEmp;
 
+    const clienteMoroso = clienteSnapTx.data()?.moroso === true;
+
     tx.set(prestamoRef, {
       clienteId: clienteId.trim(),
       clienteNombre,
@@ -172,9 +172,9 @@ export async function crearPrestamoEmpleado(
       totalAPagar,
       saldoPendiente: totalAPagar,
       estado: "activo",
+      moroso: clienteMoroso,
       fechaInicio: inicio,
       fechaVencimiento,
-      multaMora: typeof multaMora === "number" ? multaMora : 0,
       adelantoCuota: 0,
       intentosFallidos: 0,
       desembolsoDesde: "caja_empleado",

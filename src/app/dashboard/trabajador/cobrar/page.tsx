@@ -10,14 +10,13 @@ import {
   listPagos,
   registrarPago,
   registrarNoPago,
-  registrarPerdida,
   type ClienteItem,
   type PrestamoItem,
   type PagoItem,
 } from "@/lib/empresa-api";
 import { uploadImage, getImageAccept } from "@/lib/storage";
 import { getEmpresa } from "@/lib/empresa";
-import type { MotivoNoPago, MotivoPerdida } from "@/types/finanzas";
+import type { MotivoNoPago } from "@/types/finanzas";
 import {
   sanitizeMontoDecimalCOP,
   formatMontoDecimalCOPDisplay,
@@ -133,13 +132,6 @@ const MOTIVOS_NO_PAGO: { value: MotivoNoPago; label: string }[] = [
   { value: "otro", label: "Otro motivo" },
 ];
 
-const MOTIVOS_PERDIDA: { value: MotivoPerdida; label: string }[] = [
-  { value: "imposible_cobrar", label: "Imposible cobrar / incobrable" },
-  { value: "cliente_perdido", label: "Cliente perdido o mudanza" },
-  { value: "acuerdo_quita", label: "Acuerdo o quita de saldo" },
-  { value: "otro", label: "Otro motivo" },
-];
-
 function CobrarClientePageContent() {
   const { user, profile } = useAuth();
   const {
@@ -209,13 +201,8 @@ function CobrarClientePageContent() {
   const [showModalNoPago, setShowModalNoPago] = useState(false);
   const [noPagoRegistrado, setNoPagoRegistrado] = useState(false);
 
-  const [showPerdida, setShowPerdida] = useState(false);
-  const [motivoPerdida, setMotivoPerdida] = useState<MotivoPerdida | "">("");
-  const [montoPerdidaInput, setMontoPerdidaInput] = useState("");
-  const [notaPerdida, setNotaPerdida] = useState("");
-  const [submittingPerdida, setSubmittingPerdida] = useState(false);
+  const [showModalPerdida, setShowModalPerdida] = useState(false);
   const [perdidaRegistrada, setPerdidaRegistrada] = useState(false);
-  const [montoPerdidaConfirmado, setMontoPerdidaConfirmado] = useState(0);
 
   useEffect(() => {
     if (!user || !clienteId || !prestamoId) {
@@ -580,57 +567,9 @@ function CobrarClientePageContent() {
     }
   };
 
-  const montoPerdidaNum = useMemo(() => {
-    const n = interiorDecimalCOPToNumber(montoPerdidaInput);
-    return Number.isFinite(n) && n >= 0 ? n : 0;
-  }, [montoPerdidaInput]);
-
-  const handleRegistrarPerdida = async () => {
-    if (!motivoPerdida || !user || !prestamoId || !profile || !prestamo) return;
-    const montoAplicar = Math.min(montoPerdidaNum, prestamo.saldoPendiente ?? 0);
-    if (montoAplicar <= 0) return;
-    setSubmittingPerdida(true);
-    setError(null);
-    try {
-      const token = await user.getIdToken();
-      const nombreRegistro = profile.displayName ?? profile.email ?? "";
-      const res = await registrarPerdida(token, prestamoId, {
-        monto: montoAplicar,
-        motivoPerdida,
-        nota: notaPerdida.trim() || undefined,
-        registradoPorUid: user.uid,
-        registradoPorNombre: nombreRegistro || undefined,
-      });
-      setMontoPerdidaConfirmado(montoAplicar);
-      await refreshLista();
-      void refreshCajaDia();
-      setPrestamo((p) =>
-        p
-          ? {
-              ...p,
-              saldoPendiente: res.saldoPendiente,
-              adelantoCuota: res.adelantoCuota ?? p.adelantoCuota,
-              estado: res.saldoPendiente <= 0 ? "pagado" : p.estado,
-            }
-          : null
-      );
-      const nuevoPago: PagoItem = {
-        id: "",
-        monto: montoAplicar,
-        fecha: new Date().toISOString(),
-        tipo: "perdida",
-        metodoPago: null,
-        motivoPerdida,
-        registradoPorUid: user.uid,
-        registradoPorNombre: nombreRegistro || null,
-      };
-      setUltimosPagos((prev) => [nuevoPago, ...prev]);
-      setPerdidaRegistrada(true);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Error al registrar pérdida");
-    } finally {
-      setSubmittingPerdida(false);
-    }
+  const handleConfirmarPerdida = () => {
+    setShowModalPerdida(false);
+    setPerdidaRegistrada(true);
   };
 
   if (!profile || (profile.role !== "trabajador" && profile.role !== "admin")) return null;
@@ -907,94 +846,10 @@ function CobrarClientePageContent() {
       <div className="card cobrar-card cobrar-confirmacion">
         <h2 className="cobrar-title">Pérdida registrada</h2>
         <p>
-          Se reconoció una pérdida de {formatCurrency(montoPerdidaConfirmado)} para {cliente.nombre} (
-          {MOTIVOS_PERDIDA.find((m) => m.value === motivoPerdida)?.label ?? motivoPerdida}
-          ). El saldo pendiente del préstamo quedó en {formatCurrency(prestamo.saldoPendiente)}.
-        </p>
-        <p className="cobrar-perdida-nota-app">
-          En la ruta, el capital correspondiente se descuenta de inversiones y se registra en pérdidas.
+          Se registró la pérdida del préstamo de <strong>{cliente.nombre}</strong> por{" "}
+          {formatCurrency(prestamo.saldoPendiente)}.
         </p>
         <Link href={backHref} className="btn btn-primary">{backLabel}</Link>
-      </div>
-    );
-  }
-
-  if (showPerdida) {
-    if (profile?.role === "trabajador") {
-      setShowPerdida(false);
-      return null;
-    }
-    const cobrarQuery = `clienteId=${clienteId}&prestamoId=${prestamoId}${fromAdmin ? "&from=admin" : ""}`;
-    const maxPerdida = prestamo.saldoPendiente ?? 0;
-    const montoPerdidaAplicar = Math.min(montoPerdidaNum, maxPerdida);
-    const puedePerdida =
-      !!motivoPerdida && montoPerdidaAplicar > 0 && montoPerdidaNum > 0;
-    return (
-      <div className="card cobrar-card">
-        <div className="cobrar-header">
-          <Link href={fromAdmin ? `/dashboard/admin/cobrar?${cobrarQuery}` : `/dashboard/trabajador/cobrar?${cobrarQuery}`} className="cobrar-back">← Volver</Link>
-          <h2 className="cobrar-title">Registrar pérdida</h2>
-          <p className="cobrar-subtitle">{cliente.nombre}</p>
-        </div>
-        <p className="cobrar-text">
-          Monto que no se cobrará (total o parte del saldo). Se clasifica el motivo; en la ruta se mueve de inversiones a pérdidas según el capital asociado a ese saldo.
-        </p>
-        <div className="form-group">
-          <label>Monto de la pérdida</label>
-          <input
-            type="text"
-            inputMode="decimal"
-            value={montoPerdidaInput ? formatMontoDecimalCOPDisplay(montoPerdidaInput) : ""}
-            onChange={(e) => setMontoPerdidaInput(sanitizeMontoDecimalCOP(e.target.value))}
-            placeholder={maxPerdida > 0 ? formatCurrency(maxPerdida) : "0"}
-            className="cobrar-input"
-          />
-          <p className="cobrar-perdida-hint">Máximo según saldo pendiente: {formatCurrency(maxPerdida)}</p>
-        </div>
-        <div className="form-group">
-          <label>Motivo</label>
-          <select
-            value={motivoPerdida}
-            onChange={(e) => setMotivoPerdida(e.target.value as MotivoPerdida)}
-            className="cobrar-select"
-          >
-            <option value="">Seleccionar...</option>
-            {MOTIVOS_PERDIDA.map((m) => (
-              <option key={m.value} value={m.value}>{m.label}</option>
-            ))}
-          </select>
-        </div>
-        <div className="form-group">
-          <label>Nota (opcional)</label>
-          <input
-            type="text"
-            value={notaPerdida}
-            onChange={(e) => setNotaPerdida(e.target.value)}
-            placeholder="Detalle adicional"
-            className="cobrar-input"
-          />
-        </div>
-        {error && <p className="error-msg">{error}</p>}
-        <div className="cobrar-actions">
-          <button
-            type="button"
-            className="btn btn-secondary"
-            onClick={() => {
-              setShowPerdida(false);
-              setError(null);
-            }}
-          >
-            Cancelar
-          </button>
-          <button
-            type="button"
-            className="btn btn-primary"
-            disabled={!puedePerdida || submittingPerdida}
-            onClick={handleRegistrarPerdida}
-          >
-            {submittingPerdida ? "Registrando..." : "Confirmar pérdida"}
-          </button>
-        </div>
       </div>
     );
   }
@@ -1096,15 +951,7 @@ function CobrarClientePageContent() {
             <button
               type="button"
               className="btn btn-secondary cobrar-btn-perdida"
-              onClick={() => {
-                setShowPerdida(true);
-                setMontoPerdidaInput(
-                  prestamo.saldoPendiente > 0 ? String(Math.round(prestamo.saldoPendiente)) : ""
-                );
-                setMotivoPerdida("");
-                setNotaPerdida("");
-                setError(null);
-              }}
+              onClick={() => setShowModalPerdida(true)}
             >
               Pérdida
             </button>
@@ -1375,6 +1222,22 @@ function CobrarClientePageContent() {
           <p>
             Saldo restante tras el cobro:{" "}
             <strong>{formatCurrency(Math.max(0, saldoPendiente - montoAplicar))}</strong>
+          </p>
+        </ModalConfirmar>
+      )}
+
+      {showModalPerdida && (
+        <ModalConfirmar
+          titulo="Registrar pérdida"
+          labelConfirmar="Sí, registrar pérdida"
+          onCancelar={() => setShowModalPerdida(false)}
+          onConfirmar={handleConfirmarPerdida}
+        >
+          <p>
+            ¿Confirmas registrar la pérdida del préstamo de <strong>{cliente.nombre}</strong>?
+          </p>
+          <p>
+            Saldo pendiente: <strong>{formatCurrency(prestamo.saldoPendiente)}</strong>
           </p>
         </ModalConfirmar>
       )}

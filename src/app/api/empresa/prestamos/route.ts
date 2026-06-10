@@ -27,6 +27,7 @@ import {
 } from "@/lib/financial-idempotency";
 import type { ModalidadPago } from "@/types/firestore";
 import { evaluarAprobacionPrestamoEmpleado } from "@/lib/prestamo-aprobacion-empleado";
+import { backfillMorosoPrestamosSinCampo } from "@/lib/sync-prestamo-moroso";
 
 /** GET: lista préstamos. Empleado: los de su ruta. Admin/Jefe: los suyos */
 export async function GET(request: NextRequest) {
@@ -41,6 +42,12 @@ export async function GET(request: NextRequest) {
     apiUser.role === "empleado" && apiUser.rutaId
       ? await col.where("rutaId", "==", apiUser.rutaId).limit(200).get()
       : await col.where("adminId", "==", apiUser.uid).limit(200).get();
+
+  if (snap.docs.some((d) => d.data().moroso === undefined)) {
+    void backfillMorosoPrestamosSinCampo(db, apiUser.empresaId, snap.docs).catch((e) =>
+      console.warn("[prestamos] backfill moroso:", e)
+    );
+  }
 
   const prestamos = snap.docs.map((d) => {
     const data = d.data();
@@ -57,10 +64,10 @@ export async function GET(request: NextRequest) {
       totalAPagar: data.totalAPagar ?? 0,
       saldoPendiente: data.saldoPendiente ?? 0,
       estado: data.estado ?? "activo",
+      moroso: data.moroso === true,
       fechaInicio: data.fechaInicio?.toDate?.()?.toISOString?.() ?? null,
       fechaVencimiento: data.fechaVencimiento?.toDate?.()?.toISOString?.() ?? null,
       creadoEn: data.creadoEn?.toDate?.()?.toISOString?.() ?? null,
-      multaMora: data.multaMora ?? 0,
       /** Adelanto aplicado a la(s) siguiente(s) cuota(s). Si > 0, la próxima sugerencia es valorCuota - (adelanto % valorCuota). */
       adelantoCuota: data.adelantoCuota ?? 0,
       /** Fecha del último pago (para semáforo "cuota del día pagada" en ruta del día). */
@@ -101,7 +108,6 @@ export async function POST(request: NextRequest) {
     modalidad,
     numeroCuotas,
     fechaInicio,
-    multaMora,
     idempotencyKey,
   } = body as {
     clienteId?: string;
@@ -112,7 +118,6 @@ export async function POST(request: NextRequest) {
     modalidad?: ModalidadPago;
     numeroCuotas?: number;
     fechaInicio?: string;
-    multaMora?: number;
     idempotencyKey?: string;
   };
 
@@ -228,7 +233,6 @@ export async function POST(request: NextRequest) {
           typeof fechaInicio === "string" && fechaInicio.trim()
             ? fechaInicio.trim()
             : new Date().toISOString().slice(0, 10),
-        multaMora: typeof multaMora === "number" ? multaMora : 0,
         aprobacionTipo: "automatica",
         aprobadoPorAdmin: null,
         montoUltimoPrestamoReferencia: evaluacion.montoUltimoPrestamo,
@@ -373,9 +377,9 @@ export async function POST(request: NextRequest) {
         totalAPagar,
         saldoPendiente: totalAPagar,
         estado: "activo",
+        moroso: clienteData.moroso === true,
         fechaInicio: inicio,
         fechaVencimiento,
-        multaMora: typeof multaMora === "number" ? multaMora : 0,
         adelantoCuota: 0,
         creadoEn: FieldValue.serverTimestamp(),
         ...(rutaIdPrestamo ? { desembolsoDesde: "caja_ruta" as const } : {}),

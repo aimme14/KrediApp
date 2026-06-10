@@ -8,6 +8,7 @@ import { useAdminDashboard } from "@/context/AdminDashboardContext";
 import { useTrabajadorLista } from "@/context/TrabajadorListaContext";
 import {
   createPrestamo,
+  esPrestamoMorosoPendiente,
   formatClienteCodigoRutaYNumero,
   type ClienteItem,
   type PrestamoItem,
@@ -99,7 +100,7 @@ export default function PrestamoPage() {
   const [monto, setMonto] = useState("");
   const [creating, setCreating] = useState(false);
   const [confirmarMontoAlto, setConfirmarMontoAlto] = useState(false);
-  const [filtroEstado, setFiltroEstado] = useState<"hoy" | "todos" | "activo" | "pagado">("hoy");
+  const [filtroEstado, setFiltroEstado] = useState<"hoy" | "todos" | "activo" | "pagado" | "moroso">("hoy");
   const [filtroNombre, setFiltroNombre] = useState("");
   const [historialEconomicoColapsado, setHistorialEconomicoColapsado] = useState(true);
 
@@ -129,7 +130,13 @@ export default function PrestamoPage() {
   }, [searchParams, clientes, loading, rutaIdForm]);
 
   useEffect(() => {
-    if (filtroEstado !== "pagado" && filtroEstado !== "todos" && filtroEstado !== "hoy") return;
+    if (
+      filtroEstado !== "pagado" &&
+      filtroEstado !== "todos" &&
+      filtroEstado !== "hoy"
+    ) {
+      return;
+    }
     if (loadingPagados || !hayMasPagados) return;
     if (filtroEstado === "pagado" && prestamosPagados.length > 0) return;
     void cargarMasPagados();
@@ -270,6 +277,11 @@ export default function PrestamoPage() {
       return prestamos.filter((p) => p.estado === "activo");
     }
     const merged = [...prestamos, ...prestamosPagados];
+    if (filtroEstado === "moroso") {
+      return prestamos.filter((p) =>
+        esPrestamoMorosoPendiente(p, clientePorId[p.clienteId]?.moroso)
+      );
+    }
     if (filtroEstado !== "hoy") return merged;
     const seen = new Set<string>();
     return merged.filter((p) => {
@@ -277,7 +289,7 @@ export default function PrestamoPage() {
       seen.add(p.id);
       return esPrestamoCreadoHoy(p);
     });
-  }, [prestamos, prestamosPagados, filtroEstado]);
+  }, [prestamos, prestamosPagados, filtroEstado, clientePorId]);
 
   const prestamosFiltrados = useMemo(() => {
     let list = prestamosBase;
@@ -701,7 +713,7 @@ export default function PrestamoPage() {
                 ) : null}
               </div>
               <div className="prestamo-admin-tabs prestamo-historial-filtros prestamo-admin-historial-filtros" role="tablist" aria-label="Filtrar por estado">
-                {(["hoy", "todos", "activo", "pagado"] as const).map((est) => (
+                {(["hoy", "todos", "activo", "pagado", "moroso"] as const).map((est) => (
                   <button
                     key={est}
                     type="button"
@@ -716,7 +728,9 @@ export default function PrestamoPage() {
                         ? "Todos"
                         : est === "activo"
                           ? "Activos"
-                          : "Pagados"}
+                          : est === "pagado"
+                            ? "Pagados"
+                            : "Morosos"}
                   </button>
                 ))}
               </div>
@@ -853,7 +867,9 @@ export default function PrestamoPage() {
               </button>
             </div>
           )}
-          {(filtroEstado === "pagado" || filtroEstado === "todos" || filtroEstado === "hoy") &&
+          {(filtroEstado === "pagado" ||
+            filtroEstado === "todos" ||
+            filtroEstado === "hoy") &&
           hayMasPagados ? (
             <div style={{ textAlign: "center", marginTop: "0.75rem" }}>
               <button
@@ -875,7 +891,9 @@ export default function PrestamoPage() {
                 ? `No hay préstamos que coincidan con «${filtroNombre.trim()}».`
                 : filtroEstado === "hoy"
                   ? "No hay préstamos creados hoy."
-                  : `No hay préstamos en el historial con estado «${filtroEstado === "todos" ? "todos" : filtroEstado === "activo" ? "activos" : "pagados"}».`}
+                  : filtroEstado === "moroso"
+                    ? "No hay préstamos activos pendientes de clientes morosos."
+                    : `No hay préstamos en el historial con estado «${filtroEstado === "todos" ? "todos" : filtroEstado === "activo" ? "activos" : "pagados"}».`}
             </p>
           ) : null}
           </>

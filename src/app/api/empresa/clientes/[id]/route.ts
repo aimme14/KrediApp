@@ -7,6 +7,7 @@ import {
   CLIENTES_SUBCOLLECTION,
   USUARIOS_SUBCOLLECTION,
 } from "@/lib/empresas-db";
+import { syncMorosoEnPrestamosCliente } from "@/lib/sync-prestamo-moroso";
 
 /** PATCH: marcar o desmarcar cliente como moroso (excluido de ruta, no volver a prestar) */
 export async function PATCH(
@@ -45,6 +46,7 @@ export async function PATCH(
 
   await Promise.all([
     ref.update({ moroso }),
+    syncMorosoEnPrestamosCliente(db, apiUser.empresaId, clienteId, moroso),
     eraMoroso !== moroso
       ? db
           .collection(EMPRESAS_COLLECTION)
