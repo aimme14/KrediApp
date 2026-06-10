@@ -99,10 +99,8 @@ export default function PrestamoPage() {
   const [monto, setMonto] = useState("");
   const [creating, setCreating] = useState(false);
   const [confirmarMontoAlto, setConfirmarMontoAlto] = useState(false);
-  const [filtroEstado, setFiltroEstado] = useState<"hoy" | "todos" | "activo" | "mora" | "pagado">("hoy");
+  const [filtroEstado, setFiltroEstado] = useState<"hoy" | "todos" | "activo" | "pagado">("hoy");
   const [filtroNombre, setFiltroNombre] = useState("");
-  const [soloActivosMobile, setSoloActivosMobile] = useState(false);
-  const [isMobileView, setIsMobileView] = useState(false);
   const [historialEconomicoColapsado, setHistorialEconomicoColapsado] = useState(true);
 
   useEffect(() => {
@@ -129,22 +127,6 @@ export default function PrestamoPage() {
     setClienteId(id);
     setShowCreateForm(true);
   }, [searchParams, clientes, loading, rutaIdForm]);
-
-  useEffect(() => {
-    const mq = window.matchMedia("(max-width: 768px)");
-    const syncViewport = () => {
-      const mobile = mq.matches;
-      setIsMobileView(mobile);
-      if (mobile) {
-        setFiltroEstado("hoy");
-      } else {
-        setSoloActivosMobile(false);
-      }
-    };
-    syncViewport();
-    mq.addEventListener("change", syncViewport);
-    return () => mq.removeEventListener("change", syncViewport);
-  }, []);
 
   useEffect(() => {
     if (filtroEstado !== "pagado" && filtroEstado !== "todos" && filtroEstado !== "hoy") return;
@@ -275,11 +257,8 @@ export default function PrestamoPage() {
   const requiereConfirmarMonto = !isNaN(montoNum) && montoNum >= MONTO_CONFIRMAR_ALTO;
 
   const resumenPrestamos = useMemo(() => {
-    const activos = prestamos.filter((p) => p.estado === "activo");
-    const mora = prestamos.filter((p) => p.estado === "mora");
     return {
-      activos: activos.length,
-      mora: mora.length,
+      activos: prestamos.filter((p) => p.estado === "activo").length,
     };
   }, [prestamos]);
 
@@ -287,8 +266,8 @@ export default function PrestamoPage() {
 
   const prestamosBase = useMemo(() => {
     if (filtroEstado === "pagado") return prestamosPagados;
-    if (filtroEstado === "activo" || filtroEstado === "mora") {
-      return prestamos.filter((p) => p.estado === filtroEstado);
+    if (filtroEstado === "activo") {
+      return prestamos.filter((p) => p.estado === "activo");
     }
     const merged = [...prestamos, ...prestamosPagados];
     if (filtroEstado !== "hoy") return merged;
@@ -302,9 +281,6 @@ export default function PrestamoPage() {
 
   const prestamosFiltrados = useMemo(() => {
     let list = prestamosBase;
-    if (isMobileView && soloActivosMobile) {
-      list = list.filter((p) => p.estado === "activo");
-    }
     if (filtroNombreLower) {
       list = list.filter((p) => {
         const cl = clientePorId[p.clienteId];
@@ -320,14 +296,14 @@ export default function PrestamoPage() {
       });
     }
     return list;
-  }, [prestamosBase, isMobileView, soloActivosMobile, filtroNombreLower, clientePorId]);
+  }, [prestamosBase, filtroNombreLower, clientePorId]);
 
   const PAGE_SIZE = 15;
   const [pagina, setPagina] = useState(1);
 
   useEffect(() => {
     setPagina(1);
-  }, [filtroEstado, soloActivosMobile, filtroNombre]);
+  }, [filtroEstado, filtroNombre]);
 
   /** Grupos por cliente: principal = reciente y activo (activo > mora > pagado, luego por fecha). */
   const gruposPorCliente = useMemo((): GrupoClientePrestamos[] => {
@@ -674,39 +650,11 @@ export default function PrestamoPage() {
                 </svg>
               </span>
             </div>
-            <div className="prestamo-admin-kpi">
-              <div className="prestamo-admin-kpi-body">
-                <span className="prestamo-admin-kpi-label">En mora</span>
-                <span
-                  className={`prestamo-admin-kpi-value${resumenPrestamos.mora > 0 ? " prestamo-admin-kpi-value--mora" : ""}`}
-                >
-                  {resumenPrestamos.mora}
-                </span>
-              </div>
-              <span className="prestamo-admin-kpi-icon prestamo-admin-kpi-icon--mora" aria-hidden>
-                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
-                  <line x1="12" y1="9" x2="12" y2="13" />
-                  <line x1="12" y1="17" x2="12.01" y2="17" />
-                </svg>
-              </span>
-            </div>
           </div>
         )}
         <div className="card prestamo-admin-hist-card">
         <div className="prestamo-admin-hist-head">
-          <div className="prestamo-admin-hist-head-left">
-            <button
-              type="button"
-              className={`prestamo-admin-movil-filtro-activos${soloActivosMobile ? " prestamo-admin-movil-filtro-activos--on" : ""}`}
-              onClick={() => setSoloActivosMobile((v) => !v)}
-              aria-pressed={soloActivosMobile}
-              title={soloActivosMobile ? "Mostrar todos los préstamos" : "Mostrar solo préstamos activos"}
-            >
-              Activos
-            </button>
-            <h3 className="prestamo-admin-hist-title">Historial de préstamos</h3>
-          </div>
+          <h3 className="prestamo-admin-hist-title">Historial de préstamos</h3>
           <button
             type="button"
             className="prestamo-admin-add-btn"
@@ -752,8 +700,8 @@ export default function PrestamoPage() {
                   </p>
                 ) : null}
               </div>
-              <div className="prestamo-admin-tabs prestamo-historial-filtros" role="tablist" aria-label="Filtrar por estado">
-                {(["hoy", "todos", "activo", "mora", "pagado"] as const).map((est) => (
+              <div className="prestamo-admin-tabs prestamo-historial-filtros prestamo-admin-historial-filtros" role="tablist" aria-label="Filtrar por estado">
+                {(["hoy", "todos", "activo", "pagado"] as const).map((est) => (
                   <button
                     key={est}
                     type="button"
@@ -768,9 +716,7 @@ export default function PrestamoPage() {
                         ? "Todos"
                         : est === "activo"
                           ? "Activos"
-                          : est === "mora"
-                            ? "En mora"
-                            : "Pagados"}
+                          : "Pagados"}
                   </button>
                 ))}
               </div>
@@ -927,11 +873,9 @@ export default function PrestamoPage() {
             <p className="prestamo-admin-filtro-vacio">
               {filtroNombreLower
                 ? `No hay préstamos que coincidan con «${filtroNombre.trim()}».`
-                : isMobileView && soloActivosMobile
-                  ? "No hay préstamos activos en el historial."
-                  : filtroEstado === "hoy"
-                    ? "No hay préstamos creados hoy."
-                    : `No hay préstamos en el historial con estado «${filtroEstado === "todos" ? "todos" : filtroEstado === "activo" ? "activos" : filtroEstado === "mora" ? "en mora" : "pagados"}».`}
+                : filtroEstado === "hoy"
+                  ? "No hay préstamos creados hoy."
+                  : `No hay préstamos en el historial con estado «${filtroEstado === "todos" ? "todos" : filtroEstado === "activo" ? "activos" : "pagados"}».`}
             </p>
           ) : null}
           </>

@@ -2752,10 +2752,6 @@ td {
   flex: 1 1 auto;
 }
 
-.prestamo-admin-movil-filtro-activos {
-  display: none;
-}
-
 .prestamo-admin-monto-mobile,
 .prestamo-admin-monto-th-mobile {
   display: none;
@@ -2983,8 +2979,16 @@ td {
 }
 
 @media (max-width: 768px) {
-  .prestamo-historial-filtros:not(.prestamo-trabajador-historial-filtros) {
-    display: none !important;
+  .prestamo-admin-historial-filtros {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+  }
+
+  .prestamo-admin-historial-filtros .prestamo-admin-tab {
+    width: 100%;
+    text-align: center;
+    padding: 0.5rem 0.65rem;
   }
 }
 
@@ -3070,40 +3074,6 @@ td {
 
   .prestamo-admin-search-field {
     max-width: none;
-  }
-
-  .prestamo-admin-movil-filtro-activos {
-    display: inline-flex;
-    flex-shrink: 0;
-    align-items: center;
-    padding: 0.28rem 0.55rem;
-    font-size: 0.68rem;
-    font-weight: 700;
-    letter-spacing: 0.02em;
-    text-transform: uppercase;
-    border-radius: 999px;
-    border: 1px solid var(--card-border);
-    background: var(--input-bg);
-    color: var(--text-muted);
-    cursor: pointer;
-    transition: background 0.15s, color 0.15s, border-color 0.15s, box-shadow 0.15s;
-  }
-
-  .prestamo-admin-movil-filtro-activos:hover {
-    color: var(--text);
-    border-color: var(--input-border);
-  }
-
-  .prestamo-admin-movil-filtro-activos--on {
-    background: linear-gradient(145deg, #22c55e 0%, #15803d 100%);
-    border-color: transparent;
-    color: #fafafa;
-    box-shadow: 0 2px 8px rgba(34, 197, 94, 0.35);
-  }
-
-  .prestamo-admin-movil-filtro-activos:focus-visible {
-    outline: 2px solid var(--link);
-    outline-offset: 2px;
   }
 
   .prestamo-admin-hist-title {
