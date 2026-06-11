@@ -17,14 +17,26 @@ function formatMoneda(value: number): string {
   })}`;
 }
 
+function roundMoney(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
+/** Ganancias − gastos − pérdidas (mismos campos que las tarjetas del grid). */
+export function computeGananciasNetasRuta(ruta: AdminRutaStatsData): number {
+  return roundMoney((ruta.ganancias ?? 0) - (ruta.gastos ?? 0) - (ruta.perdidas ?? 0));
+}
+
 type AdminRutaStatsGridProps = {
   ruta: AdminRutaStatsData;
   className?: string;
+  /** Tarjeta derivada solo en Inicio admin. */
+  showGananciasNetas?: boolean;
 };
 
 /** Tarjetas financieras por ruta (Inicio admin, listado Rutas, etc.). */
-export function AdminRutaStatsGrid({ ruta, className }: AdminRutaStatsGridProps) {
+export function AdminRutaStatsGrid({ ruta, className, showGananciasNetas }: AdminRutaStatsGridProps) {
   const g = ruta.ganancias ?? 0;
+  const gananciasNetas = showGananciasNetas ? computeGananciasNetasRuta(ruta) : null;
   const gridClass = className
     ? `admin-inicio-ruta-stats ${className}`
     : "admin-inicio-ruta-stats";
@@ -158,6 +170,56 @@ export function AdminRutaStatsGrid({ ruta, className }: AdminRutaStatsGridProps)
           <span className="admin-inicio-ruta-stat-hint">acumulado</span>
         </div>
       </div>
+      {gananciasNetas !== null ? (
+        <div
+          className={`admin-inicio-ruta-stat ${
+            gananciasNetas > 0
+              ? "admin-inicio-ruta-stat--net-pos"
+              : gananciasNetas < 0
+                ? "admin-inicio-ruta-stat--net-neg"
+                : ""
+          }`}
+        >
+          <span
+            className={`admin-inicio-ruta-stat-icon ${
+              gananciasNetas > 0
+                ? "admin-inicio-metric-icon--green"
+                : gananciasNetas < 0
+                  ? "admin-inicio-metric-icon--red"
+                  : "admin-inicio-metric-icon--violet"
+            }`}
+            aria-hidden
+          >
+            {gananciasNetas >= 0 ? (
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="23 6 13.5 15.5 8.5 10.5 1 18" />
+                <polyline points="17 6 23 6 23 12" />
+              </svg>
+            ) : (
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                <line x1="12" y1="9" x2="12" y2="13" />
+                <line x1="12" y1="17" x2="12.01" y2="17" />
+              </svg>
+            )}
+          </span>
+          <div className="admin-inicio-ruta-stat-body">
+            <span className="admin-inicio-ruta-stat-label">Utilidad</span>
+            <span
+              className={`admin-inicio-ruta-stat-value ${
+                gananciasNetas < 0
+                  ? "admin-inicio-ruta-stat-value--neg"
+                  : gananciasNetas > 0
+                    ? "admin-inicio-ruta-stat-value--pos"
+                    : ""
+              }`}
+            >
+              {formatMoneda(gananciasNetas)}
+            </span>
+            <span className="admin-inicio-ruta-stat-hint">periodo actual</span>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

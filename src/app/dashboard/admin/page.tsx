@@ -257,7 +257,7 @@ export default function AdminDashboardPage() {
                         <p className="admin-inicio-ruta-meta">{r.ubicacion}</p>
                       ) : null}
                     </header>
-                    <AdminRutaStatsGrid ruta={r} />
+                    <AdminRutaStatsGrid ruta={r} showGananciasNetas />
                   </article>
               ))}
             </div>
