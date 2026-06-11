@@ -115,7 +115,7 @@ export default function RutasPage() {
                 ) : null}
               </div>
 
-              <AdminRutaStatsGrid ruta={ruta} className="rutas-admin-ruta-stats" />
+              <AdminRutaStatsGrid ruta={ruta} className="rutas-admin-ruta-stats" showGananciasNetas />
             </div>
           ))}
         </div>
