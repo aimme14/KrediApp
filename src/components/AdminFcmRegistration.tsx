@@ -189,6 +189,7 @@ export function AdminFcmRegistration() {
     void run();
     return () => {
       cancelled = true;
+      lock.current = false;
       unsubMessage?.();
     };
   }, [user, profile?.role]);

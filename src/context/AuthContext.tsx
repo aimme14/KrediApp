@@ -27,6 +27,7 @@ import {
   type DocumentData,
 } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
+import { revokeAdminFcmOnDevice } from "@/lib/fcm-client";
 import type { UserProfile, Role } from "@/types/roles";
 import { SUPER_ADMIN_COLLECTION } from "@/types/superAdmin";
 
@@ -408,6 +409,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signOut = async () => {
+    const currentUser = auth?.currentUser;
+    const isAdmin = state.profile?.role === "admin";
+    if (currentUser && isAdmin) {
+      try {
+        await revokeAdminFcmOnDevice(currentUser);
+      } catch (e) {
+        if (typeof window !== "undefined") {
+          console.warn("[Auth] FCM revoke on logout:", e);
+        }
+      }
+    }
     if (auth) await firebaseSignOut(auth);
     setState({
       user: null,
