@@ -2901,6 +2901,16 @@ td {
   box-shadow: 0 2px 8px rgba(99, 102, 241, 0.35);
 }
 
+.prestamo-admin-tab-count {
+  margin-left: 0.2rem;
+  font-weight: 500;
+  opacity: 0.82;
+}
+
+.prestamo-admin-tab--active .prestamo-admin-tab-count {
+  opacity: 0.95;
+}
+
 .prestamo-trabajador-historial-filtros {
   display: flex;
   flex-wrap: wrap;

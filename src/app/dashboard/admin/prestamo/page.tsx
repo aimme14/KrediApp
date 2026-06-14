@@ -25,6 +25,7 @@ import {
   interiorDecimalCOPToNumber,
 } from "@/lib/monto-input-es";
 import SelectConBusqueda from "@/components/SelectConBusqueda";
+import { ModalConfirmar } from "@/components/trabajador/ModalConfirmar";
 
 const MODALIDADES = [
   { value: "diario", label: "Diario" },
@@ -99,10 +100,22 @@ export default function PrestamoPage() {
   const [interes, setInteres] = useState("");
   const [monto, setMonto] = useState("");
   const [creating, setCreating] = useState(false);
+  const [showModalPrestamo, setShowModalPrestamo] = useState(false);
   const [confirmarMontoAlto, setConfirmarMontoAlto] = useState(false);
   const [filtroEstado, setFiltroEstado] = useState<"hoy" | "todos" | "activo" | "pagado" | "moroso">("hoy");
   const [filtroNombre, setFiltroNombre] = useState("");
   const [historialEconomicoColapsado, setHistorialEconomicoColapsado] = useState(true);
+
+  useEffect(() => {
+    setConfirmarMontoAlto(false);
+  }, [rutaIdForm, clienteId, monto, numeroCuotas, interes, modalidad]);
+
+  const abrirFormularioCrear = useCallback(() => {
+    setConfirmarMontoAlto(false);
+    setShowModalPrestamo(false);
+    setError(null);
+    setShowCreateForm(true);
+  }, []);
 
   useEffect(() => {
     setHistorialEconomicoColapsado(true);
@@ -126,6 +139,8 @@ export default function PrestamoPage() {
     const cl = clientes.find((c) => c.id === id);
     if (!cl || (cl.rutaId ?? "") !== rutaIdForm) return;
     setClienteId(id);
+    setConfirmarMontoAlto(false);
+    setShowModalPrestamo(false);
     setShowCreateForm(true);
   }, [searchParams, clientes, loading, rutaIdForm]);
 
@@ -148,8 +163,8 @@ export default function PrestamoPage() {
     cargarMasPagados,
   ]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = (e?: React.SyntheticEvent) => {
+    e?.preventDefault();
     if (!user) return;
     const montoNum = interiorDecimalCOPToNumber(monto);
     const nCuotas = Math.max(1, parseInt(numeroCuotas, 10) || 1);
@@ -175,8 +190,12 @@ export default function PrestamoPage() {
       setError(`El interés debe estar entre 0 y ${INTERES_MAX}%`);
       return;
     }
-    if (montoNum >= MONTO_CONFIRMAR_ALTO && !confirmarMontoAlto) {
-      setError(`Confirma que deseas crear un préstamo de ${formatMoneda(montoNum)} marcando la casilla`);
+    if (!confirmarMontoAlto) {
+      setError(
+        montoNum >= MONTO_CONFIRMAR_ALTO
+          ? `Confirma que deseas crear un préstamo de ${formatMoneda(montoNum)} marcando la casilla`
+          : "Marca la casilla «Confirmo» para continuar"
+      );
       return;
     }
     if (!rutaIdForm.trim()) {
@@ -187,6 +206,15 @@ export default function PrestamoPage() {
       setError("Selecciona un cliente");
       return;
     }
+    setError(null);
+    setShowModalPrestamo(true);
+  };
+
+  const handleEjecutarPrestamo = async () => {
+    if (!user || !confirmarMontoAlto) return;
+    const montoNum = interiorDecimalCOPToNumber(monto);
+    const nCuotas = Math.max(1, parseInt(numeroCuotas, 10) || 1);
+
     setError(null);
     setCreating(true);
     try {
@@ -206,6 +234,7 @@ export default function PrestamoPage() {
       setInteres("");
       setModalidad("mensual");
       setConfirmarMontoAlto(false);
+      setShowModalPrestamo(false);
       setShowCreateForm(false);
       await refresh();
     } catch (e) {
@@ -262,12 +291,53 @@ export default function PrestamoPage() {
     : 0;
   const cuotaPorPago = totalAPagar > 0 && nCuotasVal >= 1 ? totalAPagar / nCuotasVal : 0;
   const requiereConfirmarMonto = !isNaN(montoNum) && montoNum >= MONTO_CONFIRMAR_ALTO;
+  const modalidadLabel =
+    MODALIDADES.find((m) => m.value === modalidad)?.label ?? modalidad;
 
   const resumenPrestamos = useMemo(() => {
     return {
       activos: prestamos.filter((p) => p.estado === "activo").length,
     };
   }, [prestamos]);
+
+  const contadoresPorFiltro = useMemo(() => {
+    const dedupePrestamos = (list: PrestamoItem[]) => {
+      const seen = new Set<string>();
+      return list.filter((p) => {
+        if (seen.has(p.id)) return false;
+        seen.add(p.id);
+        return true;
+      });
+    };
+    const mergedUnicos = dedupePrestamos([...prestamos, ...prestamosPagados]);
+
+    return {
+      hoy: mergedUnicos.filter((p) => esPrestamoCreadoHoy(p)).length,
+      todos: mergedUnicos.length,
+      activo: prestamos.filter((p) => p.estado === "activo").length,
+      pagado: prestamosPagados.length,
+      moroso: prestamos.filter((p) =>
+        esPrestamoMorosoPendiente(p, clientePorId[p.clienteId]?.moroso)
+      ).length,
+    };
+  }, [prestamos, prestamosPagados, clientePorId]);
+
+  const formatContadorFiltro = (
+    est: "hoy" | "todos" | "activo" | "pagado" | "moroso"
+  ) => {
+    const n = contadoresPorFiltro[est];
+    const masPendiente =
+      hayMasPagados && (est === "pagado" || est === "todos" || est === "hoy");
+    return masPendiente ? `${n}+` : String(n);
+  };
+
+  const FILTROS_PRESTAMO = [
+    { est: "hoy" as const, label: "Hoy" },
+    { est: "todos" as const, label: "Todos" },
+    { est: "activo" as const, label: "Activos" },
+    { est: "pagado" as const, label: "Pagados" },
+    { est: "moroso" as const, label: "Morosos" },
+  ];
 
   const filtroNombreLower = filtroNombre.trim().toLowerCase();
 
@@ -376,7 +446,16 @@ export default function PrestamoPage() {
   return (
     <div className="card prestamo-admin-page">
       {showCreateForm && (
-      <form onSubmit={handleSubmit} className="card prestamo-admin-create-form" style={{ marginBottom: "1.25rem" }}>
+      <form
+        onSubmit={(e) => e.preventDefault()}
+        onKeyDown={(e) => {
+          if (e.key !== "Enter") return;
+          const tag = (e.target as HTMLElement).tagName;
+          if (tag !== "TEXTAREA") e.preventDefault();
+        }}
+        className="card prestamo-admin-create-form"
+        style={{ marginBottom: "1.25rem" }}
+      >
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "0.75rem", marginBottom: "0.5rem" }}>
           <h3 style={{ margin: 0 }}>Nuevo préstamo</h3>
           <button
@@ -618,9 +697,6 @@ export default function PrestamoPage() {
           <p className="error-msg">{error ?? listaError}</p>
         )}
         <div className="prestamo-nuevo-actions prestamo-admin-create-actions">
-          <button type="submit" className="btn btn-primary" disabled={creating}>
-            {creating ? "Creando..." : "Crear préstamo"}
-          </button>
           <label className="prestamo-nuevo-confirm-label prestamo-admin-create-confirm-label">
             <input
               type="checkbox"
@@ -642,6 +718,15 @@ export default function PrestamoPage() {
               )}
             </span>
           </label>
+          <button
+            type="button"
+            className="btn btn-primary"
+            disabled={creating || !confirmarMontoAlto}
+            onClick={() => handleSubmit()}
+            aria-disabled={creating || !confirmarMontoAlto}
+          >
+            {creating ? "Creando..." : "Crear préstamo"}
+          </button>
         </div>
       </form>
       )}
@@ -670,7 +755,7 @@ export default function PrestamoPage() {
           <button
             type="button"
             className="prestamo-admin-add-btn"
-            onClick={() => setShowCreateForm(true)}
+            onClick={abrirFormularioCrear}
             aria-label="Crear nuevo préstamo"
             title="Crear nuevo préstamo"
           >
@@ -713,7 +798,7 @@ export default function PrestamoPage() {
                 ) : null}
               </div>
               <div className="prestamo-admin-tabs prestamo-historial-filtros prestamo-admin-historial-filtros" role="tablist" aria-label="Filtrar por estado">
-                {(["hoy", "todos", "activo", "pagado", "moroso"] as const).map((est) => (
+                {FILTROS_PRESTAMO.map(({ est, label }) => (
                   <button
                     key={est}
                     type="button"
@@ -721,16 +806,10 @@ export default function PrestamoPage() {
                     aria-selected={filtroEstado === est}
                     className={`prestamo-admin-tab${filtroEstado === est ? " prestamo-admin-tab--active" : ""}`}
                     onClick={() => setFiltroEstado(est)}
+                    aria-label={`${label}, ${contadoresPorFiltro[est]} préstamo${contadoresPorFiltro[est] !== 1 ? "s" : ""}`}
                   >
-                    {est === "hoy"
-                      ? "Hoy"
-                      : est === "todos"
-                        ? "Todos"
-                        : est === "activo"
-                          ? "Activos"
-                          : est === "pagado"
-                            ? "Pagados"
-                            : "Morosos"}
+                    {label}
+                    <span className="prestamo-admin-tab-count">({formatContadorFiltro(est)})</span>
                   </button>
                 ))}
               </div>
@@ -900,6 +979,49 @@ export default function PrestamoPage() {
         )}
         </div>
       </>
+      )}
+
+      {showModalPrestamo && (
+        <ModalConfirmar
+          titulo="Confirmar préstamo"
+          labelConfirmar="Sí, crear préstamo"
+          confirmando={creating}
+          onCancelar={() => {
+            if (creating) return;
+            setShowModalPrestamo(false);
+          }}
+          onConfirmar={() => { void handleEjecutarPrestamo(); }}
+        >
+          <p>¿Estás seguro de crear este préstamo?</p>
+          <p>
+            Cliente: <strong>{clienteSeleccionado?.nombre ?? "—"}</strong>
+          </p>
+          {rutaSeleccionada && (
+            <p>
+              Ruta: <strong>{rutaSeleccionada.nombre ?? rutaSeleccionada.codigo ?? "—"}</strong>
+            </p>
+          )}
+          <p>
+            Monto: <strong>$ {formatMoneda(montoNum)}</strong>
+          </p>
+          <p>
+            Interés: <strong>{formatInteresResumenPct(iVal)}%</strong>
+          </p>
+          <p>
+            Cuotas: <strong>{nCuotasVal} ({modalidadLabel})</strong>
+          </p>
+          <p>
+            Total a pagar: <strong>$ {formatMoneda(totalAPagar)}</strong>
+          </p>
+          <p>
+            Cuota: <strong>$ {formatMoneda(cuotaPorPago)}</strong>
+          </p>
+          {cajaRuta > 0 && (
+            <p>
+              Se descontará de la caja de la ruta: <strong>$ {formatMoneda(montoNum)}</strong>
+            </p>
+          )}
+        </ModalConfirmar>
       )}
     </div>
   );

@@ -32,6 +32,24 @@ export default function ClientePage() {
     filtroPrestamoActivo !== "todos" ||
     Boolean(filtroRutaId);
 
+  const contadoresPorFiltro = useMemo(() => {
+    const porRuta = filtroRutaId
+      ? clientes.filter((c) => (c.rutaId ?? "") === filtroRutaId)
+      : clientes;
+
+    return {
+      todos: porRuta.length,
+      si: porRuta.filter((c) => c.prestamo_activo).length,
+      no: porRuta.filter((c) => !c.prestamo_activo).length,
+    };
+  }, [clientes, filtroRutaId]);
+
+  const FILTROS_CLIENTE = [
+    { value: "todos" as const, label: "Todos" },
+    { value: "si" as const, label: "Con préstamo" },
+    { value: "no" as const, label: "Sin préstamo" },
+  ];
+
   const clientesFiltrados = useMemo(() => {
     return clientes.filter((c) => {
       if (filtroNombreLower) {
@@ -104,9 +122,7 @@ export default function ClientePage() {
   return (
     <div className="card">
       <h2 style={{ marginTop: 0 }}>Cliente</h2>
-      <p style={{ color: "var(--text-muted)", fontSize: "0.875rem", marginBottom: "1.25rem" }}>
-        Crea clientes con nombre, ubicación, dirección, teléfono, cédula y ruta a la que pertenecen.
-      </p>
+
 
       <div style={{ marginBottom: "1.25rem" }}>
         <button
@@ -233,13 +249,7 @@ export default function ClientePage() {
                   role="tablist"
                   aria-label="Filtrar por préstamo activo"
                 >
-                  {(
-                    [
-                      { value: "todos", label: "Todos" },
-                      { value: "si", label: "Con préstamo" },
-                      { value: "no", label: "Sin préstamo" },
-                    ] as const
-                  ).map(({ value, label }) => (
+                  {FILTROS_CLIENTE.map(({ value, label }) => (
                     <button
                       key={value}
                       type="button"
@@ -247,8 +257,10 @@ export default function ClientePage() {
                       aria-selected={filtroPrestamoActivo === value}
                       className={`prestamo-admin-tab${filtroPrestamoActivo === value ? " prestamo-admin-tab--active" : ""}`}
                       onClick={() => setFiltroPrestamoActivo(value)}
+                      aria-label={`${label}, ${contadoresPorFiltro[value]} cliente${contadoresPorFiltro[value] !== 1 ? "s" : ""}`}
                     >
                       {label}
+                      <span className="prestamo-admin-tab-count">({contadoresPorFiltro[value]})</span>
                     </button>
                   ))}
                 </div>
