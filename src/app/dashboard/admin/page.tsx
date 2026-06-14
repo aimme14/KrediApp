@@ -4,7 +4,9 @@ import { useMemo } from "react";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { useAdminDashboard } from "@/context/AdminDashboardContext";
+import { useTrabajadorLista } from "@/context/TrabajadorListaContext";
 import { AdminRutaStatsGrid } from "@/components/AdminRutaStatsGrid";
+import { computeSaldoPorRecogerPorRuta } from "@/lib/prestamo-display";
 
 function formatMoneda(value: number): string {
   const hasDecimals = Math.round(value * 100) % 100 !== 0;
@@ -38,8 +40,22 @@ export default function AdminDashboardPage() {
     loading,
     error,
   } = useAdminDashboard();
+  const { prestamos, clientes } = useTrabajadorLista();
 
   const fechaTitulo = useMemo(() => formatFechaCabecera(new Date()), []);
+
+  const clienteRutaPorId = useMemo(() => {
+    const m: Record<string, string | undefined> = {};
+    clientes.forEach((c) => {
+      m[c.id] = c.rutaId;
+    });
+    return m;
+  }, [clientes]);
+
+  const saldoPorRecogerPorRuta = useMemo(
+    () => computeSaldoPorRecogerPorRuta(prestamos, clienteRutaPorId),
+    [prestamos, clienteRutaPorId]
+  );
 
   const nombreBienvenida = useMemo(() => {
     if (!profile) return "Administrador";
@@ -257,7 +273,11 @@ export default function AdminDashboardPage() {
                         <p className="admin-inicio-ruta-meta">{r.ubicacion}</p>
                       ) : null}
                     </header>
-                    <AdminRutaStatsGrid ruta={r} showGananciasNetas />
+                    <AdminRutaStatsGrid
+                      ruta={r}
+                      showGananciasNetas
+                      saldoPorRecoger={saldoPorRecogerPorRuta.get(r.id) ?? 0}
+                    />
                   </article>
               ))}
             </div>

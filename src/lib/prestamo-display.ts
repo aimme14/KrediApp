@@ -58,3 +58,19 @@ export function formatDebeSlashTotalCredito(
 ): string {
   return `${formatMonedaListado(saldoPendiente)}/${formatMonedaListado(totalCreditoPrestamo(prestamo))}`;
 }
+
+/** Suma de saldo pendiente por ruta (solo préstamos activos). */
+export function computeSaldoPorRecogerPorRuta(
+  prestamos: PrestamoItem[],
+  clienteRutaPorId?: Record<string, string | undefined>
+): Map<string, number> {
+  const map = new Map<string, number>();
+  for (const p of prestamos) {
+    if (p.estado !== "activo") continue;
+    const rutaId = p.rutaId || clienteRutaPorId?.[p.clienteId];
+    if (!rutaId) continue;
+    const prev = map.get(rutaId) ?? 0;
+    map.set(rutaId, Math.round((prev + (p.saldoPendiente ?? 0)) * 100) / 100);
+  }
+  return map;
+}

@@ -31,10 +31,17 @@ type AdminRutaStatsGridProps = {
   className?: string;
   /** Tarjeta derivada solo en Inicio admin. */
   showGananciasNetas?: boolean;
+  /** Saldo pendiente en préstamos activos de la ruta (Inicio admin). */
+  saldoPorRecoger?: number;
 };
 
 /** Tarjetas financieras por ruta (Inicio admin, listado Rutas, etc.). */
-export function AdminRutaStatsGrid({ ruta, className, showGananciasNetas }: AdminRutaStatsGridProps) {
+export function AdminRutaStatsGrid({
+  ruta,
+  className,
+  showGananciasNetas,
+  saldoPorRecoger,
+}: AdminRutaStatsGridProps) {
   const g = ruta.ganancias ?? 0;
   const gananciasNetas = showGananciasNetas ? computeGananciasNetasRuta(ruta) : null;
   const gridClass = className
@@ -114,6 +121,21 @@ export function AdminRutaStatsGrid({ ruta, className, showGananciasNetas }: Admi
           <span className="admin-inicio-ruta-stat-hint">caja en ruta</span>
         </div>
       </div>
+      {saldoPorRecoger !== undefined ? (
+        <div className="admin-inicio-ruta-stat">
+          <span className="admin-inicio-ruta-stat-icon admin-inicio-metric-icon--blue" aria-hidden>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <line x1="12" y1="1" x2="12" y2="23" />
+              <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+            </svg>
+          </span>
+          <div className="admin-inicio-ruta-stat-body">
+            <span className="admin-inicio-ruta-stat-label">Saldo por recoger</span>
+            <span className="admin-inicio-ruta-stat-value">{formatMoneda(saldoPorRecoger)}</span>
+            <span className="admin-inicio-ruta-stat-hint">préstamos activos</span>
+          </div>
+        </div>
+      ) : null}
       <div className="admin-inicio-ruta-stat">
         <span className="admin-inicio-ruta-stat-icon admin-inicio-metric-icon--blue" aria-hidden>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
