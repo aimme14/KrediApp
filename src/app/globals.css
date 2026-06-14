@@ -2623,6 +2623,22 @@ td {
   margin-bottom: 0;
 }
 
+.prestamo-admin-resumen-block {
+  margin-bottom: 0.88rem;
+}
+
+.prestamo-admin-resumen-head {
+  margin-bottom: 0.52rem;
+}
+
+.prestamo-admin-resumen-block .prestamo-admin-resumen {
+  margin-bottom: 0;
+}
+
+.prestamo-admin-filtro-ruta {
+  max-width: 18rem;
+}
+
 .prestamo-admin-resumen {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2720,6 +2736,11 @@ td {
   box-shadow: 0 2px 6px rgba(99, 102, 241, 0.35);
 }
 
+.prestamo-admin-kpi-icon--recoger {
+  background: linear-gradient(145deg, #34d399 0%, #059669 100%);
+  box-shadow: 0 2px 6px rgba(52, 211, 153, 0.35);
+}
+
 .prestamo-admin-kpi-icon--mora {
   background: linear-gradient(145deg, #f87171 0%, #b91c1c 100%);
   box-shadow: 0 2px 6px rgba(248, 113, 113, 0.3);
@@ -2731,7 +2752,7 @@ td {
   border-radius: 12px;
 }
 
-.prestamo-admin-resumen + .prestamo-admin-hist-card {
+.prestamo-admin-resumen-block + .prestamo-admin-hist-card {
   margin-top: 0.85rem;
 }
 

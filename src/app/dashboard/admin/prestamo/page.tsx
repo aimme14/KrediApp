@@ -72,6 +72,16 @@ function ordenarPrestamosParaPrincipal(prestamos: PrestamoItem[]): PrestamoItem[
 
 type GrupoClientePrestamos = { clienteId: string; prestamos: PrestamoItem[] };
 
+function prestamoCoincideRuta(
+  p: PrestamoItem,
+  rutaId: string,
+  clientePorId: Record<string, ClienteItem>
+): boolean {
+  if (!rutaId) return true;
+  const rid = p.rutaId || clientePorId[p.clienteId]?.rutaId;
+  return (rid ?? "") === rutaId;
+}
+
 export default function PrestamoPage() {
   const { user, profile } = useAuth();
   const searchParams = useSearchParams();
@@ -104,6 +114,7 @@ export default function PrestamoPage() {
   const [confirmarMontoAlto, setConfirmarMontoAlto] = useState(false);
   const [filtroEstado, setFiltroEstado] = useState<"hoy" | "todos" | "activo" | "pagado" | "moroso">("hoy");
   const [filtroNombre, setFiltroNombre] = useState("");
+  const [filtroRutaId, setFiltroRutaId] = useState("");
   const [historialEconomicoColapsado, setHistorialEconomicoColapsado] = useState(true);
 
   useEffect(() => {
@@ -295,10 +306,14 @@ export default function PrestamoPage() {
     MODALIDADES.find((m) => m.value === modalidad)?.label ?? modalidad;
 
   const resumenPrestamos = useMemo(() => {
+    const activos = prestamos.filter(
+      (p) => p.estado === "activo" && prestamoCoincideRuta(p, filtroRutaId, clientePorId)
+    );
     return {
-      activos: prestamos.filter((p) => p.estado === "activo").length,
+      activos: activos.length,
+      saldoPorRecoger: activos.reduce((sum, p) => sum + (p.saldoPendiente ?? 0), 0),
     };
-  }, [prestamos]);
+  }, [prestamos, filtroRutaId, clientePorId]);
 
   const contadoresPorFiltro = useMemo(() => {
     const dedupePrestamos = (list: PrestamoItem[]) => {
@@ -309,18 +324,23 @@ export default function PrestamoPage() {
         return true;
       });
     };
+    const porRuta = (list: PrestamoItem[]) =>
+      list.filter((p) => prestamoCoincideRuta(p, filtroRutaId, clientePorId));
     const mergedUnicos = dedupePrestamos([...prestamos, ...prestamosPagados]);
+    const prestamosRuta = porRuta(prestamos);
+    const mergedRuta = porRuta(mergedUnicos);
+    const pagadosRuta = porRuta(prestamosPagados);
 
     return {
-      hoy: mergedUnicos.filter((p) => esPrestamoCreadoHoy(p)).length,
-      todos: mergedUnicos.length,
-      activo: prestamos.filter((p) => p.estado === "activo").length,
-      pagado: prestamosPagados.length,
-      moroso: prestamos.filter((p) =>
+      hoy: mergedRuta.filter((p) => esPrestamoCreadoHoy(p)).length,
+      todos: mergedRuta.length,
+      activo: prestamosRuta.filter((p) => p.estado === "activo").length,
+      pagado: pagadosRuta.length,
+      moroso: prestamosRuta.filter((p) =>
         esPrestamoMorosoPendiente(p, clientePorId[p.clienteId]?.moroso)
       ).length,
     };
-  }, [prestamos, prestamosPagados, clientePorId]);
+  }, [prestamos, prestamosPagados, clientePorId, filtroRutaId]);
 
   const formatContadorFiltro = (
     est: "hoy" | "todos" | "activo" | "pagado" | "moroso"
@@ -363,6 +383,9 @@ export default function PrestamoPage() {
 
   const prestamosFiltrados = useMemo(() => {
     let list = prestamosBase;
+    if (filtroRutaId) {
+      list = list.filter((p) => prestamoCoincideRuta(p, filtroRutaId, clientePorId));
+    }
     if (filtroNombreLower) {
       list = list.filter((p) => {
         const cl = clientePorId[p.clienteId];
@@ -378,14 +401,14 @@ export default function PrestamoPage() {
       });
     }
     return list;
-  }, [prestamosBase, filtroNombreLower, clientePorId]);
+  }, [prestamosBase, filtroRutaId, filtroNombreLower, clientePorId]);
 
   const PAGE_SIZE = 15;
   const [pagina, setPagina] = useState(1);
 
   useEffect(() => {
     setPagina(1);
-  }, [filtroEstado, filtroNombre]);
+  }, [filtroEstado, filtroNombre, filtroRutaId]);
 
   /** Grupos por cliente: principal = reciente y activo (activo > mora > pagado, luego por fecha). */
   const gruposPorCliente = useMemo((): GrupoClientePrestamos[] => {
@@ -734,7 +757,30 @@ export default function PrestamoPage() {
       {!showCreateForm && (
       <>
         {!loading && (
-          <div className="prestamo-admin-resumen">
+          <div className="prestamo-admin-resumen-block">
+            <div className="prestamo-admin-resumen-head">
+              <div className="admin-clientes-filtro-ruta prestamo-admin-filtro-ruta">
+                <label htmlFor="prestamos-filtro-ruta" className="admin-clientes-filtro-ruta-label">
+                  Ruta
+                </label>
+                <select
+                  id="prestamos-filtro-ruta"
+                  className="admin-clientes-filtro-ruta-select"
+                  value={filtroRutaId}
+                  onChange={(e) => setFiltroRutaId(e.target.value)}
+                  aria-label="Filtrar préstamos y saldo por ruta"
+                >
+                  <option value="">Todas las rutas</option>
+                  {rutas.map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.nombre}
+                      {r.ubicacion ? ` · ${r.ubicacion}` : ""}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div className="prestamo-admin-resumen">
             <div className="prestamo-admin-kpi">
               <div className="prestamo-admin-kpi-body">
                 <span className="prestamo-admin-kpi-label">Activos</span>
@@ -746,6 +792,19 @@ export default function PrestamoPage() {
                   <polyline points="12 6 12 12 16 14" />
                 </svg>
               </span>
+            </div>
+            <div className="prestamo-admin-kpi">
+              <div className="prestamo-admin-kpi-body">
+                <span className="prestamo-admin-kpi-label">Saldo por recoger</span>
+                <span className="prestamo-admin-kpi-value">$ {formatMoneda(resumenPrestamos.saldoPorRecoger)}</span>
+              </div>
+              <span className="prestamo-admin-kpi-icon prestamo-admin-kpi-icon--recoger" aria-hidden>
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="12" y1="1" x2="12" y2="23" />
+                  <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+                </svg>
+              </span>
+            </div>
             </div>
           </div>
         )}
@@ -968,11 +1027,13 @@ export default function PrestamoPage() {
             <p className="prestamo-admin-filtro-vacio">
               {filtroNombreLower
                 ? `No hay préstamos que coincidan con «${filtroNombre.trim()}».`
-                : filtroEstado === "hoy"
-                  ? "No hay préstamos creados hoy."
-                  : filtroEstado === "moroso"
-                    ? "No hay préstamos activos pendientes de clientes morosos."
-                    : `No hay préstamos en el historial con estado «${filtroEstado === "todos" ? "todos" : filtroEstado === "activo" ? "activos" : "pagados"}».`}
+                : filtroRutaId
+                  ? "No hay préstamos en la ruta seleccionada con los filtros actuales."
+                  : filtroEstado === "hoy"
+                    ? "No hay préstamos creados hoy."
+                    : filtroEstado === "moroso"
+                      ? "No hay préstamos activos pendientes de clientes morosos."
+                      : `No hay préstamos en el historial con estado «${filtroEstado === "todos" ? "todos" : filtroEstado === "activo" ? "activos" : "pagados"}».`}
             </p>
           ) : null}
           </>
