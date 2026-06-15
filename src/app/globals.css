@@ -4348,7 +4348,44 @@ th {
 }
 
 .dashboard-help-header-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
   margin-bottom: 0.75rem;
+}
+
+.dashboard-help-header-titles {
+  min-width: 0;
+  flex: 1;
+}
+
+.dashboard-help-close-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  background: var(--btn-secondary-bg);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.dashboard-help-close-btn:hover {
+  color: var(--text);
+  border-color: var(--text-muted);
+  background: var(--btn-secondary-hover);
+}
+
+.dashboard-help-close-btn:focus-visible {
+  outline: 2px solid var(--link);
+  outline-offset: 2px;
 }
 
 .dashboard-help-title {

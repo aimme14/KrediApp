@@ -61,6 +61,11 @@ export default function DashboardHelp() {
   const activeSection =
     ADMIN_HELP_SECTIONS.find((s) => s.key === section) ?? ADMIN_HELP_SECTIONS[0];
 
+  const cerrarAyuda = useCallback(() => {
+    setOpen(false);
+    setSectionsOpen(false);
+  }, []);
+
   const selectSection = useCallback((key: AdminHelpSectionKey) => {
     setSection(key);
     setSectionsOpen(false);
@@ -77,8 +82,7 @@ export default function DashboardHelp() {
     if (!open) return;
     const handleClickOutside = (e: MouseEvent) => {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setOpen(false);
-        setSectionsOpen(false);
+        cerrarAyuda();
       }
     };
     const handleEscape = (e: KeyboardEvent) => {
@@ -88,7 +92,7 @@ export default function DashboardHelp() {
         e.stopPropagation();
         return;
       }
-      setOpen(false);
+      cerrarAyuda();
     };
     document.addEventListener("mousedown", handleClickOutside);
     document.addEventListener("keydown", handleEscape);
@@ -96,7 +100,7 @@ export default function DashboardHelp() {
       document.removeEventListener("mousedown", handleClickOutside);
       document.removeEventListener("keydown", handleEscape);
     };
-  }, [open, sectionsOpen]);
+  }, [open, sectionsOpen, cerrarAyuda]);
 
   useEffect(() => {
     if (!sectionsOpen) return;
@@ -130,10 +134,7 @@ export default function DashboardHelp() {
         <>
           <div
             className="dashboard-help-backdrop"
-            onClick={() => {
-              setOpen(false);
-              setSectionsOpen(false);
-            }}
+            onClick={cerrarAyuda}
             aria-hidden
           />
           <div
@@ -144,10 +145,22 @@ export default function DashboardHelp() {
           >
           <header className="dashboard-help-header">
             <div className="dashboard-help-header-top">
-              <div>
+              <div className="dashboard-help-header-titles">
                 <h3 className="dashboard-help-title">Centro de ayuda</h3>
                 <p className="dashboard-help-subtitle">Administrador</p>
               </div>
+              <button
+                type="button"
+                className="dashboard-help-close-btn"
+                onClick={cerrarAyuda}
+                aria-label="Cerrar centro de ayuda"
+                title="Cerrar"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <path d="M18 6 6 18" />
+                  <path d="m6 6 12 12" />
+                </svg>
+              </button>
             </div>
 
             <div className="dashboard-help-picker" ref={pickerRef}>
