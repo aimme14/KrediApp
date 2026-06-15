@@ -301,13 +301,7 @@ export async function POST(
         const prevFallos =
           typeof pr.intentosFallidos === "number" ? pr.intentosFallidos : 0;
         const intentosFallidos = prevFallos + 1;
-        /** No se pasa a mora por no pagos; estado «mora» solo puede quedar por datos previos. */
-        const estadoPrestamo =
-          pr.estado === "pagado"
-            ? "pagado"
-            : pr.estado === "mora"
-              ? "mora"
-              : "activo";
+        const estadoPrestamo = pr.estado === "pagado" ? "pagado" : "activo";
 
         tx.update(prestamoRef, {
           intentosFallidos,

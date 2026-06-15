@@ -7,28 +7,31 @@ import { useAuth } from "@/context/AuthContext";
 import { useTrabajadorCajaDia } from "@/context/TrabajadorCajaDiaContext";
 import { formatFechaDia } from "@/lib/colombia-day-bounds";
 import { useRuta } from "@/hooks/useRuta";
-import { UMBRAL_INTENTOS_ALERTA, useRutaDia } from "@/hooks/useRutaDia";
+import { useRutaDia } from "@/hooks/useRutaDia";
+import {
+  tieneAlertaAlta,
+  tieneAlertaNoPagoInformativa,
+} from "@/lib/ruta-dia-prioridad";
 import type { ClienteRutaGrupo, PrioridadClienteRuta } from "@/types/finanzas";
 
-/** Semáforo: rojo = préstamo en mora (BD), naranja = alerta informativa (1–2 no pagos), amarillo = pendiente, verde = cuota del día pagada */
+/** Semáforo: rojo = alerta alta (3+ no pagos), naranja = no pago hoy o alerta informativa, amarillo = pendiente, verde = cuota del día pagada */
 export type SemaforoRuta = "rojo" | "naranja" | "amarillo" | "verde";
 
-/** Alerta visual por intentos fallidos; no cambia mora en servidor. */
+function grupoTieneAlertaAlta(grupo: ClienteRutaGrupo): boolean {
+  return grupo.items.some((i) => tieneAlertaAlta(i.intentosFallidos));
+}
+
 function tieneAlertaNoPago(grupo: ClienteRutaGrupo): boolean {
-  return grupo.items.some(
-    (i) =>
-      i.estado === "activo" &&
-      i.intentosFallidos >= 1 &&
-      i.intentosFallidos < UMBRAL_INTENTOS_ALERTA
+  return grupo.items.some((i) =>
+    tieneAlertaNoPagoInformativa(i.intentosFallidos)
   );
 }
 
 function getSemaforo(grupo: ClienteRutaGrupo): SemaforoRuta {
-  const hasMora = grupo.items.some((i) => i.estado === "mora");
   const allCuotaPagadaHoy =
     grupo.items.length > 0 && grupo.items.every((i) => i.cuotaPagadaHoy);
   const tieneNoPagoHoy = grupo.items.some((i) => i.noPagoHoy);
-  if (hasMora) return "rojo";
+  if (grupoTieneAlertaAlta(grupo)) return "rojo";
   if (tieneNoPagoHoy) return "naranja";
   if (tieneAlertaNoPago(grupo)) return "naranja";
   if (allCuotaPagadaHoy) return "verde";
@@ -38,7 +41,7 @@ function getSemaforo(grupo: ClienteRutaGrupo): SemaforoRuta {
 function getSemaforoLabel(semaforo: SemaforoRuta): string {
   switch (semaforo) {
     case "rojo":
-      return "En mora";
+      return "Alerta alta";
     case "naranja":
       return "Sin pago reciente (informativo)";
     case "amarillo":
@@ -51,11 +54,11 @@ function getSemaforoLabel(semaforo: SemaforoRuta): string {
 }
 
 const FILTROS_OPCIONES: {
-  id: "todos" | "mora" | "no_pago_hoy" | "pendientes" | "cobrados";
+  id: "todos" | "alerta_alta" | "no_pago_hoy" | "pendientes" | "cobrados";
   label: string;
 }[] = [
   { id: "todos", label: "Todos" },
-  { id: "mora", label: "En mora" },
+  { id: "alerta_alta", label: "Alerta alta" },
   { id: "no_pago_hoy", label: "No pagaron hoy" },
   { id: "pendientes", label: "Pendientes" },
   { id: "cobrados", label: "Cobrados" },
@@ -70,11 +73,10 @@ function formatCurrency(value: number): string {
 }
 
 function getBadgeLabel(grupo: ClienteRutaGrupo, _prioridad: PrioridadClienteRuta): string {
-  const hasMora = grupo.items.some((i) => i.estado === "mora");
   const allCuotaPagadaHoy =
     grupo.items.length > 0 && grupo.items.every((i) => i.cuotaPagadaHoy);
   const tieneNoPagoHoy = grupo.items.some((i) => i.noPagoHoy);
-  if (hasMora) return "Mora";
+  if (grupoTieneAlertaAlta(grupo)) return "Alerta alta";
   if (allCuotaPagadaHoy) return "Pagó hoy";
   if (tieneNoPagoHoy) return "No pagó hoy";
   return "Pendiente";
@@ -125,7 +127,7 @@ export default function RutaDelDiaPage() {
   }, [clientesFiltradosGrouped]);
 
   const secciones = [
-    { prioridad: 1 as PrioridadClienteRuta, titulo: "URGENTE · EN MORA" },
+    { prioridad: 1 as PrioridadClienteRuta, titulo: "URGENTE · ALERTA ALTA" },
     {
       prioridad: 2 as PrioridadClienteRuta,
       titulo: "ADVERTENCIA · SIN PAGO RECIENTE (informativo)",
@@ -344,9 +346,9 @@ export default function RutaDelDiaPage() {
                         `${grupo.cantidadPrestamos} préstamos`
                       );
                     }
-                    if (grupo.diasMoraMax > 0) {
+                    if (grupo.diasVencidosMax > 0) {
                       subtituloParts.push(
-                        `${grupo.diasMoraMax} días de mora`
+                        `${grupo.diasVencidosMax} días vencidos`
                       );
                     }
                     const allCuotaPagada =
@@ -354,8 +356,8 @@ export default function RutaDelDiaPage() {
                       grupo.items.every((i) => i.cuotaPagadaHoy);
                     const estadoFirst = allCuotaPagada
                       ? "pagada"
-                      : grupo.items.some((i) => i.estado === "mora")
-                        ? "mora"
+                      : grupoTieneAlertaAlta(grupo)
+                        ? "alerta"
                         : tieneAlertaNoPago(grupo)
                           ? "alerta"
                           : (grupo.items[0]?.estado?.toLowerCase() ?? "activo");

@@ -99,7 +99,6 @@ export type FrecuenciaCuota = "diario" | "semanal" | "quincenal" | "mensual";
 export type EstadoCuota =
   | "pendiente"
   | "parcial"
-  | "mora"
   | "pagada"
   | "incobrable";
 
@@ -178,7 +177,7 @@ export interface ClienteRuta {
   frecuencia: string;
   numeroCuota: number;
   totalCuotas: number;
-  diasMora: number;
+  diasVencidos: number;
   intentosFallidos: number;
   prioridad: PrioridadClienteRuta;
   visitado: boolean;
@@ -186,7 +185,7 @@ export interface ClienteRuta {
   cuotaPagadaHoy: boolean;
   /** True si hoy se registró «no pagó» para este préstamo (cobros del día). */
   noPagoHoy: boolean;
-  /** Marcado moroso por el admin (solo UI; no es el estado mora del préstamo). */
+  /** Marcado moroso por el admin (señal en UI; distinto de alertas por no pago). */
   moroso: boolean;
 }
 
@@ -202,8 +201,8 @@ export interface ClienteRutaGrupo {
   cantidadPrestamos: number;
   /** Prioridad más urgente del grupo (1 = más urgente) */
   prioridadMax: PrioridadClienteRuta;
-  /** Máximos días de mora entre los ítems */
-  diasMoraMax: number;
+  /** Máximos días vencidos entre los ítems */
+  diasVencidosMax: number;
   /** Si el cobrador ya visitó a este cliente hoy (localStorage) */
   visitado: boolean;
   /** Cliente marcado moroso por administrador (solo señal en UI). */

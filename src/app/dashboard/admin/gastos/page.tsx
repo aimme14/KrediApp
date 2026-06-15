@@ -21,6 +21,7 @@ import {
 } from "@/lib/colombia-day-bounds";
 import { filtrarGastosPorPeriodo, type GastosPeriodoVista } from "@/lib/gastos-periodo-filter";
 import { GastosPeriodoFilter, mensajeGastosVaciosPeriodo } from "@/components/GastosPeriodoFilter";
+import { ModalConfirmar } from "@/components/trabajador/ModalConfirmar";
 
 const EMPRESAS_COLLECTION = "empresas";
 const GASTOS_ADMIN_SUBCOLLECTION = "gastosAdministrador";
@@ -31,6 +32,18 @@ const TIPOS = [
   { value: "alimentacion", label: "Alimentación", icon: "alimentacion" },
   { value: "otro", label: "Otro", icon: "otro" },
 ] as const;
+
+type TipoGasto = (typeof TIPOS)[number]["value"];
+
+type PendingGastoData = {
+  monto: number;
+  tipo: TipoGasto;
+  motivo: string;
+  conEvidencia: boolean;
+  alcance: "admin" | "ruta";
+  rutaId?: string;
+  rutaNombre?: string;
+};
 
 function TransporteIcon() {
   return (
@@ -143,6 +156,9 @@ export default function GastosPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [alcanceGasto, setAlcanceGasto] = useState<"admin" | "ruta">("admin");
   const [rutaIdGasto, setRutaIdGasto] = useState("");
+  const [showModalGasto, setShowModalGasto] = useState(false);
+  const [pendingGastoData, setPendingGastoData] = useState<PendingGastoData | null>(null);
+  const [confirmarGastoMarcado, setConfirmarGastoMarcado] = useState(false);
   const [showCamera, setShowCamera] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -353,18 +369,40 @@ export default function GastosPage() {
     setCameraError(null);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleRevisarGasto = (e: React.FormEvent) => {
     e.preventDefault();
     if (!user || !profile) return;
     const montoNum = interiorDecimalCOPToNumber(monto);
-    if (isNaN(montoNum) || montoNum < 0) {
-      setError("Monto debe ser un número mayor o igual a 0");
+    if (isNaN(montoNum) || montoNum <= 0) {
+      setError("El monto debe ser mayor a 0");
+      return;
+    }
+    const motivoTrim = motivo.trim();
+    if (!motivoTrim) {
+      setError("El motivo es obligatorio");
       return;
     }
     if (alcanceGasto === "ruta" && !rutaIdGasto.trim()) {
       setError("Selecciona la ruta a la que corresponde el gasto.");
       return;
     }
+    const rutaSel = alcanceGasto === "ruta" ? rutas.find((r) => r.id === rutaIdGasto.trim()) : undefined;
+    setError(null);
+    setConfirmarGastoMarcado(false);
+    setPendingGastoData({
+      monto: montoNum,
+      tipo,
+      motivo: motivoTrim,
+      conEvidencia: !!evidenciaFile,
+      alcance: alcanceGasto,
+      rutaId: alcanceGasto === "ruta" ? rutaIdGasto.trim() : undefined,
+      rutaNombre: rutaSel?.nombre ?? undefined,
+    });
+    setShowModalGasto(true);
+  };
+
+  const handleEjecutarGasto = async (data: PendingGastoData) => {
+    if (!user || !profile) return;
     setError(null);
     setCreating(true);
     try {
@@ -380,13 +418,13 @@ export default function GastosPage() {
       }
       const token = await user.getIdToken();
       await createGasto(token, {
-        descripcion: motivo.trim(),
-        monto: montoNum,
+        descripcion: data.motivo,
+        monto: data.monto,
         fecha: fechaDiaColombiaHoy(),
-        tipo,
+        tipo: data.tipo,
         evidencia: evidenciaUrl || undefined,
-        alcance: alcanceGasto,
-        rutaId: alcanceGasto === "ruta" ? rutaIdGasto.trim() : undefined,
+        alcance: data.alcance,
+        rutaId: data.alcance === "ruta" ? data.rutaId : undefined,
       });
       setMotivo("");
       setMonto("");
@@ -395,6 +433,9 @@ export default function GastosPage() {
       setRutaIdGasto("");
       setEvidenciaFile(null);
       setEvidenciaPreview(null);
+      setPendingGastoData(null);
+      setShowModalGasto(false);
+      setConfirmarGastoMarcado(false);
       setShowForm(false);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al registrar gasto");
@@ -402,6 +443,9 @@ export default function GastosPage() {
       setCreating(false);
     }
   };
+
+  const alcanceGastoLabel = (alcance: PendingGastoData["alcance"]) =>
+    alcance === "ruta" ? "Ruta" : "Administrador";
 
   if (!profile || profile.role !== "admin") return null;
 
@@ -460,7 +504,7 @@ export default function GastosPage() {
               <CloseIcon />
             </button>
           </div>
-          <form onSubmit={handleSubmit} className="gastos-form" noValidate>
+          <form onSubmit={handleRevisarGasto} className="gastos-form" noValidate>
             <div className="form-group">
               <label htmlFor="gastos-monto">Monto <span className="form-required" aria-hidden>*</span></label>
               <input
@@ -636,8 +680,13 @@ export default function GastosPage() {
             {error && <p className="error-msg" role="alert" id="gastos-form-error">{error}</p>}
             <p className="form-required-hint" aria-hidden>* Campos requeridos</p>
             <div className="gastos-form-actions">
-              <button type="submit" className="btn btn-primary" disabled={creating} aria-busy={creating}>
-                {creating ? "Guardando..." : "Registrar gasto"}
+              <button
+                type="submit"
+                className="btn btn-primary"
+                disabled={creating || showModalGasto}
+                aria-busy={creating}
+              >
+                Registrar gasto
               </button>
               <button type="button" className="btn btn-secondary" onClick={() => setShowForm(false)} aria-label="Cancelar y cerrar formulario">
                 Cancelar
@@ -855,6 +904,50 @@ export default function GastosPage() {
             </button>
           </div>
         </div>
+      )}
+
+      {showModalGasto && pendingGastoData && (
+        <ModalConfirmar
+          titulo="Confirmar gasto"
+          labelConfirmar="Sí, registrar gasto"
+          confirmando={creating}
+          confirmacionMarcada={confirmarGastoMarcado}
+          onConfirmacionMarcadaChange={setConfirmarGastoMarcado}
+          labelConfirmacion={
+            <>
+              Confirmo el gasto de <strong>{formatMoneda(pendingGastoData.monto)}</strong>
+            </>
+          }
+          onCancelar={() => {
+            if (creating) return;
+            setShowModalGasto(false);
+            setPendingGastoData(null);
+            setConfirmarGastoMarcado(false);
+          }}
+          onConfirmar={() => { void handleEjecutarGasto(pendingGastoData); }}
+        >
+          <p>Revisa los datos antes de registrar:</p>
+          <p>
+            Ámbito: <strong>{alcanceGastoLabel(pendingGastoData.alcance)}</strong>
+          </p>
+          {pendingGastoData.alcance === "ruta" && pendingGastoData.rutaNombre ? (
+            <p>
+              Ruta: <strong>{pendingGastoData.rutaNombre}</strong>
+            </p>
+          ) : null}
+          <p>
+            Tipo: <strong>{tipoLabel(pendingGastoData.tipo)}</strong>
+          </p>
+          <p>
+            Monto: <strong>{formatMoneda(pendingGastoData.monto)}</strong>
+          </p>
+          <p>
+            Motivo: <strong>{pendingGastoData.motivo}</strong>
+          </p>
+          <p>
+            Evidencia: <strong>{pendingGastoData.conEvidencia ? "Con foto adjunta" : "Sin evidencia"}</strong>
+          </p>
+        </ModalConfirmar>
       )}
     </div>
   );

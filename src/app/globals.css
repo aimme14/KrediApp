@@ -799,6 +799,32 @@ button {
   color: var(--text);
 }
 
+.modal-confirmar-checkbox-label {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  margin-top: 1rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--card-border);
+  font-size: 0.875rem;
+  color: var(--text);
+  line-height: 1.45;
+  cursor: pointer;
+}
+
+.modal-confirmar-checkbox-label input[type="checkbox"] {
+  flex-shrink: 0;
+  width: 1.05rem;
+  height: 1.05rem;
+  margin-top: 0.12rem;
+  accent-color: var(--link);
+  cursor: pointer;
+}
+
+.modal-confirmar-checkbox-label span strong {
+  font-weight: 700;
+}
+
 .modal-confirmar-actions {
   display: flex;
   gap: 0.75rem;
@@ -2711,10 +2737,6 @@ td {
   line-height: 1.1;
 }
 
-.prestamo-admin-kpi-value--mora {
-  color: #f87171;
-}
-
 .prestamo-admin-kpi-icon {
   flex-shrink: 0;
   width: 1.68rem;
@@ -2739,11 +2761,6 @@ td {
 .prestamo-admin-kpi-icon--recoger {
   background: linear-gradient(145deg, #34d399 0%, #059669 100%);
   box-shadow: 0 2px 6px rgba(52, 211, 153, 0.35);
-}
-
-.prestamo-admin-kpi-icon--mora {
-  background: linear-gradient(145deg, #f87171 0%, #b91c1c 100%);
-  box-shadow: 0 2px 6px rgba(248, 113, 113, 0.3);
 }
 
 .prestamo-admin-hist-card {
@@ -3332,12 +3349,6 @@ td {
   border: 1px solid color-mix(in srgb, #6366f1 45%, transparent);
 }
 
-.prestamo-admin-estado--mora {
-  background: color-mix(in srgb, #f87171 20%, transparent);
-  color: #fecaca;
-  border: 1px solid color-mix(in srgb, #f87171 40%, transparent);
-}
-
 .prestamo-admin-estado--pagado {
   background: color-mix(in srgb, #22c55e 22%, transparent);
   color: #86efac;
@@ -3346,9 +3357,6 @@ td {
 
 [data-theme="light"] .prestamo-admin-estado--activo {
   color: #4338ca;
-}
-[data-theme="light"] .prestamo-admin-estado--mora {
-  color: #b91c1c;
 }
 [data-theme="light"] .prestamo-admin-estado--pagado {
   color: #15803d;
@@ -9916,15 +9924,10 @@ a.admin-inicio-link-btn {
   text-transform: uppercase;
   letter-spacing: 0.03em;
 }
-.ruta-dia-badge.estado-mora { background: #fef2f2; color: #dc2626; }
 .ruta-dia-badge.estado-pagada { background: #f0fdf4; color: #16a34a; }
 .ruta-dia-badge.estado-activo { background: #fffbeb; color: #d97706; }
 .ruta-dia-badge.estado-alerta { background: #fff7ed; color: #ea580c; }
 
-[data-theme="dark"] .ruta-dia-badge.estado-mora {
-  background: rgba(220, 38, 38, 0.16);
-  color: #f87171;
-}
 [data-theme="dark"] .ruta-dia-badge.estado-pagada {
   background: rgba(22, 163, 74, 0.16);
   color: #34d399;

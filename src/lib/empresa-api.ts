@@ -102,7 +102,7 @@ export type PrestamoItem = {
   adelantoCuota?: number;
   /** Fecha del último pago (ISO). Para semáforo "cuota del día pagada" en ruta del día. */
   ultimoPagoFecha?: string | null;
-  /** Veces que se registró «no pago» consecutivo (informativo; no cambia mora automáticamente). */
+  /** Veces que se registró «no pago» consecutivo (informativo para alertas en ruta). */
   intentosFallidos?: number;
   /** Cliente marcado moroso por administrador (sincronizado desde cliente.moroso). */
   moroso?: boolean;
@@ -939,7 +939,7 @@ export function esPrestamoDeClienteMoroso(
   return prestamo.moroso === true || clienteMoroso === true;
 }
 
-/** Moroso con saldo pendiente: activo/mora, no pagado. */
+/** Moroso con saldo pendiente (activo, no pagado). */
 export function esPrestamoMorosoPendiente(
   prestamo: PrestamoItem,
   clienteMoroso?: boolean

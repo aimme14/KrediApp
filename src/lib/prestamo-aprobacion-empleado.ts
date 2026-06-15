@@ -41,7 +41,7 @@ function ordenarPorMasReciente(a: PrestamoHistoricoRow, b: PrestamoHistoricoRow)
   return tb - ta;
 }
 
-/** Préstamos cerrados (pagado o mora) del cliente, ordenados del más reciente al más antiguo. */
+/** Préstamos cerrados (pagado) del cliente, ordenados del más reciente al más antiguo. */
 export async function listPrestamosHistoricosCliente(
   db: Firestore,
   empresaId: string,
@@ -57,7 +57,7 @@ export async function listPrestamosHistoricosCliente(
 
   return snap.docs
     .map((d) => d.data() as Record<string, unknown>)
-    .filter((d) => d.estado === "pagado" || d.estado === "mora")
+    .filter((d) => d.estado === "pagado")
     .map((d) => ({
       monto: typeof d.monto === "number" ? d.monto : 0,
       creadoEn: timestampToDate(d.creadoEn),

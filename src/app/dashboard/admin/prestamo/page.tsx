@@ -56,8 +56,8 @@ function cuotasPagadas(totalAPagar: number, numeroCuotas: number, saldoPendiente
   return Math.min(numeroCuotas, Math.round(pagado / cuotaUnit));
 }
 
-/** Orden de prioridad para mostrar préstamo principal: activo > mora > pagado; luego más reciente primero. */
-const ESTADO_ORDEN: Record<string, number> = { activo: 0, mora: 1, pagado: 2 };
+/** Orden de prioridad para mostrar préstamo principal: activo > pagado; luego más reciente primero. */
+const ESTADO_ORDEN: Record<string, number> = { activo: 0, pagado: 1 };
 
 function ordenarPrestamosParaPrincipal(prestamos: PrestamoItem[]): PrestamoItem[] {
   return [...prestamos].sort((a, b) => {
@@ -410,7 +410,7 @@ export default function PrestamoPage() {
     setPagina(1);
   }, [filtroEstado, filtroNombre, filtroRutaId]);
 
-  /** Grupos por cliente: principal = reciente y activo (activo > mora > pagado, luego por fecha). */
+  /** Grupos por cliente: principal = reciente y activo (activo > pagado, luego por fecha). */
   const gruposPorCliente = useMemo((): GrupoClientePrestamos[] => {
     const byCliente = new Map<string, PrestamoItem[]>();
     for (const p of prestamosFiltrados) {
@@ -946,14 +946,14 @@ export default function PrestamoPage() {
                         <td className="col-num" title="Cuotas pagadas / total">{pagadas} / {principal.numeroCuotas}</td>
                         <td>
                           <span
-                            className={`prestamo-admin-estado${principal.estado === "activo" || principal.estado === "mora" || principal.estado === "pagado" ? ` prestamo-admin-estado--${principal.estado}` : ""}`}
+                            className={`prestamo-admin-estado${principal.estado === "activo" || principal.estado === "pagado" ? ` prestamo-admin-estado--${principal.estado}` : ""}`}
                           >
                             {principal.estado}
                           </span>
                         </td>
                         <td>{principal.modalidad}</td>
                         <td className="prestamo-admin-cobro-cell">
-                          {(principal.estado === "activo" || principal.estado === "mora") && (
+                          {principal.estado === "activo" && (
                             <Link
                               href={`/dashboard/admin/cobrar?clienteId=${grupo.clienteId}&prestamoId=${principal.id}`}
                               className="btn btn-primary prestamo-admin-cobro-btn"
@@ -973,7 +973,7 @@ export default function PrestamoPage() {
                                 {otros.map((p) => (
                                     <li key={p.id} style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
                                       {formatMoneda(p.monto)} · {formatFechaCreacionPrestamo(p)} · {p.estado} · {p.numeroCuotas} cuotas
-                                      {(p.estado === "activo" || p.estado === "mora") && (
+                                      {p.estado === "activo" && (
                                         <Link
                                           href={`/dashboard/admin/cobrar?clienteId=${grupo.clienteId}&prestamoId=${p.id}`}
                                           className="btn btn-primary prestamo-admin-cobro-btn prestamo-admin-cobro-btn--sm"

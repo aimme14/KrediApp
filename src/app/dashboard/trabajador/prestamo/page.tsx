@@ -55,7 +55,7 @@ function formatMoneda(n: number): string {
   return decTrim ? `${conPuntos},${decTrim}` : conPuntos;
 }
 
-const ESTADO_ORDEN: Record<string, number> = { activo: 0, mora: 1, pagado: 2 };
+const ESTADO_ORDEN: Record<string, number> = { activo: 0, pagado: 1 };
 
 function ordenarPrestamosParaPrincipal(prestamos: PrestamoItem[]): PrestamoItem[] {
   return [...prestamos].sort((a, b) => {

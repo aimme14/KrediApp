@@ -5,24 +5,31 @@ import { useAuth } from "@/context/AuthContext";
 import { useTrabajadorCajaDia } from "@/context/TrabajadorCajaDiaContext";
 import { useTrabajadorLista } from "@/context/TrabajadorListaContext";
 import { type ClienteItem, type PrestamoItem } from "@/lib/empresa-api";
+import {
+  calcularDiasVencidos,
+  calcularPrioridadCobro,
+  tieneAlertaAlta,
+} from "@/lib/ruta-dia-prioridad";
 import type {
   ClienteRuta,
   ClienteRutaGrupo,
   PrioridadClienteRuta,
 } from "@/types/finanzas";
 
-export type FiltroRutaDia = "todos" | "mora" | "no_pago_hoy" | "pendientes" | "cobrados";
+export type FiltroRutaDia =
+  | "todos"
+  | "alerta_alta"
+  | "no_pago_hoy"
+  | "pendientes"
+  | "cobrados";
 
 const VISITADOS_STORAGE_PREFIX = "krediapp-ruta-visitados-";
 
 /** No refetch al volver a la pestaña si la última carga fue hace menos de esto. */
 const VISIBILITY_MIN_INTERVAL_MS = 45_000;
 
-/**
- * Umbral solo para la UI (ruta del día: fila naranja / prioridad 2).
- * No afecta el estado del préstamo en la API.
- */
-export const UMBRAL_INTENTOS_ALERTA = 3;
+/** Re-export para compatibilidad con componentes que importan desde este hook. */
+export { UMBRAL_INTENTOS_ALERTA } from "@/lib/ruta-dia-prioridad";
 
 function getVisitadosKey(): string {
   return `${VISITADOS_STORAGE_PREFIX}${new Date().toISOString().slice(0, 10)}`;
@@ -68,39 +75,6 @@ interface UseRutaDiaState {
   markVisitado: (clienteId: string) => void;
 }
 
-function calcularDiasMora(
-  fechaVencimiento: Date | null,
-  estado: string
-): number {
-  if (!fechaVencimiento) return 0;
-  const hoy = new Date();
-  const diffMs = hoy.getTime() - fechaVencimiento.getTime();
-  const dias = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-  return estado === "mora" && dias > 0 ? dias : 0;
-}
-
-function calcularPrioridad(
-  fechaVencimiento: Date | null,
-  estado: string,
-  intentosFallidos: number
-): PrioridadClienteRuta {
-  const hoy = new Date();
-  if (estado === "mora") return 1;
-  if (
-    estado === "activo" &&
-    intentosFallidos >= 1 &&
-    intentosFallidos < UMBRAL_INTENTOS_ALERTA
-  ) {
-    return 2;
-  }
-  if (!fechaVencimiento) return 5;
-  const diffMs = fechaVencimiento.getTime() - hoy.getTime();
-  const dias = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-  if (dias <= 0) return 3;
-  if (dias === 1) return 4;
-  return 5;
-}
-
 /** Misma prioridad que `clientesFiltrados` para que el 1.er ítem del grupo = préstamo que abre Cobrar */
 function compareClienteRutaPrioridad(a: ClienteRuta, b: ClienteRuta): number {
   if (a.prioridad !== b.prioridad) return a.prioridad - b.prioridad;
@@ -109,7 +83,7 @@ function compareClienteRutaPrioridad(a: ClienteRuta, b: ClienteRuta): number {
   if (zonaA && zonaB && zonaA !== zonaB) {
     return zonaA.localeCompare(zonaB);
   }
-  if (b.diasMora !== a.diasMora) return b.diasMora - a.diasMora;
+  if (b.diasVencidos !== a.diasVencidos) return b.diasVencidos - a.diasVencidos;
   if (b.intentosFallidos !== a.intentosFallidos)
     return b.intentosFallidos - a.intentosFallidos;
   return b.monto - a.monto;
@@ -155,10 +129,9 @@ function buildClientesRuta(
   for (const p of prestamosPendientes) {
     const c = mapClientesById.get(p.clienteId);
     const fechaV = toDate(p.fechaVencimiento ?? null);
-    const estado = p.estado ?? "activo";
-    const diasMora = calcularDiasMora(fechaV, estado);
     const intentosFallidos = p.intentosFallidos ?? 0;
-    const prioridad = calcularPrioridad(fechaV, estado, intentosFallidos);
+    const diasVencidos = calcularDiasVencidos(fechaV);
+    const prioridad = calcularPrioridadCobro(fechaV, intentosFallidos);
 
     const cuotaPagadaHoy = isMismoDia(p.ultimoPagoFecha ?? null);
 
@@ -171,11 +144,11 @@ function buildClientesRuta(
       zona: c?.ubicacion ?? "",
       monto: p.saldoPendiente ?? 0,
       fechaVencimiento: fechaV,
-      estado,
+      estado: p.estado ?? "activo",
       frecuencia: p.modalidad ?? "",
       numeroCuota: 1,
       totalCuotas: p.numeroCuotas ?? 0,
-      diasMora,
+      diasVencidos,
       intentosFallidos,
       prioridad,
       visitado: visitados.has(p.clienteId),
@@ -240,16 +213,14 @@ export function useRutaDia(): UseRutaDiaState {
   const clientesFiltrados = useMemo(() => {
     let lista = [...clientesRuta];
     switch (filtro) {
-      case "mora":
-        lista = lista.filter((c) => c.estado === "mora");
+      case "alerta_alta":
+        lista = lista.filter((c) => tieneAlertaAlta(c.intentosFallidos));
         break;
       case "no_pago_hoy":
         lista = lista.filter((c) => c.noPagoHoy);
         break;
       case "pendientes":
-        lista = lista.filter(
-          (c) => !c.cuotaPagadaHoy && !c.noPagoHoy && c.estado !== "mora"
-        );
+        lista = lista.filter((c) => !c.cuotaPagadaHoy && !c.noPagoHoy);
         break;
       case "cobrados":
         lista = lista.filter((c) => c.cuotaPagadaHoy);
@@ -287,7 +258,7 @@ export function useRutaDia(): UseRutaDiaState {
       const prioridadMax = Math.min(
         ...sorted.map((i) => i.prioridad)
       ) as PrioridadClienteRuta;
-      const diasMoraMax = Math.max(...sorted.map((i) => i.diasMora));
+      const diasVencidosMax = Math.max(...sorted.map((i) => i.diasVencidos));
       const visitado = sorted.some((i) => i.visitado);
 
       groups.push({
@@ -298,7 +269,7 @@ export function useRutaDia(): UseRutaDiaState {
         totalMonto,
         cantidadPrestamos: sorted.length,
         prioridadMax,
-        diasMoraMax,
+        diasVencidosMax,
         visitado,
         moroso: sorted.some((i) => i.moroso),
         items: sorted,
@@ -308,8 +279,8 @@ export function useRutaDia(): UseRutaDiaState {
     groups.sort((a, b) => {
       if (a.prioridadMax !== b.prioridadMax)
         return a.prioridadMax - b.prioridadMax;
-      if (b.diasMoraMax !== a.diasMoraMax)
-        return b.diasMoraMax - a.diasMoraMax;
+      if (b.diasVencidosMax !== a.diasVencidosMax)
+        return b.diasVencidosMax - a.diasVencidosMax;
       return b.totalMonto - a.totalMonto;
     });
 
