@@ -7,6 +7,7 @@ import { useAuth } from "@/context/AuthContext";
 import { roleLabel } from "@/types/roles";
 import DashboardNotifications from "@/components/DashboardNotifications";
 import DashboardSettings from "@/components/DashboardSettings";
+import DashboardHelp from "@/components/help/DashboardHelp";
 import InactivityLock from "@/components/InactivityLock";
 import { DashboardHeaderProvider } from "@/context/DashboardHeaderContext";
 import { GastoFcmCampanitaProvider } from "@/context/GastoFcmCampanitaContext";
@@ -130,6 +131,7 @@ export default function DashboardLayout({
                 </span>
               </div>
               <div className="header-right">
+                {isAdmin ? <DashboardHelp /> : null}
                 <DashboardNotifications />
                 <DashboardSettings />
               </div>

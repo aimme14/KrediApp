@@ -915,6 +915,26 @@ export async function createCliente(
   return data.id;
 }
 
+/** Actualiza datos de contacto del cliente (solo admin; no modifica ruta, código ni préstamos). */
+export async function updateCliente(
+  token: string,
+  clienteId: string,
+  params: {
+    nombre: string;
+    ubicacion?: string;
+    direccion?: string;
+    telefono?: string;
+    cedula?: string;
+  }
+): Promise<void> {
+  const res = await fetchWithAuth(`/api/empresa/clientes/${encodeURIComponent(clienteId)}`, token, {
+    method: "PATCH",
+    body: JSON.stringify(params),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error ?? "Error al actualizar cliente");
+}
+
 export async function listPrestamos(token: string): Promise<PrestamoItem[]> {
   const res = await fetchWithAuth("/api/empresa/prestamos", token);
   const data = await res.json();

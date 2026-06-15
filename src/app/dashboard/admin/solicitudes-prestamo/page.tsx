@@ -139,10 +139,6 @@ export default function SolicitudesPrestamoAdminPage() {
   return (
     <div className="card">
       <h2 style={{ marginTop: 0 }}>Solicitudes de préstamo</h2>
-      <p style={{ color: "var(--text-muted)", fontSize: "0.875rem", marginBottom: "1rem" }}>
-        Los trabajadores envían solicitudes que debes aprobar o rechazar antes de que se cree el
-        préstamo.
-      </p>
 
       {error && <p className="error-msg">{error}</p>}
 
