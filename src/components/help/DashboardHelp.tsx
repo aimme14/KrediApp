@@ -127,12 +127,21 @@ export default function DashboardHelp() {
       </button>
 
       {open ? (
-        <div
-          className="dashboard-help-panel"
-          role="dialog"
-          aria-label="Centro de ayuda"
-          aria-modal="false"
-        >
+        <>
+          <div
+            className="dashboard-help-backdrop"
+            onClick={() => {
+              setOpen(false);
+              setSectionsOpen(false);
+            }}
+            aria-hidden
+          />
+          <div
+            className="dashboard-help-panel"
+            role="dialog"
+            aria-label="Centro de ayuda"
+            aria-modal="false"
+          >
           <header className="dashboard-help-header">
             <div className="dashboard-help-header-top">
               <div>
@@ -211,6 +220,7 @@ export default function DashboardHelp() {
             </span>
           </footer>
         </div>
+        </>
       ) : null}
     </div>
   );
