@@ -8,7 +8,6 @@ import { type ClienteItem, type PrestamoItem } from "@/lib/empresa-api";
 import {
   calcularDiasVencidos,
   calcularPrioridadCobro,
-  tieneAlertaAlta,
 } from "@/lib/ruta-dia-prioridad";
 import type {
   ClienteRuta,
@@ -18,10 +17,18 @@ import type {
 
 export type FiltroRutaDia =
   | "todos"
-  | "alerta_alta"
   | "no_pago_hoy"
   | "pendientes"
-  | "cobrados";
+  | "cobrados"
+  | "morosos";
+
+export const FILTROS_RUTA_DIA: { id: FiltroRutaDia; label: string }[] = [
+  { id: "todos", label: "Todos" },
+  { id: "no_pago_hoy", label: "No pagaron hoy" },
+  { id: "pendientes", label: "Pendientes" },
+  { id: "cobrados", label: "Cobrados" },
+  { id: "morosos", label: "Morosos" },
+];
 
 const VISITADOS_STORAGE_PREFIX = "krediapp-ruta-visitados-";
 
@@ -173,7 +180,7 @@ export function useRutaDia(): UseRutaDiaState {
   } = useTrabajadorLista();
   const { data: cajaDia } = useTrabajadorCajaDia();
 
-  const [filtro, setFiltro] = useState<FiltroRutaDia>("todos");
+  const [filtro, setFiltro] = useState<FiltroRutaDia>("pendientes");
   const [busquedaNombre, setBusquedaNombre] = useState("");
   /** Invalida memo de visitados tras markVisitado */
   const [visitadosBump, setVisitadosBump] = useState(0);
@@ -213,9 +220,6 @@ export function useRutaDia(): UseRutaDiaState {
   const clientesFiltrados = useMemo(() => {
     let lista = [...clientesRuta];
     switch (filtro) {
-      case "alerta_alta":
-        lista = lista.filter((c) => tieneAlertaAlta(c.intentosFallidos));
-        break;
       case "no_pago_hoy":
         lista = lista.filter((c) => c.noPagoHoy);
         break;
@@ -224,6 +228,9 @@ export function useRutaDia(): UseRutaDiaState {
         break;
       case "cobrados":
         lista = lista.filter((c) => c.cuotaPagadaHoy);
+        break;
+      case "morosos":
+        lista = lista.filter((c) => c.moroso);
         break;
       case "todos":
       default:

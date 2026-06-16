@@ -7,7 +7,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useTrabajadorCajaDia } from "@/context/TrabajadorCajaDiaContext";
 import { formatFechaDia } from "@/lib/colombia-day-bounds";
 import { useRuta } from "@/hooks/useRuta";
-import { useRutaDia } from "@/hooks/useRutaDia";
+import { FILTROS_RUTA_DIA, useRutaDia } from "@/hooks/useRutaDia";
 import {
   tieneAlertaAlta,
   tieneAlertaNoPagoInformativa,
@@ -52,17 +52,6 @@ function getSemaforoLabel(semaforo: SemaforoRuta): string {
       return "";
   }
 }
-
-const FILTROS_OPCIONES: {
-  id: "todos" | "alerta_alta" | "no_pago_hoy" | "pendientes" | "cobrados";
-  label: string;
-}[] = [
-  { id: "todos", label: "Todos" },
-  { id: "alerta_alta", label: "Alerta alta" },
-  { id: "no_pago_hoy", label: "No pagaron hoy" },
-  { id: "pendientes", label: "Pendientes" },
-  { id: "cobrados", label: "Cobrados" },
-];
 
 function formatCurrency(value: number): string {
   return value.toLocaleString("es-CO", {
@@ -109,8 +98,15 @@ export default function RutaDelDiaPage() {
     markVisitado,
   } = useRutaDia();
 
-  /** Cuotas/préstamos con pago registrado hoy (semáforo verde) */
-  const totalCobrados = clientes.filter((c) => c.cuotaPagadaHoy).length;
+  const conteosRuta = useMemo(
+    () => ({
+      cobrados: clientes.filter((c) => c.cuotaPagadaHoy).length,
+      noPagoHoy: clientes.filter((c) => c.noPagoHoy).length,
+      pendientes: clientes.filter((c) => !c.cuotaPagadaHoy && !c.noPagoHoy).length,
+      morosos: clientes.filter((c) => c.moroso).length,
+    }),
+    [clientes]
+  );
 
   const gruposPorPrioridad = useMemo(() => {
     const grupos: Record<number, ClienteRutaGrupo[]> = {
@@ -169,9 +165,9 @@ export default function RutaDelDiaPage() {
   });
 
   const filtroActualLabel =
-    FILTROS_OPCIONES.find((f) => f.id === filtro)?.label ?? "Todos";
+    FILTROS_RUTA_DIA.find((f) => f.id === filtro)?.label ?? "Todos";
   const filtroLabel =
-    FILTROS_OPCIONES.find((f) => f.id === filtro)?.label?.toLowerCase() ??
+    FILTROS_RUTA_DIA.find((f) => f.id === filtro)?.label?.toLowerCase() ??
     "este filtro";
   const emptySinClientes = clientes.length === 0;
   const emptyFiltro =
@@ -285,7 +281,7 @@ export default function RutaDelDiaPage() {
             </button>
           ) : (
             <div className="ruta-dia-filtros" role="group" aria-label="Opciones de filtro">
-              {FILTROS_OPCIONES.map((f) => (
+              {FILTROS_RUTA_DIA.map((f) => (
                 <button
                   key={f.id}
                   type="button"
@@ -445,13 +441,17 @@ export default function RutaDelDiaPage() {
       <footer className="ruta-dia-footer">
         <div className="ruta-dia-footer-item">
           <span className="ruta-dia-footer-label">Cobrados</span>
-          <span className="ruta-dia-footer-value ruta-dia-footer-value-green">{totalCobrados}</span>
+          <span className="ruta-dia-footer-value ruta-dia-footer-value-green">
+            {conteosRuta.cobrados}
+          </span>
+        </div>
+        <div className="ruta-dia-footer-item">
+          <span className="ruta-dia-footer-label">No pagaron hoy</span>
+          <span className="ruta-dia-footer-value">{conteosRuta.noPagoHoy}</span>
         </div>
         <div className="ruta-dia-footer-item">
           <span className="ruta-dia-footer-label">Pendientes</span>
-          <span className="ruta-dia-footer-value">
-            {clientes.length - totalCobrados}
-          </span>
+          <span className="ruta-dia-footer-value">{conteosRuta.pendientes}</span>
         </div>
       </footer>
     </div>
