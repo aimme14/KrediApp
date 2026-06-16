@@ -1291,6 +1291,26 @@ td {
   display: none;
 }
 
+/* Trabajador en escritorio: tablas al ancho del panel sin scroll horizontal innecesario */
+@media (min-width: 901px) {
+  .trabajador-dashboard .table-wrap {
+    overflow-x: visible;
+    margin-left: 0;
+    margin-right: 0;
+  }
+
+  .trabajador-dashboard .table-wrap table {
+    width: 100%;
+    table-layout: fixed;
+  }
+
+  .trabajador-dashboard .jefe-drawer-link {
+    width: auto;
+    margin-inline: 0.65rem;
+    border-radius: 10px;
+  }
+}
+
 @media (max-width: 768px) {
   .clientes-col-codigo,
   .clientes-col-ubicacion,
@@ -9670,7 +9690,34 @@ a.admin-inicio-link-btn {
   border-color: var(--text);
 }
 .ruta-dia-list {
-  margin-bottom: 4rem;
+  margin-bottom: 0;
+}
+
+@media (max-width: 900px) {
+  .ruta-dia-footer {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    margin-top: 0;
+    gap: 2rem;
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+    background: var(--card-bg);
+    border-top: 1px solid var(--card-border);
+    border-bottom: none;
+    padding-bottom: calc(0.85rem + env(safe-area-inset-bottom, 0px));
+    z-index: 10;
+  }
+
+  .trabajador-dashboard-has-bottom-nav .ruta-dia-footer {
+    bottom: calc(3.35rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  .ruta-dia-list {
+    margin-bottom: 4.5rem;
+  }
 }
 .ruta-dia-section {
   margin-bottom: 1.25rem;
@@ -9907,23 +9954,22 @@ a.admin-inicio-link-btn {
   color: #fb923c;
 }
 .ruta-dia-footer {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
   display: flex;
-  justify-content: space-around;
-  padding: 0.85rem 1rem;
-  padding-bottom: calc(0.85rem + env(safe-area-inset-bottom, 0px));
-  background: var(--card-bg);
-  border-top: 1px solid var(--card-border);
-  z-index: 10;
+  justify-content: center;
+  align-items: center;
+  gap: 2.5rem;
+  padding: 0.85rem 1.25rem;
+  margin-top: 0.5rem;
+  background: var(--input-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 12px;
 }
 .ruta-dia-footer-item {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 0.2rem;
+  min-width: 5.5rem;
 }
 .ruta-dia-footer-label {
   font-size: 0.6875rem;

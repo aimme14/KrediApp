@@ -26,10 +26,11 @@ export default function DashboardLayout({
   const [empresa, setEmpresa] = useState<EmpresaProfile | null>(null);
 
   const isGastosPage = pathname?.includes("/gastos") ?? false;
-  /** Jefe y admin: sin tope de 720px para usar todo el ancho del navegador */
+  /** Jefe, admin y trabajador: sin tope de 720px (sidebar + contenido en escritorio) */
   const isDashboardShellFluid =
     (pathname?.startsWith("/dashboard/admin") ?? false) ||
-    (pathname?.startsWith("/dashboard/jefe") ?? false);
+    (pathname?.startsWith("/dashboard/jefe") ?? false) ||
+    (pathname?.startsWith("/dashboard/trabajador") ?? false);
   const isJefe = profile?.role === "jefe";
   const isTrabajador = profile?.role === "trabajador";
   const isAdmin = profile?.role === "admin";
