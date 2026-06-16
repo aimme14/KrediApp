@@ -826,9 +826,6 @@ export default function GastosPage() {
                 <strong>{bannerPeriodo.titulo}</strong>
                 <span>{bannerPeriodo.detalle}</span>
               </div>
-              <Link href="/dashboard/admin/resumen" className="gastos-admin-periodo-banner-link">
-                Resumen económico
-              </Link>
             </div>
 
             {filtroContable.modo !== "todo" && gastosPorPeriodo.length > 0 && (

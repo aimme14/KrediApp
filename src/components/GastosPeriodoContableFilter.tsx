@@ -12,11 +12,15 @@ type GastosPeriodoContableFilterProps = {
   className?: string;
 };
 
-const MODOS: { id: GastosFiltroContable["modo"]; label: string }[] = [
-  { id: "hoy", label: "Hoy" },
-  { id: "actual", label: "Periodo actual" },
-  { id: "cerrado", label: "Periodo cerrado" },
-  { id: "todo", label: "Todo el historial" },
+const MODOS: {
+  id: GastosFiltroContable["modo"];
+  label: string;
+  shortLabel: string;
+}[] = [
+  { id: "hoy", label: "Hoy", shortLabel: "Hoy" },
+  { id: "actual", label: "Periodo actual", shortLabel: "Actual" },
+  { id: "cerrado", label: "Periodo cerrado", shortLabel: "Cerrado" },
+  { id: "todo", label: "Todo el historial", shortLabel: "Historial" },
 ];
 
 function fmtFechaCorta(iso: string | null): string {
@@ -42,8 +46,13 @@ export function GastosPeriodoContableFilter({
 
   return (
     <div className={rootClass}>
+      <p className="gastos-periodo-contable-legend">Periodo contable</p>
       <div className="gastos-periodo-contable-row">
-        <div className="gastos-periodo-filter" role="group" aria-label="Filtrar gastos por periodo contable">
+        <div
+          className="gastos-periodo-filter"
+          role="group"
+          aria-label="Filtrar por periodo contable"
+        >
           {MODOS.map((op) => (
             <button
               key={op.id}
@@ -60,8 +69,12 @@ export function GastosPeriodoContableFilter({
                 onChange({ modo: op.id });
               }}
               aria-pressed={filtro.modo === op.id}
+              aria-label={op.label}
             >
-              {op.label}
+              <span className="gastos-periodo-btn-text gastos-periodo-btn-text--long">{op.label}</span>
+              <span className="gastos-periodo-btn-text gastos-periodo-btn-text--short">
+                {op.shortLabel}
+              </span>
             </button>
           ))}
         </div>
@@ -71,22 +84,27 @@ export function GastosPeriodoContableFilter({
             {cerrados.length === 0 ? (
               <p className="gastos-periodo-contable-hint">No hay periodos cerrados.</p>
             ) : (
-              <select
-                className="gastos-periodo-contable-select"
-                value={filtro.periodoId}
-                onChange={(e) => onChange({ modo: "cerrado", periodoId: e.target.value })}
-                aria-label="Seleccionar periodo cerrado"
-              >
-                {cerrados.map((p) => {
-                  const num = numeroPeriodoAdmin(p.id, periodos);
-                  return (
-                    <option key={p.id} value={p.id}>
-                      Periodo #{num ?? "—"} · {fmtFechaCorta(p.fechaApertura)} –{" "}
-                      {fmtFechaCorta(p.fechaCierre)}
-                    </option>
-                  );
-                })}
-              </select>
+              <>
+                <label className="gastos-periodo-contable-select-label" htmlFor="periodo-cerrado-select">
+                  Elegir periodo
+                </label>
+                <select
+                  id="periodo-cerrado-select"
+                  className="gastos-periodo-contable-select"
+                  value={filtro.periodoId}
+                  onChange={(e) => onChange({ modo: "cerrado", periodoId: e.target.value })}
+                  aria-label="Seleccionar periodo cerrado"
+                >
+                  {cerrados.map((p) => {
+                    const num = numeroPeriodoAdmin(p.id, periodos);
+                    return (
+                      <option key={p.id} value={p.id}>
+                        #{num ?? "—"} · {fmtFechaCorta(p.fechaApertura)} – {fmtFechaCorta(p.fechaCierre)}
+                      </option>
+                    );
+                  })}
+                </select>
+              </>
             )}
           </div>
         )}

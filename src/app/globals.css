@@ -1957,6 +1957,15 @@ td {
   flex: 1 1 auto;
   min-width: 0;
 }
+.gastos-periodo-contable-legend,
+.prestamo-admin-filtro-legend {
+  margin: 0 0 0.35rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
 .gastos-periodo-contable-row {
   display: flex;
   flex-wrap: wrap;
@@ -1966,11 +1975,22 @@ td {
 .gastos-periodo-contable .gastos-periodo-filter {
   margin-bottom: 0;
 }
+.gastos-periodo-btn-text--short {
+  display: none;
+}
 .gastos-periodo-contable-select-wrap {
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.3rem;
   flex: 1 1 12rem;
   min-width: 0;
+}
+.gastos-periodo-contable-select-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  display: none;
 }
 .gastos-periodo-contable-select {
   width: 100%;
@@ -1996,9 +2016,9 @@ td {
   flex-wrap: wrap;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 0.75rem 1rem;
-  margin-bottom: 1rem;
-  padding: 0.85rem 1rem;
+  gap: 0.5rem 1rem;
+  margin-bottom: 0.7rem;
+  padding: 0.6rem 1rem;
   border-radius: 10px;
   border: 1px solid var(--input-border);
   background: color-mix(in srgb, var(--input-bg) 88%, transparent);
@@ -2014,14 +2034,16 @@ td {
 .gastos-admin-periodo-banner-text {
   display: flex;
   flex-direction: column;
-  gap: 0.2rem;
+  gap: 0.12rem;
   min-width: 0;
 }
 .gastos-admin-periodo-banner-text strong {
   font-size: 0.9375rem;
+  line-height: 1.3;
 }
 .gastos-admin-periodo-banner-text span {
   font-size: 0.8125rem;
+  line-height: 1.35;
   color: var(--text-muted);
 }
 .gastos-admin-periodo-banner-link {
@@ -2063,17 +2085,144 @@ td {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
-@media (max-width: 480px) {
+
+@media (max-width: 768px) {
   .gastos-admin-totales-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.5rem;
   }
+
+  .gastos-admin-total-stat {
+    padding: 0.55rem 0.6rem;
+  }
+
+  .gastos-admin-total-label {
+    font-size: 0.7rem;
+    line-height: 1.25;
+  }
+
+  .gastos-admin-total-value {
+    font-size: 0.875rem;
+  }
+
   .gastos-periodo-contable-row {
     flex-direction: column;
     align-items: stretch;
+    gap: 0.55rem;
   }
+
+  .gastos-periodo-contable .gastos-periodo-filter {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+    gap: 0.35rem;
+    padding: 0.3rem;
+  }
+
+  .gastos-periodo-btn {
+    min-width: 0;
+    width: 100%;
+    padding: 0.55rem 0.35rem;
+    font-size: 0.8125rem;
+    line-height: 1.2;
+    text-align: center;
+  }
+
+  .gastos-periodo-btn-text--long {
+    display: none;
+  }
+
+  .gastos-periodo-btn-text--short {
+    display: inline;
+  }
+
+  .gastos-periodo-contable-select-wrap {
+    flex: none;
+    width: 100%;
+  }
+
+  .gastos-periodo-contable-select-label {
+    display: block;
+  }
+
   .gastos-periodo-contable-select {
     min-width: 0;
     max-width: none;
+    width: 100%;
+    padding: 0.55rem 0.65rem;
+    font-size: 0.875rem;
+  }
+
+  .gastos-periodo-contable-hint {
+    white-space: normal;
+  }
+
+  .gastos-admin-periodo-banner,
+  .prestamo-admin-periodo-banner {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.3rem;
+    padding: 0.5rem 0.75rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .gastos-admin-periodo-banner-text {
+    gap: 0.08rem;
+  }
+
+  .gastos-admin-periodo-banner-text strong {
+    font-size: 0.875rem;
+    line-height: 1.25;
+  }
+
+  .gastos-admin-periodo-banner-text span {
+    font-size: 0.75rem;
+    line-height: 1.3;
+    word-break: break-word;
+  }
+
+  .gastos-admin-periodo-banner-link {
+    align-self: flex-start;
+    padding: 0;
+    font-size: 0.75rem;
+    line-height: 1.25;
+  }
+
+  .prestamo-admin-filtros-wrap {
+    gap: 0.75rem;
+  }
+
+  .prestamo-admin-filtro-estado-section {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+
+  .prestamo-admin-historial-filtros-row {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.45rem;
+    width: 100%;
+    margin-bottom: 0;
+  }
+
+  .prestamo-admin-historial-filtros-row .prestamo-admin-tab {
+    width: 100%;
+    min-width: 0;
+    text-align: center;
+    padding: 0.5rem 0.35rem;
+    font-size: 0.8125rem;
+    line-height: 1.2;
+  }
+
+  .prestamo-admin-historial-filtros-row .prestamo-admin-tab:nth-child(5) {
+    grid-column: auto;
+  }
+
+  .gastos-admin-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.65rem;
   }
 }
 
@@ -2975,6 +3124,10 @@ td {
   margin-bottom: 0.85rem;
 }
 
+.prestamo-admin-periodo-banner {
+  margin-bottom: 0.85rem;
+}
+
 .prestamo-admin-search-toolbar {
   display: flex;
   flex-direction: column;
@@ -3153,22 +3306,19 @@ td {
 }
 
 @media (max-width: 768px) {
-  .prestamo-admin-historial-filtros {
+  .prestamo-admin-historial-filtros-row {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 0.5rem;
+    gap: 0.45rem;
+    width: 100%;
   }
 
-  .prestamo-admin-historial-filtros .prestamo-admin-tab {
+  .prestamo-admin-historial-filtros-row .prestamo-admin-tab {
     width: 100%;
     min-width: 0;
     text-align: center;
     padding: 0.5rem 0.4rem;
     font-size: 0.8125rem;
-  }
-
-  .prestamo-admin-historial-filtros .prestamo-admin-tab:nth-child(5) {
-    grid-column: 1 / -1;
   }
 }
 

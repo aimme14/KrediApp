@@ -56,11 +56,13 @@ export const ADMIN_HELP_PAGES: Record<AdminHelpPageKey, HelpPageContent> = {
     summary:
       "Crea préstamos, cobra cuotas directamente o consulta los activos por ruta. Aquí ves saldos pendientes, cuotas y el historial por cliente.",
     steps: [
+      "Asegurate que el periodo esté abierto antes de crear un préstamo.",
       "Filtra por ruta si necesitas enfocarte en una zona.",
       "Para un préstamo nuevo: elige ruta y cliente, define monto, cuotas, interés y modalidad.",
       "Verifica y confirma los valores de los datos antes de crear. El préstamo queda activo de inmediato.",
     ],
     cautions: [
+      "Asegurate que el periodo esté abierto antes de crear un préstamo.",
       "Verifica que el cliente no esté en morosos antes de prestar.",
       "Revisa el monto y las cuotas: un error al crear afecta todo el ciclo de cobro.",
       "Las correcciones de los datos mal creados solo la puede realizar el proveedor del sistema y tiene un costo adicional.",

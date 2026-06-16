@@ -10,15 +10,27 @@ import {
   createPrestamo,
   esPrestamoMorosoPendiente,
   formatClienteCodigoRutaYNumero,
+  listPeriodosAdmin,
   type ClienteItem,
+  type PeriodoAdminListaItem,
   type PrestamoItem,
 } from "@/lib/empresa-api";
 import { formatInteresResumenPct, parseInteresPct } from "@/lib/interes-pct";
 import {
-  esPrestamoCreadoHoy,
   formatDebeSlashTotalCredito,
   formatFechaCreacionPrestamo,
 } from "@/lib/prestamo-display";
+import {
+  filtrarPrestamosPorFiltroContable,
+  mensajePrestamosVaciosContable,
+  numeroPeriodoAdmin,
+  periodoAbiertoAdmin,
+  resolverRangoFiltroContable,
+  type PrestamoFiltroContable,
+  type PrestamoFiltroEstado,
+} from "@/lib/prestamo-periodo-filter";
+import { fechaDiaColombiaHoy, formatFechaDia } from "@/lib/colombia-day-bounds";
+import { GastosPeriodoContableFilter } from "@/components/GastosPeriodoContableFilter";
 import {
   sanitizeMontoDecimalCOP,
   formatMontoDecimalCOPDisplay,
@@ -82,6 +94,15 @@ function prestamoCoincideRuta(
   return (rid ?? "") === rutaId;
 }
 
+function dedupePrestamos(list: PrestamoItem[]): PrestamoItem[] {
+  const seen = new Set<string>();
+  return list.filter((p) => {
+    if (seen.has(p.id)) return false;
+    seen.add(p.id);
+    return true;
+  });
+}
+
 export default function PrestamoPage() {
   const { user, profile } = useAuth();
   const searchParams = useSearchParams();
@@ -112,9 +133,12 @@ export default function PrestamoPage() {
   const [creating, setCreating] = useState(false);
   const [showModalPrestamo, setShowModalPrestamo] = useState(false);
   const [confirmarMontoAlto, setConfirmarMontoAlto] = useState(false);
-  const [filtroEstado, setFiltroEstado] = useState<"hoy" | "todos" | "activo" | "pagado" | "moroso">("hoy");
+  const [filtroContable, setFiltroContable] = useState<PrestamoFiltroContable>({ modo: "hoy" });
+  const [filtroEstado, setFiltroEstado] = useState<PrestamoFiltroEstado>("todos");
   const [filtroNombre, setFiltroNombre] = useState("");
   const [filtroRutaId, setFiltroRutaId] = useState("");
+  const [periodos, setPeriodos] = useState<PeriodoAdminListaItem[]>([]);
+  const [periodosLoading, setPeriodosLoading] = useState(true);
   const [historialEconomicoColapsado, setHistorialEconomicoColapsado] = useState(true);
 
   useEffect(() => {
@@ -155,12 +179,23 @@ export default function PrestamoPage() {
     setShowCreateForm(true);
   }, [searchParams, clientes, loading, rutaIdForm]);
 
+  const loadPeriodos = useCallback(() => {
+    if (!user) return;
+    setPeriodosLoading(true);
+    user.getIdToken().then((token) => {
+      listPeriodosAdmin(token)
+        .then(setPeriodos)
+        .catch(() => setPeriodos([]))
+        .finally(() => setPeriodosLoading(false));
+    });
+  }, [user]);
+
   useEffect(() => {
-    if (
-      filtroEstado !== "pagado" &&
-      filtroEstado !== "todos" &&
-      filtroEstado !== "hoy"
-    ) {
+    loadPeriodos();
+  }, [loadPeriodos]);
+
+  useEffect(() => {
+    if (filtroEstado !== "pagado" && filtroEstado !== "todos") {
       return;
     }
     if (loadingPagados || !hayMasPagados) return;
@@ -315,48 +350,58 @@ export default function PrestamoPage() {
     };
   }, [prestamos, filtroRutaId, clientePorId]);
 
+  const periodoAbierto = useMemo(() => periodoAbiertoAdmin(periodos), [periodos]);
+
+  const rangoContable = useMemo(
+    () => resolverRangoFiltroContable(filtroContable, periodos),
+    [filtroContable, periodos]
+  );
+
   const contadoresPorFiltro = useMemo(() => {
-    const dedupePrestamos = (list: PrestamoItem[]) => {
-      const seen = new Set<string>();
-      return list.filter((p) => {
-        if (seen.has(p.id)) return false;
-        seen.add(p.id);
-        return true;
-      });
-    };
     const porRuta = (list: PrestamoItem[]) =>
       list.filter((p) => prestamoCoincideRuta(p, filtroRutaId, clientePorId));
+
     const mergedUnicos = dedupePrestamos([...prestamos, ...prestamosPagados]);
-    const prestamosRuta = porRuta(prestamos);
-    const mergedRuta = porRuta(mergedUnicos);
-    const pagadosRuta = porRuta(prestamosPagados);
+    const mergedEnPeriodo = filtrarPrestamosPorFiltroContable(
+      mergedUnicos,
+      filtroContable,
+      periodos
+    );
+    const activosEnPeriodo = filtrarPrestamosPorFiltroContable(
+      prestamos.filter((p) => p.estado === "activo"),
+      filtroContable,
+      periodos
+    );
+    const pagadosEnPeriodo = filtrarPrestamosPorFiltroContable(
+      prestamosPagados,
+      filtroContable,
+      periodos
+    );
 
     return {
-      hoy: mergedRuta.filter((p) => esPrestamoCreadoHoy(p)).length,
-      todos: mergedRuta.length,
-      activo: prestamosRuta.filter((p) => p.estado === "activo").length,
-      pagado: pagadosRuta.length,
-      moroso: prestamosRuta.filter((p) =>
-        esPrestamoMorosoPendiente(p, clientePorId[p.clienteId]?.moroso)
+      todos: porRuta(mergedEnPeriodo).length,
+      activo: porRuta(activosEnPeriodo).length,
+      pagado: porRuta(pagadosEnPeriodo).length,
+      moroso: porRuta(
+        activosEnPeriodo.filter((p) =>
+          esPrestamoMorosoPendiente(p, clientePorId[p.clienteId]?.moroso)
+        )
       ).length,
     };
-  }, [prestamos, prestamosPagados, clientePorId, filtroRutaId]);
+  }, [prestamos, prestamosPagados, clientePorId, filtroRutaId, filtroContable, periodos]);
 
-  const formatContadorFiltro = (
-    est: "hoy" | "todos" | "activo" | "pagado" | "moroso"
-  ) => {
+  const formatContadorFiltro = (est: PrestamoFiltroEstado) => {
     const n = contadoresPorFiltro[est];
     const masPendiente =
-      hayMasPagados && (est === "pagado" || est === "todos" || est === "hoy");
+      hayMasPagados && (est === "pagado" || est === "todos");
     return masPendiente ? `${n}+` : String(n);
   };
 
-  const FILTROS_PRESTAMO = [
-    { est: "hoy" as const, label: "Hoy" },
-    { est: "todos" as const, label: "Todos" },
-    { est: "activo" as const, label: "Activos" },
-    { est: "pagado" as const, label: "Pagados" },
-    { est: "moroso" as const, label: "Morosos" },
+  const FILTROS_PRESTAMO: { est: PrestamoFiltroEstado; label: string }[] = [
+    { est: "todos", label: "Todos" },
+    { est: "activo", label: "Activos" },
+    { est: "pagado", label: "Pagados" },
+    { est: "moroso", label: "Morosos" },
   ];
 
   const filtroNombreLower = filtroNombre.trim().toLowerCase();
@@ -366,23 +411,21 @@ export default function PrestamoPage() {
     if (filtroEstado === "activo") {
       return prestamos.filter((p) => p.estado === "activo");
     }
-    const merged = [...prestamos, ...prestamosPagados];
     if (filtroEstado === "moroso") {
       return prestamos.filter((p) =>
         esPrestamoMorosoPendiente(p, clientePorId[p.clienteId]?.moroso)
       );
     }
-    if (filtroEstado !== "hoy") return merged;
-    const seen = new Set<string>();
-    return merged.filter((p) => {
-      if (seen.has(p.id)) return false;
-      seen.add(p.id);
-      return esPrestamoCreadoHoy(p);
-    });
+    return dedupePrestamos([...prestamos, ...prestamosPagados]);
   }, [prestamos, prestamosPagados, filtroEstado, clientePorId]);
 
+  const prestamosPorPeriodo = useMemo(
+    () => filtrarPrestamosPorFiltroContable(prestamosBase, filtroContable, periodos),
+    [prestamosBase, filtroContable, periodos]
+  );
+
   const prestamosFiltrados = useMemo(() => {
-    let list = prestamosBase;
+    let list = prestamosPorPeriodo;
     if (filtroRutaId) {
       list = list.filter((p) => prestamoCoincideRuta(p, filtroRutaId, clientePorId));
     }
@@ -401,14 +444,23 @@ export default function PrestamoPage() {
       });
     }
     return list;
-  }, [prestamosBase, filtroRutaId, filtroNombreLower, clientePorId]);
+  }, [prestamosPorPeriodo, filtroRutaId, filtroNombreLower, clientePorId]);
+
+  const totalDesembolsadoPeriodo = useMemo(
+    () =>
+      Math.round(
+        prestamosFiltrados.reduce((sum, p) => sum + (typeof p.monto === "number" ? p.monto : 0), 0) *
+          100
+      ) / 100,
+    [prestamosFiltrados]
+  );
 
   const PAGE_SIZE = 15;
   const [pagina, setPagina] = useState(1);
 
   useEffect(() => {
     setPagina(1);
-  }, [filtroEstado, filtroNombre, filtroRutaId]);
+  }, [filtroEstado, filtroContable, filtroNombre, filtroRutaId]);
 
   /** Grupos por cliente: principal = reciente y activo (activo > pagado, luego por fecha). */
   const gruposPorCliente = useMemo((): GrupoClientePrestamos[] => {
@@ -465,6 +517,53 @@ export default function PrestamoPage() {
   }, [prestamos, prestamosPagados, clienteId]);
 
   if (!profile || profile.role !== "admin") return null;
+
+  const bannerPeriodo = (() => {
+    if (filtroContable.modo === "hoy") {
+      const hoy = fechaDiaColombiaHoy();
+      return {
+        tone: "neutral" as const,
+        titulo: "Desembolsos de hoy",
+        detalle: `${formatFechaDia(hoy)} · ${prestamosFiltrados.length} préstamo${prestamosFiltrados.length !== 1 ? "s" : ""} · $ ${formatMoneda(totalDesembolsadoPeriodo)} colocados.`,
+      };
+    }
+    if (filtroContable.modo === "todo") {
+      return {
+        tone: "neutral" as const,
+        titulo: "Todo el historial",
+        detalle: `${prestamosFiltrados.length} préstamo${prestamosFiltrados.length !== 1 ? "s" : ""} con los filtros actuales.`,
+      };
+    }
+    if (filtroContable.modo === "actual" && !periodoAbierto) {
+      return {
+        tone: "warn" as const,
+        titulo: "Sin periodo abierto",
+        detalle:
+          "Abre un periodo en Resumen económico para ver los desembolsos del corte contable actual.",
+      };
+    }
+    if (!rangoContable?.periodo) {
+      return {
+        tone: "warn" as const,
+        titulo: "Periodo no disponible",
+        detalle: "Selecciona otro periodo o revisa el Resumen económico.",
+      };
+    }
+    const num =
+      rangoContable.numeroPeriodo ?? numeroPeriodoAdmin(rangoContable.periodo.id, periodos);
+    if (rangoContable.periodo.estado === "abierto") {
+      return {
+        tone: "active" as const,
+        titulo: `Periodo #${num ?? "—"} · Abierto`,
+        detalle: `${prestamosFiltrados.length} préstamo${prestamosFiltrados.length !== 1 ? "s" : ""} · $ ${formatMoneda(totalDesembolsadoPeriodo)} colocados.`,
+      };
+    }
+    return {
+      tone: "neutral" as const,
+      titulo: `Periodo #${num ?? "—"} · Cerrado`,
+      detalle: `${prestamosFiltrados.length} préstamo${prestamosFiltrados.length !== 1 ? "s" : ""} · $ ${formatMoneda(totalDesembolsadoPeriodo)} colocados.`,
+    };
+  })();
 
   return (
     <div className="card prestamo-admin-page">
@@ -827,11 +926,53 @@ export default function PrestamoPage() {
           prestamosPagados.length === 0 &&
           !loadingPagados &&
           filtroEstado !== "pagado" &&
-          filtroEstado !== "hoy" ? (
+          filtroContable.modo === "todo" ? (
           <p className="prestamo-admin-empty">No hay préstamos en el historial.</p>
         ) : (
           <>
+            <div
+              className={`gastos-admin-periodo-banner prestamo-admin-periodo-banner gastos-admin-periodo-banner--${bannerPeriodo.tone}`}
+              role="status"
+            >
+              <div className="gastos-admin-periodo-banner-text">
+                <strong>{bannerPeriodo.titulo}</strong>
+                <span>{bannerPeriodo.detalle}</span>
+              </div>
+            </div>
+
             <div className="prestamo-admin-filtros-wrap">
+              <GastosPeriodoContableFilter
+                filtro={filtroContable}
+                onChange={setFiltroContable}
+                periodos={periodos}
+              />
+
+              <div className="prestamo-admin-filtro-estado-section">
+                <p id="prestamo-filtro-estado-label" className="prestamo-admin-filtro-legend">
+                  Estado
+                </p>
+                <div
+                  className="prestamo-admin-tabs prestamo-historial-filtros prestamo-admin-historial-filtros-row"
+                  role="tablist"
+                  aria-labelledby="prestamo-filtro-estado-label"
+                >
+                {FILTROS_PRESTAMO.map(({ est, label }) => (
+                  <button
+                    key={est}
+                    type="button"
+                    role="tab"
+                    aria-selected={filtroEstado === est}
+                    className={`prestamo-admin-tab${filtroEstado === est ? " prestamo-admin-tab--active" : ""}`}
+                    onClick={() => setFiltroEstado(est)}
+                    aria-label={`${label}, ${contadoresPorFiltro[est]} préstamo${contadoresPorFiltro[est] !== 1 ? "s" : ""}`}
+                  >
+                    {label}
+                    <span className="prestamo-admin-tab-count">({formatContadorFiltro(est)})</span>
+                  </button>
+                ))}
+                </div>
+              </div>
+
               <div className="prestamo-admin-search-toolbar">
                 <div className="prestamo-admin-search-field">
                   <span className="prestamo-admin-search-icon" aria-hidden>
@@ -855,22 +996,6 @@ export default function PrestamoPage() {
                     {gruposPorCliente.length} cliente{gruposPorCliente.length !== 1 ? "s" : ""} encontrado{gruposPorCliente.length !== 1 ? "s" : ""}
                   </p>
                 ) : null}
-              </div>
-              <div className="prestamo-admin-tabs prestamo-historial-filtros prestamo-admin-historial-filtros" role="tablist" aria-label="Filtrar por estado">
-                {FILTROS_PRESTAMO.map(({ est, label }) => (
-                  <button
-                    key={est}
-                    type="button"
-                    role="tab"
-                    aria-selected={filtroEstado === est}
-                    className={`prestamo-admin-tab${filtroEstado === est ? " prestamo-admin-tab--active" : ""}`}
-                    onClick={() => setFiltroEstado(est)}
-                    aria-label={`${label}, ${contadoresPorFiltro[est]} préstamo${contadoresPorFiltro[est] !== 1 ? "s" : ""}`}
-                  >
-                    {label}
-                    <span className="prestamo-admin-tab-count">({formatContadorFiltro(est)})</span>
-                  </button>
-                ))}
               </div>
             </div>
             <div className="table-wrap table-historial-wrap prestamo-admin-hist-table-wrap">
@@ -1005,10 +1130,7 @@ export default function PrestamoPage() {
               </button>
             </div>
           )}
-          {(filtroEstado === "pagado" ||
-            filtroEstado === "todos" ||
-            filtroEstado === "hoy") &&
-          hayMasPagados ? (
+          {(filtroEstado === "pagado" || filtroEstado === "todos") && hayMasPagados ? (
             <div style={{ textAlign: "center", marginTop: "0.75rem" }}>
               <button
                 type="button"
@@ -1020,20 +1142,21 @@ export default function PrestamoPage() {
               </button>
             </div>
           ) : null}
+          {periodosLoading && prestamosFiltrados.length === 0 ? (
+            <p className="prestamo-admin-filtro-vacio">Cargando periodos...</p>
+          ) : null}
           {loadingPagados && prestamosFiltrados.length === 0 ? (
             <p className="prestamo-admin-filtro-vacio">Cargando préstamos pagados...</p>
           ) : null}
-          {prestamosFiltrados.length === 0 && !loadingPagados ? (
+          {prestamosFiltrados.length === 0 && !loadingPagados && !periodosLoading ? (
             <p className="prestamo-admin-filtro-vacio">
-              {filtroNombreLower
-                ? `No hay préstamos que coincidan con «${filtroNombre.trim()}».`
-                : filtroRutaId
-                  ? "No hay préstamos en la ruta seleccionada con los filtros actuales."
-                  : filtroEstado === "hoy"
-                    ? "No hay préstamos creados hoy."
-                    : filtroEstado === "moroso"
-                      ? "No hay préstamos activos pendientes de clientes morosos."
-                      : `No hay préstamos en el historial con estado «${filtroEstado === "todos" ? "todos" : filtroEstado === "activo" ? "activos" : "pagados"}».`}
+              {mensajePrestamosVaciosContable(
+                filtroContable,
+                periodos,
+                filtroEstado,
+                !!filtroNombreLower,
+                !!filtroRutaId
+              )}
             </p>
           ) : null}
           </>

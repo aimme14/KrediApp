@@ -1,4 +1,8 @@
 import type { PrestamoItem } from "@/lib/empresa-api";
+import {
+  fechaDiaCalendarioDesdeISO,
+  fechaDiaColombiaHoy,
+} from "@/lib/colombia-day-bounds";
 
 type PrestamoTotalCredito = Pick<PrestamoItem, "totalAPagar" | "monto" | "interes">;
 
@@ -29,19 +33,14 @@ export function fechaCreacionPrestamoIso(p: PrestamoFechaCreacion): string | nul
   return p.creadoEn ?? p.fechaInicio ?? null;
 }
 
-function claveFechaLocal(d: Date): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
-
-/** Préstamo creado en el día local del navegador. */
-export function esPrestamoCreadoHoy(p: PrestamoFechaCreacion): boolean {
+/** Préstamo desembolsado en el día calendario actual (Colombia). */
+export function esPrestamoCreadoHoy(
+  p: PrestamoFechaCreacion,
+  hoy: string = fechaDiaColombiaHoy()
+): boolean {
   const iso = fechaCreacionPrestamoIso(p);
-  if (!iso) return false;
-  const hoy = claveFechaLocal(new Date());
-  return claveFechaLocal(new Date(iso)) === hoy;
+  const dia = fechaDiaCalendarioDesdeISO(iso);
+  return dia !== null && dia === hoy;
 }
 
 /** Fecha corta para listados (ej. 5/06/26). */
