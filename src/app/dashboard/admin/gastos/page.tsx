@@ -511,7 +511,7 @@ export default function GastosPage() {
         tone: "warn" as const,
         titulo: "Sin periodo abierto",
         detalle:
-          "Abre un periodo en Resumen económico para delimitar el corte contable y ver los gastos del periodo actual.",
+          "",
       };
     }
     if (!rangoContable?.periodo) {
@@ -577,10 +577,7 @@ export default function GastosPage() {
   return (
     <div className="card gastos-admin-page">
       <h2 className="gastos-admin-title">Gastos operativos</h2>
-      <p className="gastos-admin-intro">
-        Consulta y registra gastos del periodo contable. Los totales coinciden con el cierre del{" "}
-        <Link href="/dashboard/admin/resumen">Resumen económico</Link>.
-      </p>
+      
 
       {showForm && (
         <div className="card gastos-form-card" style={{ marginBottom: "1rem" }}>

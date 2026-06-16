@@ -539,7 +539,7 @@ export default function PrestamoPage() {
         tone: "warn" as const,
         titulo: "Sin periodo abierto",
         detalle:
-          "Abre un periodo en Resumen económico para ver los desembolsos del corte contable actual.",
+          "",
       };
     }
     if (!rangoContable?.periodo) {
