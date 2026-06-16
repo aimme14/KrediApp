@@ -26,7 +26,7 @@ export function totalCreditoPrestamo(p: PrestamoTotalCredito): number {
   return Math.round(monto * (1 + interes / 100) * 100) / 100;
 }
 
-type PrestamoFechaCreacion = Pick<PrestamoItem, "creadoEn" | "fechaInicio">;
+export type PrestamoFechaCreacion = Pick<PrestamoItem, "creadoEn" | "fechaInicio">;
 
 /** ISO de creación del préstamo: `creadoEn` si existe, si no `fechaInicio`. */
 export function fechaCreacionPrestamoIso(p: PrestamoFechaCreacion): string | null {

@@ -13,16 +13,16 @@ import {
   resolverRangoFiltroContable,
   type GastosFiltroContable,
 } from "@/lib/gastos-periodo-filter";
-import { fechaCreacionPrestamoIso } from "@/lib/prestamo-display";
+import {
+  fechaCreacionPrestamoIso,
+  type PrestamoFechaCreacion,
+} from "@/lib/prestamo-display";
 
 export type PrestamoFiltroContable = GastosFiltroContable;
 
 export type PrestamoFiltroEstado = "todos" | "activo" | "pagado" | "moroso";
 
-export type PrestamoConFechaCreacion = {
-  creadoEn?: string | null;
-  fechaInicio?: string | null;
-};
+export type PrestamoConFechaCreacion = PrestamoFechaCreacion;
 
 export { numeroPeriodoAdmin, periodoAbiertoAdmin, resolverRangoFiltroContable };
 
