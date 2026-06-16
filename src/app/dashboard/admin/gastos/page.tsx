@@ -1,13 +1,16 @@
 "use client";
 
-import { useState, useEffect, useRef, useMemo, type ReactNode } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback, type ReactNode } from "react";
+import Link from "next/link";
 import { collection, query, where, onSnapshot } from "firebase/firestore";
 import { useAuth } from "@/context/AuthContext";
 import { useAdminDashboard } from "@/context/AdminDashboardContext";
 import { db } from "@/lib/firebase";
 import {
   createGasto,
+  listPeriodosAdmin,
   type GastoItem,
+  type PeriodoAdminListaItem,
 } from "@/lib/empresa-api";
 import {
   sanitizeMontoDecimalCOP,
@@ -17,10 +20,19 @@ import {
 import { uploadImage, IMAGE_ACCEPT, getImageAccept } from "@/lib/storage";
 import {
   fechaDiaColombiaHoy,
+  formatFechaDia,
   formatoFechaGastoColombia,
 } from "@/lib/colombia-day-bounds";
-import { filtrarGastosPorPeriodo, type GastosPeriodoVista } from "@/lib/gastos-periodo-filter";
-import { GastosPeriodoFilter, mensajeGastosVaciosPeriodo } from "@/components/GastosPeriodoFilter";
+import {
+  calcularTotalesGastosPorAlcance,
+  filtrarGastosPorFiltroContable,
+  mensajeGastosVaciosContable,
+  numeroPeriodoAdmin,
+  periodoAbiertoAdmin,
+  resolverRangoFiltroContable,
+  type GastosFiltroContable,
+} from "@/lib/gastos-periodo-filter";
+import { GastosPeriodoContableFilter } from "@/components/GastosPeriodoContableFilter";
 import { ModalConfirmar } from "@/components/trabajador/ModalConfirmar";
 
 const EMPRESAS_COLLECTION = "empresas";
@@ -152,7 +164,9 @@ export default function GastosPage() {
   const [creating, setCreating] = useState(false);
   const [motivoOverlay, setMotivoOverlay] = useState<string | null>(null);
   const [gastoDetalle, setGastoDetalle] = useState<GastoItem | null>(null);
-  const [periodoVista, setPeriodoVista] = useState<GastosPeriodoVista>("hoy");
+  const [periodos, setPeriodos] = useState<PeriodoAdminListaItem[]>([]);
+  const [periodosLoading, setPeriodosLoading] = useState(true);
+  const [filtroContable, setFiltroContable] = useState<GastosFiltroContable>({ modo: "actual" });
   const [searchQuery, setSearchQuery] = useState("");
   const [alcanceGasto, setAlcanceGasto] = useState<"admin" | "ruta">("admin");
   const [rutaIdGasto, setRutaIdGasto] = useState("");
@@ -165,9 +179,36 @@ export default function GastosPage() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
+  const loadPeriodos = useCallback(() => {
+    if (!user) return;
+    setPeriodosLoading(true);
+    user.getIdToken().then((token) => {
+      listPeriodosAdmin(token)
+        .then(setPeriodos)
+        .catch(() => setPeriodos([]))
+        .finally(() => setPeriodosLoading(false));
+    });
+  }, [user]);
+
+  useEffect(() => {
+    loadPeriodos();
+  }, [loadPeriodos]);
+
+  const rangoContable = useMemo(
+    () => resolverRangoFiltroContable(filtroContable, periodos),
+    [filtroContable, periodos]
+  );
+
+  const periodoAbierto = useMemo(() => periodoAbiertoAdmin(periodos), [periodos]);
+
   const gastosPorPeriodo = useMemo(
-    () => filtrarGastosPorPeriodo(gastos, periodoVista),
-    [gastos, periodoVista]
+    () => filtrarGastosPorFiltroContable(gastos, filtroContable, periodos),
+    [gastos, filtroContable, periodos]
+  );
+
+  const totalesPeriodo = useMemo(
+    () => calcularTotalesGastosPorAlcance(gastosPorPeriodo),
+    [gastosPorPeriodo]
   );
 
   const searchLower = searchQuery.trim().toLowerCase();
@@ -449,6 +490,56 @@ export default function GastosPage() {
 
   if (!profile || profile.role !== "admin") return null;
 
+  const bannerPeriodo = (() => {
+    if (filtroContable.modo === "hoy") {
+      const hoy = fechaDiaColombiaHoy();
+      return {
+        tone: "neutral" as const,
+        titulo: "Gastos de hoy",
+        detalle: `${formatFechaDia(hoy)} · ${gastosPorPeriodo.length} gasto${gastosPorPeriodo.length !== 1 ? "s" : ""} del día.`,
+      };
+    }
+    if (filtroContable.modo === "todo") {
+      return {
+        tone: "neutral" as const,
+        titulo: "Todo el historial",
+        detalle: `${gastos.length} gasto${gastos.length !== 1 ? "s" : ""} registrado${gastos.length !== 1 ? "s" : ""} en total.`,
+      };
+    }
+    if (filtroContable.modo === "actual" && !periodoAbierto) {
+      return {
+        tone: "warn" as const,
+        titulo: "Sin periodo abierto",
+        detalle:
+          "Abre un periodo en Resumen económico para delimitar el corte contable y ver los gastos del periodo actual.",
+      };
+    }
+    if (!rangoContable?.periodo) {
+      return {
+        tone: "warn" as const,
+        titulo: "Periodo no disponible",
+        detalle: "Selecciona otro periodo o revisa el Resumen económico.",
+      };
+    }
+    const num = rangoContable.numeroPeriodo ?? numeroPeriodoAdmin(rangoContable.periodo.id, periodos);
+    const fmt = (iso: string | null) =>
+      iso
+        ? new Date(iso).toLocaleString("es-CO", { dateStyle: "short", timeStyle: "short" })
+        : "—";
+    if (rangoContable.periodo.estado === "abierto") {
+      return {
+        tone: "active" as const,
+        titulo: `Periodo #${num ?? "—"} · Abierto`,
+        detalle: `Desde ${fmt(rangoContable.periodo.fechaApertura)} · ${gastosPorPeriodo.length} gasto${gastosPorPeriodo.length !== 1 ? "s" : ""} en el corte.`,
+      };
+    }
+    return {
+      tone: "neutral" as const,
+      titulo: `Periodo #${num ?? "—"} · Cerrado`,
+      detalle: `${fmt(rangoContable.periodo.fechaApertura)} – ${fmt(rangoContable.periodo.fechaCierre)} · ${gastosPorPeriodo.length} gasto${gastosPorPeriodo.length !== 1 ? "s" : ""}.`,
+    };
+  })();
+
   function renderAlcance(g: GastoItem): ReactNode {
     const a = (g.alcance ?? "").trim();
     if (a === "empleado") {
@@ -487,7 +578,8 @@ export default function GastosPage() {
     <div className="card gastos-admin-page">
       <h2 className="gastos-admin-title">Gastos operativos</h2>
       <p className="gastos-admin-intro">
-      
+        Consulta y registra gastos del periodo contable. Los totales coinciden con el cierre del{" "}
+        <Link href="/dashboard/admin/resumen">Resumen económico</Link>.
       </p>
 
       {showForm && (
@@ -726,8 +818,44 @@ export default function GastosPage() {
           <p className="gastos-empty-msg">No hay gastos registrados.</p>
         ) : (
           <>
+            <div
+              className={`gastos-admin-periodo-banner gastos-admin-periodo-banner--${bannerPeriodo.tone}`}
+              role="status"
+            >
+              <div className="gastos-admin-periodo-banner-text">
+                <strong>{bannerPeriodo.titulo}</strong>
+                <span>{bannerPeriodo.detalle}</span>
+              </div>
+              <Link href="/dashboard/admin/resumen" className="gastos-admin-periodo-banner-link">
+                Resumen económico
+              </Link>
+            </div>
+
+            {filtroContable.modo !== "todo" && gastosPorPeriodo.length > 0 && (
+              <div className="gastos-admin-totales-grid" aria-label="Totales del periodo">
+                {[
+                  { label: "Gastos admin", value: totalesPeriodo.admin, tone: "admin" },
+                  { label: "Gastos ruta", value: totalesPeriodo.ruta, tone: "ruta" },
+                  { label: "Gastos trabajador", value: totalesPeriodo.empleado, tone: "empleado" },
+                  { label: "Total periodo", value: totalesPeriodo.total, tone: "total" },
+                ].map((item) => (
+                  <div
+                    key={item.label}
+                    className={`gastos-admin-total-stat gastos-admin-total-stat--${item.tone}`}
+                  >
+                    <p className="gastos-admin-total-label">{item.label}</p>
+                    <p className="gastos-admin-total-value">{formatMoneda(item.value)}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+
             <div className="gastos-admin-toolbar">
-              <GastosPeriodoFilter value={periodoVista} onChange={setPeriodoVista} />
+              <GastosPeriodoContableFilter
+                filtro={filtroContable}
+                onChange={setFiltroContable}
+                periodos={periodos}
+              />
               <div className="gastos-admin-search-field">
                 <span className="gastos-admin-search-icon" aria-hidden>
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -751,9 +879,11 @@ export default function GastosPage() {
                 </p>
               ) : null}
             </div>
-            {gastosOrdenados.length === 0 ? (
+            {periodosLoading ? (
+              <p className="gastos-loading-msg">Cargando periodos...</p>
+            ) : gastosOrdenados.length === 0 ? (
               <p className="gastos-empty-msg">
-                {mensajeGastosVaciosPeriodo(periodoVista, !!searchQuery.trim())}
+                {mensajeGastosVaciosContable(filtroContable, periodos, !!searchQuery.trim())}
               </p>
             ) : (
             <>
