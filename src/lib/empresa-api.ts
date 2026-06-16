@@ -102,7 +102,7 @@ export type PrestamoItem = {
   adelantoCuota?: number;
   /** Fecha del último pago (ISO). Para semáforo "cuota del día pagada" en ruta del día. */
   ultimoPagoFecha?: string | null;
-  /** Veces que se registró «no pago» consecutivo (informativo; no cambia mora automáticamente). */
+  /** Veces que se registró «no pago» consecutivo (informativo para alertas en ruta). */
   intentosFallidos?: number;
   /** Cliente marcado moroso por administrador (sincronizado desde cliente.moroso). */
   moroso?: boolean;
@@ -915,6 +915,26 @@ export async function createCliente(
   return data.id;
 }
 
+/** Actualiza datos de contacto del cliente (solo admin; no modifica ruta, código ni préstamos). */
+export async function updateCliente(
+  token: string,
+  clienteId: string,
+  params: {
+    nombre: string;
+    ubicacion?: string;
+    direccion?: string;
+    telefono?: string;
+    cedula?: string;
+  }
+): Promise<void> {
+  const res = await fetchWithAuth(`/api/empresa/clientes/${encodeURIComponent(clienteId)}`, token, {
+    method: "PATCH",
+    body: JSON.stringify(params),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error ?? "Error al actualizar cliente");
+}
+
 export async function listPrestamos(token: string): Promise<PrestamoItem[]> {
   const res = await fetchWithAuth("/api/empresa/prestamos", token);
   const data = await res.json();
@@ -939,7 +959,7 @@ export function esPrestamoDeClienteMoroso(
   return prestamo.moroso === true || clienteMoroso === true;
 }
 
-/** Moroso con saldo pendiente: activo/mora, no pagado. */
+/** Moroso con saldo pendiente (activo, no pagado). */
 export function esPrestamoMorosoPendiente(
   prestamo: PrestamoItem,
   clienteMoroso?: boolean

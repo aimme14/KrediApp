@@ -30,6 +30,7 @@ import {
   type ClienteItem,
   type PrestamoItem,
 } from "@/lib/empresa-api";
+import { ESTADO_PRESTAMO_ABIERTO, normalizeEstadoPrestamo } from "@/lib/prestamo-estado";
 
 const EMPRESAS_COLLECTION = "empresas";
 const PRESTAMOS_SUBCOLLECTION = "prestamos";
@@ -48,7 +49,7 @@ function resolveDatosSyncEstado(): DatosSyncEstado {
 
 export type TrabajadorListaContextValue = {
   clientes: ClienteItem[];
-  /** Solo activos y en mora — en tiempo real */
+  /** Préstamos abiertos (activos) — en tiempo real */
   prestamos: PrestamoItem[];
   /** Préstamos pagados — carga lazy */
   prestamosPagados: PrestamoItem[];
@@ -88,7 +89,7 @@ function mapPrestamo(d: QueryDocumentSnapshot): PrestamoItem {
     numeroCuotas: data.numeroCuotas ?? 0,
     totalAPagar: data.totalAPagar ?? 0,
     saldoPendiente: data.saldoPendiente ?? 0,
-    estado: data.estado ?? "activo",
+    estado: normalizeEstadoPrestamo(data.estado),
     fechaInicio: data.fechaInicio?.toDate?.()?.toISOString?.() ?? null,
     fechaVencimiento: data.fechaVencimiento?.toDate?.()?.toISOString?.() ?? null,
     creadoEn: data.creadoEn?.toDate?.()?.toISOString?.() ?? null,
@@ -222,12 +223,12 @@ export function TrabajadorListaProvider({ children }: { children: ReactNode }) {
         ? query(
             prestamosCol,
             where("rutaId", "==", profile.rutaId),
-            where("estado", "in", ["activo", "mora"])
+            where("estado", "==", ESTADO_PRESTAMO_ABIERTO)
           )
         : query(
             prestamosCol,
             where("adminId", "==", user.uid),
-            where("estado", "in", ["activo", "mora"])
+            where("estado", "==", ESTADO_PRESTAMO_ABIERTO)
           );
 
     const unsub = onSnapshot(

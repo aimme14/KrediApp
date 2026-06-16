@@ -133,6 +133,7 @@ export default function GastosTrabajadorPage() {
   const [creating, setCreating] = useState(false);
   const [showModalGasto, setShowModalGasto] = useState(false);
   const [pendingGastoData, setPendingGastoData] = useState<PendingGastoData | null>(null);
+  const [confirmarGastoMarcado, setConfirmarGastoMarcado] = useState(false);
   const [motivoOverlay, setMotivoOverlay] = useState<string | null>(null);
   const [periodoVista, setPeriodoVista] = useState<GastosPeriodoVista>("hoy");
   const [searchQuery, setSearchQuery] = useState("");
@@ -308,6 +309,7 @@ export default function GastosTrabajadorPage() {
       return;
     }
     setError(null);
+    setConfirmarGastoMarcado(false);
     setPendingGastoData({
       monto: montoNum,
       tipo,
@@ -347,6 +349,7 @@ export default function GastosTrabajadorPage() {
       setEvidenciaPreview(null);
       setPendingGastoData(null);
       setShowModalGasto(false);
+      setConfirmarGastoMarcado(false);
       setShowForm(false);
       void refreshCajaDia();
     } catch (e) {
@@ -605,13 +608,22 @@ export default function GastosTrabajadorPage() {
           titulo="Confirmar gasto"
           labelConfirmar="Sí, registrar gasto"
           confirmando={creating}
+          confirmacionMarcada={confirmarGastoMarcado}
+          onConfirmacionMarcadaChange={setConfirmarGastoMarcado}
+          labelConfirmacion={
+            <>
+              Confirmo el gasto de <strong>{formatMoneda(pendingGastoData.monto)}</strong>
+            </>
+          }
           onCancelar={() => {
             if (creating) return;
             setShowModalGasto(false);
             setPendingGastoData(null);
+            setConfirmarGastoMarcado(false);
           }}
           onConfirmar={() => { void handleEjecutarGasto(pendingGastoData); }}
         >
+          <p>Revisa los datos antes de registrar:</p>
           <p>
             Tipo: <strong>{tipoLabel(pendingGastoData.tipo)}</strong>
           </p>

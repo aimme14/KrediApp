@@ -102,6 +102,30 @@ function IconReintentar({ size = REPORTES_DIA_ICON }: { size?: number }) {
   );
 }
 
+function IconBuscar({ size = REPORTES_DIA_ICON }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <circle cx="11" cy="11" r="8" />
+      <path d="m21 21-4.3-4.3" />
+    </svg>
+  );
+}
+
+function fechaHoyInput(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 function totalesVistaPreviaReporte(s: CobrosDelDiaEmpleadoResponse) {
   const prestamos = s.prestamosDesembolsoDelDia ?? [];
   return {
@@ -118,10 +142,8 @@ function totalesVistaPreviaReporte(s: CobrosDelDiaEmpleadoResponse) {
 
 export default function ReportesDiaPage() {
   const { user, profile } = useAuth();
-  const [fecha, setFecha] = useState(() => {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-  });
+  const [fecha, setFecha] = useState(fechaHoyInput);
+  const [fechaBusqueda, setFechaBusqueda] = useState(fechaHoyInput);
   const [items, setItems] = useState<ReporteDiaItem[]>([]);
   const [fechaDia, setFechaDia] = useState("");
   const [loading, setLoading] = useState(true);
@@ -189,11 +211,14 @@ export default function ReportesDiaPage() {
 
   useEffect(() => {
     if (!db || !user || !profile?.empresaId) return;
-    if (!parseFechaDiaColombia(fecha).ok) return;
+    if (!parseFechaDiaColombia(fechaBusqueda).ok) {
+      setLoading(false);
+      return;
+    }
     const empresaId = profile.empresaId.trim();
 
-    const start = inicioDiaColombiaUtc(fecha);
-    const end = finDiaColombiaUtc(fecha);
+    const start = inicioDiaColombiaUtc(fechaBusqueda);
+    const end = finDiaColombiaUtc(fechaBusqueda);
     if (!start || !end) return;
 
     setLoading(true);
@@ -223,7 +248,7 @@ export default function ReportesDiaPage() {
             typeof x.pdfError === "string" && x.pdfError.trim() ? x.pdfError.trim() : null;
           return {
             id: d.id,
-            fechaDia: typeof x.fechaDia === "string" ? x.fechaDia : fecha,
+            fechaDia: typeof x.fechaDia === "string" ? x.fechaDia : fechaBusqueda,
             rutaId: typeof x.rutaId === "string" ? x.rutaId : "",
             rutaNombre: typeof x.rutaNombre === "string" ? x.rutaNombre : "",
             empleadoId: typeof x.empleadoId === "string" ? x.empleadoId : "",
@@ -237,7 +262,7 @@ export default function ReportesDiaPage() {
         });
         list.sort((a, b) => (b.fecha ?? "").localeCompare(a.fecha ?? ""));
         setItems(list);
-        setFechaDia(fecha);
+        setFechaDia(fechaBusqueda);
         setLoading(false);
       },
       (err) => {
@@ -247,7 +272,16 @@ export default function ReportesDiaPage() {
     );
 
     return unsub;
-  }, [user?.uid, profile?.empresaId, fecha]);
+  }, [user?.uid, profile?.empresaId, fechaBusqueda]);
+
+  const handleBuscar = () => {
+    if (!parseFechaDiaColombia(fecha).ok) {
+      setError("Selecciona una fecha válida");
+      return;
+    }
+    setError(null);
+    setFechaBusqueda(fecha);
+  };
 
   useEffect(() => {
     if (!previewSolicitudId || !user) {
@@ -410,14 +444,59 @@ export default function ReportesDiaPage() {
         </div>
       )}
 
-      <div className="form-group" style={{ maxWidth: "220px" }}>
-        <label>Fecha</label>
-        <input
-          type="date"
-          value={fecha}
-          onChange={(e) => setFecha(e.target.value)}
-        />
+      <div
+        className="reportes-dia-filtro"
+        style={{
+          display: "flex",
+          flexWrap: "wrap",
+          alignItems: "flex-end",
+          gap: "0.75rem",
+          marginBottom: "1rem",
+        }}
+      >
+        <div className="form-group" style={{ maxWidth: "220px", marginBottom: 0 }}>
+          <label htmlFor="reportes-dia-fecha">Fecha</label>
+          <input
+            id="reportes-dia-fecha"
+            type="date"
+            value={fecha}
+            onChange={(e) => setFecha(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                handleBuscar();
+              }
+            }}
+          />
+        </div>
+        <button
+          type="button"
+          className="btn btn-primary reportes-dia-buscar-btn"
+          onClick={handleBuscar}
+          disabled={loading && fecha === fechaBusqueda}
+          aria-label="Buscar reportes del día"
+          title="Buscar"
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "0.4rem",
+            minHeight: "2.5rem",
+            paddingLeft: "0.85rem",
+            paddingRight: "0.85rem",
+          }}
+        >
+          <IconBuscar />
+          <span>Buscar</span>
+        </button>
       </div>
+
+      {fecha !== fechaBusqueda && !loading && (
+        <p style={{ margin: "0 0 1rem", fontSize: "0.875rem", color: "var(--text-muted)" }}>
+          Pulsa Buscar para cargar los reportes del{" "}
+          {new Date(`${fecha}T12:00:00`).toLocaleDateString("es-CO", { dateStyle: "medium" })}.
+        </p>
+      )}
 
       {error && <p className="error-msg">{error}</p>}
 
@@ -813,7 +892,7 @@ export default function ReportesDiaPage() {
         <p>Cargando...</p>
       ) : items.length === 0 ? (
         <p style={{ color: "var(--text-muted)" }}>
-          No hay entregas confirmadas para el {fechaDia || fecha}.
+          No hay entregas confirmadas para el {fechaDia || fechaBusqueda}.
           {solicitudes.length === 0 ? " Si un trabajador envió una solicitud, aparecerá arriba hasta que la confirmes." : ""}
         </p>
       ) : (

@@ -78,7 +78,7 @@ export interface ClienteDoc {
 }
 
 /** Estado del préstamo */
-export type EstadoPrestamo = "activo" | "pagado" | "mora";
+export type EstadoPrestamo = "activo" | "pagado";
 
 /** Modalidad de pago */
 export type ModalidadPago = "diario" | "semanal" | "mensual";
@@ -103,7 +103,7 @@ export interface PrestamoDoc {
 }
 
 /** Tipo de pago / registro en subcolección pagos */
-export type TipoPago = "pago" | "mora" | "no_pago";
+export type TipoPago = "pago" | "no_pago";
 
 /** Motivo cuando el cliente no pagó */
 export type MotivoNoPago =

@@ -13,6 +13,7 @@ import {
   rechazarSolicitudPrestamo,
   type SolicitudPrestamoApi,
 } from "@/lib/empresa-api";
+import { ModalConfirmar } from "@/components/trabajador/ModalConfirmar";
 
 function formatMonto(n: number): string {
   if (typeof n !== "number" || isNaN(n)) return "—";
@@ -29,6 +30,7 @@ export default function SolicitudesPrestamoAdminPage() {
   const [error, setError] = useState<string | null>(null);
   const [accionId, setAccionId] = useState<string | null>(null);
   const [accion, setAccion] = useState<"aprobar" | "rechazar" | null>(null);
+  const [solicitudModalAprobar, setSolicitudModalAprobar] = useState<SolicitudPrestamoApi | null>(null);
 
   useEffect(() => {
     if (!db || !user || !profile?.empresaId) return;
@@ -79,14 +81,22 @@ export default function SolicitudesPrestamoAdminPage() {
     return unsub;
   }, [user?.uid, profile?.empresaId]);
 
-  const handleAprobar = async (solicitudId: string) => {
-    if (!user) return;
+  const abrirModalAprobar = (solicitud: SolicitudPrestamoApi) => {
+    if (accionId !== null) return;
+    setError(null);
+    setSolicitudModalAprobar(solicitud);
+  };
+
+  const handleEjecutarAprobar = async () => {
+    if (!user || !solicitudModalAprobar) return;
+    const solicitudId = solicitudModalAprobar.id;
     setAccionId(solicitudId);
     setAccion("aprobar");
     setError(null);
     try {
       const token = await user.getIdToken();
       await aprobarSolicitudPrestamo(token, solicitudId);
+      setSolicitudModalAprobar(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al aprobar");
     } finally {
@@ -113,13 +123,22 @@ export default function SolicitudesPrestamoAdminPage() {
 
   if (!profile || profile.role !== "admin") return null;
 
+  const totalPagarModal =
+    solicitudModalAprobar != null
+      ? solicitudModalAprobar.monto * (1 + solicitudModalAprobar.interes / 100)
+      : 0;
+  const cuotaModal =
+    solicitudModalAprobar != null && solicitudModalAprobar.numeroCuotas > 0
+      ? totalPagarModal / solicitudModalAprobar.numeroCuotas
+      : 0;
+  const aprobandoModal =
+    solicitudModalAprobar != null &&
+    accionId === solicitudModalAprobar.id &&
+    accion === "aprobar";
+
   return (
     <div className="card">
       <h2 style={{ marginTop: 0 }}>Solicitudes de préstamo</h2>
-      <p style={{ color: "var(--text-muted)", fontSize: "0.875rem", marginBottom: "1rem" }}>
-        Los trabajadores envían solicitudes que debes aprobar o rechazar antes de que se cree el
-        préstamo.
-      </p>
 
       {error && <p className="error-msg">{error}</p>}
 
@@ -202,7 +221,7 @@ export default function SolicitudesPrestamoAdminPage() {
                     type="button"
                     className="btn btn-primary"
                     disabled={accionId !== null}
-                    onClick={() => void handleAprobar(s.id)}
+                    onClick={() => abrirModalAprobar(s)}
                   >
                     {accionId === s.id && accion === "aprobar" ? "Aprobando..." : "Aprobar"}
                   </button>
@@ -219,6 +238,48 @@ export default function SolicitudesPrestamoAdminPage() {
             </div>
           ))}
         </div>
+      )}
+
+      {solicitudModalAprobar && (
+        <ModalConfirmar
+          titulo="Confirmar aprobación"
+          labelConfirmar="Sí, aprobar solicitud"
+          confirmando={aprobandoModal}
+          onCancelar={() => {
+            if (aprobandoModal) return;
+            setSolicitudModalAprobar(null);
+          }}
+          onConfirmar={() => { void handleEjecutarAprobar(); }}
+        >
+          <p>¿Estás seguro de aprobar esta solicitud y crear el préstamo?</p>
+          <p>
+            Cliente: <strong>{solicitudModalAprobar.clienteNombre}</strong>
+          </p>
+          <p>
+            Solicitado por: <strong>{solicitudModalAprobar.empleadoNombre}</strong>
+          </p>
+          <p>
+            Monto: <strong>$ {formatMonto(solicitudModalAprobar.monto)}</strong>
+          </p>
+          <p>
+            Interés: <strong>{solicitudModalAprobar.interes}%</strong>
+          </p>
+          <p>
+            Cuotas:{" "}
+            <strong>
+              {solicitudModalAprobar.numeroCuotas} {solicitudModalAprobar.modalidad}s
+            </strong>
+          </p>
+          <p>
+            Total a pagar: <strong>$ {formatMonto(totalPagarModal)}</strong>
+          </p>
+          <p>
+            Cuota: <strong>$ {formatMonto(cuotaModal)}</strong>
+          </p>
+          <p style={{ color: "var(--warning, #eab308)" }}>
+            Se creará el préstamo y se descontará el monto de la caja de la ruta.
+          </p>
+        </ModalConfirmar>
       )}
     </div>
   );

@@ -28,6 +28,7 @@ import {
 import type { ModalidadPago } from "@/types/firestore";
 import { evaluarAprobacionPrestamoEmpleado } from "@/lib/prestamo-aprobacion-empleado";
 import { backfillMorosoPrestamosSinCampo } from "@/lib/sync-prestamo-moroso";
+import { normalizeEstadoPrestamo } from "@/lib/prestamo-estado";
 
 /** GET: lista préstamos. Empleado: los de su ruta. Admin/Jefe: los suyos */
 export async function GET(request: NextRequest) {
@@ -63,7 +64,7 @@ export async function GET(request: NextRequest) {
       numeroCuotas: data.numeroCuotas ?? 0,
       totalAPagar: data.totalAPagar ?? 0,
       saldoPendiente: data.saldoPendiente ?? 0,
-      estado: data.estado ?? "activo",
+      estado: normalizeEstadoPrestamo(data.estado),
       moroso: data.moroso === true,
       fechaInicio: data.fechaInicio?.toDate?.()?.toISOString?.() ?? null,
       fechaVencimiento: data.fechaVencimiento?.toDate?.()?.toISOString?.() ?? null,

@@ -106,7 +106,7 @@ export default function EmpleadoPage() {
       <h2 style={{ marginTop: 0 }}>Empleado</h2>
       <p style={{ color: "var(--text-muted)", fontSize: "0.875rem", marginBottom: "1.25rem" }}>
         Crea empleados con nombre, ubicación, dirección, teléfono, cédula, ruta, correo y contraseña (credenciales de ingreso).
-        Solo puede haber <strong>un trabajador por ruta</strong>; en el listado solo aparecen rutas que aún no tienen empleado asignado.
+        
       </p>
 
       <div style={{ marginBottom: "1.25rem" }}>

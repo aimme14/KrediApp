@@ -13,6 +13,16 @@ import {
   fechaDiaColombiaHoy,
   formatoFechaGastoColombia,
 } from "@/lib/colombia-day-bounds";
+import { ModalConfirmar } from "@/components/trabajador/ModalConfirmar";
+
+type TipoGasto = "transporte" | "alimentacion" | "otro";
+
+type PendingGastoData = {
+  monto: number;
+  tipo: TipoGasto;
+  motivo: string;
+  conEvidencia: boolean;
+};
 
 const TIPOS = [
   { value: "transporte", label: "Transporte", icon: "transporte" },
@@ -111,10 +121,13 @@ export default function GastosPage() {
   const [showForm, setShowForm] = useState(false);
   const [motivo, setMotivo] = useState("");
   const [monto, setMonto] = useState("");
-  const [tipo, setTipo] = useState<"transporte" | "alimentacion" | "otro">("otro");
+  const [tipo, setTipo] = useState<TipoGasto>("otro");
   const [evidenciaFile, setEvidenciaFile] = useState<File | null>(null);
   const [evidenciaPreview, setEvidenciaPreview] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+  const [showModalGasto, setShowModalGasto] = useState(false);
+  const [pendingGastoData, setPendingGastoData] = useState<PendingGastoData | null>(null);
+  const [confirmarGastoMarcado, setConfirmarGastoMarcado] = useState(false);
   const [motivoOverlay, setMotivoOverlay] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [showCamera, setShowCamera] = useState(false);
@@ -238,14 +251,32 @@ export default function GastosPage() {
     setCameraError(null);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleRevisarGasto = (e: React.FormEvent) => {
     e.preventDefault();
     if (!user || !profile) return;
     const montoNum = interiorDecimalCOPToNumber(monto);
-    if (isNaN(montoNum) || montoNum < 0) {
-      setError("Monto debe ser un número mayor o igual a 0");
+    if (isNaN(montoNum) || montoNum <= 0) {
+      setError("El monto debe ser mayor a 0");
       return;
     }
+    const motivoTrim = motivo.trim();
+    if (!motivoTrim) {
+      setError("El motivo es obligatorio");
+      return;
+    }
+    setError(null);
+    setConfirmarGastoMarcado(false);
+    setPendingGastoData({
+      monto: montoNum,
+      tipo,
+      motivo: motivoTrim,
+      conEvidencia: !!evidenciaFile,
+    });
+    setShowModalGasto(true);
+  };
+
+  const handleEjecutarGasto = async (data: PendingGastoData) => {
+    if (!user || !profile) return;
     setError(null);
     setCreating(true);
     try {
@@ -261,10 +292,10 @@ export default function GastosPage() {
       }
       const token = await user.getIdToken();
       await createGasto(token, {
-        descripcion: motivo.trim(),
-        monto: montoNum,
+        descripcion: data.motivo,
+        monto: data.monto,
         fecha: fechaDiaColombiaHoy(),
-        tipo,
+        tipo: data.tipo,
         evidencia: evidenciaUrl || undefined,
       });
       setMotivo("");
@@ -272,6 +303,9 @@ export default function GastosPage() {
       setTipo("otro");
       setEvidenciaFile(null);
       setEvidenciaPreview(null);
+      setPendingGastoData(null);
+      setShowModalGasto(false);
+      setConfirmarGastoMarcado(false);
       setShowForm(false);
       await loadGastos();
     } catch (e) {
@@ -304,7 +338,7 @@ export default function GastosPage() {
               <CloseIcon />
             </button>
           </div>
-          <form onSubmit={handleSubmit} className="gastos-form" noValidate>
+          <form onSubmit={handleRevisarGasto} className="gastos-form" noValidate>
             <div className="form-group">
               <label htmlFor="gastos-monto">Monto <span className="form-required" aria-hidden>*</span></label>
               <input
@@ -436,7 +470,12 @@ export default function GastosPage() {
             {error && <p className="error-msg" role="alert" id="gastos-form-error">{error}</p>}
             <p className="form-required-hint" aria-hidden>* Campos requeridos</p>
             <div className="gastos-form-actions">
-              <button type="submit" className="btn btn-primary" disabled={creating} aria-busy={creating}>
+              <button
+                type="submit"
+                className="btn btn-primary"
+                disabled={creating || showModalGasto}
+                aria-busy={creating}
+              >
                 {creating ? "Guardando..." : "Registrar gasto"}
               </button>
               <button type="button" className="btn btn-secondary" onClick={() => setShowForm(false)} aria-label="Cancelar y cerrar formulario">
@@ -561,6 +600,43 @@ export default function GastosPage() {
             </button>
           </div>
         </div>
+      )}
+
+      {showModalGasto && pendingGastoData && (
+        <ModalConfirmar
+          titulo="Confirmar gasto"
+          labelConfirmar="Sí, registrar gasto"
+          confirmando={creating}
+          confirmacionMarcada={confirmarGastoMarcado}
+          onConfirmacionMarcadaChange={setConfirmarGastoMarcado}
+          labelConfirmacion={
+            <>
+              Confirmo el gasto de <strong>{formatMoneda(pendingGastoData.monto)}</strong> descontado de la caja de
+              la empresa
+            </>
+          }
+          onCancelar={() => {
+            if (creating) return;
+            setShowModalGasto(false);
+            setPendingGastoData(null);
+            setConfirmarGastoMarcado(false);
+          }}
+          onConfirmar={() => { void handleEjecutarGasto(pendingGastoData); }}
+        >
+          <p>Revisa los datos antes de registrar:</p>
+          <p>
+            Tipo: <strong>{tipoLabel(pendingGastoData.tipo)}</strong>
+          </p>
+          <p>
+            Monto: <strong>{formatMoneda(pendingGastoData.monto)}</strong>
+          </p>
+          <p>
+            Motivo: <strong>{pendingGastoData.motivo}</strong>
+          </p>
+          <p>
+            Evidencia: <strong>{pendingGastoData.conEvidencia ? "Con foto adjunta" : "Sin evidencia"}</strong>
+          </p>
+        </ModalConfirmar>
       )}
     </div>
   );

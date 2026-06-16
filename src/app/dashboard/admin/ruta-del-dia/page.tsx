@@ -107,9 +107,6 @@ export default function RutaDelDiaPage() {
     <div className="ruta-dia-page card">
       <header className="ruta-dia-head">
         <h2 className="ruta-dia-title">Ruta del día</h2>
-        <p className="ruta-dia-subtitle">
-          Repartí efectivo desde la <strong>caja de la ruta</strong> hacia la caja de cada trabajador asignado.
-        </p>
       </header>
 
       {successMsg && (

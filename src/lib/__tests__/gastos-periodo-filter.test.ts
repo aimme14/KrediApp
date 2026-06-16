@@ -1,5 +1,7 @@
 import {
+  calcularTotalesGastosPorAlcance,
   esGastoDelDiaColombia,
+  filtrarGastosPorFiltroContable,
   filtrarGastosPorPeriodo,
 } from "@/lib/gastos-periodo-filter";
 import { inicioDiaColombiaUtc } from "@/lib/colombia-day-bounds";
@@ -45,5 +47,73 @@ describe("filtrarGastosPorPeriodo", () => {
   it("vista historial — excluye gastos de hoy", () => {
     const out = filtrarGastosPorPeriodo(gastos, "historial", HOY);
     expect(out.map((g) => g.id)).toEqual(["b", "c"]);
+  });
+});
+
+describe("filtro contable admin", () => {
+  const periodos = [
+    {
+      id: "p2",
+      estado: "abierto" as const,
+      fechaApertura: "2026-06-08T13:00:00.000Z",
+      fechaCierre: null,
+      abiertoPorUid: "a1",
+      cerradoPorUid: null,
+    },
+    {
+      id: "p1",
+      estado: "cerrado" as const,
+      fechaApertura: "2026-06-01T13:00:00.000Z",
+      fechaCierre: "2026-06-07T23:59:59.000Z",
+      abiertoPorUid: "a1",
+      cerradoPorUid: "a1",
+    },
+  ];
+
+  const gastos = [
+    { id: "en-actual", fecha: "2026-06-09T15:00:00.000Z", monto: 100, alcance: "admin" },
+    { id: "en-cerrado", fecha: "2026-06-05T15:00:00.000Z", monto: 50, alcance: "ruta" },
+    { id: "fuera", fecha: "2026-05-20T15:00:00.000Z", monto: 20, alcance: "empleado" },
+  ];
+
+  it("filtra periodo actual abierto", () => {
+    const out = filtrarGastosPorFiltroContable(
+      gastos,
+      { modo: "actual" },
+      periodos,
+      new Date("2026-06-10T12:00:00.000Z")
+    );
+    expect(out.map((g) => g.id)).toEqual(["en-actual"]);
+  });
+
+  it("filtra periodo cerrado por id", () => {
+    const out = filtrarGastosPorFiltroContable(gastos, { modo: "cerrado", periodoId: "p1" }, periodos);
+    expect(out.map((g) => g.id)).toEqual(["en-cerrado"]);
+  });
+
+  it("modo todo devuelve todos", () => {
+    const out = filtrarGastosPorFiltroContable(gastos, { modo: "todo" }, periodos);
+    expect(out).toHaveLength(3);
+  });
+
+  it("filtra solo gastos de hoy (Colombia)", () => {
+    const hoy = "2026-06-09";
+    const gastosConHoy = [
+      { id: "hoy", fecha: inicioDiaColombiaUtc(hoy)!.toISOString(), monto: 30, alcance: "admin" },
+      { id: "ayer", fecha: inicioDiaColombiaUtc("2026-06-08")!.toISOString(), monto: 10, alcance: "admin" },
+    ];
+    const out = filtrarGastosPorFiltroContable(
+      gastosConHoy,
+      { modo: "hoy" },
+      periodos,
+      new Date("2026-06-09T20:00:00.000Z"),
+      "2026-06-09"
+    );
+    expect(out.map((g) => g.id)).toEqual(["hoy"]);
+  });
+
+  it("calcula totales por alcance", () => {
+    const tot = calcularTotalesGastosPorAlcance(gastos);
+    expect(tot).toEqual({ admin: 100, ruta: 50, empleado: 20, total: 170 });
   });
 });

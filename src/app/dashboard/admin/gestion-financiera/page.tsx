@@ -411,7 +411,7 @@ export default function GestionFinancieraPage() {
                   <span className="gf-salidas-icon" aria-hidden>
                     📤
                   </span>
-                  <h2 className="gf-salidas-title">Invertir en base del admin</h2>
+                  <h2 className="gf-salidas-title">Mover dinero a base del administrador</h2>
                 </div>
                 <p className="gf-salidas-desc">
                   Transfiere dinero desde la <strong>base de la ruta</strong> seleccionada hacia tu{" "}
@@ -489,7 +489,7 @@ export default function GestionFinancieraPage() {
                       className="gf-btn-actualizar"
                       disabled={invertirSaving || !!inversionModal}
                     >
-                      Invertir en base del admin
+                      Mover dinero a base del administrador
                     </button>
                   </form>
                 )}

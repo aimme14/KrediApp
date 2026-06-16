@@ -9,6 +9,10 @@ type ModalConfirmarProps = {
   confirmando?: boolean;
   labelConfirmar?: string;
   children: ReactNode;
+  /** Segundo paso: checkbox obligatorio antes de confirmar (gastos, etc.). */
+  confirmacionMarcada?: boolean;
+  onConfirmacionMarcadaChange?: (marcada: boolean) => void;
+  labelConfirmacion?: ReactNode;
 };
 
 export function ModalConfirmar({
@@ -18,7 +22,12 @@ export function ModalConfirmar({
   confirmando = false,
   labelConfirmar = "Confirmar",
   children,
+  confirmacionMarcada = false,
+  onConfirmacionMarcadaChange,
+  labelConfirmacion,
 }: ModalConfirmarProps) {
+  const requiereCheckbox = onConfirmacionMarcadaChange !== undefined;
+  const puedeConfirmar = !requiereCheckbox || confirmacionMarcada;
   const bodyId = useId();
 
   useEffect(() => {
@@ -50,6 +59,22 @@ export function ModalConfirmar({
         </h3>
         <div className="modal-confirmar-body" id={bodyId}>
           {children}
+          {requiereCheckbox ? (
+            <label className="modal-confirmar-checkbox-label">
+              <input
+                type="checkbox"
+                checked={confirmacionMarcada}
+                onChange={(e) => onConfirmacionMarcadaChange(e.target.checked)}
+                disabled={confirmando}
+                aria-label={
+                  typeof labelConfirmacion === "string"
+                    ? labelConfirmacion
+                    : "Confirmo que deseo continuar"
+                }
+              />
+              <span>{labelConfirmacion ?? "Confirmo que deseo continuar"}</span>
+            </label>
+          ) : null}
         </div>
         <div className="modal-confirmar-actions">
           <button
@@ -64,8 +89,9 @@ export function ModalConfirmar({
             type="button"
             className="btn btn-primary"
             onClick={onConfirmar}
-            disabled={confirmando}
+            disabled={confirmando || !puedeConfirmar}
             aria-busy={confirmando}
+            aria-disabled={confirmando || !puedeConfirmar}
           >
             {confirmando ? "Procesando..." : labelConfirmar}
           </button>
