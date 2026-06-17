@@ -299,11 +299,6 @@ export default function ResumenPage() {
                       : ("muted" as const),
                   },
                   {
-                    label: "Ganancias rutas",
-                    valor: fmt(ci?.admin.gananciasRutas ?? ap.admin.gananciasRutas ?? 0),
-                    tone: "positive" as const,
-                  },
-                  {
                     label: "Gastos admin",
                     valor: fmt(ci?.admin.gastosAdmin ?? ap.admin.gastosAdmin ?? 0),
                     tone: "negative" as const,

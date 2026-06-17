@@ -44,6 +44,19 @@ function gastosTotalesAdmin(s: PeriodoAdminSnapshot): number {
   return gastosTotalesAdminSnapshot(s);
 }
 
+function round2(n: number): number {
+  return Math.round(n * 100) / 100;
+}
+
+/** Ganancias − gastos − pérdidas (misma fórmula que dashboard / resumen). */
+function computeUtilidadNeta(ganancias: number, gastos: number, perdidas: number): number {
+  return round2(ganancias - gastos - perdidas);
+}
+
+function perdidasTotalesRutas(s: PeriodoAdminSnapshot): number {
+  return round2(s.rutas.reduce((sum, r) => sum + r.perdidas, 0));
+}
+
 function mergeRutas(ap: PeriodoAdminSnapshot, ci: PeriodoAdminSnapshot | null) {
   const ids = new Set<string>();
   for (const r of ap.rutas) ids.add(r.rutaId);
@@ -67,6 +80,8 @@ type DetalleFila = {
   ganancias: number;
   gastos: number;
   perdidas: number;
+  /** Si se omite, se calcula con ganancias − gastos − pérdidas de la fila. */
+  utilidadNeta?: number;
 };
 
 function buildAdminDetalleFila(
@@ -75,6 +90,10 @@ function buildAdminDetalleFila(
   ci: PeriodoAdminSnapshot | null
 ): DetalleFila {
   const rc = ci ?? ap;
+  const ganancias = gananciasRutasAdmin(rc);
+  const gastosAdmin = ci ? gastosPersonalesAdminSnapshot(ci) : 0;
+  const gastosTotales = ci ? gastosTotalesAdmin(ci) : 0;
+  const perdidas = ci ? perdidasTotalesRutas(rc) : 0;
   return {
     nombre: nombreAdmin,
     capAp: ap.admin.capitalAdmin,
@@ -82,9 +101,12 @@ function buildAdminDetalleFila(
     baseAp: ap.admin.cajaAdmin,
     baseCi: ci?.admin.cajaAdmin ?? null,
     totalInvertido: 0,
-    ganancias: gananciasRutasAdmin(rc),
-    gastos: ci ? gastosPersonalesAdminSnapshot(ci) : 0,
+    ganancias,
+    gastos: gastosAdmin,
     perdidas: 0,
+    utilidadNeta: ci
+      ? computeUtilidadNeta(ganancias, gastosTotales, perdidas)
+      : undefined,
   };
 }
 
@@ -180,17 +202,6 @@ export async function buildPeriodoAdminPdf(payload: PeriodoAdminPdfPayload): Pro
 
   y = PAGE_H - 68;
 
-  // ── Resumen ejecutivo (KPIs) ──────────────────────────────────────────────
-
-  const snapResumen = payload.cierre ?? payload.apertura;
-  const capAdminAp = payload.apertura.admin.capitalAdmin;
-  const capAdminCi = payload.cierre?.admin.capitalAdmin ?? null;
-  const baseAdminAp = payload.apertura.admin.cajaAdmin;
-  const baseAdminCi = payload.cierre?.admin.cajaAdmin ?? null;
-  const utilidadNeta = capAdminCi !== null ? capAdminCi - capAdminAp : 0;
-  const gananciasRutas = gananciasRutasAdmin(snapResumen);
-  const gastosTotales = gastosTotalesAdmin(snapResumen);
-
   const totAp = payload.apertura.rutas.reduce(
     (a, r) => ({
       capital: a.capital + r.capitalRuta,
@@ -217,71 +228,6 @@ export async function buildPeriodoAdminPdf(payload: PeriodoAdminPdfPayload): Pro
       )
     : null;
 
-  const isPosUtil = capAdminCi !== null ? utilidadNeta >= 0 : true;
-
-  const kpis: {
-    label: string;
-    value: string;
-    barColor: ReturnType<typeof rgb>;
-    valueColor: ReturnType<typeof rgb>;
-  }[] = [
-    {
-      label: "Ganancias rutas",
-      value: fmtMoney(gananciasRutas),
-      barColor: C.success,
-      valueColor: C.success,
-    },
-    {
-      label: "Gastos totales",
-      value: fmtMoney(gastosTotales),
-      barColor: C.danger,
-      valueColor: C.danger,
-    },
-    {
-      label: "Base apertura",
-      value: fmtMoney(baseAdminAp),
-      barColor: rgb(0.35, 0.28, 0.55),
-      valueColor: C.text,
-    },
-    {
-      label: "Base cierre",
-      value: baseAdminCi !== null ? fmtMoney(baseAdminCi) : "—",
-      barColor: rgb(0.35, 0.28, 0.55),
-      valueColor: C.text,
-    },
-    {
-      label: "Capital apertura",
-      value: fmtMoney(capAdminAp),
-      barColor: C.accent,
-      valueColor: C.text,
-    },
-    {
-      label: "Capital cierre",
-      value: capAdminCi !== null ? fmtMoney(capAdminCi) : "—",
-      barColor: C.accent,
-      valueColor: C.text,
-    },
-    {
-      label: "Utilidad neta",
-      value: capAdminCi !== null ? fmtMoney(utilidadNeta) : "—",
-      barColor: isPosUtil ? C.success : C.danger,
-      valueColor: isPosUtil ? C.success : C.danger,
-    },
-  ];
-
-  const kpiGap = 4;
-  const kpiW = (CONTENT_W - kpiGap * (kpis.length - 1)) / kpis.length;
-  kpis.forEach((kpi, i) => {
-    const kx = ML + i * (kpiW + kpiGap);
-
-    page.drawRectangle({ x: kx, y: y - 44, width: kpiW, height: 44, color: rgb(0.97,0.97,0.98) });
-    page.drawRectangle({ x: kx, y: y - 44, width: 3, height: 44, color: kpi.barColor });
-    txt(kpi.label, kx + 7, y - 14, 7, font, C.muted);
-    txt(kpi.value, kx + 7, y - 30, 10, fontBold, kpi.valueColor, kpiW - 12);
-  });
-
-  y -= 56;
-
   type ColDef = { x: number; w: number };
   type DetalleColKey =
     | "nombre"
@@ -292,13 +238,15 @@ export async function buildPeriodoAdminPdf(payload: PeriodoAdminPdfPayload): Pro
     | "totalInvertido"
     | "ganancias"
     | "gastos"
-    | "utilidad"
-    | "perdidas";
+    | "perdidas"
+    | "varCap"
+    | "utlNet";
   type DetalleCols = Record<DetalleColKey, ColDef>;
 
   const COL_GAP = 3;
 
-  const buildCols = (widths: Partial<Record<DetalleColKey, number>>): DetalleCols => {
+  /** Reparte columnas activas en todo CONTENT_W según pesos relativos. */
+  const buildCols = (weights: Partial<Record<DetalleColKey, number>>): DetalleCols => {
     const order: DetalleColKey[] = [
       "nombre",
       "capAp",
@@ -309,46 +257,63 @@ export async function buildPeriodoAdminPdf(payload: PeriodoAdminPdfPayload): Pro
       "ganancias",
       "gastos",
       "perdidas",
-      "utilidad",
+      "varCap",
+      "utlNet",
     ];
+    const active = order.filter((k) => (weights[k] ?? 0) > 0);
+    const gapTotal = COL_GAP * Math.max(0, active.length - 1);
+    const available = CONTENT_W - gapTotal;
+    const weightSum = active.reduce((s, k) => s + (weights[k] ?? 0), 0);
+
     let x = ML;
     const cols = {} as DetalleCols;
     for (const key of order) {
-      const w = widths[key] ?? 0;
-      if (w > 0) {
+      const weight = weights[key] ?? 0;
+      if (weight > 0) {
+        const w = Math.floor((weight / weightSum) * available);
         cols[key] = { x, w };
         x += w + COL_GAP;
       } else {
         cols[key] = { x: 0, w: 0 };
       }
     }
+
+    const lastKey = active[active.length - 1];
+    if (lastKey) {
+      const targetEnd = ML + CONTENT_W;
+      const endX = cols[lastKey].x + cols[lastKey].w;
+      cols[lastKey].w += targetEnd - endX;
+    }
+
     return cols;
   };
 
   const colsRuta = buildCols({
-    nombre: 82,
-    capAp: 68,
-    capCi: 68,
-    baseAp: 68,
-    baseCi: 68,
-    totalInvertido: 72,
-    ganancias: 68,
-    gastos: 68,
-    perdidas: 62,
-    utilidad: 75,
+    nombre: 1.15,
+    capAp: 1,
+    capCi: 1,
+    baseAp: 1,
+    baseCi: 1,
+    totalInvertido: 1,
+    ganancias: 1,
+    gastos: 1,
+    perdidas: 0.95,
+    varCap: 1,
+    utlNet: 1,
   });
 
   const colsAdmin = buildCols({
-    nombre: 90,
-    capAp: 82,
-    capCi: 82,
-    baseAp: 82,
-    baseCi: 82,
+    nombre: 1.2,
+    capAp: 1,
+    capCi: 1,
+    baseAp: 1,
+    baseCi: 1,
     totalInvertido: 0,
-    ganancias: 82,
-    gastos: 82,
+    ganancias: 1,
+    gastos: 1,
     perdidas: 0,
-    utilidad: 90,
+    varCap: 1,
+    utlNet: 1,
   });
 
   const drawDetalleFila = (
@@ -359,7 +324,11 @@ export async function buildPeriodoAdminPdf(payload: PeriodoAdminPdfPayload): Pro
   ) => {
     const capAp = fila.capAp;
     const capCi = fila.capCi;
-    const util = capCi !== null ? capCi - capAp : null;
+    const varCap = capCi !== null ? round2(capCi - capAp) : null;
+    const utlNet =
+      fila.utilidadNeta !== undefined
+        ? fila.utilidadNeta
+        : computeUtilidadNeta(fila.ganancias, fila.gastos, fila.perdidas);
 
     if (opts?.total) {
       page.drawRectangle({ x: ML, y: rowY - 18, width: CONTENT_W, height: 18, color: C.totalBg });
@@ -379,6 +348,20 @@ export async function buildPeriodoAdminPdf(payload: PeriodoAdminPdfPayload): Pro
       txt(value !== null ? fmtMoney(value) : "—", col.x + 2, textY, sz, valueFont, valueColor, col.w - 3);
     };
 
+    const drawSignedMoney = (
+      col: ColDef | undefined,
+      value: number | null,
+      opts?: { total?: boolean }
+    ) => {
+      if (!col || col.w <= 0) return;
+      if (value === null) {
+        txt("—", col.x + 3, textY, sz, font, opts?.total ? rgb(1, 1, 1) : C.muted);
+        return;
+      }
+      const color = opts?.total ? rgb(1, 1, 1) : value >= 0 ? C.success : C.danger;
+      txt(fmtMoney(value), col.x + 3, textY, sz, fontBold, color);
+    };
+
     txt(fila.nombre, cols.nombre.x + 2, textY, sz, nameFont, nameColor, cols.nombre.w - 3);
     drawMoney(cols.capAp, capAp);
     drawMoney(cols.capCi, capCi);
@@ -391,11 +374,11 @@ export async function buildPeriodoAdminPdf(payload: PeriodoAdminPdfPayload): Pro
       drawMoney(cols.perdidas, fila.perdidas);
     }
 
-    if (util !== null) {
-      const utilColor = opts?.total ? rgb(1, 1, 1) : util >= 0 ? C.success : C.danger;
-      txt(fmtMoney(util), cols.utilidad.x + 3, textY, sz, fontBold, utilColor);
+    drawSignedMoney(cols.varCap, varCap, { total: opts?.total });
+    if (capCi !== null) {
+      drawSignedMoney(cols.utlNet, utlNet, { total: opts?.total });
     } else {
-      txt("—", cols.utilidad.x + 3, textY, sz, font, opts?.total ? rgb(1, 1, 1) : C.muted);
+      txt("—", cols.utlNet.x + 3, textY, sz, font, opts?.total ? rgb(1, 1, 1) : C.muted);
     }
   };
 
@@ -424,7 +407,8 @@ export async function buildPeriodoAdminPdf(payload: PeriodoAdminPdfPayload): Pro
           ["Ganancias", "ganancias"],
           ["Gastos", "gastos"],
           ["Perdidas", "perdidas"],
-          ["Util. cap.", "utilidad"],
+          ["var. cap.", "varCap"],
+          ["utl. net.", "utlNet"],
         ]
       : [
           [nombreHeader, "nombre"],
@@ -434,7 +418,8 @@ export async function buildPeriodoAdminPdf(payload: PeriodoAdminPdfPayload): Pro
           ["Base Final", "baseCi"],
           ["Ganancias", "ganancias"],
           ["Gastos", "gastos"],
-          ["Util. cap.", "utilidad"],
+          ["var. cap.", "varCap"],
+          ["utl. net.", "utlNet"],
         ];
     headers.forEach(([label, colKey]) => {
       const c = cols[colKey];
