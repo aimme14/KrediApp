@@ -13,6 +13,8 @@ type ModalConfirmarProps = {
   confirmacionMarcada?: boolean;
   onConfirmacionMarcadaChange?: (marcada: boolean) => void;
   labelConfirmacion?: ReactNode;
+  /** Deshabilita confirmar aunque el checkbox esté marcado (p. ej. formulario incompleto). */
+  confirmarDeshabilitado?: boolean;
 };
 
 export function ModalConfirmar({
@@ -25,9 +27,11 @@ export function ModalConfirmar({
   confirmacionMarcada = false,
   onConfirmacionMarcadaChange,
   labelConfirmacion,
+  confirmarDeshabilitado = false,
 }: ModalConfirmarProps) {
   const requiereCheckbox = onConfirmacionMarcadaChange !== undefined;
-  const puedeConfirmar = !requiereCheckbox || confirmacionMarcada;
+  const puedeConfirmar =
+    (!requiereCheckbox || confirmacionMarcada) && !confirmarDeshabilitado;
   const bodyId = useId();
 
   useEffect(() => {

@@ -10,13 +10,14 @@ import {
   listPagos,
   registrarPago,
   registrarNoPago,
+  registrarPerdida,
   type ClienteItem,
   type PrestamoItem,
   type PagoItem,
 } from "@/lib/empresa-api";
 import { uploadImage, getImageAccept } from "@/lib/storage";
 import { getEmpresa } from "@/lib/empresa";
-import type { MotivoNoPago } from "@/types/finanzas";
+import type { MotivoNoPago, MotivoPerdida } from "@/types/finanzas";
 import {
   sanitizeMontoDecimalCOP,
   formatMontoDecimalCOPDisplay,
@@ -132,6 +133,13 @@ const MOTIVOS_NO_PAGO: { value: MotivoNoPago; label: string }[] = [
   { value: "otro", label: "Otro motivo" },
 ];
 
+const MOTIVOS_PERDIDA: { value: MotivoPerdida; label: string }[] = [
+  { value: "imposible_cobrar", label: "Imposible cobrar" },
+  { value: "cliente_perdido", label: "Cliente perdido" },
+  { value: "acuerdo_quita", label: "Acuerdo / quita" },
+  { value: "otro", label: "Otro" },
+];
+
 function CobrarClientePageContent() {
   const { user, profile } = useAuth();
   const {
@@ -202,7 +210,11 @@ function CobrarClientePageContent() {
   const [noPagoRegistrado, setNoPagoRegistrado] = useState(false);
 
   const [showModalPerdida, setShowModalPerdida] = useState(false);
+  const [motivoPerdida, setMotivoPerdida] = useState<MotivoPerdida | "">("");
+  const [notaPerdida, setNotaPerdida] = useState("");
+  const [submittingPerdida, setSubmittingPerdida] = useState(false);
   const [perdidaRegistrada, setPerdidaRegistrada] = useState(false);
+  const [montoPerdidaRegistrada, setMontoPerdidaRegistrada] = useState(0);
 
   useEffect(() => {
     if (!user || !clienteId || !prestamoId) {
@@ -567,9 +579,39 @@ function CobrarClientePageContent() {
     }
   };
 
-  const handleConfirmarPerdida = () => {
-    setShowModalPerdida(false);
-    setPerdidaRegistrada(true);
+  const handleEjecutarPerdida = async () => {
+    if (!motivoPerdida || !user || !prestamoId || !profile || !prestamo) return;
+    const montoPerdida = prestamo.saldoPendiente;
+    if (montoPerdida <= 0) {
+      setError("No hay saldo pendiente para registrar la pérdida");
+      return;
+    }
+    setSubmittingPerdida(true);
+    setError(null);
+    try {
+      const token = await user.getIdToken();
+      const nombreRegistro = profile.displayName ?? profile.email ?? "";
+      const res = await registrarPerdida(token, prestamoId, {
+        monto: montoPerdida,
+        motivoPerdida,
+        nota: notaPerdida.trim() || undefined,
+        registradoPorUid: user.uid,
+        registradoPorNombre: nombreRegistro || undefined,
+      });
+      setShowModalPerdida(false);
+      setMontoPerdidaRegistrada(montoPerdida);
+      setPerdidaRegistrada(true);
+      setPrestamo({
+        ...prestamo,
+        saldoPendiente: res.saldoPendiente,
+        estado: res.saldoPendiente <= 0 ? "pagado" : prestamo.estado,
+      });
+      await refreshLista();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Error al registrar pérdida");
+    } finally {
+      setSubmittingPerdida(false);
+    }
   };
 
   if (!profile || (profile.role !== "trabajador" && profile.role !== "admin")) return null;
@@ -847,7 +889,7 @@ function CobrarClientePageContent() {
         <h2 className="cobrar-title">Pérdida registrada</h2>
         <p>
           Se registró la pérdida del préstamo de <strong>{cliente.nombre}</strong> por{" "}
-          {formatCurrency(prestamo.saldoPendiente)}.
+          {formatCurrency(montoPerdidaRegistrada)}.
         </p>
         <Link href={backHref} className="btn btn-primary">{backLabel}</Link>
       </div>
@@ -947,11 +989,16 @@ function CobrarClientePageContent() {
       <div className="cobrar-header">
         <div className="cobrar-header-top">
           <Link href={backHref} className="cobrar-back">← {backLabel}</Link>
-          {profile?.role !== "trabajador" && (
+          {profile?.role === "admin" && prestamo.saldoPendiente > 0 && (
             <button
               type="button"
               className="btn btn-secondary cobrar-btn-perdida"
-              onClick={() => setShowModalPerdida(true)}
+              onClick={() => {
+                setError(null);
+                setMotivoPerdida("");
+                setNotaPerdida("");
+                setShowModalPerdida(true);
+              }}
             >
               Pérdida
             </button>
@@ -1230,8 +1277,13 @@ function CobrarClientePageContent() {
         <ModalConfirmar
           titulo="Registrar pérdida"
           labelConfirmar="Sí, registrar pérdida"
-          onCancelar={() => setShowModalPerdida(false)}
-          onConfirmar={handleConfirmarPerdida}
+          confirmando={submittingPerdida}
+          confirmarDeshabilitado={!motivoPerdida}
+          onCancelar={() => {
+            if (submittingPerdida) return;
+            setShowModalPerdida(false);
+          }}
+          onConfirmar={() => { void handleEjecutarPerdida(); }}
         >
           <p>
             ¿Confirmas registrar la pérdida del préstamo de <strong>{cliente.nombre}</strong>?
@@ -1239,6 +1291,33 @@ function CobrarClientePageContent() {
           <p>
             Saldo pendiente: <strong>{formatCurrency(prestamo.saldoPendiente)}</strong>
           </p>
+          <div className="form-group" style={{ marginTop: "0.75rem" }}>
+            <label htmlFor="cobrar-motivo-perdida">Motivo</label>
+            <select
+              id="cobrar-motivo-perdida"
+              value={motivoPerdida}
+              onChange={(e) => setMotivoPerdida(e.target.value as MotivoPerdida)}
+              className="cobrar-select"
+              disabled={submittingPerdida}
+            >
+              <option value="">Seleccionar...</option>
+              {MOTIVOS_PERDIDA.map((m) => (
+                <option key={m.value} value={m.value}>{m.label}</option>
+              ))}
+            </select>
+          </div>
+          <div className="form-group">
+            <label htmlFor="cobrar-nota-perdida">Nota (opcional)</label>
+            <input
+              id="cobrar-nota-perdida"
+              type="text"
+              value={notaPerdida}
+              onChange={(e) => setNotaPerdida(e.target.value)}
+              placeholder="Detalle adicional"
+              className="cobrar-input"
+              disabled={submittingPerdida}
+            />
+          </div>
         </ModalConfirmar>
       )}
     </div>
