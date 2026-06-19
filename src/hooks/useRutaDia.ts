@@ -5,6 +5,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useTrabajadorCajaDia } from "@/context/TrabajadorCajaDiaContext";
 import { useTrabajadorLista } from "@/context/TrabajadorListaContext";
 import { type ClienteItem, type PrestamoItem } from "@/lib/empresa-api";
+import { isPrestamoEnCobro } from "@/lib/prestamo-estado";
 import {
   calcularDiasVencidos,
   calcularPrioridadCobro,
@@ -125,9 +126,7 @@ function buildClientesRuta(
   prestamos: PrestamoItem[],
   noPagosHoy: { prestamoId: string }[]
 ): ClienteRuta[] {
-  const prestamosPendientes = prestamos.filter(
-    (p) => p.estado !== "pagado" && (p.saldoPendiente ?? 0) > 0
-  );
+  const prestamosPendientes = prestamos.filter((p) => isPrestamoEnCobro(p));
   const mapClientesById = new Map(clientes.map((c) => [c.id, c]));
   const visitados = getVisitadosHoy();
   const noPagoHoySet = new Set(noPagosHoy.map((n) => n.prestamoId));

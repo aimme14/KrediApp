@@ -78,7 +78,10 @@ export interface ClienteDoc {
 }
 
 /** Estado del préstamo */
-export type EstadoPrestamo = "activo" | "pagado";
+export type EstadoPrestamo = "activo" | "pagado" | "castigado";
+
+/** Quién/qué provocó el cierre del préstamo */
+export type CierrePrestamoTipo = "cobro" | "castigo";
 
 /** Modalidad de pago */
 export type ModalidadPago = "diario" | "semanal" | "mensual";
@@ -100,10 +103,16 @@ export interface PrestamoDoc {
   fechaVencimiento: Date;
   /** Copia de cliente.moroso — sincronizado al marcar/desmarcar moroso. */
   moroso?: boolean;
+  /** Suma acumulada de pérdidas/castigos parciales reconocidos sobre este préstamo. */
+  totalCastigado?: number;
+  /** Fecha en que el préstamo quedó cerrado (pagado o castigado). */
+  fechaCierre?: Date;
+  /** Cómo se cerró: cobro real o castigo/incobro. */
+  cerradoPor?: CierrePrestamoTipo;
 }
 
 /** Tipo de pago / registro en subcolección pagos */
-export type TipoPago = "pago" | "no_pago";
+export type TipoPago = "pago" | "no_pago" | "perdida";
 
 /** Motivo cuando el cliente no pagó */
 export type MotivoNoPago =
@@ -115,7 +124,14 @@ export type MotivoNoPago =
 /** Método de pago al cobrar (efectivo/transferencia) */
 export type MetodoPago = "efectivo" | "transferencia";
 
-/** Pago dentro de un préstamo (o registro de intento sin pago) */
+/** Motivo al registrar pérdida/castigo */
+export type MotivoPerdida =
+  | "imposible_cobrar"
+  | "cliente_perdido"
+  | "acuerdo_quita"
+  | "otro";
+
+/** Pago dentro de un préstamo (o registro de intento sin pago / pérdida) */
 export interface PagoDoc {
   monto: number;
   fecha: Date;
@@ -127,8 +143,15 @@ export interface PagoDoc {
   evidencia?: string;
   /** Motivo por el que no pagó (solo si tipo === "no_pago") */
   motivoNoPago?: MotivoNoPago;
-  /** Nota adicional (solo si tipo === "no_pago") */
+  /** Motivo del castigo (solo si tipo === "perdida") */
+  motivoPerdida?: MotivoPerdida;
+  /** Nota adicional (no_pago o perdida) */
   nota?: string;
+  /** Desglose contable del castigo */
+  parteCapitalPerdida?: number;
+  parteGananciaPerdida?: number;
+  /** Cobro bruto acumulado antes del castigo (solo si tipo === "perdida") */
+  cobradoAcumulado?: number;
 }
 
 /** Tipo de gasto */

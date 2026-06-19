@@ -161,6 +161,24 @@
       "queryScope": "COLLECTION",
       "fields": [
         { "fieldPath": "rutaId", "order": "ASCENDING" },
+        { "fieldPath": "estado", "order": "ASCENDING" },
+        { "fieldPath": "fechaCierre", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "prestamos",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "adminId", "order": "ASCENDING" },
+        { "fieldPath": "estado", "order": "ASCENDING" },
+        { "fieldPath": "fechaCierre", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "prestamos",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "rutaId", "order": "ASCENDING" },
         { "fieldPath": "empleadoId", "order": "ASCENDING" },
         { "fieldPath": "desembolsoDesde", "order": "ASCENDING" },
         { "fieldPath": "creadoEn", "order": "ASCENDING" }

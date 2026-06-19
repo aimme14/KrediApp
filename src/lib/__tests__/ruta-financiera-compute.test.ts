@@ -5,6 +5,7 @@ import {
   computeSaldosTrasDesembolsoPrestamoDesdeCajaEmpleado,
   splitMontoPagoEnCapitalYGanancia,
   round2,
+  snapPesoCOP,
 } from "@/lib/ruta-financiera-compute";
 
 describe("splitMontoPagoEnCapitalYGanancia", () => {
@@ -33,6 +34,27 @@ describe("splitMontoPagoEnCapitalYGanancia", () => {
     const { capital, ganancia } = splitMontoPagoEnCapitalYGanancia(0, 500_000, 600_000);
     expect(capital).toBeGreaterThanOrEqual(0);
     expect(ganancia).toBeGreaterThanOrEqual(0);
+  });
+
+  it("3 cuotas de $40.000 en préstamo $100k/$120k — interés total exacto $20.000", () => {
+    const montoPrestamo = 100_000;
+    const totalAPagar = 120_000;
+    const cuota = 40_000;
+    let cobradoAntes = 0;
+    let gananciaAcum = 0;
+
+    for (let i = 0; i < 3; i++) {
+      const { ganancia } = splitMontoPagoEnCapitalYGanancia(
+        cuota,
+        montoPrestamo,
+        totalAPagar,
+        cobradoAntes
+      );
+      gananciaAcum = round2(gananciaAcum + ganancia);
+      cobradoAntes = round2(cobradoAntes + cuota);
+    }
+
+    expect(snapPesoCOP(gananciaAcum)).toBe(20_000);
   });
 });
 
@@ -159,55 +181,117 @@ describe("computeRutaCamposTrasCobroPrestamoCobroEnEmpleado", () => {
   });
 });
 
-describe("computeRutaCamposTrasPerdidaPrestamo", () => {
+describe("computeRutaCamposTrasPerdidaPrestamo — lógica Condición 1/2", () => {
   const rutaBase = {
-    cajaRuta: 1_000_000,
-    cajasEmpleados: 500_000,
-    inversiones: 800_000,
+    cajaRuta: 500_000,
+    cajasEmpleados: 200_000,
+    inversiones: 300_000,
     ganancias: 50_000,
     perdidas: 0,
-    capitalTotal: 2_300_000,
+    capitalTotal: 1_000_000,
   };
 
-  it("inversiones bajan el monto completo de la pérdida", () => {
-    const result = computeRutaCamposTrasPerdidaPrestamo(
-      rutaBase,
-      175_000,
-      500_000,
-      600_000
+  it("Cond 1: cobrado $0 — pierde todo el capital", () => {
+    const ruta = { ...rutaBase, inversiones: 100_000 };
+    const r = computeRutaCamposTrasPerdidaPrestamo(
+      ruta,
+      120_000,
+      100_000,
+      120_000,
+      0
     );
-    expect(result.inversiones).toBe(625_000); // 800k - 175k
+    expect(r.inversiones).toBe(0);
+    expect(r.ganancias).toBe(50_000);
+    expect(r.perdidas).toBe(100_000);
+    expect(r.capitalTotal).toBe(700_000);
   });
 
-  it("pérdidas informativas suben", () => {
-    const result = computeRutaCamposTrasPerdidaPrestamo(
-      rutaBase,
-      175_000,
-      500_000,
-      600_000
+  it("Cond 1: cobrado $50.000 < capital $100.000", () => {
+    const gananciaAcumulada = round2(50_000 * (20_000 / 120_000));
+    const totalADescontar = round2(50_000 + gananciaAcumulada);
+    const ruta = { ...rutaBase, inversiones: totalADescontar };
+    const r = computeRutaCamposTrasPerdidaPrestamo(
+      ruta,
+      70_000,
+      100_000,
+      120_000,
+      50_000
     );
-    expect(result.perdidas).toBe(175_000);
+    expect(r.inversiones).toBe(0);
+    expect(r.ganancias).toBeCloseTo(50_000 - gananciaAcumulada, 1);
+    expect(r.perdidas).toBe(50_000);
+    expect(r.capitalTotal).toBe(700_000);
   });
 
-  it("capital total baja exactamente el monto de la pérdida", () => {
-    const result = computeRutaCamposTrasPerdidaPrestamo(
+  it("Cond 2: cobrado $100.000 = capital — ganancia neta 0", () => {
+    const gananciaAcumulada = round2(100_000 * (20_000 / 120_000));
+    const r = computeRutaCamposTrasPerdidaPrestamo(
       rutaBase,
-      175_000,
-      500_000,
-      600_000
+      20_000,
+      100_000,
+      120_000,
+      100_000
     );
-    const nuevoCapital = rutaBase.cajaRuta + rutaBase.cajasEmpleados + result.inversiones;
-    expect(round2(nuevoCapital)).toBeCloseTo(2_125_000, 0);
+    expect(r.inversiones).toBe(300_000);
+    expect(r.ganancias).toBeCloseTo(50_000 - gananciaAcumulada + 0, 1);
+    expect(r.perdidas).toBe(0);
+    expect(r.capitalTotal).toBe(1_000_000);
   });
 
-  it("no descuenta más de las inversiones disponibles", () => {
-    const result = computeRutaCamposTrasPerdidaPrestamo(
+  it("Cond 2: cobrado $110.000 > capital — ganancia real $10.000", () => {
+    const gananciaAcumulada = round2(110_000 * (20_000 / 120_000));
+    const gananciaReal = 10_000;
+    const r = computeRutaCamposTrasPerdidaPrestamo(
       rutaBase,
-      999_999_999,
-      500_000,
-      600_000 // monto absurdo
+      10_000,
+      100_000,
+      120_000,
+      110_000
     );
-    expect(result.inversiones).toBeGreaterThanOrEqual(0);
+    expect(r.inversiones).toBe(300_000);
+    expect(r.ganancias).toBeCloseTo(50_000 - gananciaAcumulada + gananciaReal, 1);
+    expect(r.perdidas).toBe(0);
+    expect(r.capitalTotal).toBe(1_000_000);
+  });
+
+  it("lanza error si saldoPendiente = 0", () => {
+    expect(() =>
+      computeRutaCamposTrasPerdidaPrestamo(rutaBase, 0, 100_000, 120_000, 120_000)
+    ).toThrow();
+  });
+
+  it("Cond 1: inversiones insuficientes — no lanza, no queda negativa", () => {
+    const rutaPobre = { ...rutaBase, inversiones: 20_000 };
+    const gananciaAcumulada = round2(50_000 * (20_000 / 120_000));
+    const r = computeRutaCamposTrasPerdidaPrestamo(
+      rutaPobre,
+      70_000,
+      100_000,
+      120_000,
+      50_000
+    );
+    expect(r.inversiones).toBe(0);
+    expect(r.perdidas).toBe(50_000);
+    expect(r.ganancias).toBeCloseTo(50_000 - gananciaAcumulada, 1);
+    expect(r.capitalTotal).toBe(round2(500_000 + 200_000 + 0));
+  });
+
+  it("Cond 2: ganancias no queda negativa con datos legacy", () => {
+    const rutaBajaGanancia = { ...rutaBase, ganancias: 5_000 };
+    const r = computeRutaCamposTrasPerdidaPrestamo(
+      rutaBajaGanancia,
+      10_000,
+      100_000,
+      120_000,
+      110_000
+    );
+    expect(r.ganancias).toBeGreaterThanOrEqual(0);
+  });
+
+  it("lanza error si cobradoAcumulado > totalAPagar", () => {
+    expect(() =>
+      computeRutaCamposTrasPerdidaPrestamo(rutaBase, 10_000, 100_000, 120_000, 999_999)
+    ).toThrow();
   });
 });
 
@@ -261,54 +345,6 @@ describe("computeRutaCamposTrasCobroPrestamoCobroEnEmpleado — casos borde", ()
         600_000
       )
     ).not.toThrow();
-  });
-});
-
-describe("computeRutaCamposTrasPerdidaPrestamo — casos borde", () => {
-  const rutaBase = {
-    cajaRuta: 1_000_000,
-    cajasEmpleados: 500_000,
-    inversiones: 800_000,
-    ganancias: 50_000,
-    perdidas: 0,
-    capitalTotal: 2_300_000,
-  };
-
-  it("lanza error si monto es 0 o negativo (línea 156)", () => {
-    expect(() =>
-      computeRutaCamposTrasPerdidaPrestamo(rutaBase, 0, 500_000, 600_000)
-    ).toThrow();
-  });
-
-  it("lanza error si capital descuadrado (línea 180)", () => {
-    const rutaDescuadrada = {
-      ...rutaBase,
-      capitalTotal: 999_999_999,
-    };
-    expect(() =>
-      computeRutaCamposTrasPerdidaPrestamo(
-        rutaDescuadrada,
-        100_000,
-        500_000,
-        600_000
-      )
-    ).toThrow();
-  });
-
-  it("pérdida sin inversiones deja inversiones en cero — no negativas (guard línea 183)", () => {
-    const rutaSinInversiones = {
-      ...rutaBase,
-      inversiones: 0,
-      capitalTotal: 1_500_000,
-    };
-    const result = computeRutaCamposTrasPerdidaPrestamo(
-      rutaSinInversiones,
-      999_999,
-      500_000,
-      600_000
-    );
-    expect(result.inversiones).toBe(0);
-    expect(result.inversiones).toBeGreaterThanOrEqual(0);
   });
 });
 

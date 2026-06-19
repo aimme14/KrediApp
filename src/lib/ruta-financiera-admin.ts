@@ -25,6 +25,7 @@ import {
 /** Reexporta la única fuente de verdad para splits y efectos en ruta (comparte con cliente vía `ruta-financiera-compute`). */
 export {
   round2,
+  snapPesoCOP,
   splitMontoPagoEnCapitalYGanancia,
   type RutaUpdateCobro,
   computeRutaCamposTrasCobroPrestamo,

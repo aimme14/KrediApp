@@ -20,7 +20,7 @@ import {
 
 export type PrestamoFiltroContable = GastosFiltroContable;
 
-export type PrestamoFiltroEstado = "todos" | "activo" | "pagado" | "moroso";
+export type PrestamoFiltroEstado = "todos" | "activo" | "pagado" | "castigado" | "moroso";
 
 export type PrestamoConFechaCreacion = PrestamoFechaCreacion;
 
@@ -82,6 +82,9 @@ export function mensajePrestamosVaciosContable(
   }
   if (filtroEstado === "activo") return "No hay préstamos activos con los filtros actuales.";
   if (filtroEstado === "pagado") return "No hay préstamos pagados con los filtros actuales.";
+  if (filtroEstado === "castigado") {
+    return "No hay préstamos en pérdida con los filtros actuales.";
+  }
   if (filtro.modo === "actual") return "No hay préstamos en el periodo actual.";
   return "No hay préstamos con los filtros actuales.";
 }

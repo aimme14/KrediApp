@@ -35,7 +35,7 @@ import { ESTADO_PRESTAMO_ABIERTO, normalizeEstadoPrestamo } from "@/lib/prestamo
 const EMPRESAS_COLLECTION = "empresas";
 const PRESTAMOS_SUBCOLLECTION = "prestamos";
 const CLIENTES_SUBCOLLECTION = "clientes";
-const PAGE_SIZE_PAGADOS = 20;
+const PAGE_SIZE_HISTORICO = 20;
 
 export type DatosSyncEstado = "synced" | "syncing" | "offline";
 
@@ -56,6 +56,12 @@ export type TrabajadorListaContextValue = {
   loadingPagados: boolean;
   hayMasPagados: boolean;
   cargarMasPagados: () => Promise<void>;
+  /** Préstamos castigados — en tiempo real */
+  prestamosCastigados: PrestamoItem[];
+  loadingCastigados: boolean;
+  /** Siempre false: castigados ya no usan paginación lazy. */
+  hayMasCastigados: boolean;
+  cargarMasCastigados: () => Promise<void>;
   loading: boolean;
   error: string | null;
   lastFetchedAt: number;
@@ -97,6 +103,10 @@ function mapPrestamo(d: QueryDocumentSnapshot): PrestamoItem {
     ultimoPagoFecha: data.ultimoPagoFecha?.toDate?.()?.toISOString?.() ?? null,
     intentosFallidos: typeof data.intentosFallidos === "number" ? data.intentosFallidos : 0,
     moroso: data.moroso === true,
+    totalCastigado: typeof data.totalCastigado === "number" ? data.totalCastigado : 0,
+    fechaCierre: data.fechaCierre?.toDate?.()?.toISOString?.() ?? null,
+    cerradoPor:
+      data.cerradoPor === "cobro" || data.cerradoPor === "castigo" ? data.cerradoPor : null,
   };
 }
 
@@ -107,6 +117,8 @@ export function TrabajadorListaProvider({ children }: { children: ReactNode }) {
   const [prestamosPagados, setPrestamosPagados] = useState<PrestamoItem[]>([]);
   const [loadingPagados, setLoadingPagados] = useState(false);
   const [hayMasPagados, setHayMasPagados] = useState(true);
+  const [prestamosCastigados, setPrestamosCastigados] = useState<PrestamoItem[]>([]);
+  const [loadingCastigados, setLoadingCastigados] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastFetchedAt, setLastFetchedAt] = useState(0);
@@ -139,6 +151,8 @@ export function TrabajadorListaProvider({ children }: { children: ReactNode }) {
     setPrestamosPagados([]);
     setHayMasPagados(true);
     setLoadingPagados(false);
+    setPrestamosCastigados([]);
+    setLoadingCastigados(true);
     setDatosSyncEstado("syncing");
   }, [user?.uid, profile?.empresaId, profile?.rutaId]);
 
@@ -243,6 +257,44 @@ export function TrabajadorListaProvider({ children }: { children: ReactNode }) {
     return unsub;
   }, [user?.uid, profile?.role, profile?.empresaId, profile?.rutaId]);
 
+  useEffect(() => {
+    if (!db || !user || !profile) return;
+    const empresaId = profile.empresaId?.trim();
+    if (!empresaId) return;
+    const canUse = profile.role === "trabajador" || profile.role === "admin";
+    if (!canUse) return;
+
+    const prestamosCol = collection(db, EMPRESAS_COLLECTION, empresaId, PRESTAMOS_SUBCOLLECTION);
+
+    const q =
+      profile.role === "trabajador" && profile.rutaId
+        ? query(
+            prestamosCol,
+            where("rutaId", "==", profile.rutaId),
+            where("estado", "==", "castigado"),
+            orderBy("fechaCierre", "desc")
+          )
+        : query(
+            prestamosCol,
+            where("adminId", "==", user.uid),
+            where("estado", "==", "castigado"),
+            orderBy("fechaCierre", "desc")
+          );
+
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        setPrestamosCastigados(snap.docs.map(mapPrestamo));
+        setLoadingCastigados(false);
+      },
+      (err) => {
+        console.warn("[TrabajadorLista] onSnapshot préstamos castigados:", err);
+        setLoadingCastigados(false);
+      }
+    );
+    return unsub;
+  }, [user?.uid, profile?.role, profile?.empresaId, profile?.rutaId]);
+
   const cargarMasPagados = useCallback(async () => {
     if (!db || !user || !profile || loadingPagados || !hayMasPagados) return;
     const empresaId = profile.empresaId?.trim();
@@ -268,12 +320,12 @@ export function TrabajadorListaProvider({ children }: { children: ReactNode }) {
       if (lastDocPagadosRef.current) {
         constraints.push(startAfter(lastDocPagadosRef.current));
       }
-      constraints.push(limit(PAGE_SIZE_PAGADOS));
+      constraints.push(limit(PAGE_SIZE_HISTORICO));
 
       const snap = await getDocs(query(prestamosCol, ...constraints));
       const nuevos = snap.docs.map(mapPrestamo);
 
-      if (snap.docs.length < PAGE_SIZE_PAGADOS) setHayMasPagados(false);
+      if (snap.docs.length < PAGE_SIZE_HISTORICO) setHayMasPagados(false);
       if (snap.docs.length > 0) {
         lastDocPagadosRef.current = snap.docs[snap.docs.length - 1] ?? null;
       }
@@ -285,6 +337,10 @@ export function TrabajadorListaProvider({ children }: { children: ReactNode }) {
       setLoadingPagados(false);
     }
   }, [user, profile, loadingPagados, hayMasPagados]);
+
+  const cargarMasCastigados = useCallback(async () => {
+    // Castigados se actualizan con onSnapshot; sin paginación lazy.
+  }, []);
 
   const morosoPorCliente = useMemo(() => {
     const m = new Map<string, boolean>();
@@ -304,6 +360,11 @@ export function TrabajadorListaProvider({ children }: { children: ReactNode }) {
     [prestamosPagados, morosoPorCliente]
   );
 
+  const prestamosCastigadosConMoroso = useMemo(
+    () => prestamosCastigados.map((p) => enriquecerMorosoPrestamo(p, morosoPorCliente)),
+    [prestamosCastigados, morosoPorCliente]
+  );
+
   const value = useMemo(
     (): TrabajadorListaContextValue => ({
       clientes,
@@ -312,6 +373,10 @@ export function TrabajadorListaProvider({ children }: { children: ReactNode }) {
       loadingPagados,
       hayMasPagados,
       cargarMasPagados,
+      prestamosCastigados: prestamosCastigadosConMoroso,
+      loadingCastigados,
+      hayMasCastigados: false,
+      cargarMasCastigados,
       loading,
       error,
       lastFetchedAt,
@@ -325,6 +390,9 @@ export function TrabajadorListaProvider({ children }: { children: ReactNode }) {
       loadingPagados,
       hayMasPagados,
       cargarMasPagados,
+      prestamosCastigadosConMoroso,
+      loadingCastigados,
+      cargarMasCastigados,
       loading,
       error,
       lastFetchedAt,

@@ -3,6 +3,9 @@
  * Requiere el token de Firebase para autorización.
  */
 
+import { isPrestamoCerrado, normalizeEstadoPrestamo } from "@/lib/prestamo-estado";
+import type { EstadoPrestamo } from "@/types/firestore";
+
 export type RutaItem = {
   id: string;
   nombre: string;
@@ -106,6 +109,12 @@ export type PrestamoItem = {
   intentosFallidos?: number;
   /** Cliente marcado moroso por administrador (sincronizado desde cliente.moroso). */
   moroso?: boolean;
+  /** Suma acumulada de castigos parciales reconocidos. */
+  totalCastigado?: number;
+  /** Fecha de cierre del préstamo (ISO). */
+  fechaCierre?: string | null;
+  /** Cómo se cerró: cobro o castigo. */
+  cerradoPor?: "cobro" | "castigo" | null;
 };
 
 export type GastoItem = {
@@ -965,8 +974,36 @@ export function esPrestamoMorosoPendiente(
   clienteMoroso?: boolean
 ): boolean {
   if (!esPrestamoDeClienteMoroso(prestamo, clienteMoroso)) return false;
-  if (prestamo.estado === "pagado") return false;
+  if (isPrestamoCerrado(prestamo)) return false;
   return (prestamo.saldoPendiente ?? 0) > 0;
+}
+
+/** Consulta si un cobro con clave de idempotencia ya fue procesado en el servidor. */
+export async function checkCobroIdempotency(
+  token: string,
+  prestamoId: string,
+  key: string
+): Promise<{
+  processed: boolean;
+  failed?: boolean;
+  processing?: boolean;
+  payload?: {
+    saldoPendiente: number;
+    pagoId: string;
+    estado: string;
+    montoAplicado: number;
+  };
+  error?: string;
+}> {
+  const res = await fetchWithAuth(
+    `/api/empresa/prestamos/${encodeURIComponent(prestamoId)}/pagos/check-idempotency?key=${encodeURIComponent(key)}`,
+    token
+  );
+  if (!res.ok) {
+    if (res.status === 403) console.warn("[checkCobroIdempotency] Sin acceso");
+    return { processed: false };
+  }
+  return res.json();
 }
 
 /** Lista los últimos pagos de un préstamo (para historial). */
@@ -990,7 +1027,7 @@ export async function registrarPago(
     /** Clave de idempotencia: mismo key = misma respuesta, sin duplicar pago */
     idempotencyKey?: string;
   }
-): Promise<{ saldoPendiente: number; adelantoCuota?: number; pagoId?: string }> {
+): Promise<{ saldoPendiente: number; adelantoCuota?: number; pagoId?: string; estado: EstadoPrestamo }> {
   const res = await fetchWithAuth(`/api/empresa/prestamos/${encodeURIComponent(prestamoId)}/pagos`, token, {
     method: "POST",
     body: JSON.stringify(params),
@@ -1001,6 +1038,7 @@ export async function registrarPago(
     saldoPendiente: data.saldoPendiente ?? 0,
     adelantoCuota: data.adelantoCuota,
     pagoId: data.pagoId,
+    estado: normalizeEstadoPrestamo(data.estado),
   };
 }
 
@@ -1040,7 +1078,7 @@ export async function registrarPerdida(
     registradoPorUid?: string;
     registradoPorNombre?: string;
   }
-): Promise<{ saldoPendiente: number; adelantoCuota?: number }> {
+): Promise<{ saldoPendiente: number; adelantoCuota?: number; estado: EstadoPrestamo }> {
   const res = await fetchWithAuth(`/api/empresa/prestamos/${encodeURIComponent(prestamoId)}/pagos`, token, {
     method: "POST",
     body: JSON.stringify({
@@ -1057,6 +1095,7 @@ export async function registrarPerdida(
   return {
     saldoPendiente: data.saldoPendiente ?? 0,
     adelantoCuota: data.adelantoCuota,
+    estado: normalizeEstadoPrestamo(data.estado),
   };
 }
 

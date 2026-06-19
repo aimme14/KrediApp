@@ -3651,11 +3651,20 @@ td {
   border: 1px solid color-mix(in srgb, #22c55e 45%, transparent);
 }
 
+.prestamo-admin-estado--castigado {
+  background: color-mix(in srgb, #dc2626 22%, transparent);
+  color: #fca5a5;
+  border: 1px solid color-mix(in srgb, #dc2626 45%, transparent);
+}
+
 [data-theme="light"] .prestamo-admin-estado--activo {
   color: #4338ca;
 }
 [data-theme="light"] .prestamo-admin-estado--pagado {
   color: #15803d;
+}
+[data-theme="light"] .prestamo-admin-estado--castigado {
+  color: #b91c1c;
 }
 
 .prestamo-admin-cobro-btn {
