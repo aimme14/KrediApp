@@ -25,6 +25,7 @@ import {
   mensajePrestamosVaciosContable,
   numeroPeriodoAdmin,
   periodoAbiertoAdmin,
+  periodoLabelDePrestamo,
   resolverRangoFiltroContable,
   type PrestamoFiltroContable,
   type PrestamoFiltroEstado,
@@ -124,6 +125,8 @@ export default function PrestamoPage() {
     cargarMasPagados,
     prestamosCastigados,
     loadingCastigados,
+    hayMasCastigados,
+    cargarMasCastigados,
     loading,
     error: listaError,
     refresh,
@@ -492,10 +495,11 @@ export default function PrestamoPage() {
 
   const PAGE_SIZE = 15;
   const [pagina, setPagina] = useState(1);
+  const [ordenDesc, setOrdenDesc] = useState(true);
 
   useEffect(() => {
     setPagina(1);
-  }, [filtroEstado, filtroContable, filtroNombre, filtroRutaId]);
+  }, [filtroEstado, filtroContable, filtroNombre, filtroRutaId, ordenDesc]);
 
   /** Grupos por cliente: principal = reciente y activo (activo > pagado, luego por fecha). */
   const gruposPorCliente = useMemo((): GrupoClientePrestamos[] => {
@@ -518,10 +522,10 @@ export default function PrestamoPage() {
       if (oa !== ob) return oa - ob;
       const ta = new Date(pa.fechaInicio || 0).getTime();
       const tb = new Date(pb.fechaInicio || 0).getTime();
-      return tb - ta;
+      return ordenDesc ? tb - ta : ta - tb;
     });
     return grupos;
-  }, [prestamosFiltrados]);
+  }, [prestamosFiltrados, ordenDesc]);
 
   const gruposPaginados = useMemo(() => {
     return gruposPorCliente.slice(0, pagina * PAGE_SIZE);
@@ -553,12 +557,20 @@ export default function PrestamoPage() {
 
   if (!profile || profile.role !== "admin") return null;
 
+  const detalleBannerColocados = (() => {
+    const base = `${prestamosFiltrados.length} préstamo${prestamosFiltrados.length !== 1 ? "s" : ""} · $ ${formatMoneda(totalDesembolsadoPeriodo)} colocados.`;
+    if (filtroEstado === "activo") {
+      return `${base} Solo los desembolsados en este período — préstamos de períodos anteriores aún activos no aparecen aquí.`;
+    }
+    return base;
+  })();
+
   const bannerPeriodo = (() => {
     if (filtroContable.modo === "hoy") {
       const hoy = fechaDiaColombiaHoy();
       return {
         tone: "neutral" as const,
-        titulo: "Desembolsos de hoy",
+        titulo: "Desembolsados hoy",
         detalle: `${formatFechaDia(hoy)} · ${prestamosFiltrados.length} préstamo${prestamosFiltrados.length !== 1 ? "s" : ""} · $ ${formatMoneda(totalDesembolsadoPeriodo)} colocados.`,
       };
     }
@@ -589,14 +601,14 @@ export default function PrestamoPage() {
     if (rangoContable.periodo.estado === "abierto") {
       return {
         tone: "active" as const,
-        titulo: `Periodo #${num ?? "—"} · Abierto`,
-        detalle: `${prestamosFiltrados.length} préstamo${prestamosFiltrados.length !== 1 ? "s" : ""} · $ ${formatMoneda(totalDesembolsadoPeriodo)} colocados.`,
+        titulo: `Período #${num ?? "—"} · Abierto — desembolsados en este corte`,
+        detalle: detalleBannerColocados,
       };
     }
     return {
       tone: "neutral" as const,
-      titulo: `Periodo #${num ?? "—"} · Cerrado`,
-      detalle: `${prestamosFiltrados.length} préstamo${prestamosFiltrados.length !== 1 ? "s" : ""} · $ ${formatMoneda(totalDesembolsadoPeriodo)} colocados.`,
+      titulo: `Período #${num ?? "—"} · Cerrado — desembolsados en este corte`,
+      detalle: detalleBannerColocados,
     };
   })();
 
@@ -1029,6 +1041,15 @@ export default function PrestamoPage() {
                     aria-label="Buscar préstamos por nombre de cliente"
                   />
                 </div>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  style={{ fontSize: "0.8125rem", whiteSpace: "nowrap" }}
+                  onClick={() => setOrdenDesc((v) => !v)}
+                  title={ordenDesc ? "Ordenar: más antiguos primero" : "Ordenar: más recientes primero"}
+                >
+                  {ordenDesc ? "↓ Más recientes" : "↑ Más antiguos"}
+                </button>
                 {filtroNombreLower ? (
                   <p className="prestamo-admin-search-hint">
                     {gruposPorCliente.length} cliente{gruposPorCliente.length !== 1 ? "s" : ""} encontrado{gruposPorCliente.length !== 1 ? "s" : ""}
@@ -1133,8 +1154,15 @@ export default function PrestamoPage() {
                             <div className="historial-prestamos-list" style={{ fontSize: "0.8125rem", color: "var(--text-muted)" }}>
                               <span style={{ fontWeight: 600, color: "var(--text)", marginBottom: "0.35rem", display: "block" }}>Otros préstamos</span>
                               <ul>
-                                {otros.map((p) => (
+                                {otros.map((p) => {
+                                  const periodoLabel = periodoLabelDePrestamo(p, periodos);
+                                  return (
                                     <li key={p.id} style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
+                                      {periodoLabel ? (
+                                        <span style={{ fontSize: "0.75rem", color: "var(--text-muted)", fontWeight: 600 }}>
+                                          {periodoLabel}
+                                        </span>
+                                      ) : null}
                                       {formatMoneda(p.monto)} · {formatFechaCreacionPrestamo(p)} · {labelEstadoPrestamo(p)} · {p.numeroCuotas} cuotas
                                       {isPrestamoEnCobro(p) && (
                                         <Link
@@ -1145,7 +1173,8 @@ export default function PrestamoPage() {
                                         </Link>
                                       )}
                                     </li>
-                                  ))}
+                                  );
+                                })}
                               </ul>
                             </div>
                           </td>
@@ -1157,31 +1186,55 @@ export default function PrestamoPage() {
               </tbody>
             </table>
           </div>
-          {hayMas && (
-            <div style={{ textAlign: "center", marginTop: "1rem" }}>
-              <button
-                type="button"
-                className="btn btn-secondary"
-                onClick={() => setPagina((p) => p + 1)}
-              >
-                Ver más préstamos
-              </button>
+          {(hayMas || hayMasPagados || hayMasCastigados) && (
+            <div
+              style={{
+                textAlign: "center",
+                marginTop: "1rem",
+                display: "flex",
+                flexDirection: "column",
+                gap: "0.5rem",
+                alignItems: "center",
+              }}
+            >
+              {hayMas && (
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => setPagina((p) => p + 1)}
+                >
+                  Mostrar {Math.min(PAGE_SIZE, gruposPorCliente.length - gruposPaginados.length)} clientes más
+                </button>
+              )}
+              {(filtroEstado === "pagado" || filtroEstado === "todos") && hayMasPagados && (
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  style={{ fontSize: "0.875rem" }}
+                  onClick={() => void cargarMasPagados()}
+                  disabled={loadingPagados}
+                >
+                  {loadingPagados ? "Cargando..." : "Cargar más préstamos pagados del historial"}
+                </button>
+              )}
+              {(filtroEstado === "castigado" || filtroEstado === "todos") && hayMasCastigados && (
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  style={{ fontSize: "0.875rem" }}
+                  onClick={() => void cargarMasCastigados()}
+                  disabled={loadingCastigados}
+                >
+                  {loadingCastigados ? "Cargando..." : "Cargar más pérdidas del historial"}
+                </button>
+              )}
+              {(hayMasPagados || hayMasCastigados) && (
+                <p style={{ fontSize: "0.75rem", color: "var(--text-muted)", margin: 0 }}>
+                  El historial completo no está cargado aún.
+                </p>
+              )}
             </div>
           )}
-          {(filtroEstado === "pagado" || filtroEstado === "todos") && hayMasPagados ? (
-            <div style={{ textAlign: "center", marginTop: "0.75rem" }}>
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={() => {
-                  void cargarMasPagados();
-                }}
-                disabled={loadingPagados}
-              >
-                {loadingPagados ? "Cargando..." : "Ver más"}
-              </button>
-            </div>
-          ) : null}
           {periodosLoading && prestamosFiltrados.length === 0 ? (
             <p className="prestamo-admin-filtro-vacio">Cargando periodos...</p>
           ) : null}

@@ -13,6 +13,12 @@ import {
   resolverRangoFiltroContable,
   type GastosFiltroContable,
 } from "@/lib/gastos-periodo-filter";
+
+function fechaDesdeIso(iso: string | null | undefined): Date | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  return Number.isFinite(d.getTime()) ? d : null;
+}
 import {
   fechaCreacionPrestamoIso,
   type PrestamoFechaCreacion,
@@ -45,6 +51,29 @@ export function prestamoOcurreEnFiltroContable(
   const rango = resolverRangoFiltroContable(filtro, periodos, ahora);
   if (!rango) return false;
   return gastoOcurreEnRangoContable(fecha, rango.desde, rango.hasta);
+}
+
+/** Etiqueta compacta del periodo contable al que pertenece el desembolso (ej. "P#3"). */
+export function periodoLabelDePrestamo(
+  p: PrestamoConFechaCreacion,
+  periodos: PeriodoAdminListaItem[],
+  ahora: Date = new Date()
+): string {
+  const fecha = fechaPrestamoParaFiltroPeriodo(p);
+  if (!fecha) return "";
+
+  for (const periodo of periodos) {
+    const desde = fechaDesdeIso(periodo.fechaApertura);
+    if (!desde) continue;
+    const hasta =
+      fechaDesdeIso(periodo.fechaCierre) ??
+      (periodo.estado === "abierto" ? ahora : null);
+    if (!hasta) continue;
+    if (!gastoOcurreEnRangoContable(fecha, desde, hasta)) continue;
+    const num = numeroPeriodoAdmin(periodo.id, periodos);
+    return num != null ? `P#${num}` : "";
+  }
+  return "";
 }
 
 export function filtrarPrestamosPorFiltroContable<T extends PrestamoConFechaCreacion>(
