@@ -484,6 +484,14 @@ export default function PrestamoPage() {
     return list;
   }, [prestamosPorPeriodo, filtroRutaId, filtroNombreLower, clientePorId]);
 
+  const resumenPerdidas = useMemo(() => {
+    const castigados = prestamosFiltrados.filter((p) => p.estado === "castigado");
+    return {
+      cantidad: castigados.length,
+      totalPerdido: castigados.reduce((sum, p) => sum + (p.totalCastigado ?? 0), 0),
+    };
+  }, [prestamosFiltrados]);
+
   const totalDesembolsadoPeriodo = useMemo(
     () =>
       Math.round(
@@ -951,6 +959,23 @@ export default function PrestamoPage() {
                 </svg>
               </span>
             </div>
+            {filtroEstado === "castigado" && (
+              <div className="prestamo-admin-kpi">
+                <div className="prestamo-admin-kpi-body">
+                  <span className="prestamo-admin-kpi-label">Capital perdido</span>
+                  <span className="prestamo-admin-kpi-value" style={{ color: "var(--danger, #dc2626)" }}>
+                    −$ {formatMoneda(resumenPerdidas.totalPerdido)}
+                  </span>
+                </div>
+                <span className="prestamo-admin-kpi-icon" style={{ color: "var(--danger, #dc2626)" }} aria-hidden>
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                    <line x1="12" y1="9" x2="12" y2="13"/>
+                    <line x1="12" y1="17" x2="12.01" y2="17"/>
+                  </svg>
+                </span>
+              </div>
+            )}
             </div>
           </div>
         )}
@@ -1071,7 +1096,9 @@ export default function PrestamoPage() {
                   </th>
                   <th className="col-num">Total a pagar</th>
                   <th className="col-num">Saldo</th>
-                  <th className="col-num">Cuotas</th>
+                  <th className="col-num">
+                    {filtroEstado === "castigado" ? "Pérdida" : "Cuotas"}
+                  </th>
                   <th>Estado</th>
                   <th>Frecuencia</th>
                   <th>
@@ -1127,7 +1154,24 @@ export default function PrestamoPage() {
                         </td>
                         <td className="col-num">{formatMoneda(principal.totalAPagar)}</td>
                         <td className="col-num">{formatMoneda(principal.saldoPendiente)}</td>
-                        <td className="col-num" title="Cuotas pagadas / total">{pagadas} / {principal.numeroCuotas}</td>
+                        <td
+                          className="col-num"
+                          title={
+                            principal.estado === "castigado"
+                              ? "Capital en pérdida"
+                              : "Cuotas pagadas / total"
+                          }
+                        >
+                          {principal.estado === "castigado" ? (
+                            <span style={{ color: "var(--danger, #dc2626)", fontWeight: 600 }}>
+                              −$ {formatMoneda(principal.totalCastigado ?? 0)}
+                            </span>
+                          ) : principal.estado === "pagado" ? (
+                            <span style={{ color: "var(--text-muted)", fontSize: "0.875rem" }}>—</span>
+                          ) : (
+                            `${pagadas} / ${principal.numeroCuotas}`
+                          )}
+                        </td>
                         <td>
                           <span
                             className={`prestamo-admin-estado${prestamoEstadoBadgeClass(principal.estado)}`}
@@ -1163,7 +1207,13 @@ export default function PrestamoPage() {
                                           {periodoLabel}
                                         </span>
                                       ) : null}
-                                      {formatMoneda(p.monto)} · {formatFechaCreacionPrestamo(p)} · {labelEstadoPrestamo(p)} · {p.numeroCuotas} cuotas
+                                      {formatMoneda(p.monto)} · {formatFechaCreacionPrestamo(p)} · {labelEstadoPrestamo(p)}
+                                      {p.estado === "castigado" && (p.totalCastigado ?? 0) > 0 && (
+                                        <span style={{ color: "var(--danger, #dc2626)", fontSize: "0.8125rem", fontWeight: 600 }}>
+                                          · Pérdida: −$ {formatMoneda(p.totalCastigado ?? 0)}
+                                        </span>
+                                      )}
+                                      {p.estado !== "castigado" && ` · ${p.numeroCuotas} cuotas`}
                                       {isPrestamoEnCobro(p) && (
                                         <Link
                                           href={`/dashboard/admin/cobrar?clienteId=${grupo.clienteId}&prestamoId=${p.id}`}

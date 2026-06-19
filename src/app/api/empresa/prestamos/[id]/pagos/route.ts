@@ -438,7 +438,7 @@ export async function POST(
           estado: resolucionPerdida.estado,
           updatedAt: nowTx,
           adelantoCuota: adelantoParaGuardar,
-          totalCastigado: FieldValue.increment(montoAplicar),
+          totalCastigado: FieldValue.increment(capitalNoRecuperado),
           ...(resolucionPerdida.cierraPrestamo
             ? { fechaCierre: nowTx, cerradoPor: resolucionPerdida.cerradoPor }
             : {}),
