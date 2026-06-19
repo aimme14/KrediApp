@@ -3,7 +3,7 @@
  * capitalTotal no cambia.
  */
 
-import type { Firestore } from "firebase-admin/firestore";
+import type { DocumentReference, Firestore, Transaction } from "firebase-admin/firestore";
 import {
   EMPRESAS_COLLECTION,
   RUTAS_SUBCOLLECTION,
@@ -131,6 +131,110 @@ export async function entregarReporteTrabajadorARuta(
     });
 
     montoEntregado = monto;
+    tx.update(usuarioRef, {
+      cajaEmpleado: 0,
+      ultimaActualizacionCapital: now,
+    });
+    tx.update(rutaRef, {
+      cajaRuta,
+      cajasEmpleados,
+      capitalTotal: nuevoCapital,
+      ultimaActualizacion: now,
+    });
+  });
+
+  const after = await rutaRef.get();
+  if (after.exists) {
+    await upsertCapitalRutaSnapshot(db, empresaId, rutaId, after.data()!);
+  }
+
+  return { monto: montoEntregado, rutaId };
+}
+
+async function assertSolicitudPendienteEnTx(
+  tx: Transaction,
+  solRef: DocumentReference,
+  adminUid: string
+): Promise<void> {
+  const solSnapTx = await tx.get(solRef);
+  if (!solSnapTx.exists) throw new Error("Solicitud no encontrada");
+  const solData = solSnapTx.data() as Record<string, unknown>;
+  if (solData.estado !== "pendiente") throw new Error("La solicitud ya fue resuelta");
+  if (solData.adminId !== adminUid) {
+    throw new Error("No podés confirmar solicitudes de otra administración");
+  }
+}
+
+/** Valida estado pendiente dentro de una transacción (p. ej. solicitudes legacy). */
+export async function assertSolicitudEntregaPendienteEnTransaccion(
+  db: Firestore,
+  solRef: DocumentReference,
+  adminUid: string
+): Promise<void> {
+  await db.runTransaction(async (tx) => {
+    await assertSolicitudPendienteEnTx(tx, solRef, adminUid);
+  });
+}
+
+/** Traspasa cajaEmpleado → cajaRuta validando la solicitud pendiente en la misma transacción. */
+export async function entregarReporteTrabajadorARutaConValidacion(
+  db: Firestore,
+  empresaId: string,
+  empleadoUid: string,
+  solRef: DocumentReference,
+  adminUid: string
+): Promise<EntregarReporteResult> {
+  const usuarioRef = db
+    .collection(EMPRESAS_COLLECTION)
+    .doc(empresaId)
+    .collection(USUARIOS_SUBCOLLECTION)
+    .doc(empleadoUid);
+
+  const uSnap = await usuarioRef.get();
+  if (!uSnap.exists) throw new Error("Usuario no encontrado");
+  const ud = uSnap.data() as Record<string, unknown>;
+  if ((ud.rol as string) !== "empleado") throw new Error("Solo aplica a trabajadores");
+  const rutaId = typeof ud.rutaId === "string" ? ud.rutaId.trim() : "";
+  if (!rutaId) throw new Error("No tienes ruta asignada");
+
+  const rutaRef = db
+    .collection(EMPRESAS_COLLECTION)
+    .doc(empresaId)
+    .collection(RUTAS_SUBCOLLECTION)
+    .doc(rutaId);
+
+  let montoEntregado = 0;
+
+  await db.runTransaction(async (tx) => {
+    await assertSolicitudPendienteEnTx(tx, solRef, adminUid);
+
+    const rutaSnap = await tx.get(rutaRef);
+    if (!rutaSnap.exists) throw new Error("Ruta no encontrada");
+    const rd = rutaSnap.data() as Record<string, unknown>;
+
+    let cajaRuta = typeof rd.cajaRuta === "number" ? rd.cajaRuta : 0;
+    let cajasEmpleados = typeof rd.cajasEmpleados === "number" ? rd.cajasEmpleados : 0;
+    const inversiones = typeof rd.inversiones === "number" ? rd.inversiones : 0;
+    const perdidas = typeof rd.perdidas === "number" ? rd.perdidas : 0;
+
+    const now = new Date();
+    const uSnapTx = await tx.get(usuarioRef);
+    const udx = uSnapTx.data() as Record<string, unknown>;
+    const cEmp = typeof udx?.cajaEmpleado === "number" ? udx.cajaEmpleado : 0;
+    const monto = round2(cEmp);
+    if (monto <= 0) throw new Error("No hay efectivo en tu base para entregar");
+
+    cajaRuta = round2(cajaRuta + monto);
+    cajasEmpleados = round2(Math.max(0, cajasEmpleados - monto));
+    const nuevoCapital = computeCapitalTotalRutaDesdeSaldos({
+      cajaRuta,
+      cajasEmpleados,
+      inversiones,
+      perdidas,
+    });
+
+    montoEntregado = monto;
+
     tx.update(usuarioRef, {
       cajaEmpleado: 0,
       ultimaActualizacionCapital: now,

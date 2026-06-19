@@ -15,7 +15,8 @@ import {
   SOLICITUDES_ENTREGA_REPORTE_SUBCOLLECTION,
 } from "@/lib/empresas-db";
 import {
-  entregarReporteTrabajadorARuta,
+  assertSolicitudEntregaPendienteEnTransaccion,
+  entregarReporteTrabajadorARutaConValidacion,
   getPreviewEntregaReporteTrabajador,
 } from "@/lib/entregar-reporte-empleado-admin";
 import { purgeTransferenciaEvidenciasDelCierre } from "@/lib/cierre-dia-evidencia-purge";
@@ -275,8 +276,6 @@ export async function aprobarSolicitudEntregaReporte(
   const solSnap = await solRef.get();
   if (!solSnap.exists) throw new Error("Solicitud no encontrada");
   const sol = solSnap.data() as Record<string, unknown>;
-  if (sol.estado !== "pendiente") throw new Error("La solicitud ya fue resuelta");
-  if (sol.adminId !== adminUid) throw new Error("No podés confirmar solicitudes de otra administración");
 
   const empleadoUid = typeof sol.empleadoUid === "string" ? sol.empleadoUid : "";
   if (!empleadoUid) throw new Error("Solicitud inválida");
@@ -298,9 +297,19 @@ export async function aprobarSolicitudEntregaReporte(
     typeof sol.montoEntregadoEfectivo === "number" &&
     (sol.montoEntregadoEfectivo as number) > 0;
 
-  const result = legacyTraspasoAnticipado
-    ? { monto: sol.montoEntregadoEfectivo as number, rutaId: rutaIdSol }
-    : await entregarReporteTrabajadorARuta(db, empresaId, empleadoUid);
+  let result: { monto: number; rutaId: string };
+  if (legacyTraspasoAnticipado) {
+    await assertSolicitudEntregaPendienteEnTransaccion(db, solRef, adminUid);
+    result = { monto: sol.montoEntregadoEfectivo as number, rutaId: rutaIdSol };
+  } else {
+    result = await entregarReporteTrabajadorARutaConValidacion(
+      db,
+      empresaId,
+      empleadoUid,
+      solRef,
+      adminUid
+    );
+  }
 
   if (result.monto <= 0) {
     throw new Error("No hubo efectivo que transferir. Es posible que el trabajador ya no tenga saldo.");
