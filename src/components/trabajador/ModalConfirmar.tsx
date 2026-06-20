@@ -15,6 +15,10 @@ type ModalConfirmarProps = {
   labelConfirmacion?: ReactNode;
   /** Deshabilita confirmar aunque el checkbox esté marcado (p. ej. formulario incompleto). */
   confirmarDeshabilitado?: boolean;
+  /** Oculta el botón cancelar (p. ej. modal de éxito). */
+  ocultarCancelar?: boolean;
+  /** Si es false, clic fuera del cuadro no cierra el modal. */
+  cerrarConBackdrop?: boolean;
 };
 
 export function ModalConfirmar({
@@ -28,6 +32,8 @@ export function ModalConfirmar({
   onConfirmacionMarcadaChange,
   labelConfirmacion,
   confirmarDeshabilitado = false,
+  ocultarCancelar = false,
+  cerrarConBackdrop = true,
 }: ModalConfirmarProps) {
   const requiereCheckbox = onConfirmacionMarcadaChange !== undefined;
   const puedeConfirmar =
@@ -35,16 +41,22 @@ export function ModalConfirmar({
   const bodyId = useId();
 
   useEffect(() => {
+    if (!cerrarConBackdrop) return;
     const onEscape = (e: KeyboardEvent) => {
       if (e.key !== "Escape" || confirmando) return;
       onCancelar();
     };
     document.addEventListener("keydown", onEscape);
     return () => document.removeEventListener("keydown", onEscape);
-  }, [confirmando, onCancelar]);
+  }, [cerrarConBackdrop, confirmando, onCancelar]);
 
   const handleCancelar = () => {
     if (confirmando) return;
+    onCancelar();
+  };
+
+  const handleBackdropClick = () => {
+    if (!cerrarConBackdrop || confirmando) return;
     onCancelar();
   };
 
@@ -56,7 +68,7 @@ export function ModalConfirmar({
       aria-labelledby="modal-confirmar-titulo"
       aria-describedby={bodyId}
     >
-      <div className="modal-confirmar-backdrop" onClick={handleCancelar} aria-hidden />
+      <div className="modal-confirmar-backdrop" onClick={handleBackdropClick} aria-hidden />
       <div className="modal-confirmar-box" onClick={(e) => e.stopPropagation()}>
         <h3 className="modal-confirmar-titulo" id="modal-confirmar-titulo">
           {titulo}
@@ -81,14 +93,16 @@ export function ModalConfirmar({
           ) : null}
         </div>
         <div className="modal-confirmar-actions">
-          <button
-            type="button"
-            className="btn btn-secondary"
-            onClick={handleCancelar}
-            disabled={confirmando}
-          >
-            Cancelar
-          </button>
+          {!ocultarCancelar ? (
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={handleCancelar}
+              disabled={confirmando}
+            >
+              Cancelar
+            </button>
+          ) : null}
           <button
             type="button"
             className="btn btn-primary"

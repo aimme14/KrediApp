@@ -21,9 +21,17 @@ function roundMoney(value: number): number {
   return Math.round(value * 100) / 100;
 }
 
+function snapPesoDisplay(value: number): number {
+  const entero = Math.round(value);
+  if (Math.abs(value - entero) <= 0.01) return entero;
+  return roundMoney(value);
+}
+
 /** Ganancias − gastos − pérdidas (mismos campos que las tarjetas del grid). */
 export function computeGananciasNetasRuta(ruta: AdminRutaStatsData): number {
-  return roundMoney((ruta.ganancias ?? 0) - (ruta.gastos ?? 0) - (ruta.perdidas ?? 0));
+  return snapPesoDisplay(
+    roundMoney((ruta.ganancias ?? 0) - (ruta.gastos ?? 0) - (ruta.perdidas ?? 0))
+  );
 }
 
 type AdminRutaStatsGridProps = {
@@ -42,7 +50,7 @@ export function AdminRutaStatsGrid({
   showGananciasNetas,
   saldoPorRecoger,
 }: AdminRutaStatsGridProps) {
-  const g = ruta.ganancias ?? 0;
+  const g = snapPesoDisplay(ruta.ganancias ?? 0);
   const gananciasNetas = showGananciasNetas ? computeGananciasNetasRuta(ruta) : null;
   const gridClass = className
     ? `admin-inicio-ruta-stats ${className}`
@@ -92,20 +100,6 @@ export function AdminRutaStatsGrid({
           <span className="admin-inicio-ruta-stat-label">Total invertido</span>
           <span className="admin-inicio-ruta-stat-value">{formatMoneda(ruta.totalPrestado ?? 0)}</span>
           <span className="admin-inicio-ruta-stat-hint">periodo actual</span>
-        </div>
-      </div>
-      <div className="admin-inicio-ruta-stat">
-        <span className="admin-inicio-ruta-stat-icon admin-inicio-metric-icon--orange" aria-hidden>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <circle cx="12" cy="12" r="10" />
-            <line x1="12" y1="8" x2="12" y2="16" />
-            <line x1="8" y1="12" x2="16" y2="12" />
-          </svg>
-        </span>
-        <div className="admin-inicio-ruta-stat-body">
-          <span className="admin-inicio-ruta-stat-label">Inversiones</span>
-          <span className="admin-inicio-ruta-stat-value">{formatMoneda(ruta.inversiones ?? 0)}</span>
-          <span className="admin-inicio-ruta-stat-hint">acumulado</span>
         </div>
       </div>
       <div className="admin-inicio-ruta-stat">

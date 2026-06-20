@@ -25,10 +25,12 @@ import {
   mensajePrestamosVaciosContable,
   numeroPeriodoAdmin,
   periodoAbiertoAdmin,
+  periodoLabelDePrestamo,
   resolverRangoFiltroContable,
   type PrestamoFiltroContable,
   type PrestamoFiltroEstado,
 } from "@/lib/prestamo-periodo-filter";
+import { isPrestamoEnCobro, labelEstadoPrestamo } from "@/lib/prestamo-estado";
 import { fechaDiaColombiaHoy, formatFechaDia } from "@/lib/colombia-day-bounds";
 import { GastosPeriodoContableFilter } from "@/components/GastosPeriodoContableFilter";
 import {
@@ -68,8 +70,15 @@ function cuotasPagadas(totalAPagar: number, numeroCuotas: number, saldoPendiente
   return Math.min(numeroCuotas, Math.round(pagado / cuotaUnit));
 }
 
-/** Orden de prioridad para mostrar préstamo principal: activo > pagado; luego más reciente primero. */
-const ESTADO_ORDEN: Record<string, number> = { activo: 0, pagado: 1 };
+/** Orden de prioridad para mostrar préstamo principal: activo > pagado/castigado; luego más reciente primero. */
+const ESTADO_ORDEN: Record<string, number> = { activo: 0, pagado: 1, castigado: 1 };
+
+function prestamoEstadoBadgeClass(estado: string): string {
+  if (estado === "activo" || estado === "pagado" || estado === "castigado") {
+    return ` prestamo-admin-estado--${estado}`;
+  }
+  return "";
+}
 
 function ordenarPrestamosParaPrincipal(prestamos: PrestamoItem[]): PrestamoItem[] {
   return [...prestamos].sort((a, b) => {
@@ -114,6 +123,10 @@ export default function PrestamoPage() {
     loadingPagados,
     hayMasPagados,
     cargarMasPagados,
+    prestamosCastigados,
+    loadingCastigados,
+    hayMasCastigados,
+    cargarMasCastigados,
     loading,
     error: listaError,
     refresh,
@@ -195,12 +208,18 @@ export default function PrestamoPage() {
   }, [loadPeriodos]);
 
   useEffect(() => {
-    if (filtroEstado !== "pagado" && filtroEstado !== "todos") {
+    if (filtroEstado !== "pagado" && filtroEstado !== "castigado" && filtroEstado !== "todos") {
       return;
     }
-    if (loadingPagados || !hayMasPagados) return;
-    if (filtroEstado === "pagado" && prestamosPagados.length > 0) return;
-    void cargarMasPagados();
+    if (filtroEstado === "pagado" || filtroEstado === "todos") {
+      if (
+        !loadingPagados &&
+        hayMasPagados &&
+        !(filtroEstado === "pagado" && prestamosPagados.length > 0)
+      ) {
+        void cargarMasPagados();
+      }
+    }
   }, [
     filtroEstado,
     loadingPagados,
@@ -361,7 +380,11 @@ export default function PrestamoPage() {
     const porRuta = (list: PrestamoItem[]) =>
       list.filter((p) => prestamoCoincideRuta(p, filtroRutaId, clientePorId));
 
-    const mergedUnicos = dedupePrestamos([...prestamos, ...prestamosPagados]);
+    const mergedUnicos = dedupePrestamos([
+      ...prestamos,
+      ...prestamosPagados,
+      ...prestamosCastigados,
+    ]);
     const mergedEnPeriodo = filtrarPrestamosPorFiltroContable(
       mergedUnicos,
       filtroContable,
@@ -377,23 +400,36 @@ export default function PrestamoPage() {
       filtroContable,
       periodos
     );
+    const castigadosEnPeriodo = filtrarPrestamosPorFiltroContable(
+      prestamosCastigados,
+      filtroContable,
+      periodos
+    );
 
     return {
       todos: porRuta(mergedEnPeriodo).length,
       activo: porRuta(activosEnPeriodo).length,
       pagado: porRuta(pagadosEnPeriodo).length,
+      castigado: porRuta(castigadosEnPeriodo).length,
       moroso: porRuta(
         activosEnPeriodo.filter((p) =>
           esPrestamoMorosoPendiente(p, clientePorId[p.clienteId]?.moroso)
         )
       ).length,
     };
-  }, [prestamos, prestamosPagados, clientePorId, filtroRutaId, filtroContable, periodos]);
+  }, [
+    prestamos,
+    prestamosPagados,
+    prestamosCastigados,
+    clientePorId,
+    filtroRutaId,
+    filtroContable,
+    periodos,
+  ]);
 
   const formatContadorFiltro = (est: PrestamoFiltroEstado) => {
     const n = contadoresPorFiltro[est];
-    const masPendiente =
-      hayMasPagados && (est === "pagado" || est === "todos");
+    const masPendiente = hayMasPagados && (est === "pagado" || est === "todos");
     return masPendiente ? `${n}+` : String(n);
   };
 
@@ -401,6 +437,7 @@ export default function PrestamoPage() {
     { est: "todos", label: "Todos" },
     { est: "activo", label: "Activos" },
     { est: "pagado", label: "Pagados" },
+    { est: "castigado", label: "Pérdidas" },
     { est: "moroso", label: "Morosos" },
   ];
 
@@ -408,6 +445,7 @@ export default function PrestamoPage() {
 
   const prestamosBase = useMemo(() => {
     if (filtroEstado === "pagado") return prestamosPagados;
+    if (filtroEstado === "castigado") return prestamosCastigados;
     if (filtroEstado === "activo") {
       return prestamos.filter((p) => p.estado === "activo");
     }
@@ -416,8 +454,8 @@ export default function PrestamoPage() {
         esPrestamoMorosoPendiente(p, clientePorId[p.clienteId]?.moroso)
       );
     }
-    return dedupePrestamos([...prestamos, ...prestamosPagados]);
-  }, [prestamos, prestamosPagados, filtroEstado, clientePorId]);
+    return dedupePrestamos([...prestamos, ...prestamosPagados, ...prestamosCastigados]);
+  }, [prestamos, prestamosPagados, prestamosCastigados, filtroEstado, clientePorId]);
 
   const prestamosPorPeriodo = useMemo(
     () => filtrarPrestamosPorFiltroContable(prestamosBase, filtroContable, periodos),
@@ -446,6 +484,14 @@ export default function PrestamoPage() {
     return list;
   }, [prestamosPorPeriodo, filtroRutaId, filtroNombreLower, clientePorId]);
 
+  const resumenPerdidas = useMemo(() => {
+    const castigados = prestamosFiltrados.filter((p) => p.estado === "castigado");
+    return {
+      cantidad: castigados.length,
+      totalPerdido: castigados.reduce((sum, p) => sum + (p.totalCastigado ?? 0), 0),
+    };
+  }, [prestamosFiltrados]);
+
   const totalDesembolsadoPeriodo = useMemo(
     () =>
       Math.round(
@@ -457,10 +503,11 @@ export default function PrestamoPage() {
 
   const PAGE_SIZE = 15;
   const [pagina, setPagina] = useState(1);
+  const [ordenDesc, setOrdenDesc] = useState(true);
 
   useEffect(() => {
     setPagina(1);
-  }, [filtroEstado, filtroContable, filtroNombre, filtroRutaId]);
+  }, [filtroEstado, filtroContable, filtroNombre, filtroRutaId, ordenDesc]);
 
   /** Grupos por cliente: principal = reciente y activo (activo > pagado, luego por fecha). */
   const gruposPorCliente = useMemo((): GrupoClientePrestamos[] => {
@@ -483,10 +530,10 @@ export default function PrestamoPage() {
       if (oa !== ob) return oa - ob;
       const ta = new Date(pa.fechaInicio || 0).getTime();
       const tb = new Date(pb.fechaInicio || 0).getTime();
-      return tb - ta;
+      return ordenDesc ? tb - ta : ta - tb;
     });
     return grupos;
-  }, [prestamosFiltrados]);
+  }, [prestamosFiltrados, ordenDesc]);
 
   const gruposPaginados = useMemo(() => {
     return gruposPorCliente.slice(0, pagina * PAGE_SIZE);
@@ -508,22 +555,30 @@ export default function PrestamoPage() {
     if (!clienteId) return [];
     const ids = new Set<string>();
     const merged: PrestamoItem[] = [];
-    for (const p of [...prestamos, ...prestamosPagados]) {
+    for (const p of [...prestamos, ...prestamosPagados, ...prestamosCastigados]) {
       if (p.clienteId !== clienteId || ids.has(p.id)) continue;
       ids.add(p.id);
       merged.push(p);
     }
     return ordenarPrestamosParaPrincipal(merged);
-  }, [prestamos, prestamosPagados, clienteId]);
+  }, [prestamos, prestamosPagados, prestamosCastigados, clienteId]);
 
   if (!profile || profile.role !== "admin") return null;
+
+  const detalleBannerColocados = (() => {
+    const base = `${prestamosFiltrados.length} préstamo${prestamosFiltrados.length !== 1 ? "s" : ""} · $ ${formatMoneda(totalDesembolsadoPeriodo)} colocados.`;
+    if (filtroEstado === "activo") {
+      return `${base} Solo los desembolsados en este período — préstamos de períodos anteriores aún activos no aparecen aquí.`;
+    }
+    return base;
+  })();
 
   const bannerPeriodo = (() => {
     if (filtroContable.modo === "hoy") {
       const hoy = fechaDiaColombiaHoy();
       return {
         tone: "neutral" as const,
-        titulo: "Desembolsos de hoy",
+        titulo: "Desembolsados hoy",
         detalle: `${formatFechaDia(hoy)} · ${prestamosFiltrados.length} préstamo${prestamosFiltrados.length !== 1 ? "s" : ""} · $ ${formatMoneda(totalDesembolsadoPeriodo)} colocados.`,
       };
     }
@@ -554,14 +609,14 @@ export default function PrestamoPage() {
     if (rangoContable.periodo.estado === "abierto") {
       return {
         tone: "active" as const,
-        titulo: `Periodo #${num ?? "—"} · Abierto`,
-        detalle: `${prestamosFiltrados.length} préstamo${prestamosFiltrados.length !== 1 ? "s" : ""} · $ ${formatMoneda(totalDesembolsadoPeriodo)} colocados.`,
+        titulo: `Período #${num ?? "—"} · Abierto — desembolsados en este corte`,
+        detalle: detalleBannerColocados,
       };
     }
     return {
       tone: "neutral" as const,
-      titulo: `Periodo #${num ?? "—"} · Cerrado`,
-      detalle: `${prestamosFiltrados.length} préstamo${prestamosFiltrados.length !== 1 ? "s" : ""} · $ ${formatMoneda(totalDesembolsadoPeriodo)} colocados.`,
+      titulo: `Período #${num ?? "—"} · Cerrado — desembolsados en este corte`,
+      detalle: detalleBannerColocados,
     };
   })();
 
@@ -703,7 +758,7 @@ export default function PrestamoPage() {
                           <td className="col-num">{formatMoneda(p.monto)}</td>
                           <td className="col-num">{formatMoneda(p.totalAPagar)}</td>
                           <td className="col-num">{formatMoneda(p.saldoPendiente)}</td>
-                          <td>{p.estado}</td>
+                          <td>{labelEstadoPrestamo(p)}</td>
                           <td>{p.modalidad}</td>
                         </tr>
                       ))}
@@ -904,6 +959,23 @@ export default function PrestamoPage() {
                 </svg>
               </span>
             </div>
+            {filtroEstado === "castigado" && (
+              <div className="prestamo-admin-kpi">
+                <div className="prestamo-admin-kpi-body">
+                  <span className="prestamo-admin-kpi-label">Capital perdido</span>
+                  <span className="prestamo-admin-kpi-value" style={{ color: "var(--danger, #dc2626)" }}>
+                    −$ {formatMoneda(resumenPerdidas.totalPerdido)}
+                  </span>
+                </div>
+                <span className="prestamo-admin-kpi-icon" style={{ color: "var(--danger, #dc2626)" }} aria-hidden>
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                    <line x1="12" y1="9" x2="12" y2="13"/>
+                    <line x1="12" y1="17" x2="12.01" y2="17"/>
+                  </svg>
+                </span>
+              </div>
+            )}
             </div>
           </div>
         )}
@@ -924,8 +996,11 @@ export default function PrestamoPage() {
           <p className="prestamo-admin-loading">Cargando…</p>
         ) : prestamos.length === 0 &&
           prestamosPagados.length === 0 &&
+          prestamosCastigados.length === 0 &&
           !loadingPagados &&
+          !loadingCastigados &&
           filtroEstado !== "pagado" &&
+          filtroEstado !== "castigado" &&
           filtroContable.modo === "todo" ? (
           <p className="prestamo-admin-empty">No hay préstamos en el historial.</p>
         ) : (
@@ -991,6 +1066,15 @@ export default function PrestamoPage() {
                     aria-label="Buscar préstamos por nombre de cliente"
                   />
                 </div>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  style={{ fontSize: "0.8125rem", whiteSpace: "nowrap" }}
+                  onClick={() => setOrdenDesc((v) => !v)}
+                  title={ordenDesc ? "Ordenar: más antiguos primero" : "Ordenar: más recientes primero"}
+                >
+                  {ordenDesc ? "↓ Más recientes" : "↑ Más antiguos"}
+                </button>
                 {filtroNombreLower ? (
                   <p className="prestamo-admin-search-hint">
                     {gruposPorCliente.length} cliente{gruposPorCliente.length !== 1 ? "s" : ""} encontrado{gruposPorCliente.length !== 1 ? "s" : ""}
@@ -1012,7 +1096,9 @@ export default function PrestamoPage() {
                   </th>
                   <th className="col-num">Total a pagar</th>
                   <th className="col-num">Saldo</th>
-                  <th className="col-num">Cuotas</th>
+                  <th className="col-num">
+                    {filtroEstado === "castigado" ? "Pérdida" : "Cuotas"}
+                  </th>
                   <th>Estado</th>
                   <th>Frecuencia</th>
                   <th>
@@ -1068,17 +1154,34 @@ export default function PrestamoPage() {
                         </td>
                         <td className="col-num">{formatMoneda(principal.totalAPagar)}</td>
                         <td className="col-num">{formatMoneda(principal.saldoPendiente)}</td>
-                        <td className="col-num" title="Cuotas pagadas / total">{pagadas} / {principal.numeroCuotas}</td>
+                        <td
+                          className="col-num"
+                          title={
+                            principal.estado === "castigado"
+                              ? "Capital en pérdida"
+                              : "Cuotas pagadas / total"
+                          }
+                        >
+                          {principal.estado === "castigado" ? (
+                            <span style={{ color: "var(--danger, #dc2626)", fontWeight: 600 }}>
+                              −$ {formatMoneda(principal.totalCastigado ?? 0)}
+                            </span>
+                          ) : principal.estado === "pagado" ? (
+                            <span style={{ color: "var(--text-muted)", fontSize: "0.875rem" }}>—</span>
+                          ) : (
+                            `${pagadas} / ${principal.numeroCuotas}`
+                          )}
+                        </td>
                         <td>
                           <span
-                            className={`prestamo-admin-estado${principal.estado === "activo" || principal.estado === "pagado" ? ` prestamo-admin-estado--${principal.estado}` : ""}`}
+                            className={`prestamo-admin-estado${prestamoEstadoBadgeClass(principal.estado)}`}
                           >
-                            {principal.estado}
+                            {labelEstadoPrestamo(principal)}
                           </span>
                         </td>
                         <td>{principal.modalidad}</td>
                         <td className="prestamo-admin-cobro-cell">
-                          {principal.estado === "activo" && (
+                          {isPrestamoEnCobro(principal) && (
                             <Link
                               href={`/dashboard/admin/cobrar?clienteId=${grupo.clienteId}&prestamoId=${principal.id}`}
                               className="btn btn-primary prestamo-admin-cobro-btn"
@@ -1095,10 +1198,23 @@ export default function PrestamoPage() {
                             <div className="historial-prestamos-list" style={{ fontSize: "0.8125rem", color: "var(--text-muted)" }}>
                               <span style={{ fontWeight: 600, color: "var(--text)", marginBottom: "0.35rem", display: "block" }}>Otros préstamos</span>
                               <ul>
-                                {otros.map((p) => (
+                                {otros.map((p) => {
+                                  const periodoLabel = periodoLabelDePrestamo(p, periodos);
+                                  return (
                                     <li key={p.id} style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
-                                      {formatMoneda(p.monto)} · {formatFechaCreacionPrestamo(p)} · {p.estado} · {p.numeroCuotas} cuotas
-                                      {p.estado === "activo" && (
+                                      {periodoLabel ? (
+                                        <span style={{ fontSize: "0.75rem", color: "var(--text-muted)", fontWeight: 600 }}>
+                                          {periodoLabel}
+                                        </span>
+                                      ) : null}
+                                      {formatMoneda(p.monto)} · {formatFechaCreacionPrestamo(p)} · {labelEstadoPrestamo(p)}
+                                      {p.estado === "castigado" && (p.totalCastigado ?? 0) > 0 && (
+                                        <span style={{ color: "var(--danger, #dc2626)", fontSize: "0.8125rem", fontWeight: 600 }}>
+                                          · Pérdida: −$ {formatMoneda(p.totalCastigado ?? 0)}
+                                        </span>
+                                      )}
+                                      {p.estado !== "castigado" && ` · ${p.numeroCuotas} cuotas`}
+                                      {isPrestamoEnCobro(p) && (
                                         <Link
                                           href={`/dashboard/admin/cobrar?clienteId=${grupo.clienteId}&prestamoId=${p.id}`}
                                           className="btn btn-primary prestamo-admin-cobro-btn prestamo-admin-cobro-btn--sm"
@@ -1107,7 +1223,8 @@ export default function PrestamoPage() {
                                         </Link>
                                       )}
                                     </li>
-                                  ))}
+                                  );
+                                })}
                               </ul>
                             </div>
                           </td>
@@ -1119,36 +1236,72 @@ export default function PrestamoPage() {
               </tbody>
             </table>
           </div>
-          {hayMas && (
-            <div style={{ textAlign: "center", marginTop: "1rem" }}>
-              <button
-                type="button"
-                className="btn btn-secondary"
-                onClick={() => setPagina((p) => p + 1)}
-              >
-                Ver más préstamos
-              </button>
+          {(hayMas || hayMasPagados || hayMasCastigados) && (
+            <div
+              style={{
+                textAlign: "center",
+                marginTop: "1rem",
+                display: "flex",
+                flexDirection: "column",
+                gap: "0.5rem",
+                alignItems: "center",
+              }}
+            >
+              {hayMas && (
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => setPagina((p) => p + 1)}
+                >
+                  Mostrar {Math.min(PAGE_SIZE, gruposPorCliente.length - gruposPaginados.length)} clientes más
+                </button>
+              )}
+              {(filtroEstado === "pagado" || filtroEstado === "todos") && hayMasPagados && (
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  style={{ fontSize: "0.875rem" }}
+                  onClick={() => void cargarMasPagados()}
+                  disabled={loadingPagados}
+                >
+                  {loadingPagados ? "Cargando..." : "Cargar más préstamos pagados del historial"}
+                </button>
+              )}
+              {(filtroEstado === "castigado" || filtroEstado === "todos") && hayMasCastigados && (
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  style={{ fontSize: "0.875rem" }}
+                  onClick={() => void cargarMasCastigados()}
+                  disabled={loadingCastigados}
+                >
+                  {loadingCastigados ? "Cargando..." : "Cargar más pérdidas del historial"}
+                </button>
+              )}
+              {(hayMasPagados || hayMasCastigados) && (
+                <p style={{ fontSize: "0.75rem", color: "var(--text-muted)", margin: 0 }}>
+                  El historial completo no está cargado aún.
+                </p>
+              )}
             </div>
           )}
-          {(filtroEstado === "pagado" || filtroEstado === "todos") && hayMasPagados ? (
-            <div style={{ textAlign: "center", marginTop: "0.75rem" }}>
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={() => void cargarMasPagados()}
-                disabled={loadingPagados}
-              >
-                {loadingPagados ? "Cargando..." : "Ver más pagados"}
-              </button>
-            </div>
-          ) : null}
           {periodosLoading && prestamosFiltrados.length === 0 ? (
             <p className="prestamo-admin-filtro-vacio">Cargando periodos...</p>
           ) : null}
-          {loadingPagados && prestamosFiltrados.length === 0 ? (
+          {loadingPagados &&
+          prestamosFiltrados.length === 0 &&
+          (filtroEstado === "pagado" || filtroEstado === "todos") ? (
             <p className="prestamo-admin-filtro-vacio">Cargando préstamos pagados...</p>
           ) : null}
-          {prestamosFiltrados.length === 0 && !loadingPagados && !periodosLoading ? (
+          {loadingCastigados &&
+          prestamosFiltrados.length === 0 &&
+          (filtroEstado === "castigado" || filtroEstado === "todos") ? (
+            <p className="prestamo-admin-filtro-vacio">Cargando préstamos en pérdida...</p>
+          ) : null}
+          {prestamosFiltrados.length === 0 &&
+          !loadingPagados &&
+          !loadingCastigados &&
+          !periodosLoading ? (
             <p className="prestamo-admin-filtro-vacio">
               {mensajePrestamosVaciosContable(
                 filtroContable,

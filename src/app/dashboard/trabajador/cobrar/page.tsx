@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useRef, useCallback, Suspense } from "react";
-import { useSearchParams, usePathname } from "next/navigation";
+import { useSearchParams, usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { useTrabajadorLista } from "@/context/TrabajadorListaContext";
@@ -11,6 +11,7 @@ import {
   registrarPago,
   registrarNoPago,
   registrarPerdida,
+  checkCobroIdempotency,
   type ClienteItem,
   type PrestamoItem,
   type PagoItem,
@@ -24,6 +25,8 @@ import {
   interiorDecimalCOPToNumber,
 } from "@/lib/monto-input-es";
 import { ModalConfirmar } from "@/components/trabajador/ModalConfirmar";
+import { labelEstadoPrestamo, normalizeEstadoPrestamo } from "@/lib/prestamo-estado";
+import { round2 } from "@/lib/ruta-financiera-compute";
 
 /** Escala de captura: mínimo 2× para nitidez en móviles; tope para no disparar memoria ni el límite de subida. */
 function getComprobanteCaptureScale(): number {
@@ -140,6 +143,39 @@ const MOTIVOS_PERDIDA: { value: MotivoPerdida; label: string }[] = [
   { value: "otro", label: "Otro" },
 ];
 
+type CobroSnapshot = {
+  key: string;
+  prestamoId: string;
+  monto: number;
+  metodoPago: "efectivo" | "transferencia";
+  clienteId: string;
+};
+
+function getCobroSnapshot(pid: string, uid: string): CobroSnapshot | null {
+  try {
+    const raw = localStorage.getItem(`kredi:cobro:${pid}:${uid}`);
+    return raw ? (JSON.parse(raw) as CobroSnapshot) : null;
+  } catch {
+    return null;
+  }
+}
+
+function setCobroSnapshot(s: CobroSnapshot, uid: string): void {
+  try {
+    localStorage.setItem(`kredi:cobro:${s.prestamoId}:${uid}`, JSON.stringify(s));
+  } catch {
+    /* localStorage no disponible */
+  }
+}
+
+function clearCobroSnapshot(pid: string, uid: string): void {
+  try {
+    localStorage.removeItem(`kredi:cobro:${pid}:${uid}`);
+  } catch {
+    /* localStorage no disponible */
+  }
+}
+
 function CobrarClientePageContent() {
   const { user, profile } = useAuth();
   const {
@@ -152,6 +188,7 @@ function CobrarClientePageContent() {
   const { refresh: refreshCajaDia } = useTrabajadorCajaDia();
   const searchParams = useSearchParams();
   const pathname = usePathname();
+  const router = useRouter();
   const clienteId = searchParams.get("clienteId");
   const prestamoId = searchParams.get("prestamoId");
   const fromAdmin = searchParams.get("from") === "admin" || (pathname ?? "").includes("/admin/");
@@ -188,7 +225,7 @@ function CobrarClientePageContent() {
   const [comprobanteError, setComprobanteError] = useState<string | null>(null);
   const [showShareMenu, setShowShareMenu] = useState(false);
   const shareMenuRef = useRef<HTMLDivElement>(null);
-  const idempotencyKeyRef = useRef<string | null>(null);
+  const [recoveryChecked, setRecoveryChecked] = useState(false);
   /** Snapshot al confirmar cobro (evita perder datos si Firestore quita el préstamo de la lista activa). */
   const cobroConfirmadoRef = useRef<{
     cliente: ClienteItem;
@@ -213,8 +250,8 @@ function CobrarClientePageContent() {
   const [motivoPerdida, setMotivoPerdida] = useState<MotivoPerdida | "">("");
   const [notaPerdida, setNotaPerdida] = useState("");
   const [submittingPerdida, setSubmittingPerdida] = useState(false);
-  const [perdidaRegistrada, setPerdidaRegistrada] = useState(false);
-  const [montoPerdidaRegistrada, setMontoPerdidaRegistrada] = useState(0);
+  const [showModalPerdidaExito, setShowModalPerdidaExito] = useState(false);
+  const [saldoPerdidaRegistrada, setSaldoPerdidaRegistrada] = useState(0);
 
   useEffect(() => {
     if (!user || !clienteId || !prestamoId) {
@@ -295,6 +332,79 @@ function CobrarClientePageContent() {
   }, [profile?.empresaId]);
 
   useEffect(() => {
+    if (!user || !prestamoId || !clienteId || confirmado || loading) {
+      if (!loading) setRecoveryChecked(true);
+      return;
+    }
+    if (!cliente || !prestamo) {
+      if (!loading) setRecoveryChecked(true);
+      return;
+    }
+
+    const snapshot = getCobroSnapshot(prestamoId, user.uid);
+    if (!snapshot?.key || snapshot.prestamoId !== prestamoId) {
+      if (snapshot) clearCobroSnapshot(prestamoId, user.uid);
+      setRecoveryChecked(true);
+      return;
+    }
+
+    let cancelled = false;
+    void (async () => {
+      try {
+        const token = await user.getIdToken();
+        const result = await checkCobroIdempotency(token, prestamoId, snapshot.key);
+        if (cancelled) return;
+
+        if (result.processed && result.payload) {
+          clearCobroSnapshot(prestamoId, user.uid);
+          const montoRecuperado = result.payload.montoAplicado ?? snapshot.monto;
+          cobroConfirmadoRef.current = {
+            cliente,
+            prestamo,
+            montoAplicar: montoRecuperado,
+          };
+          setNuevoSaldoPendiente(result.payload.saldoPendiente);
+          setPrestamo((p) =>
+            p
+              ? {
+                  ...p,
+                  saldoPendiente: result.payload!.saldoPendiente,
+                  estado: normalizeEstadoPrestamo(result.payload!.estado),
+                }
+              : p
+          );
+          setConfirmado(true);
+          void refreshLista();
+          void refreshCajaDia();
+        } else if (result.failed) {
+          clearCobroSnapshot(prestamoId, user.uid);
+          setError(result.error ?? "El cobro anterior falló. Intenta de nuevo.");
+        } else if (result.processing) {
+          setError("Hay un cobro en proceso. Puedes reintentar sin duplicar.");
+        }
+      } catch {
+        /* Error de red — mantener snapshot para reintento */
+      } finally {
+        if (!cancelled) setRecoveryChecked(true);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    user,
+    prestamoId,
+    clienteId,
+    confirmado,
+    loading,
+    cliente,
+    prestamo,
+    refreshLista,
+    refreshCajaDia,
+  ]);
+
+  useEffect(() => {
     if (!showCamera) return;
     setCameraError(null);
     const video = videoRef.current;
@@ -326,6 +436,27 @@ function CobrarClientePageContent() {
       ? Math.min(numeroCuotas, Math.ceil((saldoPendiente / totalAPagar) * numeroCuotas))
       : numeroCuotas;
   const valorCuotaFija = numeroCuotas > 0 ? totalAPagar / numeroCuotas : 0;
+
+  const desglosePerdida = useMemo(() => {
+    if (!prestamo) return null;
+    const capitalPrestado = prestamo.monto ?? 0;
+    const total = prestamo.totalAPagar ?? 0;
+    const saldo = prestamo.saldoPendiente ?? 0;
+    if (saldo <= 0 || total <= 0) return null;
+
+    const cobradoAcumulado = round2(total - saldo);
+    const capitalNoRecuperado =
+      cobradoAcumulado < capitalPrestado
+        ? round2(capitalPrestado - cobradoAcumulado)
+        : 0;
+
+    return {
+      saldoPendiente: saldo,
+      capitalNoRecuperado,
+      interesNoCobradoEnSaldo: round2(saldo - capitalNoRecuperado),
+      capitalRecuperado: cobradoAcumulado >= capitalPrestado,
+    };
+  }, [prestamo]);
 
   const evidenciaRequerida = metodoPago === "transferencia";
   const puedeConfirmar = montoNum > 0 && metodoPago;
@@ -480,7 +611,7 @@ function CobrarClientePageContent() {
   };
 
   const handleEjecutarCobro = async () => {
-    if (!user || !prestamo || !puedeConfirmar || !profile) return;
+    if (!user || !prestamo || !puedeConfirmar || !profile || !prestamoId) return;
     const prestamoAlCobrar = prestamo;
     const clienteAlCobrar = clienteCobro;
     if (!clienteAlCobrar) {
@@ -488,12 +619,33 @@ function CobrarClientePageContent() {
       setShowModalCobro(false);
       return;
     }
+    if (evidenciaRequerida && !evidenciaFile) {
+      setError("Transferencia: debes adjuntar 1 foto de evidencia.");
+      setShowModalCobro(false);
+      return;
+    }
     const montoAplicarCobro = montoAplicar;
+
+    const idempotencyKey = (() => {
+      const existing = getCobroSnapshot(prestamoId, user.uid);
+      if (existing?.prestamoId === prestamoId) return existing.key;
+      return crypto.randomUUID();
+    })();
+
+    setCobroSnapshot(
+      {
+        key: idempotencyKey,
+        prestamoId,
+        monto: montoAplicarCobro,
+        metodoPago,
+        clienteId: clienteId ?? prestamoAlCobrar.clienteId,
+      },
+      user.uid
+    );
+
     setError(null);
     setSubmitting(true);
     setSubmitStatus(null);
-    const idempotencyKey = idempotencyKeyRef.current ?? crypto.randomUUID();
-    idempotencyKeyRef.current = idempotencyKey;
     try {
       const url =
         evidenciaFile
@@ -514,10 +666,11 @@ function CobrarClientePageContent() {
         registradoPorNombre: nombreRegistro || undefined,
         idempotencyKey,
       });
+      clearCobroSnapshot(prestamoId, user.uid);
       const prestamoActualizado: PrestamoItem = {
         ...prestamoAlCobrar,
         saldoPendiente: res.saldoPendiente,
-        estado: res.saldoPendiente <= 0 ? "pagado" : prestamoAlCobrar.estado,
+        estado: res.estado,
       };
       cobroConfirmadoRef.current = {
         cliente: clienteAlCobrar,
@@ -542,7 +695,17 @@ function CobrarClientePageContent() {
       await refreshLista();
       void refreshCajaDia();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Error al registrar cobro");
+      const msg = e instanceof Error ? e.message : "";
+      if (
+        msg.includes("fetch") ||
+        msg.includes("network") ||
+        msg.includes("NetworkError") ||
+        msg.includes("Failed to fetch")
+      ) {
+        setError("Sin conexión. Puedes reintentar — tu cobro no se duplicará.");
+      } else {
+        setError(msg || "Error al registrar cobro");
+      }
     } finally {
       setSubmitting(false);
       setSubmitStatus(null);
@@ -581,7 +744,7 @@ function CobrarClientePageContent() {
 
   const handleEjecutarPerdida = async () => {
     if (!motivoPerdida || !user || !prestamoId || !profile || !prestamo) return;
-    const montoPerdida = prestamo.saldoPendiente;
+    const montoPerdida = prestamo.saldoPendiente ?? 0;
     if (montoPerdida <= 0) {
       setError("No hay saldo pendiente para registrar la pérdida");
       return;
@@ -591,7 +754,7 @@ function CobrarClientePageContent() {
     try {
       const token = await user.getIdToken();
       const nombreRegistro = profile.displayName ?? profile.email ?? "";
-      const res = await registrarPerdida(token, prestamoId, {
+      await registrarPerdida(token, prestamoId, {
         monto: montoPerdida,
         motivoPerdida,
         nota: notaPerdida.trim() || undefined,
@@ -599,12 +762,13 @@ function CobrarClientePageContent() {
         registradoPorNombre: nombreRegistro || undefined,
       });
       setShowModalPerdida(false);
-      setMontoPerdidaRegistrada(montoPerdida);
-      setPerdidaRegistrada(true);
+      setSaldoPerdidaRegistrada(montoPerdida);
+      setShowModalPerdidaExito(true);
       setPrestamo({
         ...prestamo,
-        saldoPendiente: res.saldoPendiente,
-        estado: res.saldoPendiente <= 0 ? "pagado" : prestamo.estado,
+        saldoPendiente: 0,
+        estado: "castigado",
+        totalCastigado: (prestamo.totalCastigado ?? 0) + montoPerdida,
       });
       await refreshLista();
     } catch (e) {
@@ -622,6 +786,14 @@ function CobrarClientePageContent() {
     return (
       <div className="card">
         <p>Faltan cliente o préstamo. <Link href={backHref}>{backLabel}</Link></p>
+      </div>
+    );
+  }
+
+  if (!recoveryChecked) {
+    return (
+      <div className="card">
+        <p>Verificando estado del cobro...</p>
       </div>
     );
   }
@@ -883,19 +1055,6 @@ function CobrarClientePageContent() {
     );
   }
 
-  if (perdidaRegistrada) {
-    return (
-      <div className="card cobrar-card cobrar-confirmacion">
-        <h2 className="cobrar-title">Pérdida registrada</h2>
-        <p>
-          Se registró la pérdida del préstamo de <strong>{cliente.nombre}</strong> por{" "}
-          {formatCurrency(montoPerdidaRegistrada)}.
-        </p>
-        <Link href={backHref} className="btn btn-primary">{backLabel}</Link>
-      </div>
-    );
-  }
-
   if (showNoPago) {
     const motivoNoPagoLabel =
       MOTIVOS_NO_PAGO.find((m) => m.value === motivoNoPago)?.label ?? motivoNoPago;
@@ -1006,7 +1165,7 @@ function CobrarClientePageContent() {
         </div>
         <h2 className="cobrar-title">{cliente.nombre}</h2>
         <p className="cobrar-subtitle">
-          Saldo pendiente · {prestamo.modalidad} · Estado: {prestamo.estado}
+          Saldo pendiente · {prestamo.modalidad} · Estado: {labelEstadoPrestamo(prestamo)}
         </p>
       </div>
 
@@ -1278,7 +1437,9 @@ function CobrarClientePageContent() {
           titulo="Registrar pérdida"
           labelConfirmar="Sí, registrar pérdida"
           confirmando={submittingPerdida}
-          confirmarDeshabilitado={!motivoPerdida}
+          confirmarDeshabilitado={
+            !motivoPerdida || (prestamo?.saldoPendiente ?? 0) <= 0
+          }
           onCancelar={() => {
             if (submittingPerdida) return;
             setShowModalPerdida(false);
@@ -1288,9 +1449,45 @@ function CobrarClientePageContent() {
           <p>
             ¿Confirmas registrar la pérdida del préstamo de <strong>{cliente.nombre}</strong>?
           </p>
-          <p>
-            Saldo pendiente: <strong>{formatCurrency(prestamo.saldoPendiente)}</strong>
-          </p>
+          {desglosePerdida ? (
+            <>
+              <p style={{ fontSize: "0.9375rem", marginTop: "0.5rem" }}>
+                Saldo pendiente:{" "}
+                <strong>{formatCurrency(desglosePerdida.saldoPendiente)}</strong>
+              </p>
+              <div
+                style={{
+                  background: "var(--bg)",
+                  borderRadius: "var(--radius)",
+                  padding: "0.75rem",
+                  fontSize: "0.875rem",
+                  marginTop: "0.5rem",
+                }}
+              >
+                <p style={{ margin: "0 0 0.35rem", color: "var(--text-muted)" }}>
+                  Impacto real en la ruta:
+                </p>
+                {desglosePerdida.capitalNoRecuperado > 0 ? (
+                  <>
+                    <p style={{ margin: "0 0 0.25rem" }}>
+                      Capital a descontar de inversiones:{" "}
+                      <strong style={{ color: "var(--danger, #dc2626)" }}>
+                        {formatCurrency(desglosePerdida.capitalNoRecuperado)}
+                      </strong>
+                    </p>
+                    <p style={{ margin: 0, color: "var(--text-muted)", fontSize: "0.8rem" }}>
+                      Los {formatCurrency(desglosePerdida.interesNoCobradoEnSaldo)} restantes
+                      corresponden a interés no cobrado — no impactan inversiones.
+                    </p>
+                  </>
+                ) : (
+                  <p style={{ margin: 0 }}>
+                    Capital ya recuperado completo — solo se ajustan ganancias.
+                  </p>
+                )}
+              </div>
+            </>
+          ) : null}
           <div className="form-group" style={{ marginTop: "0.75rem" }}>
             <label htmlFor="cobrar-motivo-perdida">Motivo</label>
             <select
@@ -1318,6 +1515,26 @@ function CobrarClientePageContent() {
               disabled={submittingPerdida}
             />
           </div>
+          {error && <p className="error-msg">{error}</p>}
+        </ModalConfirmar>
+      )}
+
+      {showModalPerdidaExito && (
+        <ModalConfirmar
+          titulo="Pérdida registrada"
+          labelConfirmar={backLabel}
+          ocultarCancelar
+          cerrarConBackdrop={false}
+          onCancelar={() => {}}
+          onConfirmar={() => router.push(backHref)}
+        >
+          <p>
+            La pérdida de <strong>{cliente.nombre}</strong> fue registrada por{" "}
+            <strong>{formatCurrency(saldoPerdidaRegistrada)}</strong>.
+          </p>
+          <p style={{ fontSize: "0.875rem", color: "var(--text-muted)", lineHeight: 1.5 }}>
+            Se recomienda marcar al cliente como moroso para no volverle a prestar.
+          </p>
         </ModalConfirmar>
       )}
     </div>

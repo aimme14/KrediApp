@@ -73,4 +73,10 @@ describe("prestamo-periodo-filter", () => {
       mensajePrestamosVaciosContable({ modo: "hoy" }, periodos, "todos", false, false)
     ).toBe("No hay préstamos desembolsados hoy.");
   });
+
+  it("mensaje vacío para pérdidas", () => {
+    expect(
+      mensajePrestamosVaciosContable({ modo: "todo" }, periodos, "castigado", false, false)
+    ).toBe("No hay préstamos en pérdida con los filtros actuales.");
+  });
 });

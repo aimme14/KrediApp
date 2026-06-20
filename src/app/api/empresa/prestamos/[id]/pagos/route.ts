@@ -16,6 +16,8 @@ import {
   computeRutaCamposTrasCobroPrestamoCobroEnEmpleado,
   computeRutaCamposTrasPerdidaPrestamo,
   splitMontoPagoEnCapitalYGanancia,
+  round2,
+  snapPesoCOP,
 } from "@/lib/ruta-financiera-admin";
 import { upsertCapitalRutaSnapshot } from "@/lib/capital-ruta-snapshot";
 import { recordCreditMovement } from "@/lib/financial-ledger";
@@ -23,6 +25,11 @@ import {
   startIdempotentOperation,
   finishIdempotentOperation,
 } from "@/lib/financial-idempotency";
+import {
+  estadoTrasNoPago,
+  resolverEstadoTrasMovimiento,
+} from "@/lib/prestamo-estado";
+import type { EstadoPrestamo } from "@/types/firestore";
 
 const MOTIVOS_NO_PAGO = ["sin_fondos", "no_estaba", "promesa_pago", "otro"] as const;
 const MOTIVOS_PERDIDA = [
@@ -301,7 +308,7 @@ export async function POST(
         const prevFallos =
           typeof pr.intentosFallidos === "number" ? pr.intentosFallidos : 0;
         const intentosFallidos = prevFallos + 1;
-        const estadoPrestamo = pr.estado === "pagado" ? "pagado" : "activo";
+        const estadoPrestamo = estadoTrasNoPago(pr.estado);
 
         tx.update(prestamoRef, {
           intentosFallidos,
@@ -357,26 +364,18 @@ export async function POST(
         }
         const d = prestamoSnap.data()!;
 
-        const saldoPendiente = (d.saldoPendiente as number) ?? 0;
-        const montoAplicar = Math.min(rawMonto, saldoPendiente);
-        if (montoAplicar <= 0) {
+        const saldoPendiente = round2((d.saldoPendiente as number) ?? 0);
+        if (saldoPendiente <= 0) {
           throw new Error("SIN_SALDO_APLICABLE");
         }
-        const nuevoSaldo = Math.round((saldoPendiente - montoAplicar) * 100) / 100;
-
         const totalAPagar = (d.totalAPagar as number) ?? 0;
-        const numeroCuotas = (d.numeroCuotas as number) ?? 0;
-        const valorCuota = numeroCuotas > 0 ? totalAPagar / numeroCuotas : 0;
-        const adelantoActual = (d.adelantoCuota as number) ?? 0;
-        const totalDisponible = montoAplicar + adelantoActual;
-        const cuotasCubiertas = valorCuota > 0 ? Math.floor(totalDisponible / valorCuota) : 0;
-        const adelantoNuevo =
-          valorCuota > 0
-            ? Math.round((totalDisponible - cuotasCubiertas * valorCuota) * 100) / 100
-            : 0;
-        const adelantoParaGuardar = nuevoSaldo <= 0 ? 0 : adelantoNuevo;
-
         const montoPrestamo = (d.monto as number) ?? 0;
+
+        const montoAplicar = saldoPendiente;
+        const nuevoSaldo = 0;
+        const adelantoParaGuardar = 0;
+        const cobradoAcumulado = round2(totalAPagar - saldoPendiente);
+
         const rutaIdPrestamo = typeof d.rutaId === "string" ? d.rutaId.trim() : "";
 
         const rutaRef =
@@ -398,8 +397,20 @@ export async function POST(
         }
 
         const nowTx = new Date();
-        const { capital: parteCapital, ganancia: parteGanancia } =
-          splitMontoPagoEnCapitalYGanancia(montoAplicar, montoPrestamo, totalAPagar);
+        const gananciaTotal = round2(totalAPagar - montoPrestamo);
+        const gananciaAcumulada = round2(cobradoAcumulado * (gananciaTotal / totalAPagar));
+        const capitalNoRecuperado =
+          cobradoAcumulado < montoPrestamo
+            ? round2(montoPrestamo - cobradoAcumulado)
+            : 0;
+
+        const parteCapitalPerdida = Math.min(
+          round2(capitalNoRecuperado + gananciaAcumulada),
+          typeof rutaSnap?.data()?.inversiones === "number"
+            ? (rutaSnap.data()!.inversiones as number)
+            : 0
+        );
+        const parteGananciaPerdida = gananciaAcumulada;
 
         const pagoRef = prestamoRef.collection(PAGOS_SUBCOLLECTION).doc();
         tx.set(pagoRef, {
@@ -411,41 +422,53 @@ export async function POST(
           nota: (nota ?? "").trim() || null,
           registradoPorUid: uidRegistro,
           registradoPorNombre: nombreRegistro,
-          parteCapitalPerdida: parteCapital,
-          parteGananciaPerdida: parteGanancia,
+          parteCapitalPerdida,
+          parteGananciaPerdida,
+          cobradoAcumulado,
           ...pagoCamposNotifAdmin(apiUser, d as Record<string, unknown>),
+        });
+
+        const resolucionPerdida = resolverEstadoTrasMovimiento({
+          tipo: "perdida",
+          nuevoSaldo,
         });
 
         tx.update(prestamoRef, {
           saldoPendiente: nuevoSaldo,
-          estado: nuevoSaldo <= 0 ? "pagado" : d.estado,
+          estado: resolucionPerdida.estado,
           updatedAt: nowTx,
           adelantoCuota: adelantoParaGuardar,
+          totalCastigado: FieldValue.increment(capitalNoRecuperado),
+          ...(resolucionPerdida.cierraPrestamo
+            ? { fechaCierre: nowTx, cerradoPor: resolucionPerdida.cerradoPor }
+            : {}),
         });
 
         if (rutaRef && rutaSnap?.exists) {
           const rutaUpd = computeRutaCamposTrasPerdidaPrestamo(
             rutaSnap.data() as Record<string, unknown>,
-            montoAplicar,
+            saldoPendiente,
             montoPrestamo,
-            totalAPagar
+            totalAPagar,
+            cobradoAcumulado
           );
           tx.update(rutaRef, {
-            ...rutaUpd,
+            inversiones: rutaUpd.inversiones,
+            ganancias: rutaUpd.ganancias,
+            perdidas: rutaUpd.perdidas,
+            capitalTotal: rutaUpd.capitalTotal,
             ultimaActualizacion: nowTx,
           });
         }
 
-        if (nuevoSaldo <= 0) {
-          const clienteId = d.clienteId as string;
-          if (clienteId?.trim()) {
-            const clienteRef = db
-              .collection(EMPRESAS_COLLECTION)
-              .doc(apiUser.empresaId)
-              .collection(CLIENTES_SUBCOLLECTION)
-              .doc(clienteId.trim());
-            tx.update(clienteRef, { prestamo_activo: false });
-          }
+        const clienteId = d.clienteId as string;
+        if (clienteId?.trim()) {
+          const clienteRef = db
+            .collection(EMPRESAS_COLLECTION)
+            .doc(apiUser.empresaId)
+            .collection(CLIENTES_SUBCOLLECTION)
+            .doc(clienteId.trim());
+          tx.update(clienteRef, { prestamo_activo: false });
         }
 
         return {
@@ -454,6 +477,7 @@ export async function POST(
           rutaId: rutaIdPrestamo || null,
           pagoId: pagoRef.id,
           montoAplicar,
+          estado: resolucionPerdida.estado,
         };
       });
 
@@ -506,6 +530,7 @@ export async function POST(
         tipo: "perdida",
         saldoPendiente: result.saldoPendiente,
         adelantoCuota: result.adelantoCuota,
+        estado: result.estado,
       });
     } catch (e) {
       const msg = e instanceof Error ? e.message : "";
@@ -517,9 +542,6 @@ export async function POST(
       }
       if (msg === "RUTA_NOT_FOUND") {
         return finalize(400, { error: "Ruta del préstamo no encontrada" });
-      }
-      if (msg.includes("Capital de ruta descuadrado")) {
-        return finalize(400, { error: msg });
       }
       return finalize(400, { error: msg || "No se pudo registrar la pérdida" });
     }
@@ -576,8 +598,14 @@ export async function POST(
       const rutaIdPrestamo = typeof d.rutaId === "string" ? d.rutaId.trim() : "";
 
       const nowTx = new Date();
+      const cobradoAcumuladoAntes = round2(totalAPagar - saldoPendiente);
       const { capital: parteCapital, ganancia: parteGanancia } =
-        splitMontoPagoEnCapitalYGanancia(montoAplicar, montoPrestamo, totalAPagar);
+        splitMontoPagoEnCapitalYGanancia(
+          montoAplicar,
+          montoPrestamo,
+          totalAPagar,
+          cobradoAcumuladoAntes
+        );
 
       const pagoRef = prestamoRef.collection(PAGOS_SUBCOLLECTION).doc();
       const pagoData: Record<string, unknown> = {
@@ -637,13 +665,21 @@ export async function POST(
 
       tx.set(pagoRef, pagoData);
 
+      const resolucionPago = resolverEstadoTrasMovimiento({
+        tipo: "pago",
+        nuevoSaldo,
+      });
+
       tx.update(prestamoRef, {
         saldoPendiente: nuevoSaldo,
-        estado: nuevoSaldo <= 0 ? "pagado" : "activo",
+        estado: resolucionPago.estado,
         updatedAt: nowTx,
         adelantoCuota: adelantoParaGuardar,
         ultimoPagoFecha: FieldValue.serverTimestamp(),
         intentosFallidos: 0,
+        ...(resolucionPago.cierraPrestamo
+          ? { fechaCierre: nowTx, cerradoPor: resolucionPago.cerradoPor }
+          : {}),
       });
 
       if (rutaRef && rutaSnap?.exists) {
@@ -657,7 +693,7 @@ export async function POST(
 
           const capitalDescontar = Math.min(parteCapital, inversiones);
           inversiones = Math.round((inversiones - capitalDescontar) * 100) / 100;
-          ganancias = Math.round((ganancias + parteGanancia) * 100) / 100;
+          ganancias = snapPesoCOP(Math.round((ganancias + parteGanancia) * 100) / 100);
           const nuevaCajaRuta = Math.round((cajaRuta + montoAplicar) * 100) / 100;
           const nuevoCapital = Math.round((nuevaCajaRuta + cajasEmpleados + inversiones) * 100) / 100;
 
@@ -673,7 +709,8 @@ export async function POST(
             rutaSnap.data() as Record<string, unknown>,
             montoAplicar,
             montoPrestamo,
-            totalAPagar
+            totalAPagar,
+            cobradoAcumuladoAntes
           );
           const { montoAcreditarCajaEmpleado, ...rutaCampos } = rutaUpd;
           tx.update(rutaRef, {
@@ -716,6 +753,7 @@ export async function POST(
         cuotaGanancia: parteGanancia,
         walletBalanceAfter,
         montoAplicado: montoAplicar,
+        estado: resolucionPago.estado as EstadoPrestamo,
       };
     });
 
@@ -856,6 +894,8 @@ export async function POST(
       saldoPendiente: result.saldoPendiente,
       adelantoCuota: result.adelantoCuota,
       pagoId: result.pagoId,
+      estado: result.estado,
+      montoAplicado: result.montoAplicado,
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "";
