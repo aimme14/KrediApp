@@ -565,7 +565,21 @@ export default function GastosTrabajadorPage() {
                     <td className="gastos-col-fecha">{formatoFechaGastoColombia(g.fecha ?? null)}</td>
                     <td className="gastos-col-tipo">{tipoLabel(g.tipo ?? "")}</td>
                     <td className="gastos-col-monto">{formatMoneda(g.monto ?? 0)}</td>
-                    <td className="gastos-col-evidencia">{g.evidencia ? <a href={g.evidencia} target="_blank" rel="noopener noreferrer" aria-label="Ver comprobante del gasto">Ver comprobante</a> : "—"}</td>
+                    <td className="gastos-col-evidencia">
+                      {g.evidencia ? (
+                        <a
+                          href={g.evidencia}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="gastos-ver-motivo-btn"
+                          aria-label="Ver comprobante del gasto"
+                        >
+                          Ver comprobante
+                        </a>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
                     <td>
                       {g.descripcion ? (
                         <button

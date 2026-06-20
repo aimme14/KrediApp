@@ -924,7 +924,13 @@ export default function GastosPage() {
                     <td className="gastos-col-monto">{formatMoneda(g.monto ?? 0)}</td>
                     <td className="gastos-col-evidencia">
                       {g.evidencia ? (
-                        <a href={g.evidencia} target="_blank" rel="noopener noreferrer" aria-label="Ver comprobante del gasto">
+                        <a
+                          href={g.evidencia}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="gastos-ver-motivo-btn gastos-admin-ver-motivo-btn"
+                          aria-label="Ver comprobante del gasto"
+                        >
                           Ver comprobante
                         </a>
                       ) : (
@@ -1010,7 +1016,12 @@ export default function GastosPage() {
                 <dt>Evidencia</dt>
                 <dd>
                   {gastoDetalle.evidencia ? (
-                    <a href={gastoDetalle.evidencia} target="_blank" rel="noopener noreferrer">
+                    <a
+                      href={gastoDetalle.evidencia}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="gastos-ver-motivo-btn gastos-admin-ver-motivo-btn"
+                    >
                       Ver comprobante
                     </a>
                   ) : (

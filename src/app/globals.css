@@ -1634,6 +1634,7 @@ td {
   cursor: pointer;
   transition: background 0.15s, border-color 0.15s;
   white-space: nowrap;
+  text-decoration: none;
 }
 .gastos-ver-motivo-btn:hover {
   background: var(--btn-secondary-hover);
