@@ -276,9 +276,6 @@ export default function SolicitudesPrestamoAdminPage() {
           <p>
             Cuota: <strong>$ {formatMonto(cuotaModal)}</strong>
           </p>
-          <p style={{ color: "var(--warning, #eab308)" }}>
-            Se creará el préstamo y se descontará el monto de la caja de la ruta.
-          </p>
         </ModalConfirmar>
       )}
     </div>
