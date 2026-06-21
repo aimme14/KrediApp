@@ -25,6 +25,7 @@ import {
   type SolicitudEntregaPendienteAdmin,
   type CobrosDelDiaEmpleadoResponse,
 } from "@/lib/empresa-api";
+import { ModalConfirmar } from "@/components/trabajador/ModalConfirmar";
 
 function normalizarMetodoPago(metodo: string | null | undefined): "efectivo" | "transferencia" | "otro" {
   const m = (metodo ?? "").trim().toLowerCase();
@@ -171,6 +172,9 @@ export default function ReportesDiaPage() {
     ruta: string;
     texto: string | null;
   } | null>(null);
+  const [pendingSolicitudAprobar, setPendingSolicitudAprobar] =
+    useState<SolicitudEntregaPendienteAdmin | null>(null);
+  const [confirmarRecepcionMarcada, setConfirmarRecepcionMarcada] = useState(false);
 
   useEffect(() => {
     if (!db || !user || !profile?.empresaId) return;
@@ -349,6 +353,22 @@ export default function ReportesDiaPage() {
     }
   };
 
+  const handleAprobarSolicitud = async (solicitud: SolicitudEntregaPendienteAdmin) => {
+    if (!user) return;
+    setAccionId(solicitud.id);
+    setError(null);
+    try {
+      const token = await user.getIdToken();
+      await aprobarSolicitudEntregaReporte(token, solicitud.id);
+      setPendingSolicitudAprobar(null);
+      setConfirmarRecepcionMarcada(false);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Error al aprobar");
+    } finally {
+      setAccionId(null);
+    }
+  };
+
   if (!profile || profile.role !== "admin") return null;
 
   return (
@@ -394,22 +414,13 @@ export default function ReportesDiaPage() {
                   <button
                     type="button"
                     className="btn btn-primary"
-                    disabled={accionId !== null}
-                    onClick={async () => {
-                      if (!user) return;
-                      setAccionId(s.id);
-                      setError(null);
-                      try {
-                        const token = await user.getIdToken();
-                        await aprobarSolicitudEntregaReporte(token, s.id);
-                      } catch (e) {
-                        setError(e instanceof Error ? e.message : "Error al aprobar");
-                      } finally {
-                        setAccionId(null);
-                      }
+                    disabled={accionId !== null || pendingSolicitudAprobar !== null}
+                    onClick={() => {
+                      setConfirmarRecepcionMarcada(false);
+                      setPendingSolicitudAprobar(s);
                     }}
                   >
-                    {accionId === s.id ? "Procesando…" : "Confirmar recepción (OK)"}
+                    Confirmar recepción (OK)
                   </button>
                   <button
                     type="button"
@@ -1098,6 +1109,45 @@ export default function ReportesDiaPage() {
             </table>
           </div>
         </>
+      )}
+
+      {pendingSolicitudAprobar && (
+        <ModalConfirmar
+          titulo="Confirmar recepción del reporte"
+          labelConfirmar="Sí, aceptar reporte"
+          confirmando={accionId === pendingSolicitudAprobar.id}
+          confirmacionMarcada={confirmarRecepcionMarcada}
+          onConfirmacionMarcadaChange={setConfirmarRecepcionMarcada}
+          labelConfirmacion={
+            <>
+              Confirmo que revisé el cierre del día y acepto la recepción de{" "}
+              <strong>{formatMonto(pendingSolicitudAprobar.montoAlSolicitar)}</strong>
+            </>
+          }
+          onCancelar={() => {
+            if (accionId === pendingSolicitudAprobar.id) return;
+            setPendingSolicitudAprobar(null);
+            setConfirmarRecepcionMarcada(false);
+          }}
+          onConfirmar={() => {
+            void handleAprobarSolicitud(pendingSolicitudAprobar);
+          }}
+        >
+          <p>
+            <strong>{pendingSolicitudAprobar.empleadoNombre}</strong> te entrega el reporte diario
+            de la ruta <strong>{pendingSolicitudAprobar.rutaNombre || "—"}</strong>.
+          </p>
+          <p>
+            Efectivo a recibir:{" "}
+            <strong>{formatMonto(pendingSolicitudAprobar.montoAlSolicitar)}</strong>
+          </p>
+          {pendingSolicitudAprobar.comentarioTrabajador ? (
+            <p>
+              Comentario del trabajador:{" "}
+              <em>{pendingSolicitudAprobar.comentarioTrabajador}</em>
+            </p>
+          ) : null}
+        </ModalConfirmar>
       )}
     </div>
   );
