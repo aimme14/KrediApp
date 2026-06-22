@@ -8,6 +8,7 @@ import {
   setClienteMoroso,
   type ClienteItem,
 } from "@/lib/empresa-api";
+import { guardOfflineWrite, useOnline } from "@/hooks/useOnline";
 
 function codigoSinCL(codigo: string | undefined): string {
   return formatClienteCodigoRutaYNumero(codigo).replace(/^CL-/i, "");
@@ -15,6 +16,7 @@ function codigoSinCL(codigo: string | undefined): string {
 
 export default function ClienteMorosoPage() {
   const { user, profile } = useAuth();
+  const online = useOnline();
   const [clientes, setClientes] = useState<ClienteItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -35,6 +37,7 @@ export default function ClienteMorosoPage() {
   }, [loadClientes]);
 
   const handleToggleMoroso = async (c: ClienteItem) => {
+    if (!guardOfflineWrite(online, setError)) return;
     if (!user) return;
     setError(null);
     setTogglingId(c.id);
@@ -157,7 +160,7 @@ export default function ClienteMorosoPage() {
                             type="button"
                             className="btn btn-success"
                             onClick={() => handleToggleMoroso(c)}
-                            disabled={togglingId === c.id}
+                            disabled={togglingId === c.id || !online}
                           >
                             {togglingId === c.id ? (
                               "..."
@@ -211,7 +214,7 @@ export default function ClienteMorosoPage() {
                             type="button"
                             className="btn btn-danger"
                             onClick={() => handleToggleMoroso(c)}
-                            disabled={togglingId === c.id}
+                            disabled={togglingId === c.id || !online}
                           >
                             {togglingId === c.id ? (
                               "..."

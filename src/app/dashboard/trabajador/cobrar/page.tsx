@@ -26,8 +26,13 @@ import {
   interiorDecimalCOPToNumber,
 } from "@/lib/monto-input-es";
 import { ModalConfirmar } from "@/components/trabajador/ModalConfirmar";
+import { OFFLINE_MSG, useOnline } from "@/hooks/useOnline";
 import { labelEstadoPrestamo, normalizeEstadoPrestamo } from "@/lib/prestamo-estado";
 import { round2 } from "@/lib/ruta-financiera-compute";
+import {
+  fechaDiaCalendarioDesdeISO,
+  fechaDiaColombiaHoy,
+} from "@/lib/colombia-day-bounds";
 
 /** Escala de captura: mínimo 2× para nitidez en móviles; tope para no disparar memoria ni el límite de subida. */
 function getComprobanteCaptureScale(): number {
@@ -187,6 +192,7 @@ function CobrarClientePageContent() {
     refresh: refreshLista,
   } = useTrabajadorLista();
   const { refresh: refreshCajaDia } = useTrabajadorCajaDia();
+  const online = useOnline();
   const searchParams = useSearchParams();
   const pathname = usePathname();
   const router = useRouter();
@@ -216,6 +222,7 @@ function CobrarClientePageContent() {
   /** Texto auxiliar durante envío (subidas en paralelo + API). */
   const [submitStatus, setSubmitStatus] = useState<string | null>(null);
   const [showModalCobro, setShowModalCobro] = useState(false);
+  const [showModalYaPagoHoy, setShowModalYaPagoHoy] = useState(false);
   const [confirmado, setConfirmado] = useState(false);
   const comprobanteRef = useRef<HTMLDivElement>(null);
   const comprobanteBlobRef = useRef<Blob | null>(null);
@@ -465,6 +472,14 @@ function CobrarClientePageContent() {
   const clienteCobro =
     cliente ?? clientesLista.find((x) => x.id === clienteId) ?? null;
 
+  const pagoHoy = useMemo(() => {
+    const fechaHoy = fechaDiaColombiaHoy();
+    return ultimosPagos.some((p) => {
+      if (p.tipo !== "pago" || !p.fecha) return false;
+      return fechaDiaCalendarioDesdeISO(p.fecha) === fechaHoy;
+    });
+  }, [ultimosPagos]);
+
   const setEvidencia = (file: File | null) => {
     setEvidenciaFile(file);
     setEvidenciaPreview((prev) => {
@@ -599,6 +614,10 @@ function CobrarClientePageContent() {
 
   const handleRevisarCobro = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!online) {
+      setError(OFFLINE_MSG);
+      return;
+    }
     if (!user || !prestamo || !puedeConfirmar || !profile) return;
     if (!clienteCobro) {
       setError("Cliente no encontrado");
@@ -609,10 +628,18 @@ function CobrarClientePageContent() {
       return;
     }
     setError(null);
-    setShowModalCobro(true);
+    if (pagoHoy) {
+      setShowModalYaPagoHoy(true);
+    } else {
+      setShowModalCobro(true);
+    }
   };
 
   const handleEjecutarCobro = async () => {
+    if (!online) {
+      setError(OFFLINE_MSG);
+      return;
+    }
     if (!user || !prestamo || !puedeConfirmar || !profile || !prestamoId) return;
     const prestamoAlCobrar = prestamo;
     const clienteAlCobrar = clienteCobro;
@@ -715,12 +742,20 @@ function CobrarClientePageContent() {
   };
 
   const handleRevisarNoPago = () => {
+    if (!online) {
+      setError(OFFLINE_MSG);
+      return;
+    }
     if (!motivoNoPago || !user || !prestamoId || !profile) return;
     setError(null);
     setShowModalNoPago(true);
   };
 
   const handleRevisarPerdida = () => {
+    if (!online) {
+      setError(OFFLINE_MSG);
+      return;
+    }
     if (!motivoPerdida || !user || !prestamoId || !profile || !prestamo) return;
     if ((prestamo.saldoPendiente ?? 0) <= 0) {
       setError("No hay saldo pendiente para registrar la pérdida");
@@ -731,6 +766,10 @@ function CobrarClientePageContent() {
   };
 
   const handleEjecutarNoPago = async () => {
+    if (!online) {
+      setError(OFFLINE_MSG);
+      return;
+    }
     if (!motivoNoPago || !user || !prestamoId || !profile) return;
     setSubmittingNoPago(true);
     setError(null);
@@ -755,6 +794,10 @@ function CobrarClientePageContent() {
   };
 
   const handleEjecutarPerdida = async () => {
+    if (!online) {
+      setError(OFFLINE_MSG);
+      return;
+    }
     if (!motivoPerdida || !user || !prestamoId || !profile || !prestamo) return;
     const montoPerdida = prestamo.saldoPendiente ?? 0;
     if (montoPerdida <= 0) {
@@ -1109,6 +1152,9 @@ function CobrarClientePageContent() {
           />
         </div>
         {error && <p className="error-msg">{error}</p>}
+        {!online && (
+          <p className="error-msg" role="alert">{OFFLINE_MSG}</p>
+        )}
         <div className="cobrar-actions">
           <button
             type="button"
@@ -1123,7 +1169,7 @@ function CobrarClientePageContent() {
           <button
             type="button"
             className="btn btn-primary"
-            disabled={!motivoNoPago || submittingNoPago || showModalNoPago}
+            disabled={!motivoNoPago || submittingNoPago || showModalNoPago || !online}
             onClick={handleRevisarNoPago}
           >
             Confirmar no pago
@@ -1135,6 +1181,7 @@ function CobrarClientePageContent() {
             titulo="Confirmar no pago"
             labelConfirmar="Sí, registrar no pago"
             confirmando={submittingNoPago}
+            confirmarDeshabilitado={!online}
             onCancelar={() => {
               if (submittingNoPago) return;
               setShowModalNoPago(false);
@@ -1238,6 +1285,9 @@ function CobrarClientePageContent() {
           />
         </div>
         {error && <p className="error-msg">{error}</p>}
+        {!online && (
+          <p className="error-msg" role="alert">{OFFLINE_MSG}</p>
+        )}
         <div className="cobrar-actions">
           <button
             type="button"
@@ -1257,7 +1307,8 @@ function CobrarClientePageContent() {
               !motivoPerdida ||
               (prestamo.saldoPendiente ?? 0) <= 0 ||
               submittingPerdida ||
-              showModalPerdida
+              showModalPerdida ||
+              !online
             }
             onClick={handleRevisarPerdida}
           >
@@ -1270,6 +1321,7 @@ function CobrarClientePageContent() {
             titulo="Confirmar pérdida"
             labelConfirmar="Sí, registrar pérdida"
             confirmando={submittingPerdida}
+            confirmarDeshabilitado={!online}
             onCancelar={() => {
               if (submittingPerdida) return;
               setShowModalPerdida(false);
@@ -1321,6 +1373,7 @@ function CobrarClientePageContent() {
             <button
               type="button"
               className="btn btn-secondary cobrar-btn-perdida"
+              disabled={!online}
               onClick={() => {
                 setError(null);
                 setMotivoPerdida("");
@@ -1554,30 +1607,57 @@ function CobrarClientePageContent() {
 
 
         {error && <p className="error-msg">{error}</p>}
+        {!online && (
+          <p className="error-msg" role="alert">{OFFLINE_MSG}</p>
+        )}
 
         <div className="cobrar-actions">
           <button
             type="button"
             className="btn btn-secondary"
             onClick={() => setShowNoPago(true)}
+            disabled={!online}
           >
             No pagó
           </button>
           <button
             type="submit"
             className="btn btn-primary"
-            disabled={!puedeConfirmar || submitting || showModalCobro}
+            disabled={!puedeConfirmar || submitting || showModalCobro || showModalYaPagoHoy || !online}
           >
             Confirmar cobro
           </button>
         </div>
       </form>
 
+      {showModalYaPagoHoy && (
+        <ModalConfirmar
+          titulo="Este cliente ya pagó hoy"
+          labelConfirmar="Sí, registrar de todas formas"
+          confirmando={false}
+          confirmarDeshabilitado={!online}
+          onCancelar={() => setShowModalYaPagoHoy(false)}
+          onConfirmar={() => {
+            setShowModalYaPagoHoy(false);
+            setShowModalCobro(true);
+          }}
+        >
+          <p>
+            <strong>{cliente?.nombre ?? "Este cliente"}</strong> ya realizó un pago hoy.
+            ¿Estás seguro de que quieres registrar otro cobro?
+          </p>
+          <p style={{ color: "var(--text-muted)", fontSize: "0.875rem" }}>
+            Verifica el historial antes de continuar para evitar cobros duplicados.
+          </p>
+        </ModalConfirmar>
+      )}
+
       {showModalCobro && prestamo && clienteCobro && (
         <ModalConfirmar
           titulo="Confirmar cobro"
           labelConfirmar="Sí, registrar cobro"
           confirmando={submitting}
+          confirmarDeshabilitado={!online}
           onCancelar={() => setShowModalCobro(false)}
           onConfirmar={() => { void handleEjecutarCobro(); }}
         >

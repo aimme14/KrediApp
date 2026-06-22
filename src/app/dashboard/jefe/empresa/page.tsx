@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { getEmpresa, saveEmpresa, uploadLogo, getLogoAccept } from "@/lib/empresa";
 import type { EmpresaProfile } from "@/types/empresa";
+import { guardOfflineWrite, useOnline } from "@/hooks/useOnline";
 
 /** Genera iniciales: "Mi Empresa S.A." → "ME" (máx. 2 caracteres). */
 function getInicialesNombre(texto: string): string {
@@ -90,6 +91,7 @@ function IconSave() {
 
 export default function PerfilEmpresaPage() {
   const { profile } = useAuth();
+  const online = useOnline();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -124,6 +126,7 @@ export default function PerfilEmpresaPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!guardOfflineWrite(online, setError)) return;
     if (!profile) return;
     setError(null);
     setSuccess(false);
@@ -163,6 +166,7 @@ export default function PerfilEmpresaPage() {
   const handleLogoFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !profile) return;
+    if (!guardOfflineWrite(online, setError)) return;
     e.target.value = "";
     setError(null);
     setUploadingLogo(true);
@@ -273,7 +277,7 @@ export default function PerfilEmpresaPage() {
                 type="button"
                 className="btn btn-secondary perfil-empresa-btn-upload"
                 onClick={() => fileInputRef.current?.click()}
-                disabled={uploadingLogo}
+                disabled={uploadingLogo || !online}
                 title="Cargar imagen desde tu dispositivo"
               >
                 <IconUpload aria-hidden />
@@ -354,7 +358,7 @@ export default function PerfilEmpresaPage() {
             <button
               type="submit"
               className="btn btn-primary perfil-empresa-btn-save"
-              disabled={saving}
+              disabled={saving || !online}
               title="Guardar cambios"
             >
               <IconSave aria-hidden />

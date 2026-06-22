@@ -5,9 +5,11 @@ import { useAuth } from "@/context/AuthContext";
 import { useAdminDashboard } from "@/context/AdminDashboardContext";
 import { AdminRutaStatsGrid } from "@/components/AdminRutaStatsGrid";
 import { createRuta } from "@/lib/empresa-api";
+import { guardOfflineWrite, useOnline } from "@/hooks/useOnline";
 
 export default function RutasPage() {
   const { user, profile } = useAuth();
+  const online = useOnline();
   const { rutas, loading, error: ctxError } = useAdminDashboard();
   const [formError, setFormError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
@@ -25,6 +27,7 @@ export default function RutasPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!guardOfflineWrite(online, setFormError)) return;
     if (!user) return;
     setFormError(null);
     setCreating(true);
@@ -84,7 +87,7 @@ export default function RutasPage() {
               />
             </div>
             {formError && <p className="error-msg">{formError}</p>}
-            <button type="submit" className="btn btn-primary" disabled={creating}>
+            <button type="submit" className="btn btn-primary" disabled={creating || !online}>
               {creating ? "Creando..." : "Crear ruta"}
             </button>
           </form>

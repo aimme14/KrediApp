@@ -5,9 +5,11 @@ import { useAuth } from "@/context/AuthContext";
 import { listUsersByCreator } from "@/lib/users";
 import { setEmpleadoEnabled } from "@/lib/empresa-api";
 import type { UserProfile } from "@/types/roles";
+import { guardOfflineWrite, useOnline } from "@/hooks/useOnline";
 
 export default function PermisosPage() {
   const { user, profile } = useAuth();
+  const online = useOnline();
   const [empleados, setEmpleados] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -30,6 +32,7 @@ export default function PermisosPage() {
   }, [profile]);
 
   const handleToggle = async (empleado: UserProfile) => {
+    if (!guardOfflineWrite(online, setError)) return;
     if (!user) return;
     setError(null);
     setTogglingUid(empleado.uid);
@@ -78,7 +81,7 @@ export default function PermisosPage() {
                 type="button"
                 className={`btn ${e.enabled ? "btn-danger" : "btn-success"}`}
                 onClick={() => handleToggle(e)}
-                disabled={togglingUid === e.uid}
+                disabled={togglingUid === e.uid || !online}
               >
                 {togglingUid === e.uid ? "..." : e.enabled ? "Deshabilitar" : "Habilitar"}
               </button>

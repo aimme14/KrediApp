@@ -1,21 +1,33 @@
 "use client";
 
 import { useTrabajadorLista } from "@/context/TrabajadorListaContext";
+import { OFFLINE_BANNER_MSG, useOnline } from "@/hooks/useOnline";
 
 export function TrabajadorSyncBanner() {
   const { datosSyncEstado } = useTrabajadorLista();
+  const online = useOnline();
+
+  if (!online) {
+    return (
+      <div
+        className="trabajador-sync-banner trabajador-sync-banner--offline"
+        role="alert"
+        aria-live="assertive"
+      >
+        {OFFLINE_BANNER_MSG}
+      </div>
+    );
+  }
+
   if (datosSyncEstado === "synced") return null;
-  const offline = datosSyncEstado === "offline";
-  const msg = offline
-    ? "Sin conexión — los datos se actualizarán cuando vuelvas a tener conexión"
-    : "Actualizando datos…";
+
   return (
     <div
-      className={`trabajador-sync-banner${offline ? " trabajador-sync-banner--offline" : ""}`}
+      className="trabajador-sync-banner"
       role="status"
       aria-live="polite"
     >
-      {msg}
+      Actualizando datos…
     </div>
   );
 }

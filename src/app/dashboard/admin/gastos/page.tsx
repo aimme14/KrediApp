@@ -34,6 +34,7 @@ import {
 } from "@/lib/gastos-periodo-filter";
 import { GastosPeriodoContableFilter } from "@/components/GastosPeriodoContableFilter";
 import { ModalConfirmar } from "@/components/trabajador/ModalConfirmar";
+import { OFFLINE_MSG, useOnline } from "@/hooks/useOnline";
 
 const EMPRESAS_COLLECTION = "empresas";
 const GASTOS_ADMIN_SUBCOLLECTION = "gastosAdministrador";
@@ -152,6 +153,7 @@ function EyeIcon() {
 export default function GastosPage() {
   const { user, profile } = useAuth();
   const { rutas } = useAdminDashboard();
+  const online = useOnline();
   const [gastos, setGastos] = useState<GastoItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -406,6 +408,10 @@ export default function GastosPage() {
 
   const handleRevisarGasto = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!online) {
+      setError(OFFLINE_MSG);
+      return;
+    }
     if (!user || !profile) return;
     const montoNum = interiorDecimalCOPToNumber(monto);
     if (isNaN(montoNum) || montoNum <= 0) {
@@ -437,6 +443,10 @@ export default function GastosPage() {
   };
 
   const handleEjecutarGasto = async (data: PendingGastoData) => {
+    if (!online) {
+      setError(OFFLINE_MSG);
+      return;
+    }
     if (!user || !profile) return;
     setError(null);
     setCreating(true);
@@ -760,7 +770,7 @@ export default function GastosPage() {
               <button
                 type="submit"
                 className="btn btn-primary"
-                disabled={creating || showModalGasto}
+                disabled={creating || showModalGasto || !online}
                 aria-busy={creating}
               >
                 Registrar gasto
@@ -1034,6 +1044,7 @@ export default function GastosPage() {
           titulo="Confirmar gasto"
           labelConfirmar="Sí, registrar gasto"
           confirmando={creating}
+          confirmarDeshabilitado={!online}
           confirmacionMarcada={confirmarGastoMarcado}
           onConfirmacionMarcadaChange={setConfirmarGastoMarcado}
           labelConfirmacion={

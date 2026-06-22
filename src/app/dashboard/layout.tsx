@@ -11,6 +11,7 @@ import DashboardHelp from "@/components/help/DashboardHelp";
 import InactivityLock from "@/components/InactivityLock";
 import { DashboardHeaderProvider } from "@/context/DashboardHeaderContext";
 import { GastoFcmCampanitaProvider } from "@/context/GastoFcmCampanitaContext";
+import { OfflineRootEffect } from "@/components/OfflineRootEffect";
 import { getEmpresa } from "@/lib/empresa";
 import type { ReactNode } from "react";
 import type { EmpresaProfile } from "@/types/empresa";
@@ -101,6 +102,7 @@ export default function DashboardLayout({
 
   return (
     <InactivityLock>
+      <OfflineRootEffect />
       <GastoFcmCampanitaProvider>
         <DashboardHeaderProvider value={setHeaderLeftSlot}>
           <div

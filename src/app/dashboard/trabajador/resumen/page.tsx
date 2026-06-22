@@ -10,6 +10,7 @@ import {
   solicitarEntregaReporteDia,
   type SolicitudEntregaReporteApi,
 } from "@/lib/empresa-api";
+import { guardOfflineWrite, useOnline } from "@/hooks/useOnline";
 
 const MAX_COMENTARIO_REPORTE = 2000;
 
@@ -23,6 +24,7 @@ function formatMonto(value: number): string {
 
 export default function ResumenDelDiaPage() {
   const { user, profile } = useAuth();
+  const online = useOnline();
   const { data: cajaDia, tuCajaEfectivo } = useTrabajadorCajaDia();
   const [entregando, setEntregando] = useState(false);
   const [modalEntregaAbierto, setModalEntregaAbierto] = useState(false);
@@ -127,6 +129,7 @@ export default function ResumenDelDiaPage() {
   };
 
   const handleConfirmarEntrega = async () => {
+    if (!guardOfflineWrite(online, setErrReporte)) return;
     if (!user) return;
     if (comentarioEntrega.length > MAX_COMENTARIO_REPORTE) {
       setErrReporte(`El comentario no puede superar ${MAX_COMENTARIO_REPORTE} caracteres`);
@@ -278,7 +281,7 @@ export default function ResumenDelDiaPage() {
         <button
           type="button"
           className="btn btn-primary"
-          disabled={entregando || estadoSolicitud === "en_curso"}
+          disabled={entregando || estadoSolicitud === "en_curso" || !online}
           title={btnTitle}
           onClick={() => {
             setModalEntregaAbierto(true);
@@ -339,7 +342,7 @@ export default function ResumenDelDiaPage() {
                 type="button"
                 className="btn btn-secondary"
                 onClick={cerrarModalEntrega}
-                disabled={entregando}
+                disabled={entregando || !online}
               >
                 Cancelar
               </button>
@@ -347,7 +350,7 @@ export default function ResumenDelDiaPage() {
                 type="button"
                 className="btn btn-primary"
                 onClick={() => void handleConfirmarEntrega()}
-                disabled={entregando}
+                disabled={entregando || !online}
               >
                 {entregando ? "Enviando…" : "Enviar solicitud"}
               </button>

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { listUsersByCreator, setAdminEnabled } from "@/lib/users";
 import type { UserProfile } from "@/types/roles";
+import { guardOfflineWrite, useOnline } from "@/hooks/useOnline";
 
 function IconShield() {
   return (
@@ -48,6 +49,7 @@ function adminInitial(admin: UserProfile): string {
 
 export default function PermisosPage() {
   const { profile } = useAuth();
+  const online = useOnline();
   const [admins, setAdmins] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -74,6 +76,7 @@ export default function PermisosPage() {
   const enabledCount = useMemo(() => admins.filter((a) => a.enabled).length, [admins]);
 
   const handleToggle = async (admin: UserProfile) => {
+    if (!guardOfflineWrite(online, setError)) return;
     if (!profile) return;
     setError(null);
     setTogglingUid(admin.uid);
@@ -178,7 +181,7 @@ export default function PermisosPage() {
                     type="button"
                     className={`jefe-permisos-btn ${a.enabled ? "jefe-permisos-btn--danger" : "jefe-permisos-btn--success"}`}
                     onClick={() => handleToggle(a)}
-                    disabled={togglingUid === a.uid}
+                    disabled={togglingUid === a.uid || !online}
                     aria-busy={togglingUid === a.uid}
                     aria-label={a.enabled ? `Deshabilitar acceso de ${a.displayName || a.email}` : `Habilitar acceso de ${a.displayName || a.email}`}
                   >

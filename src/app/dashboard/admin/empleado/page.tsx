@@ -6,9 +6,11 @@ import { listUsersByCreator, createUser } from "@/lib/users";
 import { listRutas, type RutaItem } from "@/lib/empresa-api";
 import type { UserProfile } from "@/types/roles";
 import PasswordCreateFields from "@/components/PasswordCreateFields";
+import { guardOfflineWrite, useOnline } from "@/hooks/useOnline";
 
 export default function EmpleadoPage() {
   const { user, profile } = useAuth();
+  const online = useOnline();
   const [trabajadores, setTrabajadores] = useState<UserProfile[]>([]);
   const [rutas, setRutas] = useState<RutaItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -50,6 +52,7 @@ export default function EmpleadoPage() {
 
   const handleCreateTrabajador = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!guardOfflineWrite(online, setError)) return;
     if (!profile || !user) return;
     setError(null);
     if (!rutaId.trim()) {
@@ -215,7 +218,7 @@ export default function EmpleadoPage() {
               confirmLabel="Confirmar contraseña"
             />
             {error && <p className="error-msg">{error}</p>}
-            <button type="submit" className="btn btn-primary" disabled={creating}>
+            <button type="submit" className="btn btn-primary" disabled={creating || !online}>
               {creating ? "Creando..." : "Crear empleado"}
             </button>
           </form>

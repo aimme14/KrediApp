@@ -26,6 +26,7 @@ import {
   type CobrosDelDiaEmpleadoResponse,
 } from "@/lib/empresa-api";
 import { ModalConfirmar } from "@/components/trabajador/ModalConfirmar";
+import { guardOfflineWrite, useOnline } from "@/hooks/useOnline";
 
 function normalizarMetodoPago(metodo: string | null | undefined): "efectivo" | "transferencia" | "otro" {
   const m = (metodo ?? "").trim().toLowerCase();
@@ -143,6 +144,7 @@ function totalesVistaPreviaReporte(s: CobrosDelDiaEmpleadoResponse) {
 
 export default function ReportesDiaPage() {
   const { user, profile } = useAuth();
+  const online = useOnline();
   const [fecha, setFecha] = useState(fechaHoyInput);
   const [fechaBusqueda, setFechaBusqueda] = useState(fechaHoyInput);
   const [items, setItems] = useState<ReporteDiaItem[]>([]);
@@ -340,6 +342,7 @@ export default function ReportesDiaPage() {
   };
 
   const reintentarPdfReporte = async (reporteId: string) => {
+    if (!guardOfflineWrite(online, setRegenerarPdfErr)) return;
     if (!user) return;
     setRegenerarPdfId(reporteId);
     setRegenerarPdfErr(null);
@@ -354,6 +357,7 @@ export default function ReportesDiaPage() {
   };
 
   const handleAprobarSolicitud = async (solicitud: SolicitudEntregaPendienteAdmin) => {
+    if (!guardOfflineWrite(online, setError)) return;
     if (!user) return;
     setAccionId(solicitud.id);
     setError(null);
@@ -414,7 +418,7 @@ export default function ReportesDiaPage() {
                   <button
                     type="button"
                     className="btn btn-primary"
-                    disabled={accionId !== null || pendingSolicitudAprobar !== null}
+                    disabled={accionId !== null || pendingSolicitudAprobar !== null || !online}
                     onClick={() => {
                       setConfirmarRecepcionMarcada(false);
                       setPendingSolicitudAprobar(s);
@@ -425,8 +429,9 @@ export default function ReportesDiaPage() {
                   <button
                     type="button"
                     className="btn btn-secondary"
-                    disabled={accionId !== null}
+                    disabled={accionId !== null || !online}
                     onClick={async () => {
+                      if (!guardOfflineWrite(online, setError)) return;
                       if (!user) return;
                       const motivo =
                         typeof window !== "undefined"
@@ -1078,7 +1083,7 @@ export default function ReportesDiaPage() {
                               height: "2.25rem",
                               padding: 0,
                             }}
-                            disabled={regenerarPdfId === row.id}
+                            disabled={regenerarPdfId === row.id || !online}
                             onClick={() => void reintentarPdfReporte(row.id)}
                           >
                             {regenerarPdfId === row.id ? (
@@ -1116,6 +1121,7 @@ export default function ReportesDiaPage() {
           titulo="Confirmar recepción del reporte"
           labelConfirmar="Sí, aceptar reporte"
           confirmando={accionId === pendingSolicitudAprobar.id}
+          confirmarDeshabilitado={!online}
           confirmacionMarcada={confirmarRecepcionMarcada}
           onConfirmacionMarcadaChange={setConfirmarRecepcionMarcada}
           labelConfirmacion={

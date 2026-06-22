@@ -34,6 +34,7 @@ import {
   formatFechaCreacionPrestamo,
 } from "@/lib/prestamo-display";
 import { ModalConfirmar } from "@/components/trabajador/ModalConfirmar";
+import { OFFLINE_MSG, useOnline } from "@/hooks/useOnline";
 
 const MODALIDADES = [
   { value: "diario", label: "Diario" },
@@ -83,6 +84,7 @@ export default function PrestamoTrabajadorPage() {
   } = useTrabajadorLista();
   const { cajaEmpleadoRT, data: cajaDia } = useTrabajadorCajaDia();
   const cajaEmpleado = cajaEmpleadoRT ?? cajaDia?.cajaEmpleado ?? 0;
+  const online = useOnline();
   const MONTO_MAX = cajaEmpleado > 0 ? cajaEmpleado : 50_000_000;
   const [error, setError] = useState<string | null>(null);
   const [clienteId, setClienteId] = useState("");
@@ -240,6 +242,10 @@ export default function PrestamoTrabajadorPage() {
 
   const handleRevisarPrestamo = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!online) {
+      setError(OFFLINE_MSG);
+      return;
+    }
     if (!user) return;
     const montoNum = interiorDecimalCOPToNumber(monto);
     const nCuotas = Math.max(1, parseInt(numeroCuotas, 10) || 1);
@@ -278,6 +284,10 @@ export default function PrestamoTrabajadorPage() {
   };
 
   const handleEjecutarPrestamo = async () => {
+    if (!online) {
+      setError(OFFLINE_MSG);
+      return;
+    }
     if (!user) return;
     const montoNum = interiorDecimalCOPToNumber(monto);
     const nCuotas = Math.max(1, parseInt(numeroCuotas, 10) || 1);
@@ -734,7 +744,7 @@ export default function PrestamoTrabajadorPage() {
           <button
             type="submit"
             className="btn btn-primary"
-            disabled={creating || showModalPrestamo}
+            disabled={creating || showModalPrestamo || !online}
             style={{ flexShrink: 0 }}
           >
             {requiereAprobacionAdmin ? "Solicitar aprobación" : "Crear préstamo"}
@@ -910,6 +920,7 @@ export default function PrestamoTrabajadorPage() {
           titulo={requiereAprobacionAdmin ? "Solicitar aprobación" : "Confirmar préstamo"}
           labelConfirmar={requiereAprobacionAdmin ? "Sí, solicitar" : "Sí, crear préstamo"}
           confirmando={creating}
+          confirmarDeshabilitado={!online}
           onCancelar={() => {
             if (creating) return;
             setShowModalPrestamo(false);

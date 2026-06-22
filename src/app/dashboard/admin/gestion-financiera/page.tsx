@@ -14,6 +14,7 @@ import {
   type ResumenRutaItem,
 } from "@/lib/empresa-api";
 import { formatMontoEnteroInput } from "@/lib/monto-input-es";
+import { guardOfflineWrite, useOnline } from "@/hooks/useOnline";
 
 function formatMoneda(value: number): string {
   const hasDecimals = Math.round(value * 100) % 100 !== 0;
@@ -56,6 +57,7 @@ type TabInversion = "ruta" | "admin";
 
 export default function GestionFinancieraPage() {
   const { user, profile } = useAuth();
+  const online = useOnline();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -130,6 +132,7 @@ export default function GestionFinancieraPage() {
 
   const ejecutarInversionConfirmada = useCallback(async () => {
     const pending = inversionModal;
+    if (!guardOfflineWrite(online, setError)) return;
     if (!user || !profile || profile.role !== "admin" || !pending) return;
     setInvertirSaving(true);
     try {
@@ -159,10 +162,11 @@ export default function GestionFinancieraPage() {
     } finally {
       setInvertirSaving(false);
     }
-  }, [user, profile, inversionModal, load]);
+  }, [user, profile, inversionModal, load, online]);
 
   const handleInvertirEnRuta = (e: FormEvent) => {
     e.preventDefault();
+    if (!guardOfflineWrite(online, setInvertirError)) return;
     if (!user || !profile || profile.role !== "admin") return;
     setInvertirError(null);
     setInvertirOk(false);
@@ -190,6 +194,7 @@ export default function GestionFinancieraPage() {
 
   const handleInvertirEnAdmin = (e: FormEvent) => {
     e.preventDefault();
+    if (!guardOfflineWrite(online, setInvertirAdminError)) return;
     if (!user || !profile || profile.role !== "admin") return;
     setInvertirAdminError(null);
     setInvertirAdminOk(false);
@@ -315,7 +320,7 @@ export default function GestionFinancieraPage() {
                         setInvertirRutaId(e.target.value);
                         setInvertirError(null);
                       }}
-                      disabled={invertirSaving || !!inversionModal}
+                      disabled={invertirSaving || !!inversionModal || !online}
                       required
                     >
                       <option value="">— selecciona —</option>
@@ -341,7 +346,7 @@ export default function GestionFinancieraPage() {
                         }}
                         placeholder="Ej. 500000"
                         className={`gf-capital-input ${invertirError ? "gf-capital-input-error" : ""}`}
-                        disabled={invertirSaving || !!inversionModal}
+                        disabled={invertirSaving || !!inversionModal || !online}
                         autoComplete="off"
                       />
                     </div>
@@ -355,7 +360,7 @@ export default function GestionFinancieraPage() {
                         Inversión aplicada correctamente.
                       </p>
                     )}
-                    <button type="submit" className="gf-btn-actualizar" disabled={invertirSaving || !!inversionModal}>
+                    <button type="submit" className="gf-btn-actualizar" disabled={invertirSaving || !!inversionModal || !online}>
                       Invertir en la ruta
                     </button>
                   </form>
@@ -438,7 +443,7 @@ export default function GestionFinancieraPage() {
                         setInvertirAdminRutaId(e.target.value);
                         setInvertirAdminError(null);
                       }}
-                      disabled={invertirSaving || !!inversionModal}
+                      disabled={invertirSaving || !!inversionModal || !online}
                       required
                     >
                       <option value="">— selecciona —</option>
@@ -470,7 +475,7 @@ export default function GestionFinancieraPage() {
                         }}
                         placeholder="Ej. 500000"
                         className={`gf-capital-input ${invertirAdminError ? "gf-capital-input-error" : ""}`}
-                        disabled={invertirSaving || !!inversionModal}
+                        disabled={invertirSaving || !!inversionModal || !online}
                         autoComplete="off"
                       />
                     </div>
@@ -487,7 +492,7 @@ export default function GestionFinancieraPage() {
                     <button
                       type="submit"
                       className="gf-btn-actualizar"
-                      disabled={invertirSaving || !!inversionModal}
+                      disabled={invertirSaving || !!inversionModal || !online}
                     >
                       Mover dinero a base del administrador
                     </button>
@@ -575,7 +580,7 @@ export default function GestionFinancieraPage() {
                 type="button"
                 className="btn btn-secondary"
                 onClick={cerrarModalInversion}
-                disabled={invertirSaving}
+                disabled={invertirSaving || !online}
               >
                 Cancelar
               </button>
@@ -583,7 +588,7 @@ export default function GestionFinancieraPage() {
                 type="button"
                 className="btn btn-primary"
                 onClick={() => void ejecutarInversionConfirmada()}
-                disabled={invertirSaving}
+                disabled={invertirSaving || !online}
                 aria-busy={invertirSaving}
               >
                 {invertirSaving ? "Procesando…" : "Confirmar inversión"}

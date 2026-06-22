@@ -14,6 +14,7 @@ import {
   type SolicitudPrestamoApi,
 } from "@/lib/empresa-api";
 import { ModalConfirmar } from "@/components/trabajador/ModalConfirmar";
+import { OFFLINE_MSG, useOnline } from "@/hooks/useOnline";
 
 function formatMonto(n: number): string {
   if (typeof n !== "number" || isNaN(n)) return "—";
@@ -25,6 +26,7 @@ function formatMonto(n: number): string {
 
 export default function SolicitudesPrestamoAdminPage() {
   const { user, profile } = useAuth();
+  const online = useOnline();
   const [solicitudes, setSolicitudes] = useState<SolicitudPrestamoApi[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -83,11 +85,19 @@ export default function SolicitudesPrestamoAdminPage() {
 
   const abrirModalAprobar = (solicitud: SolicitudPrestamoApi) => {
     if (accionId !== null) return;
+    if (!online) {
+      setError(OFFLINE_MSG);
+      return;
+    }
     setError(null);
     setSolicitudModalAprobar(solicitud);
   };
 
   const handleEjecutarAprobar = async () => {
+    if (!online) {
+      setError(OFFLINE_MSG);
+      return;
+    }
     if (!user || !solicitudModalAprobar) return;
     const solicitudId = solicitudModalAprobar.id;
     setAccionId(solicitudId);
@@ -220,7 +230,7 @@ export default function SolicitudesPrestamoAdminPage() {
                   <button
                     type="button"
                     className="btn btn-primary"
-                    disabled={accionId !== null}
+                    disabled={accionId !== null || !online}
                     onClick={() => abrirModalAprobar(s)}
                   >
                     {accionId === s.id && accion === "aprobar" ? "Aprobando..." : "Aprobar"}
@@ -245,6 +255,7 @@ export default function SolicitudesPrestamoAdminPage() {
           titulo="Confirmar aprobación"
           labelConfirmar="Sí, aprobar solicitud"
           confirmando={aprobandoModal}
+          confirmarDeshabilitado={!online}
           onCancelar={() => {
             if (aprobandoModal) return;
             setSolicitudModalAprobar(null);

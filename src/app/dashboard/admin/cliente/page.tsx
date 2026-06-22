@@ -13,9 +13,11 @@ import {
 import { filtrarClientesParaExport } from "@/lib/export-clientes";
 import { getEmpresa } from "@/lib/empresa";
 import { ExportClientesModal } from "@/components/ExportClientesModal";
+import { guardOfflineWrite, OFFLINE_MSG, useOnline } from "@/hooks/useOnline";
 
 export default function ClientePage() {
   const { user, profile } = useAuth();
+  const online = useOnline();
   const { rutas } = useAdminDashboard();
   const { clientes, refresh: refreshLista } = useTrabajadorLista();
   const [loading] = useState(false);
@@ -140,6 +142,7 @@ export default function ClientePage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!guardOfflineWrite(online, setError)) return;
     if (!user) return;
     if (!rutaId.trim()) {
       setError("Debes seleccionar una ruta");
@@ -174,6 +177,7 @@ export default function ClientePage() {
 
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!guardOfflineWrite(online, setEditError)) return;
     if (!user || !clienteEditando) return;
     if (!editNombre.trim()) {
       setEditError("El nombre es obligatorio");
@@ -283,7 +287,8 @@ export default function ClientePage() {
               </select>
             </div>
             {error && <p className="error-msg">{error}</p>}
-            <button type="submit" className="btn btn-primary" disabled={creating}>
+            {!online && !error && <p className="error-msg" role="alert">{OFFLINE_MSG}</p>}
+            <button type="submit" className="btn btn-primary" disabled={creating || !online}>
               {creating ? "Creando..." : "Crear cliente"}
             </button>
           </form>
@@ -554,7 +559,7 @@ export default function ClientePage() {
                 <button
                   type="submit"
                   className="btn btn-primary"
-                  disabled={savingEdit}
+                  disabled={savingEdit || !online}
                   aria-busy={savingEdit}
                 >
                   {savingEdit ? "Guardando…" : "Guardar cambios"}

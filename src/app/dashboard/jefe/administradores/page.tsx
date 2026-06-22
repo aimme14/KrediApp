@@ -5,6 +5,7 @@ import { useAuth } from "@/context/AuthContext";
 import { listUsersByCreator, createUser } from "@/lib/users";
 import type { UserProfile } from "@/types/roles";
 import PasswordCreateFields from "@/components/PasswordCreateFields";
+import { guardOfflineWrite, useOnline } from "@/hooks/useOnline";
 
 function IconSearch() {
   return (
@@ -47,6 +48,7 @@ function filterAdmins(list: UserProfile[], term: string): UserProfile[] {
 
 export default function AdministradoresPage() {
   const { profile } = useAuth();
+  const online = useOnline();
   const [admins, setAdmins] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -83,6 +85,7 @@ export default function AdministradoresPage() {
 
   const handleCreateAdmin = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!guardOfflineWrite(online, setError)) return;
     if (!profile) return;
     setError(null);
     setSuccess(false);
@@ -232,7 +235,7 @@ export default function AdministradoresPage() {
                 <button type="button" className="btn btn-secondary" onClick={handleCloseForm} disabled={creating}>
                   Cancelar
                 </button>
-                <button type="submit" className="btn btn-primary" disabled={creating} title="Crear administrador">
+                <button type="submit" className="btn btn-primary" disabled={creating || !online} title="Crear administrador">
                   {creating ? "Creando..." : "Crear administrador"}
                 </button>
               </div>

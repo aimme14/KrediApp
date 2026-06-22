@@ -5891,6 +5891,12 @@ th {
   font-weight: 500;
 }
 
+html[data-offline="true"] button[type="submit"]:not([data-allow-offline]) {
+  pointer-events: none;
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 /* Drawer trabajador: iconos y fila activa por color (no afecta panel jefe) */
 .trabajador-dashboard .jefe-drawer-icon {
   background: transparent;

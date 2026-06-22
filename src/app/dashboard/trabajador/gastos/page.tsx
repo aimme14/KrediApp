@@ -20,6 +20,7 @@ import {
 import { filtrarGastosPorPeriodo, type GastosPeriodoVista } from "@/lib/gastos-periodo-filter";
 import { GastosPeriodoFilter, mensajeGastosVaciosPeriodo } from "@/components/GastosPeriodoFilter";
 import { ModalConfirmar } from "@/components/trabajador/ModalConfirmar";
+import { OFFLINE_MSG, useOnline } from "@/hooks/useOnline";
 
 const TIPOS = [
   { value: "transporte", label: "Transporte", icon: "transporte" },
@@ -122,6 +123,7 @@ function CloseIcon() {
 export default function GastosTrabajadorPage() {
   const { user, profile } = useAuth();
   const { refresh: refreshCajaDia } = useTrabajadorCajaDia();
+  const online = useOnline();
   const [gastos, setGastos] = useState<GastoItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -292,6 +294,10 @@ export default function GastosTrabajadorPage() {
 
   const handleRevisarGasto = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!online) {
+      setError(OFFLINE_MSG);
+      return;
+    }
     if (!user || !profile) return;
     const montoNum = interiorDecimalCOPToNumber(monto);
     if (isNaN(montoNum) || montoNum <= 0) {
@@ -315,6 +321,10 @@ export default function GastosTrabajadorPage() {
   };
 
   const handleEjecutarGasto = async (data: PendingGastoData) => {
+    if (!online) {
+      setError(OFFLINE_MSG);
+      return;
+    }
     if (!user || !profile) return;
     setError(null);
     setCreating(true);
@@ -488,7 +498,7 @@ export default function GastosTrabajadorPage() {
             {error && <p className="error-msg" role="alert">{error}</p>}
             <p className="form-required-hint" aria-hidden>* Campos requeridos</p>
             <div className="gastos-form-actions">
-              <button type="submit" className="btn btn-primary" disabled={creating || showModalGasto} aria-busy={creating}>
+              <button type="submit" className="btn btn-primary" disabled={creating || showModalGasto || !online} aria-busy={creating}>
                 Registrar gasto
               </button>
               <button type="button" className="btn btn-secondary" onClick={() => setShowForm(false)} aria-label="Cancelar y cerrar formulario">
@@ -617,6 +627,7 @@ export default function GastosTrabajadorPage() {
           titulo="Confirmar gasto"
           labelConfirmar="Sí, registrar gasto"
           confirmando={creating}
+          confirmarDeshabilitado={!online}
           confirmacionMarcada={confirmarGastoMarcado}
           onConfirmacionMarcadaChange={setConfirmarGastoMarcado}
           labelConfirmacion={

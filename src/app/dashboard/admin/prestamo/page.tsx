@@ -43,6 +43,7 @@ import {
 } from "@/lib/monto-input-es";
 import SelectConBusqueda from "@/components/SelectConBusqueda";
 import { ModalConfirmar } from "@/components/trabajador/ModalConfirmar";
+import { OFFLINE_MSG, useOnline } from "@/hooks/useOnline";
 
 const MODALIDADES = [
   { value: "diario", label: "Diario" },
@@ -208,6 +209,7 @@ export default function PrestamoPage() {
     error: listaError,
     refresh,
   } = useTrabajadorLista();
+  const online = useOnline();
   const [error, setError] = useState<string | null>(null);
   const [rutaIdForm, setRutaIdForm] = useState("");
   const rutaSeleccionada = rutas.find((r) => r.id === rutaIdForm);
@@ -318,6 +320,10 @@ export default function PrestamoPage() {
 
   const handleSubmit = (e?: React.SyntheticEvent) => {
     e?.preventDefault();
+    if (!online) {
+      setError(OFFLINE_MSG);
+      return;
+    }
     if (!user) return;
     const montoNum = interiorDecimalCOPToNumber(monto);
     const nCuotas = Math.max(1, parseInt(numeroCuotas, 10) || 1);
@@ -364,6 +370,10 @@ export default function PrestamoPage() {
   };
 
   const handleEjecutarPrestamo = async () => {
+    if (!online) {
+      setError(OFFLINE_MSG);
+      return;
+    }
     if (!user || !confirmarMontoAlto) return;
     const montoNum = interiorDecimalCOPToNumber(monto);
     const nCuotas = Math.max(1, parseInt(numeroCuotas, 10) || 1);
@@ -932,9 +942,9 @@ export default function PrestamoPage() {
           <button
             type="button"
             className="btn btn-primary"
-            disabled={creating || !confirmarMontoAlto}
+            disabled={creating || !confirmarMontoAlto || !online}
             onClick={() => handleSubmit()}
-            aria-disabled={creating || !confirmarMontoAlto}
+            aria-disabled={creating || !confirmarMontoAlto || !online}
           >
             {creating ? "Creando..." : "Crear préstamo"}
           </button>
@@ -1405,6 +1415,7 @@ export default function PrestamoPage() {
           titulo="Confirmar préstamo"
           labelConfirmar="Sí, crear préstamo"
           confirmando={creating}
+          confirmarDeshabilitado={!online}
           onCancelar={() => {
             if (creating) return;
             setShowModalPrestamo(false);

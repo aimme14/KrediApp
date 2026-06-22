@@ -4,9 +4,11 @@ import { Fragment, useMemo, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useTrabajadorLista } from "@/context/TrabajadorListaContext";
 import { createCliente, formatClienteCodigoCorto } from "@/lib/empresa-api";
+import { guardOfflineWrite, useOnline } from "@/hooks/useOnline";
 
 export default function ClienteTrabajadorPage() {
   const { user, profile } = useAuth();
+  const online = useOnline();
   const {
     clientes,
     loading,
@@ -45,6 +47,7 @@ export default function ClienteTrabajadorPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!guardOfflineWrite(online, setError)) return;
     if (!user) return;
     setError(null);
     setCreating(true);
@@ -112,7 +115,7 @@ export default function ClienteTrabajadorPage() {
               <label>Cédula</label>
               <input type="text" value={cedula} onChange={(e) => setCedula(e.target.value)} placeholder="Sin puntos ni espacios" />
             </div>
-            <button type="submit" className="btn btn-primary" disabled={creating}>
+            <button type="submit" className="btn btn-primary" disabled={creating || !online}>
               {creating ? "Creando..." : "Crear cliente"}
             </button>
           </form>

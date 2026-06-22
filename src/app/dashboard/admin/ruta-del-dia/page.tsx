@@ -6,6 +6,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useAdminDashboard } from "@/context/AdminDashboardContext";
 import { asignarBaseEmpleadoDesdeRuta } from "@/lib/empresa-api";
 import { formatMontoEnteroInput, parseMontoEnteroFormatted } from "@/lib/monto-input-es";
+import { guardOfflineWrite, useOnline } from "@/hooks/useOnline";
 
 type AsignarBasePendiente = {
   rutaId: string;
@@ -32,6 +33,7 @@ function initialsFromNombre(nombre: string): string {
 
 export default function RutaDelDiaPage() {
   const { user, profile } = useAuth();
+  const online = useOnline();
   const { rutasConEmpleados, loading, error: ctxError } = useAdminDashboard();
 
   const [error, setError] = useState<string | null>(null);
@@ -68,6 +70,7 @@ export default function RutaDelDiaPage() {
     empleadoNombre: string,
     rutaNombre: string
   ) => {
+    if (!guardOfflineWrite(online, setError)) return;
     const key = asignarKey(rutaId, empleadoUid);
     const monto = parseMontoEnteroFormatted(montosAsignar[key] ?? "");
     if (!Number.isFinite(monto) || monto <= 0) {
@@ -80,6 +83,7 @@ export default function RutaDelDiaPage() {
   };
 
   const ejecutarAsignacionConfirmada = async () => {
+    if (!guardOfflineWrite(online, setError)) return;
     if (!user || !confirmModal) return;
     const { rutaId, empleadoUid, monto } = confirmModal;
     const key = asignarKey(rutaId, empleadoUid);
@@ -212,7 +216,7 @@ export default function RutaDelDiaPage() {
                               inputMode="decimal"
                               placeholder="Ej: 150000"
                               value={montosAsignar[key] ?? ""}
-                              disabled={busy || !!confirmModal}
+                              disabled={busy || !!confirmModal || !online}
                               onChange={(e) =>
                                 setMontosAsignar((prev) => ({
                                   ...prev,
@@ -224,7 +228,7 @@ export default function RutaDelDiaPage() {
                           <button
                             type="button"
                             className="btn btn-primary ruta-dia-emp-btn"
-                            disabled={busy || !!confirmModal || (r.cajaRuta ?? 0) <= 0}
+                            disabled={busy || !!confirmModal || (r.cajaRuta ?? 0) <= 0 || !online}
                             onClick={() =>
                               abrirConfirmacionAsignar(r.id, emp.uid, emp.nombre, r.nombre)
                             }
@@ -285,7 +289,7 @@ export default function RutaDelDiaPage() {
               type="button"
               className="btn btn-secondary"
               onClick={cerrarModalConfirmacion}
-              disabled={!!asignandoKey}
+              disabled={!!asignandoKey || !online}
             >
               Cancelar
             </button>
@@ -293,7 +297,7 @@ export default function RutaDelDiaPage() {
               type="button"
               className="btn btn-primary"
               onClick={() => void ejecutarAsignacionConfirmada()}
-              disabled={!!asignandoKey}
+              disabled={!!asignandoKey || !online}
               aria-busy={!!asignandoKey}
             >
               {asignandoKey ? "Asignando…" : "Confirmar asignación"}
