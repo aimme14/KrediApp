@@ -105,6 +105,9 @@ export interface PrestamoDoc {
   moroso?: boolean;
   /** Suma acumulada de pérdidas/castigos parciales reconocidos sobre este préstamo. */
   totalCastigado?: number;
+  /** Cobro bruto acumulado al momento del castigo (capital + interés cobrado).
+   * Solo préstamos castigados. No confundir con PagoDoc.cobradoAcumulado (auditoría del evento). */
+  cobradoAcumulado?: number;
   /** Fecha en que el préstamo quedó cerrado (pagado o castigado). */
   fechaCierre?: Date;
   /** Cómo se cerró: cobro real o castigo/incobro. */

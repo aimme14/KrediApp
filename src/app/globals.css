@@ -2884,6 +2884,10 @@ td {
 }
 
 /* Lista de otros préstamos al expandir */
+.historial-prestamos-list {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
 .historial-prestamos-list ul {
   margin: 0;
   padding-left: 1.25rem;
@@ -3720,6 +3724,33 @@ td {
   background: color-mix(in srgb, var(--input-bg) 80%, transparent) !important;
   border-bottom: 1px solid var(--table-border) !important;
   vertical-align: top !important;
+}
+
+.prestamo-admin-expand-header-row td,
+.prestamo-admin-expand-row td {
+  background: color-mix(in srgb, var(--input-bg) 80%, transparent) !important;
+  border-top: 1px solid var(--table-border) !important;
+  vertical-align: middle !important;
+}
+
+.prestamo-admin-expand-title-cell {
+  text-align: left !important;
+  padding-left: 0.5rem !important;
+}
+
+.prestamo-admin-expand-title {
+  font-weight: 600;
+  color: var(--text);
+  font-size: 0.8125rem;
+}
+
+.prestamo-admin-expand-empty {
+  color: var(--text-muted);
+}
+
+.prestamo-admin-expand-row .prestamo-histo-col-fecha,
+.prestamo-admin-expand-row .col-num {
+  font-size: 0.8125rem;
 }
 
 /* Admin — Rutas: tarjetas, KPIs y operación del día */

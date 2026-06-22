@@ -20,7 +20,6 @@ import {
 import { uploadImage, IMAGE_ACCEPT, getImageAccept } from "@/lib/storage";
 import {
   fechaDiaColombiaHoy,
-  formatFechaDia,
   formatoFechaGastoColombia,
 } from "@/lib/colombia-day-bounds";
 import {
@@ -492,51 +491,45 @@ export default function GastosPage() {
 
   const bannerPeriodo = (() => {
     if (filtroContable.modo === "hoy") {
-      const hoy = fechaDiaColombiaHoy();
       return {
         tone: "neutral" as const,
         titulo: "Gastos de hoy",
-        detalle: `${formatFechaDia(hoy)} · ${gastosPorPeriodo.length} gasto${gastosPorPeriodo.length !== 1 ? "s" : ""} del día.`,
+        detalle: "",
       };
     }
     if (filtroContable.modo === "todo") {
       return {
         tone: "neutral" as const,
         titulo: "Todo el historial",
-        detalle: `${gastos.length} gasto${gastos.length !== 1 ? "s" : ""} registrado${gastos.length !== 1 ? "s" : ""} en total.`,
+        detalle: "",
       };
     }
     if (filtroContable.modo === "actual" && !periodoAbierto) {
       return {
         tone: "warn" as const,
         titulo: "Sin periodo abierto",
-        detalle:
-          "",
+        detalle: "",
       };
     }
     if (!rangoContable?.periodo) {
       return {
         tone: "warn" as const,
         titulo: "Periodo no disponible",
-        detalle: "Selecciona otro periodo o revisa el Resumen económico.",
+        detalle: "",
       };
     }
     const num = rangoContable.numeroPeriodo ?? numeroPeriodoAdmin(rangoContable.periodo.id, periodos);
-    const fmt = (iso: string | null) =>
-      iso
-        ? new Date(iso).toLocaleString("es-CO", { dateStyle: "short", timeStyle: "short" })
-        : "—";
     if (rangoContable.periodo.estado === "abierto") {
       return {
         tone: "active" as const,
         titulo: `Periodo #${num ?? "—"} · Abierto`,
-        detalle: `Desde ${fmt(rangoContable.periodo.fechaApertura)} · ${gastosPorPeriodo.length} gasto${gastosPorPeriodo.length !== 1 ? "s" : ""} en el corte.`,
+        detalle: "",
       };
     }
     return {
       tone: "neutral" as const,
       titulo: `Periodo #${num ?? "—"} · Cerrado`,
-      detalle: `${fmt(rangoContable.periodo.fechaApertura)} – ${fmt(rangoContable.periodo.fechaCierre)} · ${gastosPorPeriodo.length} gasto${gastosPorPeriodo.length !== 1 ? "s" : ""}.`,
+      detalle: "",
     };
   })();
 
@@ -821,7 +814,7 @@ export default function GastosPage() {
             >
               <div className="gastos-admin-periodo-banner-text">
                 <strong>{bannerPeriodo.titulo}</strong>
-                <span>{bannerPeriodo.detalle}</span>
+                {bannerPeriodo.detalle ? <span>{bannerPeriodo.detalle}</span> : null}
               </div>
             </div>
 

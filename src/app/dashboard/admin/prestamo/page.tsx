@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo, Fragment } from "react";
+import { useState, useEffect, useCallback, useMemo, Fragment, type ReactNode } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
@@ -18,20 +18,19 @@ import {
 import { formatInteresResumenPct, parseInteresPct } from "@/lib/interes-pct";
 import {
   formatDebeSlashTotalCredito,
-  formatFechaCreacionPrestamo,
+  fechaRelevantePrestamo,
+  calcularDuracionDias,
 } from "@/lib/prestamo-display";
 import {
   filtrarPrestamosPorFiltroContable,
   mensajePrestamosVaciosContable,
   numeroPeriodoAdmin,
   periodoAbiertoAdmin,
-  periodoLabelDePrestamo,
   resolverRangoFiltroContable,
   type PrestamoFiltroContable,
   type PrestamoFiltroEstado,
 } from "@/lib/prestamo-periodo-filter";
 import { isPrestamoEnCobro, labelEstadoPrestamo } from "@/lib/prestamo-estado";
-import { fechaDiaColombiaHoy, formatFechaDia } from "@/lib/colombia-day-bounds";
 import { GastosPeriodoContableFilter } from "@/components/GastosPeriodoContableFilter";
 import {
   sanitizeMontoDecimalCOP,
@@ -110,6 +109,98 @@ function dedupePrestamos(list: PrestamoItem[]): PrestamoItem[] {
     seen.add(p.id);
     return true;
   });
+}
+
+function tituloColumnaMetrica(filtroEstado: PrestamoFiltroEstado): string {
+  if (filtroEstado === "castigado") return "Capital perdido";
+  return "Cuotas";
+}
+
+function mostrarColumnaMetrica(filtroEstado: PrestamoFiltroEstado): boolean {
+  return filtroEstado !== "pagado";
+}
+
+function numColumnasTablaPrestamo(filtroEstado: PrestamoFiltroEstado): number {
+  if (filtroEstado === "pagado") return 9;
+  if (filtroEstado === "castigado") return 10;
+  return 11;
+}
+
+function tituloColumnaSaldo(filtroEstado: PrestamoFiltroEstado): string {
+  if (filtroEstado === "castigado") return "Cobrado";
+  if (filtroEstado === "pagado") return "Total Pagado";
+  return "Saldo";
+}
+
+function celdaSaldoOCobrado(
+  p: PrestamoItem,
+  filtroEstado: PrestamoFiltroEstado
+): ReactNode {
+  if (filtroEstado === "castigado") {
+    return (
+      <span
+        style={{ color: "var(--success, #16a34a)", fontWeight: 600 }}
+        title="Cobro bruto acumulado antes del castigo"
+      >
+        $ {formatMoneda(p.cobradoAcumulado ?? 0)}
+      </span>
+    );
+  }
+  if (filtroEstado === "pagado") {
+    return formatMoneda(p.totalAPagar);
+  }
+  if (p.estado === "castigado") {
+    return (
+      <span
+        style={{ color: "var(--success, #16a34a)", fontWeight: 600 }}
+        title="Cobro bruto acumulado"
+      >
+        $ {formatMoneda(p.cobradoAcumulado ?? 0)}
+      </span>
+    );
+  }
+  if (p.estado === "pagado") {
+    return <span style={{ color: "var(--text-muted)" }}>—</span>;
+  }
+  return formatMoneda(p.saldoPendiente);
+}
+
+function celdaMetrica(
+  p: PrestamoItem,
+  filtroEstado: PrestamoFiltroEstado,
+  pagadas: number
+): ReactNode {
+  if (filtroEstado === "castigado") {
+    return (
+      <span
+        style={{ color: "var(--danger, #dc2626)", fontWeight: 600 }}
+        title="Capital no recuperado"
+      >
+        −$ {formatMoneda(p.totalCastigado ?? 0)}
+      </span>
+    );
+  }
+  if (p.estado === "castigado") {
+    return (
+      <span
+        style={{ color: "var(--danger, #dc2626)", fontWeight: 600 }}
+        title="Capital no recuperado"
+      >
+        −$ {formatMoneda(p.totalCastigado ?? 0)}
+      </span>
+    );
+  }
+  if (p.estado === "pagado") {
+    return (
+      <span
+        style={{ color: "var(--text-muted)", fontSize: "0.875rem" }}
+        title="Duración del crédito"
+      >
+        {calcularDuracionDias(p.fechaInicio, p.fechaCierre)}
+      </span>
+    );
+  }
+  return `${pagadas} / ${p.numeroCuotas}`;
 }
 
 export default function PrestamoPage() {
@@ -395,10 +486,8 @@ export default function PrestamoPage() {
       filtroContable,
       periodos
     );
-    const pagadosEnPeriodo = filtrarPrestamosPorFiltroContable(
-      prestamosPagados,
-      filtroContable,
-      periodos
+    const pagadosEnPeriodo = dedupePrestamos(
+      filtrarPrestamosPorFiltroContable(prestamosPagados, filtroContable, periodos)
     );
     const castigadosEnPeriodo = filtrarPrestamosPorFiltroContable(
       prestamosCastigados,
@@ -444,7 +533,7 @@ export default function PrestamoPage() {
   const filtroNombreLower = filtroNombre.trim().toLowerCase();
 
   const prestamosBase = useMemo(() => {
-    if (filtroEstado === "pagado") return prestamosPagados;
+    if (filtroEstado === "pagado") return dedupePrestamos(prestamosPagados);
     if (filtroEstado === "castigado") return prestamosCastigados;
     if (filtroEstado === "activo") {
       return prestamos.filter((p) => p.estado === "activo");
@@ -491,15 +580,6 @@ export default function PrestamoPage() {
       totalPerdido: castigados.reduce((sum, p) => sum + (p.totalCastigado ?? 0), 0),
     };
   }, [prestamosFiltrados]);
-
-  const totalDesembolsadoPeriodo = useMemo(
-    () =>
-      Math.round(
-        prestamosFiltrados.reduce((sum, p) => sum + (typeof p.monto === "number" ? p.monto : 0), 0) *
-          100
-      ) / 100,
-    [prestamosFiltrados]
-  );
 
   const PAGE_SIZE = 15;
   const [pagina, setPagina] = useState(1);
@@ -565,28 +645,19 @@ export default function PrestamoPage() {
 
   if (!profile || profile.role !== "admin") return null;
 
-  const detalleBannerColocados = (() => {
-    const base = `${prestamosFiltrados.length} préstamo${prestamosFiltrados.length !== 1 ? "s" : ""} · $ ${formatMoneda(totalDesembolsadoPeriodo)} colocados.`;
-    if (filtroEstado === "activo") {
-      return `${base} Solo los desembolsados en este período — préstamos de períodos anteriores aún activos no aparecen aquí.`;
-    }
-    return base;
-  })();
-
   const bannerPeriodo = (() => {
     if (filtroContable.modo === "hoy") {
-      const hoy = fechaDiaColombiaHoy();
       return {
         tone: "neutral" as const,
         titulo: "Desembolsados hoy",
-        detalle: `${formatFechaDia(hoy)} · ${prestamosFiltrados.length} préstamo${prestamosFiltrados.length !== 1 ? "s" : ""} · $ ${formatMoneda(totalDesembolsadoPeriodo)} colocados.`,
+        detalle: "",
       };
     }
     if (filtroContable.modo === "todo") {
       return {
         tone: "neutral" as const,
         titulo: "Todo el historial",
-        detalle: `${prestamosFiltrados.length} préstamo${prestamosFiltrados.length !== 1 ? "s" : ""} con los filtros actuales.`,
+        detalle: "",
       };
     }
     if (filtroContable.modo === "actual" && !periodoAbierto) {
@@ -601,7 +672,7 @@ export default function PrestamoPage() {
       return {
         tone: "warn" as const,
         titulo: "Periodo no disponible",
-        detalle: "Selecciona otro periodo o revisa el Resumen económico.",
+        detalle: "",
       };
     }
     const num =
@@ -610,13 +681,13 @@ export default function PrestamoPage() {
       return {
         tone: "active" as const,
         titulo: `Período #${num ?? "—"} · Abierto — desembolsados en este corte`,
-        detalle: detalleBannerColocados,
+        detalle: "",
       };
     }
     return {
       tone: "neutral" as const,
       titulo: `Período #${num ?? "—"} · Cerrado — desembolsados en este corte`,
-      detalle: detalleBannerColocados,
+      detalle: "",
     };
   })();
 
@@ -1011,7 +1082,7 @@ export default function PrestamoPage() {
             >
               <div className="gastos-admin-periodo-banner-text">
                 <strong>{bannerPeriodo.titulo}</strong>
-                <span>{bannerPeriodo.detalle}</span>
+                {bannerPeriodo.detalle ? <span>{bannerPeriodo.detalle}</span> : null}
               </div>
             </div>
 
@@ -1089,16 +1160,24 @@ export default function PrestamoPage() {
                   <th aria-label="Expandir historial" />
                   <th>Código</th>
                   <th>Cliente</th>
-                  <th>Fecha</th>
+                  <th>
+                    {filtroEstado === "pagado"
+                      ? "Fecha pago"
+                      : filtroEstado === "castigado"
+                        ? "Fecha pérdida"
+                        : "Fecha"}
+                  </th>
                   <th className="col-num">
                     <span className="prestamo-admin-monto-th-desktop">Monto</span>
                     <span className="prestamo-admin-monto-th-mobile">Debe</span>
                   </th>
-                  <th className="col-num">Total a pagar</th>
-                  <th className="col-num">Saldo</th>
-                  <th className="col-num">
-                    {filtroEstado === "castigado" ? "Pérdida" : "Cuotas"}
-                  </th>
+                  {filtroEstado !== "pagado" && filtroEstado !== "castigado" && (
+                    <th className="col-num">Total a pagar</th>
+                  )}
+                  <th className="col-num">{tituloColumnaSaldo(filtroEstado)}</th>
+                  {mostrarColumnaMetrica(filtroEstado) && (
+                    <th className="col-num">{tituloColumnaMetrica(filtroEstado)}</th>
+                  )}
                   <th>Estado</th>
                   <th>Frecuencia</th>
                   <th>
@@ -1143,8 +1222,15 @@ export default function PrestamoPage() {
                         <td className="prestamo-admin-col-cliente" title={nombre}>
                           {nombre}
                         </td>
-                        <td className="prestamo-histo-col-fecha" title="Fecha de creación">
-                          {formatFechaCreacionPrestamo(principal)}
+                        <td
+                          className="prestamo-histo-col-fecha"
+                          title={
+                            principal.estado === "pagado" || principal.estado === "castigado"
+                              ? "Fecha de cierre"
+                              : "Fecha de creación"
+                          }
+                        >
+                          {fechaRelevantePrestamo(principal)}
                         </td>
                         <td className="col-num">
                           <span className="prestamo-admin-monto-desktop">{formatMoneda(principal.monto)}</span>
@@ -1152,26 +1238,24 @@ export default function PrestamoPage() {
                             {formatDebeSlashTotalCredito(principal.saldoPendiente, principal)}
                           </span>
                         </td>
-                        <td className="col-num">{formatMoneda(principal.totalAPagar)}</td>
-                        <td className="col-num">{formatMoneda(principal.saldoPendiente)}</td>
-                        <td
-                          className="col-num"
-                          title={
-                            principal.estado === "castigado"
-                              ? "Capital en pérdida"
-                              : "Cuotas pagadas / total"
-                          }
-                        >
-                          {principal.estado === "castigado" ? (
-                            <span style={{ color: "var(--danger, #dc2626)", fontWeight: 600 }}>
-                              −$ {formatMoneda(principal.totalCastigado ?? 0)}
-                            </span>
-                          ) : principal.estado === "pagado" ? (
-                            <span style={{ color: "var(--text-muted)", fontSize: "0.875rem" }}>—</span>
-                          ) : (
-                            `${pagadas} / ${principal.numeroCuotas}`
-                          )}
-                        </td>
+                        {filtroEstado !== "pagado" && filtroEstado !== "castigado" && (
+                          <td className="col-num">{formatMoneda(principal.totalAPagar)}</td>
+                        )}
+                        <td className="col-num">{celdaSaldoOCobrado(principal, filtroEstado)}</td>
+                        {mostrarColumnaMetrica(filtroEstado) && (
+                          <td
+                            className="col-num"
+                            title={
+                              filtroEstado === "castigado" || principal.estado === "castigado"
+                                ? "Capital no recuperado"
+                                : principal.estado === "pagado"
+                                  ? "Duración del crédito"
+                                  : "Cuotas pagadas / total"
+                            }
+                          >
+                            {celdaMetrica(principal, filtroEstado, pagadas)}
+                          </td>
+                        )}
                         <td>
                           <span
                             className={`prestamo-admin-estado${prestamoEstadoBadgeClass(principal.estado)}`}
@@ -1193,42 +1277,65 @@ export default function PrestamoPage() {
                         </td>
                       </tr>
                       {tieneMas && expandido && (
-                        <tr id={`historial-cliente-${grupo.clienteId}`} aria-labelledby={`btn-expand-${grupo.clienteId}`}>
-                          <td colSpan={11} className="prestamo-admin-expand-panel">
-                            <div className="historial-prestamos-list" style={{ fontSize: "0.8125rem", color: "var(--text-muted)" }}>
-                              <span style={{ fontWeight: 600, color: "var(--text)", marginBottom: "0.35rem", display: "block" }}>Otros préstamos</span>
-                              <ul>
-                                {otros.map((p) => {
-                                  const periodoLabel = periodoLabelDePrestamo(p, periodos);
-                                  return (
-                                    <li key={p.id} style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
-                                      {periodoLabel ? (
-                                        <span style={{ fontSize: "0.75rem", color: "var(--text-muted)", fontWeight: 600 }}>
-                                          {periodoLabel}
-                                        </span>
-                                      ) : null}
-                                      {formatMoneda(p.monto)} · {formatFechaCreacionPrestamo(p)} · {labelEstadoPrestamo(p)}
-                                      {p.estado === "castigado" && (p.totalCastigado ?? 0) > 0 && (
-                                        <span style={{ color: "var(--danger, #dc2626)", fontSize: "0.8125rem", fontWeight: 600 }}>
-                                          · Pérdida: −$ {formatMoneda(p.totalCastigado ?? 0)}
-                                        </span>
-                                      )}
-                                      {p.estado !== "castigado" && ` · ${p.numeroCuotas} cuotas`}
-                                      {isPrestamoEnCobro(p) && (
-                                        <Link
-                                          href={`/dashboard/admin/cobrar?clienteId=${grupo.clienteId}&prestamoId=${p.id}`}
-                                          className="btn btn-primary prestamo-admin-cobro-btn prestamo-admin-cobro-btn--sm"
-                                        >
-                                          Registrar cobro
-                                        </Link>
-                                      )}
-                                    </li>
-                                  );
-                                })}
-                              </ul>
-                            </div>
-                          </td>
-                        </tr>
+                        <>
+                          <tr
+                            className="prestamo-admin-expand-header-row"
+                            aria-labelledby={`btn-expand-${grupo.clienteId}`}
+                          >
+                            <td aria-hidden />
+                            <td colSpan={2} className="prestamo-admin-expand-title-cell">
+                              <span className="prestamo-admin-expand-title">Otros préstamos</span>
+                            </td>
+                            <td
+                              colSpan={numColumnasTablaPrestamo(filtroEstado) - 3}
+                              aria-hidden
+                              className="prestamo-admin-expand-empty"
+                            />
+                          </tr>
+                          {otros.map((p) => {
+                            const pagadasP = cuotasPagadas(
+                              p.totalAPagar,
+                              p.numeroCuotas,
+                              p.saldoPendiente
+                            );
+                            return (
+                              <tr key={p.id} className="prestamo-admin-expand-row">
+                                <td aria-hidden className="prestamo-admin-expand-empty" />
+                                <td aria-hidden className="prestamo-admin-expand-empty" />
+                                <td aria-hidden className="prestamo-admin-expand-empty" />
+                                <td className="prestamo-histo-col-fecha">
+                                  {fechaRelevantePrestamo(p)}
+                                </td>
+                                <td className="col-num">{formatMoneda(p.monto)}</td>
+                                {filtroEstado !== "pagado" && filtroEstado !== "castigado" && (
+                                  <td className="col-num">{formatMoneda(p.totalAPagar)}</td>
+                                )}
+                                <td className="col-num">{celdaSaldoOCobrado(p, filtroEstado)}</td>
+                                {mostrarColumnaMetrica(filtroEstado) && (
+                                  <td className="col-num">{celdaMetrica(p, filtroEstado, pagadasP)}</td>
+                                )}
+                                <td>
+                                  <span
+                                    className={`prestamo-admin-estado${prestamoEstadoBadgeClass(p.estado)}`}
+                                  >
+                                    {labelEstadoPrestamo(p)}
+                                  </span>
+                                </td>
+                                <td className="prestamo-admin-expand-empty">{p.modalidad}</td>
+                                <td className="prestamo-admin-cobro-cell">
+                                  {isPrestamoEnCobro(p) && (
+                                    <Link
+                                      href={`/dashboard/admin/cobrar?clienteId=${grupo.clienteId}&prestamoId=${p.id}`}
+                                      className="btn btn-primary prestamo-admin-cobro-btn prestamo-admin-cobro-btn--sm"
+                                    >
+                                      Cobrar
+                                    </Link>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </>
                       )}
                     </Fragment>
                   );

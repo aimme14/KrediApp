@@ -111,6 +111,8 @@ export type PrestamoItem = {
   moroso?: boolean;
   /** Suma acumulada de castigos parciales reconocidos. */
   totalCastigado?: number;
+  /** Cobro bruto acumulado antes del castigo. */
+  cobradoAcumulado?: number;
   /** Fecha de cierre del préstamo (ISO). */
   fechaCierre?: string | null;
   /** Cómo se cerró: cobro o castigo. */

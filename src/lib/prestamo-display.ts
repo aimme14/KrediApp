@@ -73,3 +73,34 @@ export function computeSaldoPorRecogerPorRuta(
   }
   return map;
 }
+
+export function formatFechaCierrePrestamo(p: { fechaCierre?: string | null }): string {
+  if (!p.fechaCierre) return "—";
+  return new Date(p.fechaCierre).toLocaleDateString("es-CO", { dateStyle: "short" });
+}
+
+/** Fecha relevante según estado del préstamo (no del filtro UI). */
+export function fechaRelevantePrestamo(
+  p: Pick<PrestamoItem, "estado" | "creadoEn" | "fechaInicio" | "fechaCierre">
+): string {
+  if ((p.estado === "pagado" || p.estado === "castigado") && p.fechaCierre) {
+    return formatFechaCierrePrestamo(p);
+  }
+  return formatFechaCreacionPrestamo(p);
+}
+
+/** Días calendario Colombia entre inicio y cierre. */
+export function calcularDuracionDias(
+  fechaInicio: string | null | undefined,
+  fechaCierre: string | null | undefined
+): string {
+  const diaInicio = fechaDiaCalendarioDesdeISO(fechaInicio ?? null);
+  const diaCierre = fechaDiaCalendarioDesdeISO(fechaCierre ?? null);
+  if (!diaInicio || !diaCierre) return "—";
+  const t0 = Date.parse(`${diaInicio}T12:00:00Z`);
+  const t1 = Date.parse(`${diaCierre}T12:00:00Z`);
+  const dias = Math.round((t1 - t0) / (1000 * 60 * 60 * 24));
+  if (dias < 0) return "—";
+  if (dias === 0) return "mismo día";
+  return `${dias} día${dias !== 1 ? "s" : ""}`;
+}

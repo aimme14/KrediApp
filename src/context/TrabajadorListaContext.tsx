@@ -104,10 +104,22 @@ function mapPrestamo(d: QueryDocumentSnapshot): PrestamoItem {
     intentosFallidos: typeof data.intentosFallidos === "number" ? data.intentosFallidos : 0,
     moroso: data.moroso === true,
     totalCastigado: typeof data.totalCastigado === "number" ? data.totalCastigado : 0,
+    cobradoAcumulado:
+      typeof data.cobradoAcumulado === "number" ? data.cobradoAcumulado : undefined,
     fechaCierre: data.fechaCierre?.toDate?.()?.toISOString?.() ?? null,
     cerradoPor:
       data.cerradoPor === "cobro" || data.cerradoPor === "castigo" ? data.cerradoPor : null,
   };
+}
+
+function appendPrestamosSinDuplicar(
+  prev: PrestamoItem[],
+  nuevos: PrestamoItem[]
+): PrestamoItem[] {
+  if (nuevos.length === 0) return prev;
+  const seen = new Set(prev.map((p) => p.id));
+  const toAdd = nuevos.filter((p) => !seen.has(p.id));
+  return toAdd.length > 0 ? [...prev, ...toAdd] : prev;
 }
 
 export function TrabajadorListaProvider({ children }: { children: ReactNode }) {
@@ -124,6 +136,7 @@ export function TrabajadorListaProvider({ children }: { children: ReactNode }) {
   const [lastFetchedAt, setLastFetchedAt] = useState(0);
   const [datosSyncEstado, setDatosSyncEstado] = useState<DatosSyncEstado>("syncing");
   const lastDocPagadosRef = useRef<QueryDocumentSnapshot | null>(null);
+  const cargandoPagadosRef = useRef(false);
   const syncMorosoHechoRef = useRef(false);
 
   const refresh = useCallback(async () => {
@@ -148,6 +161,7 @@ export function TrabajadorListaProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     lastDocPagadosRef.current = null;
+    cargandoPagadosRef.current = false;
     setPrestamosPagados([]);
     setHayMasPagados(true);
     setLoadingPagados(false);
@@ -296,10 +310,12 @@ export function TrabajadorListaProvider({ children }: { children: ReactNode }) {
   }, [user?.uid, profile?.role, profile?.empresaId, profile?.rutaId]);
 
   const cargarMasPagados = useCallback(async () => {
-    if (!db || !user || !profile || loadingPagados || !hayMasPagados) return;
+    if (!db || !user || !profile || !hayMasPagados) return;
+    if (cargandoPagadosRef.current) return;
     const empresaId = profile.empresaId?.trim();
     if (!empresaId) return;
 
+    cargandoPagadosRef.current = true;
     setLoadingPagados(true);
     try {
       const prestamosCol = collection(db, EMPRESAS_COLLECTION, empresaId, PRESTAMOS_SUBCOLLECTION);
@@ -330,13 +346,14 @@ export function TrabajadorListaProvider({ children }: { children: ReactNode }) {
         lastDocPagadosRef.current = snap.docs[snap.docs.length - 1] ?? null;
       }
 
-      setPrestamosPagados((prev) => [...prev, ...nuevos]);
+      setPrestamosPagados((prev) => appendPrestamosSinDuplicar(prev, nuevos));
     } catch (e) {
       console.warn("[TrabajadorLista] fetch pagados:", e);
     } finally {
+      cargandoPagadosRef.current = false;
       setLoadingPagados(false);
     }
-  }, [user, profile, loadingPagados, hayMasPagados]);
+  }, [user, profile, hayMasPagados]);
 
   const cargarMasCastigados = useCallback(async () => {
     // Castigados se actualizan con onSnapshot; sin paginación lazy.

@@ -764,11 +764,17 @@ function CobrarClientePageContent() {
       setShowModalPerdida(false);
       setSaldoPerdidaRegistrada(montoPerdida);
       setShowModalPerdidaExito(true);
+      const cobrado = round2((prestamo.totalAPagar ?? 0) - (prestamo.saldoPendiente ?? 0));
+      const capitalPerdido =
+        cobrado < (prestamo.monto ?? 0) ? round2((prestamo.monto ?? 0) - cobrado) : 0;
       setPrestamo({
         ...prestamo,
         saldoPendiente: 0,
         estado: "castigado",
-        totalCastigado: (prestamo.totalCastigado ?? 0) + montoPerdida,
+        cobradoAcumulado: cobrado,
+        totalCastigado: (prestamo.totalCastigado ?? 0) + capitalPerdido,
+        fechaCierre: new Date().toISOString(),
+        cerradoPor: "castigo",
       });
       await refreshLista();
     } catch (e) {
