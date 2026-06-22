@@ -123,7 +123,15 @@ function TarjetaResumen(props: {
 
 export default function CajaDelDiaPage() {
   const { profile } = useAuth();
-  const { fechaDia, data, loading, error, tuCajaEfectivo } = useTrabajadorCajaDia();
+  const {
+    fechaDia,
+    data,
+    loading,
+    error,
+    tuCajaEfectivo,
+    totalGastosRT,
+    totalPrestamosRT,
+  } = useTrabajadorCajaDia();
   const cajaActual = tuCajaEfectivo ?? 0;
   const [evidenciaModalUrl, setEvidenciaModalUrl] = useState<string | null>(null);
   const evidenciaCerrarRef = useRef<HTMLButtonElement>(null);
@@ -231,11 +239,11 @@ export default function CajaDelDiaPage() {
                   />
                   <TarjetaResumen
                     etiqueta="Gastos del día"
-                    valor={formatMonto(data.totalGastosDia)}
+                    valor={formatMonto(totalGastosRT ?? data.totalGastosDia ?? 0)}
                   />
                   <TarjetaResumen
                     etiqueta={`Préstamos (${formatFechaDia(data.fechaDia)})`}
-                    valor={formatMonto(data.totalPrestamosDesembolsoDia ?? 0)}
+                    valor={formatMonto(totalPrestamosRT ?? data.totalPrestamosDesembolsoDia ?? 0)}
                   />
                   {(data.totalPerdidasDia ?? 0) > 0 && (
                     <TarjetaResumen

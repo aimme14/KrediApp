@@ -45,6 +45,9 @@ export type TrabajadorCajaDiaContextValue = {
   refresh: () => Promise<void>;
   cajaEmpleadoRT: number | null;
   tuCajaEfectivo: number | null;
+  totalGastosRT: number | null;
+  totalPrestamosRT: number | null;
+  totalCobrosEfectivoRT: number | null;
 };
 
 const TrabajadorCajaDiaContext = createContext<TrabajadorCajaDiaContextValue | null>(null);
@@ -282,8 +285,22 @@ export function TrabajadorCajaDiaProvider({ children }: { children: ReactNode })
       refresh,
       cajaEmpleadoRT,
       tuCajaEfectivo,
+      totalGastosRT: gastosRT,
+      totalPrestamosRT: prestamosRT,
+      totalCobrosEfectivoRT: cobrosEfectivoRT,
     }),
-    [fechaDia, data, loading, error, refresh, cajaEmpleadoRT, tuCajaEfectivo]
+    [
+      fechaDia,
+      data,
+      loading,
+      error,
+      refresh,
+      cajaEmpleadoRT,
+      tuCajaEfectivo,
+      gastosRT,
+      prestamosRT,
+      cobrosEfectivoRT,
+    ]
   );
 
   return (
