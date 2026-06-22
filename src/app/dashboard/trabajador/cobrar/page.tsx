@@ -382,7 +382,7 @@ function CobrarClientePageContent() {
           clearCobroSnapshot(prestamoId, user.uid);
           setError(result.error ?? "El cobro anterior falló. Intenta de nuevo.");
         } else if (result.processing) {
-          setError("Hay un cobro en proceso. Puedes reintentar sin duplicar.");
+          setError("");
         }
       } catch {
         /* Error de red — mantener snapshot para reintento */

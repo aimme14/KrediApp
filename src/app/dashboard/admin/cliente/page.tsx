@@ -10,6 +10,9 @@ import {
   formatClienteCodigoRutaYNumero,
   type ClienteItem,
 } from "@/lib/empresa-api";
+import { filtrarClientesParaExport } from "@/lib/export-clientes";
+import { getEmpresa } from "@/lib/empresa";
+import { ExportClientesModal } from "@/components/ExportClientesModal";
 
 export default function ClientePage() {
   const { user, profile } = useAuth();
@@ -38,6 +41,8 @@ export default function ClientePage() {
   const [filtroNombre, setFiltroNombre] = useState("");
   const [filtroPrestamoActivo, setFiltroPrestamoActivo] = useState<"todos" | "si" | "no">("todos");
   const [filtroRutaId, setFiltroRutaId] = useState("");
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [nombreEmpresa, setNombreEmpresa] = useState("KrediApp");
 
   const rutaPorId = useMemo(() => {
     const m: Record<string, string> = {};
@@ -69,24 +74,21 @@ export default function ClientePage() {
     { value: "no" as const, label: "Sin préstamo" },
   ];
 
-  const clientesFiltrados = useMemo(() => {
-    return clientes.filter((c) => {
-      if (filtroNombreLower) {
-        const nombre = (c.nombre ?? "").toLowerCase();
-        const codigo = c.codigo ? formatClienteCodigoRutaYNumero(c.codigo).toLowerCase() : "";
-        const cedula = (c.cedula ?? "").toLowerCase();
-        const coincideNombre =
-          nombre.includes(filtroNombreLower) ||
-          codigo.includes(filtroNombreLower) ||
-          cedula.includes(filtroNombreLower);
-        if (!coincideNombre) return false;
-      }
-      if (filtroPrestamoActivo === "si" && !c.prestamo_activo) return false;
-      if (filtroPrestamoActivo === "no" && c.prestamo_activo) return false;
-      if (filtroRutaId && (c.rutaId ?? "") !== filtroRutaId) return false;
-      return true;
-    });
-  }, [clientes, filtroNombreLower, filtroPrestamoActivo, filtroRutaId]);
+  const clientesFiltrados = useMemo(
+    () =>
+      filtrarClientesParaExport(
+        clientes,
+        filtroNombre,
+        filtroRutaId,
+        filtroPrestamoActivo
+      ),
+    [clientes, filtroNombre, filtroRutaId, filtroPrestamoActivo]
+  );
+
+  const clientesExportables = useMemo(
+    () => filtrarClientesParaExport(clientes, filtroNombre, filtroRutaId, "todos"),
+    [clientes, filtroNombre, filtroRutaId]
+  );
 
   const clientesPaginados = useMemo(() => {
     const sorted = [...clientesFiltrados].sort(
@@ -101,6 +103,15 @@ export default function ClientePage() {
   useEffect(() => {
     setPagina(1);
   }, [filtroNombre, filtroPrestamoActivo, filtroRutaId]);
+
+  useEffect(() => {
+    if (!profile?.empresaId) return;
+    getEmpresa(profile.empresaId)
+      .then((e) => {
+        if (e?.nombre) setNombreEmpresa(e.nombre.trim());
+      })
+      .catch(() => {});
+  }, [profile?.empresaId]);
 
   const cerrarEdicion = useCallback(() => {
     setClienteEditando(null);
@@ -282,7 +293,20 @@ export default function ClientePage() {
       {!showForm && error && <p className="error-msg">{error}</p>}
 
       <div className="card admin-clientes-list-card">
-        <h3 style={{ marginTop: 0 }}>Clientes</h3>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.75rem" }}>
+          <h3 style={{ margin: 0 }}>Clientes</h3>
+          {clientesExportables.length > 0 && (
+            <button
+              type="button"
+              className="btn btn-secondary"
+              style={{ fontSize: "0.8125rem" }}
+              onClick={() => setShowExportModal(true)}
+              title="Exportar clientes a Excel"
+            >
+              ↓ Excel
+            </button>
+          )}
+        </div>
         {loading ? (
           <p>Cargando...</p>
         ) : clientes.length === 0 ? (
@@ -539,6 +563,18 @@ export default function ClientePage() {
             </form>
           </div>
         </div>
+      )}
+
+      {showExportModal && (
+        <ExportClientesModal
+          onCerrar={() => setShowExportModal(false)}
+          clientes={clientes}
+          rutaPorId={rutaPorId}
+          filtroRutaId={filtroRutaId}
+          filtroNombre={filtroNombre.trim() || undefined}
+          nombreEmpresa={nombreEmpresa}
+          filtroPrestamoInicial={filtroPrestamoActivo}
+        />
       )}
     </div>
   );
