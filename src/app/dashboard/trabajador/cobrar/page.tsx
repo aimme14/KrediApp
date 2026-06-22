@@ -247,6 +247,7 @@ function CobrarClientePageContent() {
   const [showModalNoPago, setShowModalNoPago] = useState(false);
   const [noPagoRegistrado, setNoPagoRegistrado] = useState(false);
 
+  const [showPerdida, setShowPerdida] = useState(false);
   const [showModalPerdida, setShowModalPerdida] = useState(false);
   const [motivoPerdida, setMotivoPerdida] = useState<MotivoPerdida | "">("");
   const [notaPerdida, setNotaPerdida] = useState("");
@@ -719,6 +720,16 @@ function CobrarClientePageContent() {
     setShowModalNoPago(true);
   };
 
+  const handleRevisarPerdida = () => {
+    if (!motivoPerdida || !user || !prestamoId || !profile || !prestamo) return;
+    if ((prestamo.saldoPendiente ?? 0) <= 0) {
+      setError("No hay saldo pendiente para registrar la pérdida");
+      return;
+    }
+    setError(null);
+    setShowModalPerdida(true);
+  };
+
   const handleEjecutarNoPago = async () => {
     if (!motivoNoPago || !user || !prestamoId || !profile) return;
     setSubmittingNoPago(true);
@@ -762,6 +773,7 @@ function CobrarClientePageContent() {
         registradoPorUid: user.uid,
         registradoPorNombre: nombreRegistro || undefined,
       });
+      setShowPerdida(false);
       setShowModalPerdida(false);
       setSaldoPerdidaRegistrada(montoPerdida);
       setShowModalPerdidaExito(true);
@@ -1146,6 +1158,156 @@ function CobrarClientePageContent() {
     );
   }
 
+  if (showPerdida && cliente && prestamo) {
+    const motivoPerdidaLabel =
+      MOTIVOS_PERDIDA.find((m) => m.value === motivoPerdida)?.label ?? motivoPerdida;
+    const notaPerdidaTrim = notaPerdida.trim();
+    return (
+      <div className="card cobrar-card">
+        <div className="cobrar-header">
+          <h2 className="cobrar-title">Registrar pérdida</h2>
+          <p className="cobrar-subtitle">{cliente.nombre}</p>
+        </div>
+        <p className="cobrar-text">
+          Indica el motivo para castigar el saldo pendiente del préstamo. Esta acción no se puede deshacer.
+        </p>
+        {desglosePerdida ? (
+          <>
+            <p style={{ fontSize: "0.9375rem", marginTop: "0.25rem" }}>
+              Saldo pendiente:{" "}
+              <strong>{formatCurrency(desglosePerdida.saldoPendiente)}</strong>
+            </p>
+            <div
+              style={{
+                background: "var(--bg)",
+                borderRadius: "var(--radius)",
+                padding: "0.75rem",
+                fontSize: "0.875rem",
+                marginTop: "0.5rem",
+              }}
+            >
+              <p style={{ margin: "0 0 0.35rem", color: "var(--text-muted)" }}>
+                Impacto real en la ruta:
+              </p>
+              {desglosePerdida.capitalNoRecuperado > 0 ? (
+                <>
+                  <p style={{ margin: "0 0 0.25rem" }}>
+                    Capital a descontar de inversiones:{" "}
+                    <strong style={{ color: "var(--danger, #dc2626)" }}>
+                      {formatCurrency(desglosePerdida.capitalNoRecuperado)}
+                    </strong>
+                  </p>
+                  <p style={{ margin: 0, color: "var(--text-muted)", fontSize: "0.8rem" }}>
+                    Los {formatCurrency(desglosePerdida.interesNoCobradoEnSaldo)} restantes
+                    corresponden a interés no cobrado.
+                  </p>
+                </>
+              ) : (
+                <p style={{ margin: 0 }}>
+                  Capital ya recuperado completo — solo se ajustan ganancias.
+                </p>
+              )}
+            </div>
+          </>
+        ) : null}
+        <div className="form-group" style={{ marginTop: "0.75rem" }}>
+          <label htmlFor="cobrar-motivo-perdida">Motivo</label>
+          <select
+            id="cobrar-motivo-perdida"
+            value={motivoPerdida}
+            onChange={(e) => setMotivoPerdida(e.target.value as MotivoPerdida)}
+            className="cobrar-select"
+            disabled={submittingPerdida}
+          >
+            <option value="">Seleccionar...</option>
+            {MOTIVOS_PERDIDA.map((m) => (
+              <option key={m.value} value={m.value}>{m.label}</option>
+            ))}
+          </select>
+        </div>
+        <div className="form-group">
+          <label htmlFor="cobrar-nota-perdida">Nota (opcional)</label>
+          <input
+            id="cobrar-nota-perdida"
+            type="text"
+            value={notaPerdida}
+            onChange={(e) => setNotaPerdida(e.target.value)}
+            placeholder="Detalle adicional"
+            className="cobrar-input"
+            disabled={submittingPerdida}
+          />
+        </div>
+        {error && <p className="error-msg">{error}</p>}
+        <div className="cobrar-actions">
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={() => {
+              setShowModalPerdida(false);
+              setShowPerdida(false);
+            }}
+            disabled={submittingPerdida}
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            className="btn btn-primary"
+            disabled={
+              !motivoPerdida ||
+              (prestamo.saldoPendiente ?? 0) <= 0 ||
+              submittingPerdida ||
+              showModalPerdida
+            }
+            onClick={handleRevisarPerdida}
+          >
+            Revisar pérdida
+          </button>
+        </div>
+
+        {showModalPerdida && (
+          <ModalConfirmar
+            titulo="Confirmar pérdida"
+            labelConfirmar="Sí, registrar pérdida"
+            confirmando={submittingPerdida}
+            onCancelar={() => {
+              if (submittingPerdida) return;
+              setShowModalPerdida(false);
+            }}
+            onConfirmar={() => { void handleEjecutarPerdida(); }}
+          >
+            <p>
+              ¿Confirmas registrar la pérdida del préstamo de <strong>{cliente.nombre}</strong>?
+            </p>
+            {desglosePerdida ? (
+              desglosePerdida.capitalNoRecuperado > 0 ? (
+                <p>
+                  Capital a descontar de inversiones:{" "}
+                  <strong style={{ color: "var(--danger, #dc2626)" }}>
+                    {formatCurrency(desglosePerdida.capitalNoRecuperado)}
+                  </strong>
+                </p>
+              ) : (
+                <p style={{ fontSize: "0.875rem", color: "var(--text-muted)" }}>
+                  Capital ya recuperado completo — solo se ajustan ganancias en la ruta.
+                </p>
+              )
+            ) : null}
+            <p>
+              Motivo: <strong>{motivoPerdidaLabel}</strong>
+            </p>
+            {notaPerdidaTrim ? (
+              <p>
+                Nota: <strong>{notaPerdidaTrim}</strong>
+              </p>
+            ) : null}
+            
+          </ModalConfirmar>
+        )}
+      </div>
+    );
+  }
+
   const pagosHistorial = ultimosPagos;
   const formatFechaPago = (f: string | null) =>
     f ? new Date(f).toLocaleString("es-CO", { dateStyle: "short", timeStyle: "short" }) : "—";
@@ -1163,7 +1325,7 @@ function CobrarClientePageContent() {
                 setError(null);
                 setMotivoPerdida("");
                 setNotaPerdida("");
-                setShowModalPerdida(true);
+                setShowPerdida(true);
               }}
             >
               Pérdida
@@ -1430,93 +1592,6 @@ function CobrarClientePageContent() {
             Saldo restante tras el cobro:{" "}
             <strong>{formatCurrency(Math.max(0, saldoPendiente - montoAplicar))}</strong>
           </p>
-        </ModalConfirmar>
-      )}
-
-      {showModalPerdida && (
-        <ModalConfirmar
-          titulo="Registrar pérdida"
-          labelConfirmar="Sí, registrar pérdida"
-          confirmando={submittingPerdida}
-          confirmarDeshabilitado={
-            !motivoPerdida || (prestamo?.saldoPendiente ?? 0) <= 0
-          }
-          onCancelar={() => {
-            if (submittingPerdida) return;
-            setShowModalPerdida(false);
-          }}
-          onConfirmar={() => { void handleEjecutarPerdida(); }}
-        >
-          <p>
-            ¿Confirmas registrar la pérdida del préstamo de <strong>{cliente.nombre}</strong>?
-          </p>
-          {desglosePerdida ? (
-            <>
-              <p style={{ fontSize: "0.9375rem", marginTop: "0.5rem" }}>
-                Saldo pendiente:{" "}
-                <strong>{formatCurrency(desglosePerdida.saldoPendiente)}</strong>
-              </p>
-              <div
-                style={{
-                  background: "var(--bg)",
-                  borderRadius: "var(--radius)",
-                  padding: "0.75rem",
-                  fontSize: "0.875rem",
-                  marginTop: "0.5rem",
-                }}
-              >
-                <p style={{ margin: "0 0 0.35rem", color: "var(--text-muted)" }}>
-                  Impacto real en la ruta:
-                </p>
-                {desglosePerdida.capitalNoRecuperado > 0 ? (
-                  <>
-                    <p style={{ margin: "0 0 0.25rem" }}>
-                      Capital a descontar de inversiones:{" "}
-                      <strong style={{ color: "var(--danger, #dc2626)" }}>
-                        {formatCurrency(desglosePerdida.capitalNoRecuperado)}
-                      </strong>
-                    </p>
-                    <p style={{ margin: 0, color: "var(--text-muted)", fontSize: "0.8rem" }}>
-                      Los {formatCurrency(desglosePerdida.interesNoCobradoEnSaldo)} restantes
-                      corresponden a interés no cobrado — no impactan inversiones.
-                    </p>
-                  </>
-                ) : (
-                  <p style={{ margin: 0 }}>
-                    Capital ya recuperado completo — solo se ajustan ganancias.
-                  </p>
-                )}
-              </div>
-            </>
-          ) : null}
-          <div className="form-group" style={{ marginTop: "0.75rem" }}>
-            <label htmlFor="cobrar-motivo-perdida">Motivo</label>
-            <select
-              id="cobrar-motivo-perdida"
-              value={motivoPerdida}
-              onChange={(e) => setMotivoPerdida(e.target.value as MotivoPerdida)}
-              className="cobrar-select"
-              disabled={submittingPerdida}
-            >
-              <option value="">Seleccionar...</option>
-              {MOTIVOS_PERDIDA.map((m) => (
-                <option key={m.value} value={m.value}>{m.label}</option>
-              ))}
-            </select>
-          </div>
-          <div className="form-group">
-            <label htmlFor="cobrar-nota-perdida">Nota (opcional)</label>
-            <input
-              id="cobrar-nota-perdida"
-              type="text"
-              value={notaPerdida}
-              onChange={(e) => setNotaPerdida(e.target.value)}
-              placeholder="Detalle adicional"
-              className="cobrar-input"
-              disabled={submittingPerdida}
-            />
-          </div>
-          {error && <p className="error-msg">{error}</p>}
         </ModalConfirmar>
       )}
 
