@@ -15,6 +15,7 @@
     "migrate-empresas": "node scripts/migrate-to-empresas-structure.js"
   },
   "dependencies": {
+    "exceljs": "^4.4.0",
     "firebase": "^10.14.0",
     "firebase-admin": "^12.7.0",
     "html2canvas": "^1.4.1",

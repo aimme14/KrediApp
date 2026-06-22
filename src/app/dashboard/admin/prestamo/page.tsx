@@ -8,7 +8,6 @@ import { useAdminDashboard } from "@/context/AdminDashboardContext";
 import { useTrabajadorLista } from "@/context/TrabajadorListaContext";
 import {
   createPrestamo,
-  esPrestamoMorosoPendiente,
   formatClienteCodigoRutaYNumero,
   listPeriodosAdmin,
   type ClienteItem,
@@ -22,7 +21,6 @@ import {
   calcularDuracionDias,
 } from "@/lib/prestamo-display";
 import {
-  filtrarPrestamosPorFiltroContable,
   mensajePrestamosVaciosContable,
   numeroPeriodoAdmin,
   periodoAbiertoAdmin,
@@ -30,6 +28,12 @@ import {
   type PrestamoFiltroContable,
   type PrestamoFiltroEstado,
 } from "@/lib/prestamo-periodo-filter";
+import {
+  filtrarPrestamosParaListado,
+  prestamoCoincideRuta,
+} from "@/lib/prestamo-list-filter";
+import { getEmpresa } from "@/lib/empresa";
+import { ExportPrestamosModal } from "@/components/ExportPrestamosModal";
 import { isPrestamoEnCobro, labelEstadoPrestamo } from "@/lib/prestamo-estado";
 import { GastosPeriodoContableFilter } from "@/components/GastosPeriodoContableFilter";
 import {
@@ -91,25 +95,6 @@ function ordenarPrestamosParaPrincipal(prestamos: PrestamoItem[]): PrestamoItem[
 }
 
 type GrupoClientePrestamos = { clienteId: string; prestamos: PrestamoItem[] };
-
-function prestamoCoincideRuta(
-  p: PrestamoItem,
-  rutaId: string,
-  clientePorId: Record<string, ClienteItem>
-): boolean {
-  if (!rutaId) return true;
-  const rid = p.rutaId || clientePorId[p.clienteId]?.rutaId;
-  return (rid ?? "") === rutaId;
-}
-
-function dedupePrestamos(list: PrestamoItem[]): PrestamoItem[] {
-  const seen = new Set<string>();
-  return list.filter((p) => {
-    if (seen.has(p.id)) return false;
-    seen.add(p.id);
-    return true;
-  });
-}
 
 function tituloColumnaMetrica(filtroEstado: PrestamoFiltroEstado): string {
   if (filtroEstado === "castigado") return "Capital perdido";
@@ -214,6 +199,7 @@ export default function PrestamoPage() {
     loadingPagados,
     hayMasPagados,
     cargarMasPagados,
+    cargarTodosPagados,
     prestamosCastigados,
     loadingCastigados,
     hayMasCastigados,
@@ -236,6 +222,8 @@ export default function PrestamoPage() {
   const [monto, setMonto] = useState("");
   const [creating, setCreating] = useState(false);
   const [showModalPrestamo, setShowModalPrestamo] = useState(false);
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [nombreEmpresa, setNombreEmpresa] = useState("KrediApp");
   const [confirmarMontoAlto, setConfirmarMontoAlto] = useState(false);
   const [filtroContable, setFiltroContable] = useState<PrestamoFiltroContable>({ modo: "hoy" });
   const [filtroEstado, setFiltroEstado] = useState<PrestamoFiltroEstado>("todos");
@@ -297,6 +285,15 @@ export default function PrestamoPage() {
   useEffect(() => {
     loadPeriodos();
   }, [loadPeriodos]);
+
+  useEffect(() => {
+    if (!profile?.empresaId) return;
+    getEmpresa(profile.empresaId)
+      .then((e) => {
+        if (e?.nombre?.trim()) setNombreEmpresa(e.nombre.trim());
+      })
+      .catch(() => {});
+  }, [profile?.empresaId]);
 
   useEffect(() => {
     if (filtroEstado !== "pagado" && filtroEstado !== "castigado" && filtroEstado !== "todos") {
@@ -468,51 +465,32 @@ export default function PrestamoPage() {
   );
 
   const contadoresPorFiltro = useMemo(() => {
-    const porRuta = (list: PrestamoItem[]) =>
-      list.filter((p) => prestamoCoincideRuta(p, filtroRutaId, clientePorId));
-
-    const mergedUnicos = dedupePrestamos([
-      ...prestamos,
-      ...prestamosPagados,
-      ...prestamosCastigados,
-    ]);
-    const mergedEnPeriodo = filtrarPrestamosPorFiltroContable(
-      mergedUnicos,
-      filtroContable,
-      periodos
-    );
-    const activosEnPeriodo = filtrarPrestamosPorFiltroContable(
-      prestamos.filter((p) => p.estado === "activo"),
-      filtroContable,
-      periodos
-    );
-    const pagadosEnPeriodo = dedupePrestamos(
-      filtrarPrestamosPorFiltroContable(prestamosPagados, filtroContable, periodos)
-    );
-    const castigadosEnPeriodo = filtrarPrestamosPorFiltroContable(
-      prestamosCastigados,
-      filtroContable,
-      periodos
-    );
+    const contar = (estado: PrestamoFiltroEstado) =>
+      filtrarPrestamosParaListado({
+        prestamos,
+        prestamosPagados,
+        prestamosCastigados,
+        filtroContable,
+        filtroEstado: estado,
+        filtroRutaId,
+        clientePorId,
+        periodos,
+      }).length;
 
     return {
-      todos: porRuta(mergedEnPeriodo).length,
-      activo: porRuta(activosEnPeriodo).length,
-      pagado: porRuta(pagadosEnPeriodo).length,
-      castigado: porRuta(castigadosEnPeriodo).length,
-      moroso: porRuta(
-        activosEnPeriodo.filter((p) =>
-          esPrestamoMorosoPendiente(p, clientePorId[p.clienteId]?.moroso)
-        )
-      ).length,
+      todos: contar("todos"),
+      activo: contar("activo"),
+      pagado: contar("pagado"),
+      castigado: contar("castigado"),
+      moroso: contar("moroso"),
     };
   }, [
     prestamos,
     prestamosPagados,
     prestamosCastigados,
-    clientePorId,
-    filtroRutaId,
     filtroContable,
+    filtroRutaId,
+    clientePorId,
     periodos,
   ]);
 
@@ -532,46 +510,31 @@ export default function PrestamoPage() {
 
   const filtroNombreLower = filtroNombre.trim().toLowerCase();
 
-  const prestamosBase = useMemo(() => {
-    if (filtroEstado === "pagado") return dedupePrestamos(prestamosPagados);
-    if (filtroEstado === "castigado") return prestamosCastigados;
-    if (filtroEstado === "activo") {
-      return prestamos.filter((p) => p.estado === "activo");
-    }
-    if (filtroEstado === "moroso") {
-      return prestamos.filter((p) =>
-        esPrestamoMorosoPendiente(p, clientePorId[p.clienteId]?.moroso)
-      );
-    }
-    return dedupePrestamos([...prestamos, ...prestamosPagados, ...prestamosCastigados]);
-  }, [prestamos, prestamosPagados, prestamosCastigados, filtroEstado, clientePorId]);
-
-  const prestamosPorPeriodo = useMemo(
-    () => filtrarPrestamosPorFiltroContable(prestamosBase, filtroContable, periodos),
-    [prestamosBase, filtroContable, periodos]
+  const prestamosFiltrados = useMemo(
+    () =>
+      filtrarPrestamosParaListado({
+        prestamos,
+        prestamosPagados,
+        prestamosCastigados,
+        filtroContable,
+        filtroEstado,
+        filtroRutaId,
+        filtroNombre,
+        clientePorId,
+        periodos,
+      }),
+    [
+      prestamos,
+      prestamosPagados,
+      prestamosCastigados,
+      filtroContable,
+      filtroEstado,
+      filtroRutaId,
+      filtroNombre,
+      clientePorId,
+      periodos,
+    ]
   );
-
-  const prestamosFiltrados = useMemo(() => {
-    let list = prestamosPorPeriodo;
-    if (filtroRutaId) {
-      list = list.filter((p) => prestamoCoincideRuta(p, filtroRutaId, clientePorId));
-    }
-    if (filtroNombreLower) {
-      list = list.filter((p) => {
-        const cl = clientePorId[p.clienteId];
-        if (!cl) return false;
-        const nombre = (cl.nombre ?? "").toLowerCase();
-        const codigo = cl.codigo ? formatClienteCodigoRutaYNumero(cl.codigo).toLowerCase() : "";
-        const cedula = (cl.cedula ?? "").toLowerCase();
-        return (
-          nombre.includes(filtroNombreLower) ||
-          codigo.includes(filtroNombreLower) ||
-          cedula.includes(filtroNombreLower)
-        );
-      });
-    }
-    return list;
-  }, [prestamosPorPeriodo, filtroRutaId, filtroNombreLower, clientePorId]);
 
   const resumenPerdidas = useMemo(() => {
     const castigados = prestamosFiltrados.filter((p) => p.estado === "castigado");
@@ -1053,15 +1016,27 @@ export default function PrestamoPage() {
         <div className={`card prestamo-admin-hist-card${filtroEstado === "moroso" ? " prestamo-admin-hist-card--moroso" : ""}`}>
         <div className="prestamo-admin-hist-head">
           <h3 className="prestamo-admin-hist-title">Historial de préstamos</h3>
-          <button
-            type="button"
-            className="prestamo-admin-add-btn"
-            onClick={abrirFormularioCrear}
-            aria-label="Crear nuevo préstamo"
-            title="Crear nuevo préstamo"
-          >
-            +
-          </button>
+          <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              style={{ fontSize: "0.8125rem" }}
+              onClick={() => setShowExportModal(true)}
+              title="Descargar préstamos"
+              aria-label="Descargar préstamos"
+            >
+              Descargar
+            </button>
+            <button
+              type="button"
+              className="prestamo-admin-add-btn"
+              onClick={abrirFormularioCrear}
+              aria-label="Crear nuevo préstamo"
+              title="Crear nuevo préstamo"
+            >
+              +
+            </button>
+          </div>
         </div>
         {loading ? (
           <p className="prestamo-admin-loading">Cargando…</p>
@@ -1466,6 +1441,28 @@ export default function PrestamoPage() {
             </p>
           )}
         </ModalConfirmar>
+      )}
+
+      {showExportModal && (
+        <ExportPrestamosModal
+          onCerrar={() => setShowExportModal(false)}
+          prestamos={prestamos}
+          prestamosPagados={prestamosPagados}
+          prestamosCastigados={prestamosCastigados}
+          clientePorId={clientePorId}
+          periodos={periodos}
+          rutas={rutas}
+          hayMasPagados={hayMasPagados}
+          onCargarTodosPagados={cargarTodosPagados}
+          loadingPagados={loadingPagados}
+          nombreEmpresa={nombreEmpresa}
+          filtrosIniciales={{
+            filtroContable,
+            filtroEstado,
+            filtroRutaId,
+            filtroNombre,
+          }}
+        />
       )}
     </div>
   );

@@ -56,6 +56,7 @@ export type TrabajadorListaContextValue = {
   loadingPagados: boolean;
   hayMasPagados: boolean;
   cargarMasPagados: () => Promise<void>;
+  cargarTodosPagados: () => Promise<void>;
   /** Préstamos castigados — en tiempo real */
   prestamosCastigados: PrestamoItem[];
   loadingCastigados: boolean;
@@ -137,7 +138,12 @@ export function TrabajadorListaProvider({ children }: { children: ReactNode }) {
   const [datosSyncEstado, setDatosSyncEstado] = useState<DatosSyncEstado>("syncing");
   const lastDocPagadosRef = useRef<QueryDocumentSnapshot | null>(null);
   const cargandoPagadosRef = useRef(false);
+  const hayMasPagadosRef = useRef(true);
   const syncMorosoHechoRef = useRef(false);
+
+  useEffect(() => {
+    hayMasPagadosRef.current = hayMasPagados;
+  }, [hayMasPagados]);
 
   const refresh = useCallback(async () => {
     // onSnapshot actualiza automáticamente
@@ -164,6 +170,7 @@ export function TrabajadorListaProvider({ children }: { children: ReactNode }) {
     cargandoPagadosRef.current = false;
     setPrestamosPagados([]);
     setHayMasPagados(true);
+    hayMasPagadosRef.current = true;
     setLoadingPagados(false);
     setPrestamosCastigados([]);
     setLoadingCastigados(true);
@@ -309,11 +316,12 @@ export function TrabajadorListaProvider({ children }: { children: ReactNode }) {
     return unsub;
   }, [user?.uid, profile?.role, profile?.empresaId, profile?.rutaId]);
 
-  const cargarMasPagados = useCallback(async () => {
-    if (!db || !user || !profile || !hayMasPagados) return;
-    if (cargandoPagadosRef.current) return;
+  const cargarPagadosPagina = useCallback(async (): Promise<boolean> => {
+    if (!db || !user || !profile) return false;
+    if (cargandoPagadosRef.current) return hayMasPagadosRef.current;
+    if (!hayMasPagadosRef.current) return false;
     const empresaId = profile.empresaId?.trim();
-    if (!empresaId) return;
+    if (!empresaId) return false;
 
     cargandoPagadosRef.current = true;
     setLoadingPagados(true);
@@ -341,19 +349,38 @@ export function TrabajadorListaProvider({ children }: { children: ReactNode }) {
       const snap = await getDocs(query(prestamosCol, ...constraints));
       const nuevos = snap.docs.map(mapPrestamo);
 
-      if (snap.docs.length < PAGE_SIZE_HISTORICO) setHayMasPagados(false);
+      const hasMore = snap.docs.length === PAGE_SIZE_HISTORICO;
+      if (!hasMore) {
+        setHayMasPagados(false);
+        hayMasPagadosRef.current = false;
+      }
       if (snap.docs.length > 0) {
         lastDocPagadosRef.current = snap.docs[snap.docs.length - 1] ?? null;
       }
 
       setPrestamosPagados((prev) => appendPrestamosSinDuplicar(prev, nuevos));
+      return hasMore;
     } catch (e) {
       console.warn("[TrabajadorLista] fetch pagados:", e);
+      return false;
     } finally {
       cargandoPagadosRef.current = false;
       setLoadingPagados(false);
     }
-  }, [user, profile, hayMasPagados]);
+  }, [user, profile]);
+
+  const cargarMasPagados = useCallback(async () => {
+    if (!hayMasPagadosRef.current) return;
+    await cargarPagadosPagina();
+  }, [cargarPagadosPagina]);
+
+  const cargarTodosPagados = useCallback(async () => {
+    if (!hayMasPagadosRef.current) return;
+    while (hayMasPagadosRef.current) {
+      const hasMore = await cargarPagadosPagina();
+      if (!hasMore) break;
+    }
+  }, [cargarPagadosPagina]);
 
   const cargarMasCastigados = useCallback(async () => {
     // Castigados se actualizan con onSnapshot; sin paginación lazy.
@@ -390,6 +417,7 @@ export function TrabajadorListaProvider({ children }: { children: ReactNode }) {
       loadingPagados,
       hayMasPagados,
       cargarMasPagados,
+      cargarTodosPagados,
       prestamosCastigados: prestamosCastigadosConMoroso,
       loadingCastigados,
       hayMasCastigados: false,
@@ -407,6 +435,7 @@ export function TrabajadorListaProvider({ children }: { children: ReactNode }) {
       loadingPagados,
       hayMasPagados,
       cargarMasPagados,
+      cargarTodosPagados,
       prestamosCastigadosConMoroso,
       loadingCastigados,
       cargarMasCastigados,
