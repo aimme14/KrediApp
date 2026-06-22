@@ -43,5 +43,6 @@ export async function uploadLogo(jefeUid: string, file: File): Promise<string> {
     filename: "logo",
     acceptTypes: IMAGE_ACCEPT,
     maxSizeMB: IMAGE_MAX_SIZE_MB,
+    imageProfile: "logo",
   });
 }

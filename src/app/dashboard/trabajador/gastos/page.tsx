@@ -12,6 +12,7 @@ import {
   interiorDecimalCOPToNumber,
 } from "@/lib/monto-input-es";
 import { uploadImage, IMAGE_ACCEPT, getImageAccept } from "@/lib/storage";
+import { captureVideoFrameAsJpeg } from "@/lib/image-utils";
 import {
   fechaDiaColombiaHoy,
   formatoFechaGastoColombia,
@@ -270,21 +271,15 @@ export default function GastosTrabajadorPage() {
   const handleCapturePhoto = () => {
     const video = videoRef.current;
     if (!video || !video.videoWidth) return;
-    const canvas = document.createElement("canvas");
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-    ctx.drawImage(video, 0, 0);
-    canvas.toBlob((blob) => {
-      if (!blob) return;
-      const file = new File([blob], "evidencia.png", { type: "image/png" });
-      setFileFromInput(file);
-      streamRef.current?.getTracks().forEach((t) => t.stop());
-      streamRef.current = null;
-      if (video) video.srcObject = null;
-      setShowCamera(false);
-    }, "image/png", 0.92);
+    void captureVideoFrameAsJpeg(video, "evidencia")
+      .then((file) => {
+        setFileFromInput(file);
+        streamRef.current?.getTracks().forEach((t) => t.stop());
+        streamRef.current = null;
+        if (video) video.srcObject = null;
+        setShowCamera(false);
+      })
+      .catch(() => setError("No se pudo capturar la imagen"));
   };
 
   const handleCloseCamera = () => {

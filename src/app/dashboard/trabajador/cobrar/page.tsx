@@ -17,6 +17,7 @@ import {
   type PagoItem,
 } from "@/lib/empresa-api";
 import { uploadImage, getImageAccept } from "@/lib/storage";
+import { captureVideoFrameAsJpeg } from "@/lib/image-utils";
 import { getEmpresa } from "@/lib/empresa";
 import type { MotivoNoPago, MotivoPerdida } from "@/types/finanzas";
 import {
@@ -1371,21 +1372,15 @@ function CobrarClientePageContent() {
                   onClick={() => {
                     const video = videoRef.current;
                     if (!video || !video.videoWidth) return;
-                    const canvas = document.createElement("canvas");
-                    canvas.width = video.videoWidth;
-                    canvas.height = video.videoHeight;
-                    const ctx = canvas.getContext("2d");
-                    if (!ctx) return;
-                    ctx.drawImage(video, 0, 0);
-                    canvas.toBlob((blob) => {
-                      if (!blob) return;
-                      const file = new File([blob], `evidencia-${cameraSlot + 1}.png`, { type: "image/png" });
-                      setEvidencia(file);
-                      streamRef.current?.getTracks().forEach((t) => t.stop());
-                      streamRef.current = null;
-                      if (video) video.srcObject = null;
-                      setShowCamera(false);
-                    }, "image/png", 0.92);
+                    void captureVideoFrameAsJpeg(video, `evidencia-${cameraSlot + 1}`)
+                      .then((file) => {
+                        setEvidencia(file);
+                        streamRef.current?.getTracks().forEach((t) => t.stop());
+                        streamRef.current = null;
+                        if (video) video.srcObject = null;
+                        setShowCamera(false);
+                      })
+                      .catch(() => setError("No se pudo capturar la imagen"));
                   }}
                 >
                   Capturar
