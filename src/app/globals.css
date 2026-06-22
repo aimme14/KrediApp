@@ -5884,6 +5884,13 @@ th {
   z-index: 10;
 }
 
+.trabajador-sync-banner--offline {
+  background: color-mix(in srgb, var(--warning, #d97706) 12%, var(--card-bg));
+  border-bottom-color: color-mix(in srgb, var(--warning, #d97706) 35%, var(--card-border));
+  color: var(--warning, #b45309);
+  font-weight: 500;
+}
+
 /* Drawer trabajador: iconos y fila activa por color (no afecta panel jefe) */
 .trabajador-dashboard .jefe-drawer-icon {
   background: transparent;

@@ -12,6 +12,7 @@ import { useGastoFcmCampanita } from "@/context/GastoFcmCampanitaContext";
 import { TrabajadorCajaDiaProvider } from "@/context/TrabajadorCajaDiaContext";
 import { AdminDashboardProvider } from "@/context/AdminDashboardContext";
 import { ADMIN_NAV_ITEMS, AdminNavIcon } from "@/components/admin/adminNavConfig";
+import { TrabajadorSyncBanner } from "@/components/TrabajadorSyncBanner";
 
 function adminNavItemActive(pathname: string, href: string): boolean {
   if (href === "/dashboard/admin") return pathname === "/dashboard/admin";
@@ -135,7 +136,10 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
         <button type="button" className="admin-shell-backdrop" onClick={closeMenu} aria-label="Cerrar menú" />
       )}
 
-      <main className="admin-shell-main">{children}</main>
+      <main className="admin-shell-main">
+        <TrabajadorSyncBanner />
+        {children}
+      </main>
 
       <nav className="admin-mobile-tabbar" aria-label="Accesos rápidos">
         <Link
