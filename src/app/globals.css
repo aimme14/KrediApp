@@ -3125,6 +3125,10 @@ td {
   color: var(--text-muted);
 }
 
+.export-clientes-prestamo-tabs {
+  margin-top: 0.35rem;
+}
+
 .export-prestamos-error {
   margin: 0 0 0.5rem;
   font-size: 0.875rem;
