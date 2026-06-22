@@ -13,6 +13,7 @@ import {
   type PeriodoAdminSnapshot,
   type PeriodoAdminSnapshotRuta,
 } from "@/lib/empresa-api";
+import { ModalConfirmar } from "@/components/trabajador/ModalConfirmar";
 
 function mergeRutaIds(ap: PeriodoAdminSnapshot | null, ci: PeriodoAdminSnapshot | null): string[] {
   const ids = new Set<string>();
@@ -78,6 +79,8 @@ export default function ResumenPage() {
   const [periodosLoading, setPeriodosLoading] = useState(false);
   const [abriendo, setAbriendo] = useState(false);
   const [cerrando, setCerrando] = useState(false);
+  const [showModalCerrar, setShowModalCerrar] = useState(false);
+  const [confirmarCierreMarcado, setConfirmarCierreMarcado] = useState(false);
   const [detalle, setDetalle] = useState<PeriodoAdminDetalle | null>(null);
   const [detalleLoading, setDetalleLoading] = useState(false);
   const [pdfLoadingId, setPdfLoadingId] = useState<string | null>(null);
@@ -122,6 +125,8 @@ export default function ResumenPage() {
         .then(() => {
           loadPeriodos();
           setDetalle(null);
+          setShowModalCerrar(false);
+          setConfirmarCierreMarcado(false);
         })
         .catch((e) => setError(e instanceof Error ? e.message : "Error al cerrar periodo"))
         .finally(() => setCerrando(false));
@@ -185,10 +190,14 @@ export default function ResumenPage() {
           <button
             type="button"
             className="btn btn-secondary"
-            onClick={handleCerrar}
+            onClick={() => {
+              setError(null);
+              setConfirmarCierreMarcado(false);
+              setShowModalCerrar(true);
+            }}
             disabled={abriendo || cerrando || periodosLoading || !hayAbierto}
           >
-            {cerrando ? "Cerrando..." : "Cerrar periodo"}
+            Cerrar periodo
           </button>
         </div>
 
@@ -247,6 +256,45 @@ export default function ResumenPage() {
           </div>
         )}
       </div>
+
+      {showModalCerrar && (
+        <ModalConfirmar
+          titulo="Cerrar periodo contable"
+          labelConfirmar="Sí, cerrar periodo"
+          confirmando={cerrando}
+          confirmacionMarcada={confirmarCierreMarcado}
+          onConfirmacionMarcadaChange={setConfirmarCierreMarcado}
+          labelConfirmacion="Entiendo que los contadores del periodo se reiniciarán"
+          onCancelar={() => {
+            if (cerrando) return;
+            setShowModalCerrar(false);
+            setConfirmarCierreMarcado(false);
+          }}
+          onConfirmar={() => { void handleCerrar(); }}
+        >
+          <p>
+            Vas a cerrar el periodo abierto. Esta acción congela el estado actual como{" "}
+            <strong>cierre</strong> para compararlo con la apertura.
+          </p>
+          <p style={{ marginBottom: "0.5rem" }}>Al cerrar ocurrirá lo siguiente:</p>
+          <ul style={{ margin: "0 0 0.75rem", paddingLeft: "1.25rem", fontSize: "0.9375rem" }}>
+            <li>El periodo quedará marcado como <strong>cerrado</strong> con fecha y hora de cierre.</li>
+            <li>Podrás ver la comparación apertura / cierre y descargar el <strong>PDF</strong> del periodo.</li>
+            <li>
+              Se reiniciarán a cero en todas las rutas: <strong>ganancias</strong>,{" "}
+              <strong>gastos</strong>, <strong>pérdidas</strong> y <strong>total prestado</strong> del periodo.
+            </li>
+            <li>Se reiniciarán los <strong>gastos del administrador</strong> del periodo.</li>
+            <li>
+              <strong>No</strong> se modifican caja, inversiones ni capital; solo los contadores del corte actual.
+            </li>
+            <li>Después podrás abrir un <strong>nuevo periodo</strong> para el siguiente corte.</li>
+          </ul>
+          <p style={{ fontSize: "0.875rem", color: "var(--text-muted)", margin: 0 }}>
+            El cierre no se puede deshacer. Revisa que los datos del periodo estén completos antes de continuar.
+          </p>
+        </ModalConfirmar>
+      )}
 
       {(detalle || detalleLoading) && (
         <div className="card resumen-comparar-card" style={{ marginTop: "1rem" }} role="region" aria-label="Comparación de periodo">
