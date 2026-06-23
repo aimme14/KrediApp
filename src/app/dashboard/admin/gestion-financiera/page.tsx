@@ -15,6 +15,7 @@ import {
 } from "@/lib/empresa-api";
 import { formatMontoEnteroInput } from "@/lib/monto-input-es";
 import { guardOfflineWrite, useOnline } from "@/hooks/useOnline";
+import { ModalConfirmar } from "@/components/trabajador/ModalConfirmar";
 
 function formatMoneda(value: number): string {
   const hasDecimals = Math.round(value * 100) % 100 !== 0;
@@ -72,6 +73,7 @@ export default function GestionFinancieraPage() {
   const [inversiones, setInversiones] = useState<InversionCajaRutaItem[]>([]);
   const [inversionesAdmin, setInversionesAdmin] = useState<InversionRutaCajaAdminItem[]>([]);
   const [inversionModal, setInversionModal] = useState<InversionPendienteModal | null>(null);
+  const [confirmarInversionMarcado, setConfirmarInversionMarcado] = useState(false);
 
   const [invertirAdminRutaId, setInvertirAdminRutaId] = useState("");
   const [invertirAdminMonto, setInvertirAdminMonto] = useState("");
@@ -119,16 +121,8 @@ export default function GestionFinancieraPage() {
   const cerrarModalInversion = useCallback(() => {
     if (invertirSaving) return;
     setInversionModal(null);
+    setConfirmarInversionMarcado(false);
   }, [invertirSaving]);
-
-  useEffect(() => {
-    if (!inversionModal) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") cerrarModalInversion();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [inversionModal, cerrarModalInversion]);
 
   const ejecutarInversionConfirmada = useCallback(async () => {
     const pending = inversionModal;
@@ -153,12 +147,14 @@ export default function GestionFinancieraPage() {
         setTimeout(() => setInvertirAdminOk(false), 3200);
       }
       setInversionModal(null);
+      setConfirmarInversionMarcado(false);
       await load();
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Error al invertir";
       if (pending.tipo === "a-ruta") setInvertirError(msg);
       else setInvertirAdminError(msg);
       setInversionModal(null);
+      setConfirmarInversionMarcado(false);
     } finally {
       setInvertirSaving(false);
     }
@@ -184,6 +180,7 @@ export default function GestionFinancieraPage() {
       return;
     }
     const ruta = rutasPropias.find((r) => r.rutaId === invertirRutaId.trim());
+    setConfirmarInversionMarcado(false);
     setInversionModal({
       tipo: "a-ruta",
       rutaId: invertirRutaId.trim(),
@@ -213,6 +210,7 @@ export default function GestionFinancieraPage() {
       setInvertirAdminError("La ruta no tiene suficiente base disponible.");
       return;
     }
+    setConfirmarInversionMarcado(false);
     setInversionModal({
       tipo: "a-admin",
       rutaId: invertirAdminRutaId.trim(),
@@ -542,60 +540,47 @@ export default function GestionFinancieraPage() {
       )}
 
       {inversionModal && (
-        <div
-          className="gf-modal-backdrop gf-modal-backdrop--inversion"
-          onClick={cerrarModalInversion}
-          role="presentation"
+        <ModalConfirmar
+          titulo="Confirmar inversión"
+          labelConfirmar="Sí, registrar inversión"
+          confirmando={invertirSaving}
+          confirmarDeshabilitado={!online}
+          confirmacionMarcada={confirmarInversionMarcado}
+          onConfirmacionMarcadaChange={setConfirmarInversionMarcado}
+          labelConfirmacion={
+            inversionModal.tipo === "a-ruta" ? (
+              <>
+                Confirmo la inversión de <strong>${formatMonto(inversionModal.monto)}</strong> en la
+                ruta <strong>{inversionModal.rutaNombre}</strong>
+              </>
+            ) : (
+              <>
+                Confirmo la devolución de <strong>${formatMonto(inversionModal.monto)}</strong> desde
+                la ruta <strong>{inversionModal.rutaNombre}</strong> hacia mi base
+              </>
+            )
+          }
+          onCancelar={cerrarModalInversion}
+          onConfirmar={() => { void ejecutarInversionConfirmada(); }}
         >
-          <div
-            className="gf-modal"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="gf-inv-modal-title"
-            aria-describedby="gf-inv-modal-desc"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2 id="gf-inv-modal-title" className="gf-modal-title">
-              ¿Confirmar inversión?
-            </h2>
-            <p id="gf-inv-modal-desc" className="gf-modal-desc">
-              {inversionModal.tipo === "a-ruta"
-                ? "Se transferirá dinero desde tu base de administrador hacia la ruta. Revisa los datos antes de continuar."
-                : "Se transferirá dinero desde la base de la ruta hacia tu base de administrador. Revisa los datos antes de continuar."}
-            </p>
-            <div className="gf-inversion-confirm-resumen">
-              <div className="gf-inversion-confirm-row">
-                <span className="gf-inversion-confirm-label">Ruta</span>
-                <span className="gf-inversion-confirm-value">{inversionModal.rutaNombre}</span>
-              </div>
-              <div className="gf-inversion-confirm-row">
-                <span className="gf-inversion-confirm-label">Monto a invertir</span>
-                <span className="gf-inversion-confirm-value gf-inversion-confirm-value--monto">
-                  ${formatMonto(inversionModal.monto)}
-                </span>
-              </div>
+          <p>
+            {inversionModal.tipo === "a-ruta"
+              ? "Se transferirá dinero desde tu base de administrador hacia la ruta. Revisa los datos antes de continuar."
+              : "Se transferirá dinero desde la base de la ruta hacia tu base de administrador. Revisa los datos antes de continuar."}
+          </p>
+          <div className="gf-inversion-confirm-resumen">
+            <div className="gf-inversion-confirm-row">
+              <span className="gf-inversion-confirm-label">Ruta</span>
+              <span className="gf-inversion-confirm-value">{inversionModal.rutaNombre}</span>
             </div>
-            <div className="gf-modal-actions gf-modal-actions--inversion">
-              <button
-                type="button"
-                className="btn btn-secondary"
-                onClick={cerrarModalInversion}
-                disabled={invertirSaving || !online}
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={() => void ejecutarInversionConfirmada()}
-                disabled={invertirSaving || !online}
-                aria-busy={invertirSaving}
-              >
-                {invertirSaving ? "Procesando…" : "Confirmar inversión"}
-              </button>
+            <div className="gf-inversion-confirm-row">
+              <span className="gf-inversion-confirm-label">Monto a invertir</span>
+              <span className="gf-inversion-confirm-value gf-inversion-confirm-value--monto">
+                ${formatMonto(inversionModal.monto)}
+              </span>
             </div>
           </div>
-        </div>
+        </ModalConfirmar>
       )}
     </>
   );

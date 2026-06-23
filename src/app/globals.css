@@ -756,6 +756,10 @@ button {
   padding: max(1rem, env(safe-area-inset-top)) 1rem max(1rem, env(safe-area-inset-bottom));
 }
 
+.modal-confirmar-overlay:has(.gf-inversion-confirm-resumen) {
+  z-index: 2000;
+}
+
 .modal-confirmar-backdrop {
   position: absolute;
   inset: 0;

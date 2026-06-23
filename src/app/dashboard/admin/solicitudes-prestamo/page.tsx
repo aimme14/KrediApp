@@ -33,6 +33,7 @@ export default function SolicitudesPrestamoAdminPage() {
   const [accionId, setAccionId] = useState<string | null>(null);
   const [accion, setAccion] = useState<"aprobar" | "rechazar" | null>(null);
   const [solicitudModalAprobar, setSolicitudModalAprobar] = useState<SolicitudPrestamoApi | null>(null);
+  const [confirmarAprobarMarcado, setConfirmarAprobarMarcado] = useState(false);
 
   useEffect(() => {
     if (!db || !user || !profile?.empresaId) return;
@@ -90,6 +91,7 @@ export default function SolicitudesPrestamoAdminPage() {
       return;
     }
     setError(null);
+    setConfirmarAprobarMarcado(false);
     setSolicitudModalAprobar(solicitud);
   };
 
@@ -107,6 +109,7 @@ export default function SolicitudesPrestamoAdminPage() {
       const token = await user.getIdToken();
       await aprobarSolicitudPrestamo(token, solicitudId);
       setSolicitudModalAprobar(null);
+      setConfirmarAprobarMarcado(false);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al aprobar");
     } finally {
@@ -256,13 +259,22 @@ export default function SolicitudesPrestamoAdminPage() {
           labelConfirmar="Sí, aprobar solicitud"
           confirmando={aprobandoModal}
           confirmarDeshabilitado={!online}
+          confirmacionMarcada={confirmarAprobarMarcado}
+          onConfirmacionMarcadaChange={setConfirmarAprobarMarcado}
+          labelConfirmacion={
+            <>
+              Confirmo la aprobación del préstamo de <strong>$ {formatMonto(solicitudModalAprobar.monto)}</strong>{" "}
+              para <strong>{solicitudModalAprobar.clienteNombre}</strong>
+            </>
+          }
           onCancelar={() => {
             if (aprobandoModal) return;
             setSolicitudModalAprobar(null);
+            setConfirmarAprobarMarcado(false);
           }}
           onConfirmar={() => { void handleEjecutarAprobar(); }}
         >
-          <p>¿Estás seguro de aprobar esta solicitud y crear el préstamo?</p>
+          <p>Revisa los datos antes de aprobar y crear el préstamo:</p>
           <p>
             Cliente: <strong>{solicitudModalAprobar.clienteNombre}</strong>
           </p>

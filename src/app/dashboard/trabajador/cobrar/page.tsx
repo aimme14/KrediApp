@@ -222,6 +222,7 @@ function CobrarClientePageContent() {
   /** Texto auxiliar durante envío (subidas en paralelo + API). */
   const [submitStatus, setSubmitStatus] = useState<string | null>(null);
   const [showModalCobro, setShowModalCobro] = useState(false);
+  const [confirmarCobroMarcado, setConfirmarCobroMarcado] = useState(false);
   const [showModalYaPagoHoy, setShowModalYaPagoHoy] = useState(false);
   const [confirmado, setConfirmado] = useState(false);
   const comprobanteRef = useRef<HTMLDivElement>(null);
@@ -628,6 +629,7 @@ function CobrarClientePageContent() {
       return;
     }
     setError(null);
+    setConfirmarCobroMarcado(false);
     if (pagoHoy) {
       setShowModalYaPagoHoy(true);
     } else {
@@ -707,6 +709,7 @@ function CobrarClientePageContent() {
         montoAplicar: montoAplicarCobro,
       };
       setShowModalCobro(false);
+      setConfirmarCobroMarcado(false);
       setConfirmado(true);
       setNuevoSaldoPendiente(res.saldoPendiente);
       setCliente(clienteAlCobrar);
@@ -1639,6 +1642,7 @@ function CobrarClientePageContent() {
           onCancelar={() => setShowModalYaPagoHoy(false)}
           onConfirmar={() => {
             setShowModalYaPagoHoy(false);
+            setConfirmarCobroMarcado(false);
             setShowModalCobro(true);
           }}
         >
@@ -1658,12 +1662,27 @@ function CobrarClientePageContent() {
           labelConfirmar="Sí, registrar cobro"
           confirmando={submitting}
           confirmarDeshabilitado={!online}
-          onCancelar={() => setShowModalCobro(false)}
+          confirmacionMarcada={confirmarCobroMarcado}
+          onConfirmacionMarcadaChange={setConfirmarCobroMarcado}
+          labelConfirmacion={
+            <>
+              Confirmo el cobro de <strong>{formatCurrency(montoAplicar)}</strong> a{" "}
+              <strong>{clienteCobro.nombre}</strong>
+            </>
+          }
+          onCancelar={() => {
+            if (submitting) return;
+            setShowModalCobro(false);
+            setConfirmarCobroMarcado(false);
+          }}
           onConfirmar={() => { void handleEjecutarCobro(); }}
         >
+          <p>Revisa los datos antes de registrar:</p>
           <p>
-            ¿Confirmas el cobro de <strong>{formatCurrency(montoAplicar)}</strong> a{" "}
-            <strong>{clienteCobro.nombre}</strong>?
+            Cliente: <strong>{clienteCobro.nombre}</strong>
+          </p>
+          <p>
+            Monto: <strong>{formatCurrency(montoAplicar)}</strong>
           </p>
           <p>
             Método: <strong>{metodoPago === "efectivo" ? "Efectivo" : "Transferencia"}</strong>
@@ -1671,6 +1690,16 @@ function CobrarClientePageContent() {
           <p>
             Saldo restante tras el cobro:{" "}
             <strong>{formatCurrency(Math.max(0, saldoPendiente - montoAplicar))}</strong>
+          </p>
+          <p>
+            Evidencia:{" "}
+            <strong>
+              {evidenciaRequerida
+                ? evidenciaFile
+                  ? "Con foto adjunta"
+                  : "Sin foto (requerida)"
+                : "No aplica"}
+            </strong>
           </p>
         </ModalConfirmar>
       )}

@@ -95,6 +95,7 @@ export default function PrestamoTrabajadorPage() {
   const [monto, setMonto] = useState("");
   const [creating, setCreating] = useState(false);
   const [showModalPrestamo, setShowModalPrestamo] = useState(false);
+  const [confirmarPrestamoMarcado, setConfirmarPrestamoMarcado] = useState(false);
   const [solicitudPendiente, setSolicitudPendiente] = useState<{
     id: string;
     estado: string;
@@ -280,6 +281,7 @@ export default function PrestamoTrabajadorPage() {
       return;
     }
     setError(null);
+    setConfirmarPrestamoMarcado(false);
     setShowModalPrestamo(true);
   };
 
@@ -313,6 +315,7 @@ export default function PrestamoTrabajadorPage() {
       setModalidad("mensual");
       setEvaluacionAprobacion(null);
       setShowModalPrestamo(false);
+      setConfirmarPrestamoMarcado(false);
       setShowCreateForm(false);
       if (resultado.tipo === "prestamo_creado") {
         setExitoCreacion(resultado.mensaje || "Préstamo creado correctamente.");
@@ -921,12 +924,29 @@ export default function PrestamoTrabajadorPage() {
           labelConfirmar={requiereAprobacionAdmin ? "Sí, solicitar" : "Sí, crear préstamo"}
           confirmando={creating}
           confirmarDeshabilitado={!online}
+          confirmacionMarcada={confirmarPrestamoMarcado}
+          onConfirmacionMarcadaChange={setConfirmarPrestamoMarcado}
+          labelConfirmacion={
+            requiereAprobacionAdmin ? (
+              <>
+                Confirmo la solicitud de préstamo de <strong>$ {formatMoneda(montoNum)}</strong> para{" "}
+                <strong>{clienteSeleccionado?.nombre ?? "—"}</strong>
+              </>
+            ) : (
+              <>
+                Confirmo la creación del préstamo de <strong>$ {formatMoneda(montoNum)}</strong> para{" "}
+                <strong>{clienteSeleccionado?.nombre ?? "—"}</strong>
+              </>
+            )
+          }
           onCancelar={() => {
             if (creating) return;
             setShowModalPrestamo(false);
+            setConfirmarPrestamoMarcado(false);
           }}
           onConfirmar={() => { void handleEjecutarPrestamo(); }}
         >
+          <p>Revisa los datos antes de registrar:</p>
           <p>
             Cliente: <strong>{clienteSeleccionado?.nombre ?? "—"}</strong>
           </p>
