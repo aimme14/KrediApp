@@ -11,6 +11,7 @@ const ADMIN_PATH_MATCHERS: { prefix: string; key: AdminHelpPageKey }[] = [
   { prefix: `${ADMIN_ROUTE_PREFIX}/cliente-moroso`, key: "cliente-moroso" },
   { prefix: `${ADMIN_ROUTE_PREFIX}/ruta-del-dia`, key: "ruta-del-dia" },
   { prefix: `${ADMIN_ROUTE_PREFIX}/reportes-dia`, key: "reportes-dia" },
+  { prefix: `${ADMIN_ROUTE_PREFIX}/pagos-diarios`, key: "pagos-diarios" },
   { prefix: `${ADMIN_ROUTE_PREFIX}/prestamo`, key: "prestamo" },
   { prefix: `${ADMIN_ROUTE_PREFIX}/resumen`, key: "resumen" },
   { prefix: `${ADMIN_ROUTE_PREFIX}/cliente`, key: "cliente" },

@@ -224,6 +224,7 @@ function CobrarClientePageContent() {
   const [showModalCobro, setShowModalCobro] = useState(false);
   const [confirmarCobroMarcado, setConfirmarCobroMarcado] = useState(false);
   const [showModalYaPagoHoy, setShowModalYaPagoHoy] = useState(false);
+  const [confirmarYaPagoHoyMarcado, setConfirmarYaPagoHoyMarcado] = useState(false);
   const [confirmado, setConfirmado] = useState(false);
   const comprobanteRef = useRef<HTMLDivElement>(null);
   const comprobanteBlobRef = useRef<Blob | null>(null);
@@ -1639,9 +1640,16 @@ function CobrarClientePageContent() {
           labelConfirmar="Sí, registrar de todas formas"
           confirmando={false}
           confirmarDeshabilitado={!online}
-          onCancelar={() => setShowModalYaPagoHoy(false)}
+          confirmacionMarcada={confirmarYaPagoHoyMarcado}
+          onConfirmacionMarcadaChange={setConfirmarYaPagoHoyMarcado}
+          labelConfirmacion="Confirmo que revisé el historial y deseo registrar otro cobro hoy"
+          onCancelar={() => {
+            setShowModalYaPagoHoy(false);
+            setConfirmarYaPagoHoyMarcado(false);
+          }}
           onConfirmar={() => {
             setShowModalYaPagoHoy(false);
+            setConfirmarYaPagoHoyMarcado(false);
             setConfirmarCobroMarcado(false);
             setShowModalCobro(true);
           }}

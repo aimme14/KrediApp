@@ -9,6 +9,7 @@ describe("resolveAdminHelpPageKey", () => {
     expect(resolveAdminHelpPageKey("/dashboard/admin/solicitudes-prestamo")).toBe("solicitudes-prestamo");
     expect(resolveAdminHelpPageKey("/dashboard/admin/gestion-financiera")).toBe("gestion-financiera");
     expect(resolveAdminHelpPageKey("/dashboard/admin/cliente-moroso")).toBe("cliente-moroso");
+    expect(resolveAdminHelpPageKey("/dashboard/admin/pagos-diarios")).toBe("pagos-diarios");
     expect(resolveAdminHelpPageKey("/dashboard/admin/cliente")).toBe("cliente");
   });
 

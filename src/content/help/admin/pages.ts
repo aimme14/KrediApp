@@ -14,7 +14,8 @@ export type AdminHelpPageKey =
   | "resumen"
   | "cliente-moroso"
   | "permisos"
-  | "cobrar";
+  | "cobrar"
+  | "pagos-diarios";
 
 export const ADMIN_HELP_PAGES: Record<AdminHelpPageKey, HelpPageContent> = {
   inicio: {
@@ -171,10 +172,7 @@ export const ADMIN_HELP_PAGES: Record<AdminHelpPageKey, HelpPageContent> = {
       "Inversión a admin: devuelve capital desde la caja de una ruta a tu base.",
       "Confirma monto y ruta antes de ejecutar cada movimiento.",
     ],
-    cautions: [
-      "Verifica el saldo disponible antes de invertir o retirar.",
-      "Los movimientos quedan registrados; no uses inversiones para corregir errores de cobro del trabajador.",
-    ],
+    cautions: ["Verifica el saldo disponible antes de invertir o retirar."],
     relatedLinks: [
       { label: "Ruta del día", href: "/dashboard/admin/ruta-del-dia" },
       { label: "Resumen económico", href: "/dashboard/admin/resumen" },
@@ -241,5 +239,27 @@ export const ADMIN_HELP_PAGES: Record<AdminHelpPageKey, HelpPageContent> = {
       "Los cobros en campo los registra normalmente el trabajador; usa esta vista solo cuando sea necesario.",
     ],
     relatedLinks: [{ label: "Préstamos", href: "/dashboard/admin/prestamo" }],
+  },
+  "pagos-diarios": {
+    title: "Pagos diarios",
+    summary:
+      "Vista en tiempo real de todos los cobros registrados en el día, por empleados y por ti. Desde aquí puedes anular un cobro erróneo o duplicado antes de que el reporte del empleado sea aprobado.",
+    steps: [
+      "Selecciona la fecha para ver los movimientos de ese día.",
+      "Todos los cobros del día aparecen en la lista con cliente, ruta, método de pago y quién lo registró (trabajador o administrador).",
+      "Si detectas un cobro erróneo o duplicado, usa el botón Anular en la fila correspondiente.",
+      "Marca la casilla de confirmación y, si quieres, escribe un motivo opcional. Luego confirma la anulación.",
+      "El saldo del préstamo, la caja del empleado y las tarjetas de ruta se corrigen automáticamente.",
+    ],
+    cautions: [
+      "Solo se pueden anular cobros del día actual.",
+      "Solo se puede anular el cobro más reciente del préstamo. Si hay dos errores, anula primero el más reciente.",
+      "Si el reporte del empleado ya fue aprobado, el cobro en efectivo no se puede anular. Revisa antes de aprobar reportes.",
+      "Los cobros por transferencia se pueden anular aunque el reporte esté aprobado, ya que no pasan por la caja del empleado.",
+    ],
+    relatedLinks: [
+      { label: "Reportes del día", href: "/dashboard/admin/reportes-dia" },
+      { label: "Préstamos", href: "/dashboard/admin/prestamo" },
+    ],
   },
 };
