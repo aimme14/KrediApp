@@ -835,6 +835,142 @@ button {
   justify-content: flex-end;
 }
 
+/* Modal anular cobro — admin pagos diarios (tema claro/oscuro) */
+.pagos-diarios-anular-resumen {
+  background: var(--btn-secondary-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  padding: 0.85rem 1rem;
+  margin-bottom: 1rem;
+  font-size: 0.9rem;
+  color: var(--text);
+  line-height: 1.55;
+}
+
+.pagos-diarios-anular-resumen > div + div {
+  margin-top: 0.2rem;
+}
+
+.pagos-diarios-anular-resumen strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.pagos-diarios-anular-resumen-aviso {
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--card-border);
+  color: #f87171;
+  font-size: 0.85rem;
+}
+
+[data-theme="light"] .pagos-diarios-anular-resumen-aviso {
+  color: #b91c1c;
+}
+
+.pagos-diarios-anular-resumen-nota {
+  margin-top: 0.35rem;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.pagos-diarios-anular-label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-bottom: 1rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.pagos-diarios-anular-textarea {
+  resize: vertical;
+  padding: 0.55rem 0.75rem;
+  border-radius: 8px;
+  border: 1px solid var(--input-border);
+  background: var(--input-bg);
+  color: var(--text);
+  font-size: 0.9rem;
+  font-family: inherit;
+  width: 100%;
+  box-sizing: border-box;
+  line-height: 1.45;
+}
+
+.pagos-diarios-anular-textarea::placeholder {
+  color: var(--text-muted);
+  opacity: 0.85;
+}
+
+.pagos-diarios-anular-textarea:focus {
+  outline: 2px solid var(--link);
+  outline-offset: 1px;
+}
+
+.pagos-diarios-anular-contador {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.pagos-diarios-anular-error {
+  color: #f87171;
+  font-size: 0.88rem;
+  margin: 0 0 0.75rem;
+}
+
+[data-theme="light"] .pagos-diarios-anular-error {
+  color: #b91c1c;
+}
+
+.pagos-diarios-row-anulado {
+  opacity: 0.65;
+  background: var(--btn-secondary-bg);
+}
+
+.pagos-diarios-badge-anulado {
+  margin-left: 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #f87171;
+  background: rgba(248, 113, 113, 0.12);
+  padding: 0.1rem 0.45rem;
+  border-radius: 4px;
+  border: 1px solid rgba(248, 113, 113, 0.35);
+}
+
+[data-theme="light"] .pagos-diarios-badge-anulado {
+  color: #b91c1c;
+  background: #fef2f2;
+  border-color: #fecaca;
+}
+
+.pagos-diarios-btn-anular {
+  font-size: 0.78rem;
+  padding: 0.25rem 0.65rem;
+  border-radius: 6px;
+  border: 1px solid rgba(248, 113, 113, 0.55);
+  color: #f87171;
+  background: transparent;
+  cursor: pointer;
+  line-height: 1.4;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.pagos-diarios-btn-anular:hover {
+  background: rgba(248, 113, 113, 0.12);
+  border-color: #f87171;
+}
+
+[data-theme="light"] .pagos-diarios-btn-anular {
+  color: #b91c1c;
+  border-color: #fca5a5;
+}
+
+[data-theme="light"] .pagos-diarios-btn-anular:hover {
+  background: #fef2f2;
+}
+
 /* Modal cámara para tomar foto */
 .gastos-camera-overlay {
   position: fixed;

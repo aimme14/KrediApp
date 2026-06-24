@@ -173,6 +173,8 @@ export function TrabajadorCajaDiaProvider({ children }: { children: ReactNode })
       where("fecha", "<=", Timestamp.fromDate(end))
     );
 
+    let initialLoad = true;
+
     const unsub = onSnapshot(
       q,
       (snap) => {
@@ -180,6 +182,7 @@ export function TrabajadorCajaDiaProvider({ children }: { children: ReactNode })
         for (const d of snap.docs) {
           const x = d.data();
           if (x.tipo !== "pago") continue;
+          if ((x.estado ?? "activo") === "anulado") continue;
           const monto = typeof x.monto === "number" ? x.monto : 0;
           if (monto <= 0) continue;
           const metodo = (x.metodoPago ?? "").toLowerCase();
@@ -188,6 +191,16 @@ export function TrabajadorCajaDiaProvider({ children }: { children: ReactNode })
           }
         }
         setCobrosEfectivoRT(Math.round(efectivo * 100) / 100);
+
+        if (!initialLoad) {
+          const tieneModificaciones = snap
+            .docChanges()
+            .some((c) => c.type === "modified" || c.type === "removed");
+          if (tieneModificaciones) {
+            void refresh();
+          }
+        }
+        initialLoad = false;
       },
       (err) => {
         console.warn("[TrabajadorCajaDia] onSnapshot pagos:", err);
@@ -195,7 +208,7 @@ export function TrabajadorCajaDiaProvider({ children }: { children: ReactNode })
     );
 
     return unsub;
-  }, [user?.uid, profile?.role, fechaDia]);
+  }, [user?.uid, profile?.role, fechaDia, refresh]);
 
   useEffect(() => {
     if (!db || !user || profile?.role !== "trabajador") return;

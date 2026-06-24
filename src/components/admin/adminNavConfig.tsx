@@ -9,6 +9,7 @@ export type AdminNavIconName =
   | "expense"
   | "wallet"
   | "chart"
+  | "payments"
   | "alert"
   | "lock"
   | "more";
@@ -34,6 +35,7 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
     solicitudesPrestamoBadge: true,
   },
   { href: "/dashboard/admin/reportes-dia", label: "Reportes del día", icon: "report" },
+  { href: "/dashboard/admin/pagos-diarios", label: "Pagos diarios", icon: "payments" },
   { href: "/dashboard/admin/cliente", label: "Clientes", icon: "client" },
   { href: "/dashboard/admin/empleado", label: "Empleados", icon: "user" },
   { href: "/dashboard/admin/rutas", label: "Rutas", icon: "route" },
@@ -115,6 +117,13 @@ export function AdminNavIcon({ name }: { name: AdminNavIconName }) {
           <line x1="18" y1="20" x2="18" y2="10" />
           <line x1="12" y1="20" x2="12" y2="4" />
           <line x1="6" y1="20" x2="6" y2="14" />
+        </svg>
+      );
+    case "payments":
+      return (
+        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+          <rect x="2" y="5" width="20" height="14" rx="2" />
+          <line x1="2" y1="10" x2="22" y2="10" />
         </svg>
       );
     case "report":

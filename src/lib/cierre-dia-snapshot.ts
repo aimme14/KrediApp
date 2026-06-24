@@ -274,6 +274,7 @@ export async function buildCierreDiaSnapshot(
         for (const p of pq.docs) {
           const pd = p.data() as Record<string, unknown>;
           const tipo = typeof pd.tipo === "string" ? pd.tipo : "";
+          if ((pd.estado ?? "activo") === "anulado") continue;
           const f = pd.fecha as { toMillis?: () => number } | undefined;
           const fechaMs = typeof f?.toMillis === "function" ? f.toMillis() : 0;
 

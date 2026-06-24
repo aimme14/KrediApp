@@ -123,6 +123,23 @@
       ]
     },
     {
+      "collectionGroup": "reportesDia",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "empleadoId", "order": "ASCENDING" },
+        { "fieldPath": "fechaDia", "order": "ASCENDING" },
+        { "fieldPath": "adminId", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "pagos",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "tipo", "order": "ASCENDING" },
+        { "fieldPath": "fecha", "order": "DESCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "prestamos",
       "queryScope": "COLLECTION",
       "fields": [

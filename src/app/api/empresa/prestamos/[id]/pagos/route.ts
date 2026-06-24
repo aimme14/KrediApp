@@ -27,6 +27,7 @@ import {
 } from "@/lib/financial-idempotency";
 import {
   estadoTrasNoPago,
+  normalizeEstadoPrestamo,
   resolverEstadoTrasMovimiento,
 } from "@/lib/prestamo-estado";
 import type { EstadoPrestamo } from "@/types/firestore";
@@ -40,28 +41,36 @@ const MOTIVOS_PERDIDA = [
 ] as const;
 const MAX_PAGOS_LIST = 50;
 
-/** Campos para campanita admin (collectionGroup pagos) y push FCM. */
-function pagoCamposNotifAdmin(
-  apiUser: { uid: string; empresaId: string; role: string; adminId?: string },
-  prestamoFlat: Record<string, unknown>
-): Record<string, string> {
-  if (apiUser.role !== "empleado") return {};
-  const adminId =
-    (typeof prestamoFlat.adminId === "string" ? prestamoFlat.adminId.trim() : "") ||
-    (typeof apiUser.adminId === "string" ? apiUser.adminId.trim() : "");
-  const clienteId =
-    typeof prestamoFlat.clienteId === "string" ? prestamoFlat.clienteId.trim() : "";
-  const clienteNombre =
-    typeof prestamoFlat.clienteNombre === "string"
-      ? prestamoFlat.clienteNombre.trim()
-      : "";
+/** Campos de auditoría y collectionGroup en todos los pagos, sin importar el rol. */
+function buildCamposAuditoria(params: {
+  adminId: string;
+  empresaId: string;
+  prestamoId: string;
+  rutaId: string;
+  clienteId: string;
+  clienteNombre: string;
+  rutaNombre: string;
+  cobradoPorRol: string;
+}): Record<string, unknown> {
   return {
-    adminId,
-    empresaId: apiUser.empresaId,
-    cobradoPorRol: apiUser.role,
-    clienteId,
-    clienteNombre,
+    adminId: params.adminId,
+    empresaId: params.empresaId,
+    prestamoId: params.prestamoId,
+    rutaId: params.rutaId,
+    clienteId: params.clienteId,
+    clienteNombre: params.clienteNombre,
+    rutaNombre: params.rutaNombre,
+    cobradoPorRol: params.cobradoPorRol,
+    estado: "activo" as const,
   };
+}
+
+function rutaNombreDesdeSnap(
+  snap: FirebaseFirestore.DocumentSnapshot | null | undefined
+): string {
+  if (!snap?.exists) return "";
+  const nombre = snap.data()?.nombre;
+  return typeof nombre === "string" ? nombre.trim() : "";
 }
 
 async function resolveClienteNombre(
@@ -191,6 +200,7 @@ export async function GET(
       motivoPerdida: typeof d.motivoPerdida === "string" ? d.motivoPerdida : null,
       registradoPorUid: d.registradoPorUid ?? d.empleadoId ?? null,
       registradoPorNombre: d.registradoPorNombre ?? null,
+      estado: d.estado ?? "activo",
     };
   });
 
@@ -277,6 +287,27 @@ export async function POST(
     return NextResponse.json(payload, { status });
   };
 
+  const adminIdPrestamo =
+    typeof data.adminId === "string" && data.adminId.trim()
+      ? data.adminId.trim()
+      : apiUser.uid;
+  const clienteIdPrestamo =
+    typeof data.clienteId === "string" ? data.clienteId.trim() : "";
+  let clienteNombrePrestamo =
+    typeof data.clienteNombre === "string" && data.clienteNombre.trim()
+      ? data.clienteNombre.trim()
+      : "";
+  const rutaIdPrestamoData =
+    typeof data.rutaId === "string" ? data.rutaId.trim() : "";
+
+  if (!clienteNombrePrestamo && clienteIdPrestamo) {
+    clienteNombrePrestamo = await resolveClienteNombre(
+      db,
+      apiUser.empresaId,
+      clienteIdPrestamo
+    );
+  }
+
   if (tipo === "no_pago") {
     const motivo =
       motivoNoPago && MOTIVOS_NO_PAGO.includes(motivoNoPago as (typeof MOTIVOS_NO_PAGO)[number])
@@ -292,6 +323,17 @@ export async function POST(
         }
         const pr = prSnap.data()!;
 
+        let rutaNombreNoPago = "";
+        if (rutaIdPrestamoData) {
+          const rutaRef = db
+            .collection(EMPRESAS_COLLECTION)
+            .doc(apiUser.empresaId)
+            .collection(RUTAS_SUBCOLLECTION)
+            .doc(rutaIdPrestamoData);
+          const rSnap = await tx.get(rutaRef);
+          rutaNombreNoPago = rutaNombreDesdeSnap(rSnap);
+        }
+
         const pagoRef = prestamoRef.collection(PAGOS_SUBCOLLECTION).doc();
         tx.set(pagoRef, {
           monto: 0,
@@ -302,7 +344,16 @@ export async function POST(
           nota: (nota ?? "").trim() || null,
           registradoPorUid: uidRegistro,
           registradoPorNombre: nombreRegistro,
-          ...pagoCamposNotifAdmin(apiUser, pr as Record<string, unknown>),
+          ...buildCamposAuditoria({
+            adminId: adminIdPrestamo,
+            empresaId: apiUser.empresaId,
+            prestamoId,
+            rutaId: rutaIdPrestamoData,
+            clienteId: clienteIdPrestamo,
+            clienteNombre: clienteNombrePrestamo,
+            rutaNombre: rutaNombreNoPago,
+            cobradoPorRol: apiUser.role,
+          }),
         });
 
         const prevFallos =
@@ -412,6 +463,8 @@ export async function POST(
         );
         const parteGananciaPerdida = gananciaAcumulada;
 
+        const rutaNombrePerdida = rutaNombreDesdeSnap(rutaSnap);
+
         const pagoRef = prestamoRef.collection(PAGOS_SUBCOLLECTION).doc();
         tx.set(pagoRef, {
           monto: montoAplicar,
@@ -425,7 +478,16 @@ export async function POST(
           parteCapitalPerdida,
           parteGananciaPerdida,
           cobradoAcumulado,
-          ...pagoCamposNotifAdmin(apiUser, d as Record<string, unknown>),
+          ...buildCamposAuditoria({
+            adminId: adminIdPrestamo,
+            empresaId: apiUser.empresaId,
+            prestamoId,
+            rutaId: rutaIdPrestamo,
+            clienteId: clienteIdPrestamo,
+            clienteNombre: clienteNombrePrestamo,
+            rutaNombre: rutaNombrePerdida,
+            cobradoPorRol: apiUser.role,
+          }),
         });
 
         const resolucionPerdida = resolverEstadoTrasMovimiento({
@@ -597,6 +659,7 @@ export async function POST(
 
       const montoPrestamo = (d.monto as number) ?? 0;
       const rutaIdPrestamo = typeof d.rutaId === "string" ? d.rutaId.trim() : "";
+      const estadoPrestamoAntes = normalizeEstadoPrestamo(d.estado);
 
       const nowTx = new Date();
       const cobradoAcumuladoAntes = round2(totalAPagar - saldoPendiente);
@@ -607,23 +670,6 @@ export async function POST(
           totalAPagar,
           cobradoAcumuladoAntes
         );
-
-      const pagoRef = prestamoRef.collection(PAGOS_SUBCOLLECTION).doc();
-      const pagoData: Record<string, unknown> = {
-        monto: montoAplicar,
-        fecha: nowTx,
-        empleadoId: apiUser.uid,
-        cobradoPorRol: apiUser.role,
-        tipo: "pago",
-        metodoPago: metodo,
-        evidencia: evidenciaTrim || null,
-        registradoPorUid: uidRegistro,
-        registradoPorNombre: nombreRegistro,
-        cuotaCapital: parteCapital,
-        cuotaGanancia: parteGanancia,
-        ...pagoCamposNotifAdmin(apiUser, d as Record<string, unknown>),
-      };
-      if (keyTrimmed) pagoData.idempotencyKey = keyTrimmed;
 
       /**
        * Efectivo: admin → cajaRuta; empleado → cajaEmpleado del cobrador.
@@ -664,12 +710,45 @@ export async function POST(
         }
       }
 
-      tx.set(pagoRef, pagoData);
-
       const resolucionPago = resolverEstadoTrasMovimiento({
         tipo: "pago",
         nuevoSaldo,
       });
+
+      const pagoRef = prestamoRef.collection(PAGOS_SUBCOLLECTION).doc();
+      const pagoData: Record<string, unknown> = {
+        monto: montoAplicar,
+        fecha: nowTx,
+        empleadoId: apiUser.uid,
+        tipo: "pago",
+        metodoPago: metodo,
+        evidencia: evidenciaTrim || null,
+        registradoPorUid: uidRegistro,
+        registradoPorNombre: nombreRegistro,
+        cuotaCapital: parteCapital,
+        cuotaGanancia: parteGanancia,
+        saldoPendienteAntes: saldoPendiente,
+        saldoPendienteDespues: nuevoSaldo,
+        adelantoCuotaAntes: adelantoActual,
+        adelantoCuotaDespues: adelantoParaGuardar,
+        estadoPrestamoAntes,
+        estadoPrestamoDespues: resolucionPago.estado,
+        acreditaCajaRuta,
+        tieneSnapshotsCompletos: true,
+        ...buildCamposAuditoria({
+          adminId: adminIdPrestamo,
+          empresaId: apiUser.empresaId,
+          prestamoId,
+          rutaId: rutaIdPrestamo,
+          clienteId: clienteIdPrestamo,
+          clienteNombre: clienteNombrePrestamo,
+          rutaNombre: rutaNombreDesdeSnap(rutaSnap),
+          cobradoPorRol: apiUser.role,
+        }),
+      };
+      if (keyTrimmed) pagoData.idempotencyKey = keyTrimmed;
+
+      tx.set(pagoRef, pagoData);
 
       tx.update(prestamoRef, {
         saldoPendiente: nuevoSaldo,

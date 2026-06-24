@@ -134,12 +134,17 @@ export type MotivoPerdida =
   | "acuerdo_quita"
   | "otro";
 
+/** Estado del documento de pago en Firestore */
+export type EstadoPagoDoc = "activo" | "anulado";
+
 /** Pago dentro de un préstamo (o registro de intento sin pago / pérdida) */
 export interface PagoDoc {
   monto: number;
   fecha: Date;
   empleadoId: string;
   tipo: TipoPago;
+  /** activo por defecto; anulado tras corrección admin */
+  estado?: EstadoPagoDoc;
   /** Efectivo o transferencia (solo si tipo === "pago") */
   metodoPago?: MetodoPago;
   /** URL de la foto de la evidencia del cobro (solo si tipo === "pago") */
@@ -155,6 +160,27 @@ export interface PagoDoc {
   parteGananciaPerdida?: number;
   /** Cobro bruto acumulado antes del castigo (solo si tipo === "perdida") */
   cobradoAcumulado?: number;
+  /** Desglose contable del cobro (solo si tipo === "pago") */
+  cuotaCapital?: number;
+  cuotaGanancia?: number;
+  /** Denormalización para collectionGroup admin */
+  adminId?: string;
+  empresaId?: string;
+  prestamoId?: string;
+  rutaId?: string;
+  clienteId?: string;
+  clienteNombre?: string;
+  rutaNombre?: string;
+  cobradoPorRol?: string;
+  /** Snapshots para reversión (solo cobros con tieneSnapshotsCompletos) */
+  saldoPendienteAntes?: number;
+  saldoPendienteDespues?: number;
+  adelantoCuotaAntes?: number;
+  adelantoCuotaDespues?: number;
+  estadoPrestamoAntes?: EstadoPrestamo;
+  estadoPrestamoDespues?: EstadoPrestamo;
+  acreditaCajaRuta?: boolean;
+  tieneSnapshotsCompletos?: boolean;
 }
 
 /** Tipo de gasto */
