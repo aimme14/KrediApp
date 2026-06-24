@@ -11,6 +11,7 @@ import {
 import {
   fechaDiaCalendarioDesdeISO,
   fechaDiaColombiaHoy,
+  parseFechaDiaColombia,
 } from "@/lib/colombia-day-bounds";
 
 function formatMonto(value: number): string {
@@ -72,8 +73,11 @@ type EstadoModal =
 
 export default function PagosDiariosPage() {
   const { user, profile } = useAuth();
-  const [fecha, setFecha] = useState(fechaDiaColombiaHoy);
-  const { pagos, totales, loading, error, fechaHoy } = usePagosDiariosAdmin(fecha);
+  const hoy = fechaDiaColombiaHoy();
+  const [fecha, setFecha] = useState(hoy);
+  const [fechaBusqueda, setFechaBusqueda] = useState(hoy);
+  const [errorFiltro, setErrorFiltro] = useState<string | null>(null);
+  const { pagos, totales, loading, error, fechaHoy } = usePagosDiariosAdmin(fechaBusqueda);
   const [modal, setModal] = useState<EstadoModal>({ abierto: false });
   const [nombreEmpresa, setNombreEmpresa] = useState("");
 
@@ -121,6 +125,15 @@ export default function PagosDiariosPage() {
     window.addEventListener("afterprint", restaurarTitulo);
     window.print();
   }, []);
+
+  const handleBuscar = useCallback(() => {
+    if (!parseFechaDiaColombia(fecha).ok) {
+      setErrorFiltro("Selecciona una fecha válida.");
+      return;
+    }
+    setErrorFiltro(null);
+    setFechaBusqueda(fecha);
+  }, [fecha]);
 
   const confirmarAnulacion = useCallback(async () => {
     if (!modal.abierto || !user) return;
@@ -184,9 +197,7 @@ export default function PagosDiariosPage() {
         >
           <div>
             <h2 style={{ margin: "0 0 0.35rem" }}>Pagos diarios</h2>
-            <p className="no-print" style={{ margin: 0, opacity: 0.75, fontSize: "0.95rem" }}>
-              Todos los movimientos registrados en el día. Se actualiza en tiempo real.
-            </p>
+           
           </div>
           <button
             type="button"
@@ -205,7 +216,7 @@ export default function PagosDiariosPage() {
           )}
           <div>
             <strong>Pagos diarios</strong>
-            <span style={{ marginLeft: "0.5rem" }}>— {formatFechaImpresion(fecha)}</span>
+            <span style={{ marginLeft: "0.5rem" }}>— {formatFechaImpresion(fechaBusqueda)}</span>
           </div>
           <div style={{ marginTop: "0.25rem" }}>
             Generado:{" "}
@@ -219,21 +230,63 @@ export default function PagosDiariosPage() {
             display: "flex",
             flexWrap: "wrap",
             gap: "0.75rem",
-            alignItems: "center",
+            alignItems: "flex-end",
             marginBottom: "1.25rem",
           }}
         >
-          <label style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+          <label
+            htmlFor="pagos-diarios-fecha"
+            style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}
+          >
             <span style={{ fontSize: "0.85rem", opacity: 0.8 }}>Fecha</span>
             <input
+              id="pagos-diarios-fecha"
               type="date"
               value={fecha}
-              onChange={(e) => setFecha(e.target.value)}
+              onChange={(e) => {
+                setFecha(e.target.value);
+                setErrorFiltro(null);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  handleBuscar();
+                }
+              }}
               className="input"
               style={{ minWidth: "10rem" }}
             />
           </label>
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={handleBuscar}
+            disabled={loading && fecha === fechaBusqueda}
+            style={{
+              fontSize: "0.85rem",
+              padding: "0.35rem 0.75rem",
+              minHeight: "unset",
+              lineHeight: 1.3,
+            }}
+          >
+            Buscar
+          </button>
         </div>
+
+        {fecha !== fechaBusqueda && !loading && (
+          <p
+            className="no-print"
+            style={{ margin: "0 0 1rem", fontSize: "0.875rem", color: "var(--text-muted)" }}
+          >
+            Pulsa Buscar para cargar los pagos del {formatFechaImpresion(fecha)}.
+          </p>
+        )}
+
+        {errorFiltro && (
+          <p role="alert" className="pagos-diarios-anular-error no-print" style={{ marginBottom: "1rem" }}>
+            {errorFiltro}
+          </p>
+        )}
 
         <div
           style={{
