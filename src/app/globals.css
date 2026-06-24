@@ -11821,6 +11821,14 @@ a.admin-inicio-link-btn {
   }
 }
 
+.print-only {
+  display: none;
+}
+
+@page {
+  margin: 0;
+}
+
 @media print {
   .cobrar-confirmacion-actions,
   .cobrar-back { display: none !important; }
@@ -11829,5 +11837,92 @@ a.admin-inicio-link-btn {
     border: 1px solid #cbd5e1;
     max-width: 100%;
     border-radius: 12px;
+  }
+
+  /* Pagos diarios: impresión */
+  html,
+  body {
+    margin: 0 !important;
+    padding: 0 !important;
+    background: white !important;
+  }
+
+  .dashboard-header,
+  .admin-sidebar,
+  .admin-mobile-tabbar,
+  .admin-shell-backdrop,
+  .trabajador-sync-banner,
+  .modal-confirmar-overlay,
+  .no-print {
+    display: none !important;
+  }
+
+  .print-only {
+    display: block !important;
+  }
+
+  .pagos-diarios-page > header {
+    display: none !important;
+  }
+
+  .pagos-diarios-page {
+    max-width: 100% !important;
+    box-shadow: none !important;
+    border: none !important;
+    margin: 0 !important;
+    padding: 1.2cm 1.5cm !important;
+  }
+
+  .pagos-diarios-page,
+  .pagos-diarios-page * {
+    background: white !important;
+    color: #000 !important;
+    opacity: 1 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .pagos-diarios-page h2,
+  .pagos-diarios-page h3,
+  .pagos-diarios-page strong {
+    color: #000 !important;
+    font-weight: 700 !important;
+  }
+
+  .pagos-diarios-page h3 {
+    break-after: avoid;
+    page-break-after: avoid;
+  }
+
+  .pagos-diarios-page ul {
+    display: block !important;
+  }
+
+  .pagos-diarios-page .card,
+  .pagos-diarios-page li {
+    box-shadow: none !important;
+    border: 1px solid #000 !important;
+    border-radius: 6px !important;
+  }
+
+  .pagos-diarios-page li {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .pagos-diarios-page .pagos-diarios-row-anulado {
+    background: white !important;
+  }
+
+  .pagos-diarios-page .pagos-diarios-badge-anulado {
+    color: #000 !important;
+    background: white !important;
+    border: 1px solid #000 !important;
+    font-weight: 700 !important;
+  }
+
+  .pagos-diarios-btn-anular,
+  .pagos-diarios-ver-prestamo {
+    display: none !important;
   }
 }

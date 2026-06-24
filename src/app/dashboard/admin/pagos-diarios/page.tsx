@@ -1,8 +1,9 @@
 "use client";
 
-import { useMemo, useState, useCallback } from "react";
+import { useMemo, useState, useCallback, useEffect } from "react";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
+import { getEmpresa } from "@/lib/empresa";
 import {
   usePagosDiariosAdmin,
   type PagoDiarioAdminItem,
@@ -48,6 +49,16 @@ function labelRegistrador(item: PagoDiarioAdminItem): string {
   return "Trabajador";
 }
 
+function formatFechaImpresion(fechaDia: string): string {
+  return new Date(`${fechaDia}T12:00:00`).toLocaleDateString("es-CO", {
+    timeZone: "America/Bogota",
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+}
+
 type EstadoModal =
   | { abierto: false }
   | {
@@ -64,6 +75,23 @@ export default function PagosDiariosPage() {
   const [fecha, setFecha] = useState(fechaDiaColombiaHoy);
   const { pagos, totales, loading, error, fechaHoy } = usePagosDiariosAdmin(fecha);
   const [modal, setModal] = useState<EstadoModal>({ abierto: false });
+  const [nombreEmpresa, setNombreEmpresa] = useState("");
+
+  useEffect(() => {
+    const empresaId = profile?.empresaId;
+    if (!empresaId) return;
+    let cancelled = false;
+    getEmpresa(empresaId)
+      .then((data) => {
+        if (!cancelled && data?.nombre?.trim()) {
+          setNombreEmpresa(data.nombre.trim());
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [profile?.empresaId]);
 
   const cobros = useMemo(() => pagos.filter((p) => p.tipo === "pago"), [pagos]);
   const otros = useMemo(() => pagos.filter((p) => p.tipo !== "pago"), [pagos]);
@@ -81,6 +109,17 @@ export default function PagosDiariosPage() {
 
   const cerrarModal = useCallback(() => {
     setModal({ abierto: false });
+  }, []);
+
+  const imprimirPagos = useCallback(() => {
+    const tituloAnterior = document.title;
+    document.title = " ";
+    const restaurarTitulo = () => {
+      document.title = tituloAnterior;
+      window.removeEventListener("afterprint", restaurarTitulo);
+    };
+    window.addEventListener("afterprint", restaurarTitulo);
+    window.print();
   }, []);
 
   const confirmarAnulacion = useCallback(async () => {
@@ -132,12 +171,50 @@ export default function PagosDiariosPage() {
 
   return (
     <>
-      <div className="card" style={{ maxWidth: "960px" }}>
-        <header style={{ marginBottom: "1.25rem" }}>
-          <h2 style={{ margin: "0 0 0.35rem" }}>Pagos diarios</h2>
+      <div className="card pagos-diarios-page" style={{ maxWidth: "960px" }}>
+        <header
+          style={{
+            marginBottom: "1.25rem",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "flex-start",
+            gap: "1rem",
+            flexWrap: "wrap",
+          }}
+        >
+          <div>
+            <h2 style={{ margin: "0 0 0.35rem" }}>Pagos diarios</h2>
+            <p className="no-print" style={{ margin: 0, opacity: 0.75, fontSize: "0.95rem" }}>
+              Todos los movimientos registrados en el día. Se actualiza en tiempo real.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={imprimirPagos}
+            disabled={loading || pagos.length === 0}
+            className="btn no-print"
+            style={{ whiteSpace: "nowrap", alignSelf: "center" }}
+          >
+            Descargar pagos
+          </button>
         </header>
 
+        <div className="print-only" style={{ marginBottom: "1rem", fontSize: "0.9rem" }}>
+          {nombreEmpresa && (
+            <div style={{ fontWeight: 600, marginBottom: "0.25rem" }}>{nombreEmpresa}</div>
+          )}
+          <div>
+            <strong>Pagos diarios</strong>
+            <span style={{ marginLeft: "0.5rem" }}>— {formatFechaImpresion(fecha)}</span>
+          </div>
+          <div style={{ marginTop: "0.25rem" }}>
+            Generado:{" "}
+            {new Date().toLocaleString("es-CO", { timeZone: "America/Bogota" })}
+          </div>
+        </div>
+
         <div
+          className="no-print"
           style={{
             display: "flex",
             flexWrap: "wrap",
@@ -349,6 +426,7 @@ function PagoDiarioRow({
                 {" · "}
                 <Link
                   href={`/dashboard/admin/prestamo?prestamo=${encodeURIComponent(item.prestamoId)}`}
+                  className="pagos-diarios-ver-prestamo"
                   style={{ fontSize: "inherit" }}
                 >
                   Ver préstamo
