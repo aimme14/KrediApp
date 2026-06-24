@@ -308,7 +308,28 @@
 <a name='L243'></a><a href='#L243'>243</a>
 <a name='L244'></a><a href='#L244'>244</a>
 <a name='L245'></a><a href='#L245'>245</a>
-<a name='L246'></a><a href='#L246'>246</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L246'></a><a href='#L246'>246</a>
+<a name='L247'></a><a href='#L247'>247</a>
+<a name='L248'></a><a href='#L248'>248</a>
+<a name='L249'></a><a href='#L249'>249</a>
+<a name='L250'></a><a href='#L250'>250</a>
+<a name='L251'></a><a href='#L251'>251</a>
+<a name='L252'></a><a href='#L252'>252</a>
+<a name='L253'></a><a href='#L253'>253</a>
+<a name='L254'></a><a href='#L254'>254</a>
+<a name='L255'></a><a href='#L255'>255</a>
+<a name='L256'></a><a href='#L256'>256</a>
+<a name='L257'></a><a href='#L257'>257</a>
+<a name='L258'></a><a href='#L258'>258</a>
+<a name='L259'></a><a href='#L259'>259</a>
+<a name='L260'></a><a href='#L260'>260</a>
+<a name='L261'></a><a href='#L261'>261</a>
+<a name='L262'></a><a href='#L262'>262</a>
+<a name='L263'></a><a href='#L263'>263</a>
+<a name='L264'></a><a href='#L264'>264</a>
+<a name='L265'></a><a href='#L265'>265</a>
+<a name='L266'></a><a href='#L266'>266</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -553,6 +574,25 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import type { HelpPageContent } from "../types";
 &nbsp;
 export type AdminHelpPageKey =
@@ -569,7 +609,8 @@ export type AdminHelpPageKey =
   | "resumen"
   | "cliente-moroso"
   | "permisos"
-  | "cobrar";
+  | "cobrar"
+  | "pagos-diarios";
 &nbsp;
 export const ADMIN_HELP_PAGES: Record&lt;AdminHelpPageKey, HelpPageContent&gt; = {
   inicio: {
@@ -726,10 +767,7 @@ export const ADMIN_HELP_PAGES: Record&lt;AdminHelpPageKey, HelpPageContent&gt; =
       "Inversión a admin: devuelve capital desde la caja de una ruta a tu base.",
       "Confirma monto y ruta antes de ejecutar cada movimiento.",
     ],
-    cautions: [
-      "Verifica el saldo disponible antes de invertir o retirar.",
-      "Los movimientos quedan registrados; no uses inversiones para corregir errores de cobro del trabajador.",
-    ],
+    cautions: ["Verifica el saldo disponible antes de invertir o retirar."],
     relatedLinks: [
       { label: "Ruta del día", href: "/dashboard/admin/ruta-del-dia" },
       { label: "Resumen económico", href: "/dashboard/admin/resumen" },
@@ -797,6 +835,28 @@ export const ADMIN_HELP_PAGES: Record&lt;AdminHelpPageKey, HelpPageContent&gt; =
     ],
     relatedLinks: [{ label: "Préstamos", href: "/dashboard/admin/prestamo" }],
   },
+  "pagos-diarios": {
+    title: "Pagos diarios",
+    summary:
+      "Vista en tiempo real de todos los cobros registrados en el día, por empleados y por ti. Desde aquí puedes anular un cobro erróneo o duplicado antes de que el reporte del empleado sea aprobado.",
+    steps: [
+      "Selecciona la fecha para ver los movimientos de ese día.",
+      "Todos los cobros del día aparecen en la lista con cliente, ruta, método de pago y quién lo registró (trabajador o administrador).",
+      "Si detectas un cobro erróneo o duplicado, usa el botón Anular en la fila correspondiente.",
+      "Marca la casilla de confirmación y, si quieres, escribe un motivo opcional. Luego confirma la anulación.",
+      "El saldo del préstamo, la caja del empleado y las tarjetas de ruta se corrigen automáticamente.",
+    ],
+    cautions: [
+      "Solo se pueden anular cobros del día actual.",
+      "Solo se puede anular el cobro más reciente del préstamo. Si hay dos errores, anula primero el más reciente.",
+      "Si el reporte del empleado ya fue aprobado, el cobro en efectivo no se puede anular. Revisa antes de aprobar reportes.",
+      "Los cobros por transferencia se pueden anular aunque el reporte esté aprobado, ya que no pasan por la caja del empleado.",
+    ],
+    relatedLinks: [
+      { label: "Reportes del día", href: "/dashboard/admin/reportes-dia" },
+      { label: "Préstamos", href: "/dashboard/admin/prestamo" },
+    ],
+  },
 };
 &nbsp;</pre></td></tr></table></pre>
 
@@ -805,7 +865,7 @@ export const ADMIN_HELP_PAGES: Record&lt;AdminHelpPageKey, HelpPageContent&gt; =
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-06-17T22:20:04.599Z
+                at 2026-06-24T23:30:15.586Z
             </div>
         <script src="../../../prettify.js"></script>
         <script>

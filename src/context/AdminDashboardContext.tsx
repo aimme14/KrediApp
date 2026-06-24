@@ -21,6 +21,7 @@ import {
 import type { RutaItem, ResumenRutaItem } from "@/lib/empresa-api";
 import { getCajaAdmin } from "@/lib/empresa-api";
 import { computeCapitalRutaFromRutaFields } from "@/lib/capital-formulas";
+import { useDeferredMount } from "@/hooks/useDeferredMount";
 
 export type AdminRutaLive = RutaItem & {
   capitalRuta: number;
@@ -57,6 +58,7 @@ const AdminDashboardContext = createContext<AdminDashboardContextValue | null>(n
 
 export function AdminDashboardProvider({ children }: { children: ReactNode }) {
   const { user, profile } = useAuth();
+  const subscriptionsReady = useDeferredMount(50);
 
   const [rutasBase, setRutasBase] = useState<AdminRutaLive[]>([]);
   const [gastosAdminPeriodo, setGastosAdminPeriodo] = useState(0);
@@ -82,6 +84,7 @@ export function AdminDashboardProvider({ children }: { children: ReactNode }) {
   }, [user, profile?.role]);
 
   useEffect(() => {
+    if (!subscriptionsReady) return;
     if (!db) {
       setError("Firestore no está configurado en el cliente");
       setRutasBase([]);
@@ -163,13 +166,13 @@ export function AdminDashboardProvider({ children }: { children: ReactNode }) {
     );
 
     return () => unsub();
-  }, [user?.uid, profile?.role, profile?.empresaId, refreshCaja]);
+  }, [user?.uid, profile?.role, profile?.empresaId, refreshCaja, subscriptionsReady]);
 
   /** Contador de gastos por ruta: solo `ruta.gastos` (se reinicia al cerrar periodo). */
   const rutas = rutasBase;
 
   useEffect(() => {
-    if (!db || !user || !profile || profile.role !== "admin" || !profile.empresaId) {
+    if (!subscriptionsReady || !db || !user || !profile || profile.role !== "admin" || !profile.empresaId) {
       setCajaAdmin(0);
       setGastosAdminPeriodo(0);
       setTotalClientes(0);
@@ -212,10 +215,10 @@ export function AdminDashboardProvider({ children }: { children: ReactNode }) {
     );
 
     return () => unsub();
-  }, [user, profile]);
+  }, [user, profile, subscriptionsReady]);
 
   useEffect(() => {
-    if (!db || !user || !profile || profile.role !== "admin" || !profile.empresaId) {
+    if (!subscriptionsReady || !db || !user || !profile || profile.role !== "admin" || !profile.empresaId) {
       setEmpleadosPorRuta(new Map());
       return;
     }
@@ -268,7 +271,7 @@ export function AdminDashboardProvider({ children }: { children: ReactNode }) {
     );
 
     return () => unsub();
-  }, [user, profile]);
+  }, [user, profile, subscriptionsReady]);
 
   const rutasConEmpleados = useMemo((): AdminRutaConEmpleados[] => {
     return rutas.map((r) => ({

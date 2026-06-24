@@ -1,13 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { roleLabel } from "@/types/roles";
 import DashboardNotifications from "@/components/DashboardNotifications";
-import DashboardSettings from "@/components/DashboardSettings";
-import DashboardHelp from "@/components/help/DashboardHelp";
 import InactivityLock from "@/components/InactivityLock";
 import { DashboardHeaderProvider } from "@/context/DashboardHeaderContext";
 import { GastoFcmCampanitaProvider } from "@/context/GastoFcmCampanitaContext";
@@ -15,6 +14,9 @@ import { OfflineRootEffect } from "@/components/OfflineRootEffect";
 import { getEmpresa } from "@/lib/empresa";
 import type { ReactNode } from "react";
 import type { EmpresaProfile } from "@/types/empresa";
+
+const DashboardHelp = dynamic(() => import("@/components/help/DashboardHelp"), { ssr: false });
+const DashboardSettings = dynamic(() => import("@/components/DashboardSettings"), { ssr: false });
 
 export default function DashboardLayout({
   children,

@@ -31,6 +31,7 @@ import {
   type PrestamoItem,
 } from "@/lib/empresa-api";
 import { ESTADO_PRESTAMO_ABIERTO, normalizeEstadoPrestamo } from "@/lib/prestamo-estado";
+import { useDeferredMount } from "@/hooks/useDeferredMount";
 
 const EMPRESAS_COLLECTION = "empresas";
 const PRESTAMOS_SUBCOLLECTION = "prestamos";
@@ -125,6 +126,7 @@ function appendPrestamosSinDuplicar(
 
 export function TrabajadorListaProvider({ children }: { children: ReactNode }) {
   const { user, profile } = useAuth();
+  const subscriptionsReady = useDeferredMount(50);
   const [clientes, setClientes] = useState<ClienteItem[]>([]);
   const [prestamos, setPrestamos] = useState<PrestamoItem[]>([]);
   const [prestamosPagados, setPrestamosPagados] = useState<PrestamoItem[]>([]);
@@ -189,7 +191,7 @@ export function TrabajadorListaProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (!db || !user || !profile) return;
+    if (!subscriptionsReady || !db || !user || !profile) return;
     const empresaId = profile.empresaId?.trim();
     if (!empresaId) return;
     const canUse = profile.role === "trabajador" || profile.role === "admin";
@@ -242,10 +244,10 @@ export function TrabajadorListaProvider({ children }: { children: ReactNode }) {
       }
     );
     return unsub;
-  }, [user?.uid, profile?.role, profile?.empresaId, profile?.rutaId]);
+  }, [user?.uid, profile?.role, profile?.empresaId, profile?.rutaId, subscriptionsReady]);
 
   useEffect(() => {
-    if (!db || !user || !profile) return;
+    if (!subscriptionsReady || !db || !user || !profile) return;
     const empresaId = profile.empresaId?.trim();
     if (!empresaId) return;
     const canUse = profile.role === "trabajador" || profile.role === "admin";
@@ -276,10 +278,10 @@ export function TrabajadorListaProvider({ children }: { children: ReactNode }) {
       }
     );
     return unsub;
-  }, [user?.uid, profile?.role, profile?.empresaId, profile?.rutaId]);
+  }, [user?.uid, profile?.role, profile?.empresaId, profile?.rutaId, subscriptionsReady]);
 
   useEffect(() => {
-    if (!db || !user || !profile) return;
+    if (!subscriptionsReady || !db || !user || !profile) return;
     const empresaId = profile.empresaId?.trim();
     if (!empresaId) return;
     const canUse = profile.role === "trabajador" || profile.role === "admin";
@@ -314,7 +316,7 @@ export function TrabajadorListaProvider({ children }: { children: ReactNode }) {
       }
     );
     return unsub;
-  }, [user?.uid, profile?.role, profile?.empresaId, profile?.rutaId]);
+  }, [user?.uid, profile?.role, profile?.empresaId, profile?.rutaId, subscriptionsReady]);
 
   const cargarPagadosPagina = useCallback(async (): Promise<boolean> => {
     if (!db || !user || !profile) return false;

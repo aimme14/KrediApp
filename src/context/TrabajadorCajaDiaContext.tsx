@@ -36,6 +36,7 @@ import {
   getCobrosDelDiaEmpleado,
   type CobrosDelDiaEmpleadoResponse,
 } from "@/lib/empresa-api";
+import { useDeferredMount } from "@/hooks/useDeferredMount";
 
 export type TrabajadorCajaDiaContextValue = {
   fechaDia: string;
@@ -54,6 +55,7 @@ const TrabajadorCajaDiaContext = createContext<TrabajadorCajaDiaContextValue | n
 
 export function TrabajadorCajaDiaProvider({ children }: { children: ReactNode }) {
   const { user, profile } = useAuth();
+  const subscriptionsReady = useDeferredMount(50);
   const [fechaDia] = useState(() => fechaDiaColombiaHoy());
   const [data, setData] = useState<CobrosDelDiaEmpleadoResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -86,11 +88,12 @@ export function TrabajadorCajaDiaProvider({ children }: { children: ReactNode })
   }, [user, profile?.role, fechaDia]);
 
   useEffect(() => {
+    if (!subscriptionsReady) return;
     void refresh();
-  }, [refresh]);
+  }, [refresh, subscriptionsReady]);
 
   useEffect(() => {
-    if (!db || !user || profile?.role !== "trabajador") return;
+    if (!subscriptionsReady || !db || !user || profile?.role !== "trabajador") return;
     const empresaId = profile?.empresaId?.trim();
     if (!empresaId) return;
 
@@ -115,10 +118,10 @@ export function TrabajadorCajaDiaProvider({ children }: { children: ReactNode })
     );
 
     return unsub;
-  }, [user?.uid, profile?.role, profile?.empresaId]);
+  }, [user?.uid, profile?.role, profile?.empresaId, subscriptionsReady]);
 
   useEffect(() => {
-    if (!db || !user || profile?.role !== "trabajador") return;
+    if (!subscriptionsReady || !db || !user || profile?.role !== "trabajador") return;
     const empresaId = profile?.empresaId?.trim();
     const rutaId = profile?.rutaId?.trim();
     if (!empresaId) return;
@@ -158,10 +161,10 @@ export function TrabajadorCajaDiaProvider({ children }: { children: ReactNode })
     );
 
     return unsub;
-  }, [user?.uid, profile?.role, profile?.empresaId, profile?.rutaId, fechaDia]);
+  }, [user?.uid, profile?.role, profile?.empresaId, profile?.rutaId, fechaDia, subscriptionsReady]);
 
   useEffect(() => {
-    if (!db || !user || profile?.role !== "trabajador") return;
+    if (!subscriptionsReady || !db || !user || profile?.role !== "trabajador") return;
     const start = inicioDiaColombiaUtc(fechaDia);
     const end = finDiaColombiaUtc(fechaDia);
     if (!start || !end) return;
@@ -208,10 +211,10 @@ export function TrabajadorCajaDiaProvider({ children }: { children: ReactNode })
     );
 
     return unsub;
-  }, [user?.uid, profile?.role, fechaDia, refresh]);
+  }, [user?.uid, profile?.role, fechaDia, refresh, subscriptionsReady]);
 
   useEffect(() => {
-    if (!db || !user || profile?.role !== "trabajador") return;
+    if (!subscriptionsReady || !db || !user || profile?.role !== "trabajador") return;
     const empresaId = profile?.empresaId?.trim();
     if (!empresaId) return;
     const start = inicioDiaColombiaUtc(fechaDia);
@@ -241,10 +244,10 @@ export function TrabajadorCajaDiaProvider({ children }: { children: ReactNode })
     );
 
     return unsub;
-  }, [user?.uid, profile?.role, profile?.empresaId, fechaDia]);
+  }, [user?.uid, profile?.role, profile?.empresaId, fechaDia, subscriptionsReady]);
 
   useEffect(() => {
-    if (!db || !user || profile?.role !== "trabajador") return;
+    if (!subscriptionsReady || !db || !user || profile?.role !== "trabajador") return;
     const empresaId = profile?.empresaId?.trim();
     const rutaId = profile?.rutaId?.trim();
     if (!empresaId || !rutaId) return;
@@ -278,7 +281,7 @@ export function TrabajadorCajaDiaProvider({ children }: { children: ReactNode })
     );
 
     return unsub;
-  }, [user?.uid, profile?.role, profile?.empresaId, profile?.rutaId, fechaDia]);
+  }, [user?.uid, profile?.role, profile?.empresaId, profile?.rutaId, fechaDia, subscriptionsReady]);
 
   const tuCajaEfectivo = useMemo(() => {
     if (!data) return null;

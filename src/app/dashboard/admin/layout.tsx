@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useState, useCallback, useMemo } from "react";
+import dynamic from "next/dynamic";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { useDashboardHeaderSlot } from "@/context/DashboardHeaderContext";
-import { AdminFcmRegistration } from "@/components/AdminFcmRegistration";
 import { AdminNotificacionesRealtimeListener } from "@/components/AdminNotificacionesRealtimeListener";
 import { TrabajadorListaProvider, useTrabajadorLista } from "@/context/TrabajadorListaContext";
 import { useGastoFcmCampanita } from "@/context/GastoFcmCampanitaContext";
@@ -13,6 +13,11 @@ import { TrabajadorCajaDiaProvider } from "@/context/TrabajadorCajaDiaContext";
 import { AdminDashboardProvider } from "@/context/AdminDashboardContext";
 import { ADMIN_NAV_ITEMS, AdminNavIcon } from "@/components/admin/adminNavConfig";
 import { TrabajadorSyncBanner } from "@/components/TrabajadorSyncBanner";
+
+const AdminFcmRegistration = dynamic(
+  () => import("@/components/AdminFcmRegistration").then((m) => ({ default: m.AdminFcmRegistration })),
+  { ssr: false }
+);
 
 function adminNavItemActive(pathname: string, href: string): boolean {
   if (href === "/dashboard/admin") return pathname === "/dashboard/admin";

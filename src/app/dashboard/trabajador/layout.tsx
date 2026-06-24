@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 import { createPortal } from "react-dom";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
@@ -30,14 +31,11 @@ const BOTTOM_NAV_ITEMS = [
   { type: "menu" as const, label: "Más", icon: "menu" as const },
 ];
 
-/** Rutas que conviene precargar para que el cambio de pestaña sea más rápido. */
+/** Rutas ligeras para prefetch: las páginas pesadas (cliente, préstamo, cobrar) se cargan bajo demanda. */
 const PREFETCH_TRABAJADOR_HREFS = [
   "/dashboard/trabajador",
   "/dashboard/trabajador/ruta",
   "/dashboard/trabajador/caja-del-dia",
-  "/dashboard/trabajador/resumen",
-  "/dashboard/trabajador/cliente",
-  "/dashboard/trabajador/prestamo",
 ] as const;
 
 function TrabajadorLayoutInner({ children }: { children: React.ReactNode }) {

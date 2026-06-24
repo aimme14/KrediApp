@@ -6,6 +6,8 @@ import { db } from "@/lib/firebase";
 import { useAuth } from "@/context/AuthContext";
 import { computeCapitalTotalRutaDesdeSaldos } from "@/lib/capital-formulas";
 import { EMPRESAS_COLLECTION, RUTAS_SUBCOLLECTION } from "@/lib/empresas-db";
+import { useDeferredMount } from "@/hooks/useDeferredMount";
+
 import type { RutaFinanciera } from "@/types/finanzas";
 
 export interface TrabajadorRutaContextValue {
@@ -18,6 +20,7 @@ const TrabajadorRutaContext = createContext<TrabajadorRutaContextValue | null>(n
 
 export function TrabajadorRutaProvider({ children }: { children: ReactNode }) {
   const { user, profile } = useAuth();
+  const subscriptionsReady = useDeferredMount(50);
   const [state, setState] = useState<TrabajadorRutaContextValue>({
     ruta: null,
     loading: true,
@@ -25,6 +28,7 @@ export function TrabajadorRutaProvider({ children }: { children: ReactNode }) {
   });
 
   useEffect(() => {
+    if (!subscriptionsReady) return;
     if (!db) {
       setState({
         ruta: null,
@@ -145,7 +149,7 @@ export function TrabajadorRutaProvider({ children }: { children: ReactNode }) {
       cancelled = true;
       if (unsubscribe) unsubscribe();
     };
-  }, [user, profile]);
+  }, [user, profile, subscriptionsReady]);
 
   const value = useMemo(() => state, [state]);
 
