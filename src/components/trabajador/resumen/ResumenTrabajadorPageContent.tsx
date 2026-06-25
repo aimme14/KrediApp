@@ -25,7 +25,7 @@ function formatMonto(value: number): string {
 export default function ResumenTrabajadorPageContent() {
   const { user, profile } = useAuth();
   const online = useOnline();
-  const { data: cajaDia, tuCajaEfectivo } = useTrabajadorCajaDia();
+  const { data: cajaDia, tuCajaActual } = useTrabajadorCajaDia();
   const [entregando, setEntregando] = useState(false);
   const [modalEntregaAbierto, setModalEntregaAbierto] = useState(false);
   const [comentarioEntrega, setComentarioEntrega] = useState("");
@@ -269,9 +269,9 @@ export default function ResumenTrabajadorPageContent() {
               marginTop: "0.25rem",
             }}
           >
-            <span style={{ fontWeight: 700, fontSize: "0.9rem" }}>A entregar (efectivo)</span>
+            <span style={{ fontWeight: 700, fontSize: "0.9rem" }}>Tu caja actual</span>
             <span style={{ fontWeight: 800, fontSize: "1.1rem", color: "var(--text)" }}>
-              {formatMonto(tuCajaEfectivo ?? 0)}
+              {formatMonto(tuCajaActual ?? 0)}
             </span>
           </div>
         </div>

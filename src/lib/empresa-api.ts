@@ -571,7 +571,7 @@ export type CobrosDelDiaEmpleadoResponse = {
   totalCobrosEfectivoDia: number;
   /** Saldo en `empresas/{empresaId}/usuarios/{uid}.cajaEmpleado` (si la API lo incluye). */
   cajaEmpleado?: number;
-  /** Total cobrado en ruta + base − gastos − préstamos desde tu caja (tarjeta «Tu caja del día»). */
+  /** Total cobrado en ruta + base − gastos − préstamos del día (desglose diario; la tarjeta «Tu caja actual» usa `cajaEmpleado`). */
   tuCajaDelDia: number;
   /** Cobros en efectivo del día por este trabajador (acreditan a su caja; transferencias van a cajaRuta). */
   totalCobrosAcreditanTuCaja: number;

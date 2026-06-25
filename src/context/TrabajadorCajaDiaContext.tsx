@@ -28,7 +28,6 @@ import {
 import {
   EMPRESAS_COLLECTION,
   USUARIOS_SUBCOLLECTION,
-  ASIGNACIONES_BASE_EMPLEADO_SUBCOLLECTION,
   GASTOS_EMPLEADO_SUBCOLLECTION,
   PRESTAMOS_SUBCOLLECTION,
 } from "@/lib/empresas-db";
@@ -44,8 +43,10 @@ export type TrabajadorCajaDiaContextValue = {
   loading: boolean;
   error: string | null;
   refresh: () => Promise<void>;
+  /** Saldo en `usuarios/{uid}.cajaEmpleado` (efectivo acumulado; va a 0 al aprobar entrega de reporte). */
   cajaEmpleadoRT: number | null;
-  tuCajaEfectivo: number | null;
+  /** Alias de `cajaEmpleadoRT` para la tarjeta «Tu caja actual». */
+  tuCajaActual: number | null;
   totalGastosRT: number | null;
   totalPrestamosRT: number | null;
   totalCobrosEfectivoRT: number | null;
@@ -61,7 +62,6 @@ export function TrabajadorCajaDiaProvider({ children }: { children: ReactNode })
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [cajaEmpleadoRT, setCajaEmpleadoRT] = useState<number | null>(null);
-  const [baseAsignadaRT, setBaseAsignadaRT] = useState<number | null>(null);
   const [cobrosEfectivoRT, setCobrosEfectivoRT] = useState<number | null>(null);
   const [gastosRT, setGastosRT] = useState<number | null>(null);
   const [prestamosRT, setPrestamosRT] = useState<number | null>(null);
@@ -119,49 +119,6 @@ export function TrabajadorCajaDiaProvider({ children }: { children: ReactNode })
 
     return unsub;
   }, [user?.uid, profile?.role, profile?.empresaId, subscriptionsReady]);
-
-  useEffect(() => {
-    if (!subscriptionsReady || !db || !user || profile?.role !== "trabajador") return;
-    const empresaId = profile?.empresaId?.trim();
-    const rutaId = profile?.rutaId?.trim();
-    if (!empresaId) return;
-
-    const start = inicioDiaColombiaUtc(fechaDia);
-    const end = finDiaColombiaUtc(fechaDia);
-    if (!start || !end) return;
-
-    const q = query(
-      collection(
-        db,
-        EMPRESAS_COLLECTION,
-        empresaId,
-        USUARIOS_SUBCOLLECTION,
-        user.uid,
-        ASIGNACIONES_BASE_EMPLEADO_SUBCOLLECTION
-      ),
-      where("fecha", ">=", Timestamp.fromDate(start)),
-      where("fecha", "<=", Timestamp.fromDate(end))
-    );
-
-    const unsub = onSnapshot(
-      q,
-      (snap) => {
-        let total = 0;
-        for (const d of snap.docs) {
-          const x = d.data();
-          if (rutaId && x.rutaId && x.rutaId !== rutaId) continue;
-          const m = typeof x.monto === "number" && x.monto > 0 ? x.monto : 0;
-          total += m;
-        }
-        setBaseAsignadaRT(Math.round(total * 100) / 100);
-      },
-      (err) => {
-        console.warn("[TrabajadorCajaDia] onSnapshot asignacionesBase:", err);
-      }
-    );
-
-    return unsub;
-  }, [user?.uid, profile?.role, profile?.empresaId, profile?.rutaId, fechaDia, subscriptionsReady]);
 
   useEffect(() => {
     if (!subscriptionsReady || !db || !user || profile?.role !== "trabajador") return;
@@ -283,15 +240,6 @@ export function TrabajadorCajaDiaProvider({ children }: { children: ReactNode })
     return unsub;
   }, [user?.uid, profile?.role, profile?.empresaId, profile?.rutaId, fechaDia, subscriptionsReady]);
 
-  const tuCajaEfectivo = useMemo(() => {
-    if (!data) return null;
-    const base = baseAsignadaRT ?? data.totalBaseAsignadaDia;
-    const cobrosEfectivo = cobrosEfectivoRT ?? data.totalCobrosEfectivoDia;
-    const gastos = gastosRT ?? data.totalGastosDia;
-    const prestamos = prestamosRT ?? data.totalPrestamosDesembolsoDia ?? 0;
-    return Math.round((cobrosEfectivo + base - gastos - prestamos) * 100) / 100;
-  }, [data, baseAsignadaRT, cobrosEfectivoRT, gastosRT, prestamosRT]);
-
   const value = useMemo(
     (): TrabajadorCajaDiaContextValue => ({
       fechaDia,
@@ -300,7 +248,7 @@ export function TrabajadorCajaDiaProvider({ children }: { children: ReactNode })
       error,
       refresh,
       cajaEmpleadoRT,
-      tuCajaEfectivo,
+      tuCajaActual: cajaEmpleadoRT,
       totalGastosRT: gastosRT,
       totalPrestamosRT: prestamosRT,
       totalCobrosEfectivoRT: cobrosEfectivoRT,
@@ -312,7 +260,6 @@ export function TrabajadorCajaDiaProvider({ children }: { children: ReactNode })
       error,
       refresh,
       cajaEmpleadoRT,
-      tuCajaEfectivo,
       gastosRT,
       prestamosRT,
       cobrosEfectivoRT,

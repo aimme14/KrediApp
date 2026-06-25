@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { useTrabajadorCajaDia } from "@/context/TrabajadorCajaDiaContext";
-import { formatFechaDia } from "@/lib/colombia-day-bounds";
 import { useRuta } from "@/hooks/useRuta";
 import { FILTROS_RUTA_DIA, useRutaDia } from "@/hooks/useRutaDia";
 import {
@@ -74,9 +73,8 @@ function getBadgeLabel(grupo: ClienteRutaGrupo, _prioridad: PrioridadClienteRuta
 export default function TrabajadorRutaPageContent() {
   const { profile } = useAuth();
   const router = useRouter();
-  const { fechaDia, data: cajaDelDiaResumen, loading: loadingCajaDelDia, tuCajaEfectivo } =
-    useTrabajadorCajaDia();
-  const cajaActual = tuCajaEfectivo ?? 0;
+  const { loading: loadingCajaDelDia, tuCajaActual } = useTrabajadorCajaDia();
+  const cajaActual = tuCajaActual ?? 0;
   const [filtroExpandido, setFiltroExpandido] = useState(false);
 
   const {
@@ -198,15 +196,13 @@ export default function TrabajadorRutaPageContent() {
         <div className="ruta-dia-caja-inner">
           <div className="ruta-dia-caja-text">
             <h3 id="ruta-dia-caja-heading" className="ruta-dia-caja-title">
-              caja 
+              Tu caja actual
             </h3>
-            <p className="ruta-dia-caja-desc">
-              {formatFechaDia(cajaDelDiaResumen?.fechaDia ?? fechaDia)}
-            </p>
+            <p className="ruta-dia-caja-desc">Efectivo acumulado hasta entregar el reporte</p>
           </div>
           <div className="ruta-dia-caja-monto-wrap">
             <span className="ruta-dia-caja-monto" aria-live="polite">
-              {loadingCajaDelDia && tuCajaEfectivo == null
+              {loadingCajaDelDia && tuCajaActual == null
                 ? "…"
                 : formatCurrency(cajaActual)}
             </span>

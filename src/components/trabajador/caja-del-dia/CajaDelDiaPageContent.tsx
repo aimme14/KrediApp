@@ -128,11 +128,11 @@ export default function CajaDelDiaPageContent() {
     data,
     loading,
     error,
-    tuCajaEfectivo,
+    tuCajaActual,
     totalGastosRT,
     totalPrestamosRT,
   } = useTrabajadorCajaDia();
-  const cajaActual = tuCajaEfectivo ?? 0;
+  const cajaActual = tuCajaActual ?? 0;
   const [evidenciaModalUrl, setEvidenciaModalUrl] = useState<string | null>(null);
   const evidenciaCerrarRef = useRef<HTMLButtonElement>(null);
 
@@ -230,7 +230,7 @@ export default function CajaDelDiaPageContent() {
                   }}
                 >
                   <TarjetaResumen
-                    etiqueta="Caja actual (efectivo)"
+                    etiqueta="Tu caja actual"
                     valor={formatMonto(cajaActual)}
                   />
                   <TarjetaResumen
