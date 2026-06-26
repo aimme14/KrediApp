@@ -4,6 +4,10 @@ import type { CSSProperties } from "react";
 import type { CobrosDelDiaEmpleadoResponse } from "@/lib/empresa-api";
 import { formatoCuotasRestanteTotal } from "@/lib/cuotas-display";
 import {
+  fechaDiaCalendarioDesdeISO,
+  formatFechaDia,
+} from "@/lib/colombia-day-bounds";
+import {
   formatMontoReporteDia,
   normalizarMetodoPagoReporteDia,
   totalesVistaPreviaReporte,
@@ -59,7 +63,11 @@ export default function ReportesDiaPreviewModal({
               </button>
             </div>
             <p style={{ color: "var(--text-muted)", fontSize: "0.875rem", marginTop: 0 }}>
-              <strong>{previewMeta?.fechaDiaPreview ?? "—"}</strong>
+              <strong>
+                {previewSnapshot?.fechaDesdeISO
+                  ? `${formatFechaDia(fechaDiaCalendarioDesdeISO(previewSnapshot.fechaDesdeISO) ?? "")} – ${formatFechaDia(previewSnapshot.fechaDia)}`
+                  : previewMeta?.fechaDiaPreview ?? "—"}
+              </strong>
               {previewMeta ? (
                 <>
                   {" "}
@@ -115,6 +123,36 @@ export default function ReportesDiaPreviewModal({
                     <li>Clientes que no pagaron: {previewSnapshot.noPagos.length}</li>
                   </ul>
                 </div>
+                {(previewSnapshot.diasDelPeriodo ?? []).length > 1 ? (
+                  <div>
+                    <strong>Desglose por día</strong>
+                    {(previewSnapshot.diasDelPeriodo ?? []).map((dia) => (
+                      <div
+                        key={dia.fechaDia}
+                        style={{
+                          borderTop: "1px solid var(--card-border)",
+                          paddingTop: "0.75rem",
+                          marginTop: "0.75rem",
+                        }}
+                      >
+                        <div style={{ fontWeight: 700, marginBottom: "0.35rem" }}>
+                          {formatFechaDia(dia.fechaDia)}
+                        </div>
+                        <ul style={{ margin: 0, paddingLeft: "1.25rem", fontSize: "0.875rem" }}>
+                          <li>Efectivo: {formatMontoReporteDia(dia.totalCobrosEfectivo)}</li>
+                          <li>
+                            Transferencia: {formatMontoReporteDia(dia.totalCobrosTransferencia)}
+                          </li>
+                          <li>Gastos: {formatMontoReporteDia(dia.totalGastos)}</li>
+                          <li>Total cobros: {formatMontoReporteDia(dia.totalCobros)}</li>
+                          <li>Cobros: {dia.cobros.length}</li>
+                          <li>No pagó: {dia.noPagos.length}</li>
+                          <li>Pérdidas: {dia.perdidasDelDia.length}</li>
+                        </ul>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
                 <div className="table-wrap">
                   <strong>Préstamos</strong>
                   <table>

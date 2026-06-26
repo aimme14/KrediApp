@@ -7,6 +7,7 @@ import {
 } from "@/lib/empresas-db";
 import { buildCierreDiaSnapshot } from "@/lib/cierre-dia-snapshot";
 import { fechaDiaColombiaHoy } from "@/lib/colombia-day-bounds";
+import { getInicioPeriodoActual } from "@/lib/periodo-reporte-empleado";
 
 /**
  * GET: previsualización del cierre del día (misma lógica que cobros del día del trabajador).
@@ -62,15 +63,26 @@ export async function GET(
   const fechaDia = fechaDiaColombiaHoy();
 
   try {
+    const { fechaDesde, fechaHasta } = await getInicioPeriodoActual(db, {
+      empresaId,
+      empleadoUid,
+      rutaId,
+      adminId: apiUser.uid,
+    });
+
     const snapshot = await buildCierreDiaSnapshot(db, {
       empresaId,
       empleadoUid,
       rutaId,
       fechaDia,
+      fechaDesde,
+      fechaHasta,
     });
 
     return NextResponse.json({
       fechaDiaPreview: fechaDia,
+      fechaDesdeISO: snapshot.fechaDesdeISO,
+      fechaHastaISO: snapshot.fechaHastaISO,
       solicitud: {
         id: solicitudId.trim(),
         empleadoNombre:

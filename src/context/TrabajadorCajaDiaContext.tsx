@@ -20,11 +20,7 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/context/AuthContext";
-import {
-  fechaDiaColombiaHoy,
-  inicioDiaColombiaUtc,
-  finDiaColombiaUtc,
-} from "@/lib/colombia-day-bounds";
+import { fechaDiaColombiaHoy } from "@/lib/colombia-day-bounds";
 import {
   EMPRESAS_COLLECTION,
   USUARIOS_SUBCOLLECTION,
@@ -61,6 +57,8 @@ export function TrabajadorCajaDiaProvider({ children }: { children: ReactNode })
   const [data, setData] = useState<CobrosDelDiaEmpleadoResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [periodoStart, setPeriodoStart] = useState<Date | null>(null);
+  const [periodoEnd, setPeriodoEnd] = useState<Date | null>(null);
   const [cajaEmpleadoRT, setCajaEmpleadoRT] = useState<number | null>(null);
   const [cobrosEfectivoRT, setCobrosEfectivoRT] = useState<number | null>(null);
   const [gastosRT, setGastosRT] = useState<number | null>(null);
@@ -77,15 +75,17 @@ export function TrabajadorCajaDiaProvider({ children }: { children: ReactNode })
     setError(null);
     try {
       const token = await user.getIdToken();
-      const res = await getCobrosDelDiaEmpleado(token, fechaDia);
+      const res = await getCobrosDelDiaEmpleado(token);
       setData(res);
+      if (res.fechaDesdeISO) setPeriodoStart(new Date(res.fechaDesdeISO));
+      if (res.fechaHastaISO) setPeriodoEnd(new Date(res.fechaHastaISO));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al cargar");
       setData(null);
     } finally {
       setLoading(false);
     }
-  }, [user, profile?.role, fechaDia]);
+  }, [user, profile?.role]);
 
   useEffect(() => {
     if (!subscriptionsReady) return;
@@ -122,9 +122,10 @@ export function TrabajadorCajaDiaProvider({ children }: { children: ReactNode })
 
   useEffect(() => {
     if (!subscriptionsReady || !db || !user || profile?.role !== "trabajador") return;
-    const start = inicioDiaColombiaUtc(fechaDia);
-    const end = finDiaColombiaUtc(fechaDia);
-    if (!start || !end) return;
+    if (!periodoStart) return;
+
+    const start = periodoStart;
+    const end = periodoEnd ?? new Date();
 
     const q = query(
       collectionGroup(db, "pagos"),
@@ -168,15 +169,15 @@ export function TrabajadorCajaDiaProvider({ children }: { children: ReactNode })
     );
 
     return unsub;
-  }, [user?.uid, profile?.role, fechaDia, refresh, subscriptionsReady]);
+  }, [user?.uid, profile?.role, periodoStart, periodoEnd, refresh, subscriptionsReady]);
 
   useEffect(() => {
     if (!subscriptionsReady || !db || !user || profile?.role !== "trabajador") return;
     const empresaId = profile?.empresaId?.trim();
-    if (!empresaId) return;
-    const start = inicioDiaColombiaUtc(fechaDia);
-    const end = finDiaColombiaUtc(fechaDia);
-    if (!start || !end) return;
+    if (!empresaId || !periodoStart) return;
+
+    const start = periodoStart;
+    const end = periodoEnd ?? new Date();
 
     const q = query(
       collection(db, EMPRESAS_COLLECTION, empresaId, GASTOS_EMPLEADO_SUBCOLLECTION),
@@ -201,17 +202,16 @@ export function TrabajadorCajaDiaProvider({ children }: { children: ReactNode })
     );
 
     return unsub;
-  }, [user?.uid, profile?.role, profile?.empresaId, fechaDia, subscriptionsReady]);
+  }, [user?.uid, profile?.role, profile?.empresaId, periodoStart, periodoEnd, subscriptionsReady]);
 
   useEffect(() => {
     if (!subscriptionsReady || !db || !user || profile?.role !== "trabajador") return;
     const empresaId = profile?.empresaId?.trim();
     const rutaId = profile?.rutaId?.trim();
-    if (!empresaId || !rutaId) return;
+    if (!empresaId || !rutaId || !periodoStart) return;
 
-    const start = inicioDiaColombiaUtc(fechaDia);
-    const end = finDiaColombiaUtc(fechaDia);
-    if (!start || !end) return;
+    const start = periodoStart;
+    const end = periodoEnd ?? new Date();
 
     const q = query(
       collection(db, EMPRESAS_COLLECTION, empresaId, PRESTAMOS_SUBCOLLECTION),
@@ -238,7 +238,15 @@ export function TrabajadorCajaDiaProvider({ children }: { children: ReactNode })
     );
 
     return unsub;
-  }, [user?.uid, profile?.role, profile?.empresaId, profile?.rutaId, fechaDia, subscriptionsReady]);
+  }, [
+    user?.uid,
+    profile?.role,
+    profile?.empresaId,
+    profile?.rutaId,
+    periodoStart,
+    periodoEnd,
+    subscriptionsReady,
+  ]);
 
   const value = useMemo(
     (): TrabajadorCajaDiaContextValue => ({

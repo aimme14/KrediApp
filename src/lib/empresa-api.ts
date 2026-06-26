@@ -560,8 +560,22 @@ export type PerdidaDiaSnapshotItem = {
   saldoPendienteTrasPerdida: number;
 };
 
+export type DiaPeriodoItem = {
+  fechaDia: string;
+  cobros: CobroDiaItem[];
+  noPagos: NoPagoDiaItem[];
+  perdidasDelDia: PerdidaDiaSnapshotItem[];
+  gastosDelDia: GastoDiaItem[];
+  totalCobrosEfectivo: number;
+  totalCobrosTransferencia: number;
+  totalGastos: number;
+  totalCobros: number;
+};
+
 export type CobrosDelDiaEmpleadoResponse = {
   fechaDia: string;
+  fechaDesdeISO?: string | null;
+  fechaHastaISO?: string | null;
   rutaId: string;
   cobros: CobroDiaItem[];
   noPagos: NoPagoDiaItem[];
@@ -581,7 +595,26 @@ export type CobrosDelDiaEmpleadoResponse = {
   totalBaseAsignadaDia: number;
   prestamosDesembolsoDelDia: PrestamoDesembolsoDiaItem[];
   totalPrestamosDesembolsoDia: number;
+  diasDelPeriodo?: DiaPeriodoItem[];
 };
+
+function mapDiasDelPeriodoFromApi(raw: unknown): DiaPeriodoItem[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.map((row: Record<string, unknown>) => ({
+    fechaDia: String(row.fechaDia ?? ""),
+    cobros: Array.isArray(row.cobros) ? (row.cobros as CobroDiaItem[]) : [],
+    noPagos: Array.isArray(row.noPagos) ? (row.noPagos as NoPagoDiaItem[]) : [],
+    perdidasDelDia: Array.isArray(row.perdidasDelDia)
+      ? (row.perdidasDelDia as PerdidaDiaSnapshotItem[])
+      : [],
+    gastosDelDia: Array.isArray(row.gastosDelDia) ? (row.gastosDelDia as GastoDiaItem[]) : [],
+    totalCobrosEfectivo: typeof row.totalCobrosEfectivo === "number" ? row.totalCobrosEfectivo : 0,
+    totalCobrosTransferencia:
+      typeof row.totalCobrosTransferencia === "number" ? row.totalCobrosTransferencia : 0,
+    totalGastos: typeof row.totalGastos === "number" ? row.totalGastos : 0,
+    totalCobros: typeof row.totalCobros === "number" ? row.totalCobros : 0,
+  }));
+}
 
 /** Admin: vista previa del cierre (misma data que cobros del día del trabajador). Solo solicitudes pendientes. */
 export async function getPreviewEntregaReporteAdmin(
@@ -651,6 +684,10 @@ export async function getPreviewEntregaReporteAdmin(
     solicitud: data.solicitud ?? {},
     snapshot: {
       fechaDia: data.snapshot?.fechaDia ?? "",
+      fechaDesdeISO:
+        typeof data.snapshot?.fechaDesdeISO === "string" ? data.snapshot.fechaDesdeISO : null,
+      fechaHastaISO:
+        typeof data.snapshot?.fechaHastaISO === "string" ? data.snapshot.fechaHastaISO : null,
       rutaId: data.snapshot?.rutaId ?? "",
       cobros: Array.isArray(data.snapshot?.cobros) ? data.snapshot.cobros : [],
       noPagos: Array.isArray(data.snapshot?.noPagos) ? data.snapshot.noPagos : [],
@@ -676,6 +713,7 @@ export async function getPreviewEntregaReporteAdmin(
         typeof data.snapshot?.totalPrestamosDesembolsoDia === "number"
           ? data.snapshot.totalPrestamosDesembolsoDia
           : 0,
+      diasDelPeriodo: mapDiasDelPeriodoFromApi(data.snapshot?.diasDelPeriodo),
     },
   };
 }
@@ -712,11 +750,9 @@ export async function regenerarReporteDiaPdf(
 }
 
 export async function getCobrosDelDiaEmpleado(
-  token: string,
-  fecha?: string
+  token: string
 ): Promise<CobrosDelDiaEmpleadoResponse> {
-  const qs = fecha ? `?fecha=${encodeURIComponent(fecha)}` : "";
-  const res = await fetchWithAuth(`/api/empresa/empleado/cobros-del-dia${qs}`, token);
+  const res = await fetchWithAuth(`/api/empresa/empleado/cobros-del-dia`, token);
   const data = await res.json();
   if (!res.ok) throw new Error(data.error ?? "Error al cargar cobros del día");
 
@@ -806,6 +842,8 @@ export async function getCobrosDelDiaEmpleado(
 
   return {
     fechaDia: data.fechaDia ?? "",
+    fechaDesdeISO: typeof data.fechaDesdeISO === "string" ? data.fechaDesdeISO : null,
+    fechaHastaISO: typeof data.fechaHastaISO === "string" ? data.fechaHastaISO : null,
     rutaId: data.rutaId ?? "",
     cobros,
     noPagos,
@@ -826,6 +864,7 @@ export async function getCobrosDelDiaEmpleado(
     prestamosDesembolsoDelDia,
     totalPrestamosDesembolsoDia:
       typeof data.totalPrestamosDesembolsoDia === "number" ? data.totalPrestamosDesembolsoDia : 0,
+    diasDelPeriodo: mapDiasDelPeriodoFromApi(data.diasDelPeriodo),
   };
 }
 
