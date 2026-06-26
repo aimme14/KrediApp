@@ -27,11 +27,11 @@ export const ADMIN_HELP_PAGES: Record<AdminHelpPageKey, HelpPageContent> = {
       "Accede rápido a las secciones clave desde el menú lateral o la barra inferior en móvil.",
     ],
     cautions: [
-      "No asumas que las cifras de las cajas del inicio del dia encajrán con las del cierre en Reportes del día.",
+      "No asumas que las cifras de las cajas del inicio del dia encajrán con las del cierre en Reportes.",
     ],
     relatedLinks: [
       { label: "Ruta del día", href: "/dashboard/admin/ruta-del-dia" },
-      { label: "Reportes del día", href: "/dashboard/admin/reportes-dia" },
+      { label: "Reportes", href: "/dashboard/admin/reportes-dia" },
     ],
   },
   "ruta-del-dia": {
@@ -49,7 +49,7 @@ export const ADMIN_HELP_PAGES: Record<AdminHelpPageKey, HelpPageContent> = {
     ],
     relatedLinks: [
       { label: "Inversiones", href: "/dashboard/admin/gestion-financiera" },
-      { label: "Reportes del día", href: "/dashboard/admin/reportes-dia" },
+      { label: "Reportes", href: "/dashboard/admin/reportes-dia" },
     ],
   },
   prestamo: {
@@ -89,7 +89,7 @@ export const ADMIN_HELP_PAGES: Record<AdminHelpPageKey, HelpPageContent> = {
     ],
   },
   "reportes-dia": {
-    title: "Reportes del día",
+    title: "Reportes",
     summary:
       "Los trabajadores entregan su cierre diario aquí. Revisa cobros, gastos y cuadre antes de aprobar o rechazar cada entrega.",
     steps: [
@@ -190,7 +190,7 @@ export const ADMIN_HELP_PAGES: Record<AdminHelpPageKey, HelpPageContent> = {
     ],
     cautions: [
       "Ejecuta los cierres siempre en la noche o mañana cuando en elpmeado no esté laborando",
-      "No cierres un periodo si aún hay reportes del día pendientes de aprobar.",
+      "No cierres un periodo si aún hay reportes pendientes de aprobar.",
       "Un periodo cerrado no se reabre; verifica totales antes de confirmar el cierre.",
     ],
     relatedLinks: [
@@ -258,7 +258,7 @@ export const ADMIN_HELP_PAGES: Record<AdminHelpPageKey, HelpPageContent> = {
       "Los cobros por transferencia se pueden anular aunque el reporte esté aprobado, ya que no pasan por la caja del empleado.",
     ],
     relatedLinks: [
-      { label: "Reportes del día", href: "/dashboard/admin/reportes-dia" },
+      { label: "Reportes", href: "/dashboard/admin/reportes-dia" },
       { label: "Préstamos", href: "/dashboard/admin/prestamo" },
     ],
   },

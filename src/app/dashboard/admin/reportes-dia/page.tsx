@@ -9,7 +9,7 @@ const ReportesDiaPageContent = dynamic(
     ssr: false,
     loading: () => (
       <div className="container" style={{ paddingTop: "2rem", textAlign: "center" }}>
-        <p>Cargando reportes del día...</p>
+        <p>Cargando reportes...</p>
       </div>
     ),
   }
@@ -20,7 +20,7 @@ export default function ReportesDiaPage() {
     <Suspense
       fallback={
         <div className="container" style={{ paddingTop: "2rem", textAlign: "center" }}>
-          <p>Cargando reportes del día...</p>
+          <p>Cargando reportes...</p>
         </div>
       }
     >

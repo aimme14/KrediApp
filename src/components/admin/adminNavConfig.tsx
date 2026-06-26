@@ -34,7 +34,7 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
     icon: "loan",
     solicitudesPrestamoBadge: true,
   },
-  { href: "/dashboard/admin/reportes-dia", label: "Reportes del día", icon: "report" },
+  { href: "/dashboard/admin/reportes-dia", label: "Reportes", icon: "report" },
   { href: "/dashboard/admin/pagos-diarios", label: "Pagos diarios", icon: "payments" },
   { href: "/dashboard/admin/cliente", label: "Clientes", icon: "client" },
   { href: "/dashboard/admin/empleado", label: "Empleados", icon: "user" },

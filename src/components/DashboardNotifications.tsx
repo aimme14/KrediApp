@@ -103,7 +103,7 @@ function NotifAdminPendientes({
         className="dashboard-notifications-link"
         onClick={onClose}
       >
-        Ir a reportes del día
+        Ir a reportes
       </Link>
     </div>
   );
