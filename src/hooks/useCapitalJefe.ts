@@ -59,19 +59,28 @@ export function useCapitalJefe() {
       CAPITAL_SUBCOLLECTION,
       CAPITAL_CAJA_EMPRESA_DOC
     );
+
+    let prevCaja: number | undefined;
+
     const unsub = onSnapshot(
       ref,
       (snap) => {
         if (!snap.exists()) return;
         const caja = snap.data()?.cajaEmpresa;
-        setCajaEmpresaRT(typeof caja === "number" ? caja : null);
+        const next = typeof caja === "number" ? caja : null;
+        setCajaEmpresaRT(next);
+        // Re-sincroniza HTTP solo cuando el valor cambia (no en el primer disparo)
+        if (next !== null && prevCaja !== undefined && next !== prevCaja) {
+          void reload();
+        }
+        prevCaja = next ?? undefined;
       },
       (err) => {
         console.warn("[useCapitalJefe] onSnapshot cajaEmpresa:", err);
       }
     );
     return unsub;
-  }, [user?.uid, profile?.role, profile?.uid]);
+  }, [user?.uid, profile?.role, profile?.uid, reload]);
 
   const sumaCapitalAdmins =
     capital?.sumaCapitalAdmins ?? capital?.capitalAsignadoAdmins ?? 0;
