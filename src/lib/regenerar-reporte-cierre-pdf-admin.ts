@@ -3,6 +3,7 @@ import type { Firestore } from "firebase-admin/firestore";
 import { buildCierreDiaSnapshot } from "@/lib/cierre-dia-snapshot";
 import { buildReporteCierrePdf } from "@/lib/reporte-cierre-pdf";
 import { uploadReporteCierrePdfBuffer } from "@/lib/reporte-cierre-storage";
+import { finDiaColombiaUtc } from "@/lib/colombia-day-bounds";
 import {
   EMPRESAS_COLLECTION,
   REPORTES_DIA_SUBCOLLECTION,
@@ -45,6 +46,14 @@ export async function regenerarPdfReporteCierreDia(
   const fechaDoc = x.fecha as { toDate?: () => Date } | undefined;
   const aprobadoEn = typeof fechaDoc?.toDate === "function" ? fechaDoc.toDate() : new Date();
 
+  const fechaDesdeGuardada =
+    x.fechaDesde instanceof Timestamp ? x.fechaDesde.toDate() : null;
+
+  const fechaHastaGuardada =
+    x.fechaHasta instanceof Timestamp
+      ? x.fechaHasta.toDate()
+      : finDiaColombiaUtc(fechaDia);
+
   if (!rutaId || !empleadoUid || !fechaDia) {
     throw new Error("El documento del reporte no tiene ruta, empleado o fecha operativa");
   }
@@ -70,6 +79,8 @@ export async function regenerarPdfReporteCierreDia(
     empleadoUid,
     rutaId,
     fechaDia,
+    fechaDesde: fechaDesdeGuardada,
+    fechaHasta: fechaHastaGuardada,
   });
 
   const pdfBytes = await buildReporteCierrePdf(snapshot, {

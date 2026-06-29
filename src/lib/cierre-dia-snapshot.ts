@@ -106,6 +106,18 @@ export type PrestamoDesembolsoDiaSnapshotItem = {
   totalAPagar: number;
 };
 
+export type DiaPeriodoSnapshot = {
+  fechaDia: string;
+  cobros: CobroDiaSnapshotItem[];
+  noPagos: NoPagoDiaSnapshotItem[];
+  perdidasDelDia: PerdidaDiaSnapshotItem[];
+  gastosDelDia: GastoDiaSnapshotItem[];
+  totalCobrosEfectivo: number;
+  totalCobrosTransferencia: number;
+  totalGastos: number;
+  totalCobros: number;
+};
+
 export type CierreDiaSnapshot = {
   fechaDia: string;
   rutaId: string;
@@ -123,33 +135,40 @@ export type CierreDiaSnapshot = {
   totalBaseAsignadaDia: number;
   prestamosDesembolsoDelDia: PrestamoDesembolsoDiaSnapshotItem[];
   totalPrestamosDesembolsoDia: number;
+  fechaDesdeISO: string | null;
+  fechaHastaISO: string;
+  diasDelPeriodo: DiaPeriodoSnapshot[];
 };
 
 export type BuildCierreDiaSnapshotParams = {
   empresaId: string;
   empleadoUid: string;
   rutaId: string;
-  /** YYYY-MM-DD (Colombia). Debe ser válido. */
+  /** YYYY-MM-DD Colombia — día de cierre (fechaHasta calendario). */
   fechaDia: string;
+  /** Timestamp exacto de inicio del período. null = inicio del día calendario. */
+  fechaDesde?: Date | null;
+  /** Timestamp exacto de fin del período. Por defecto: fin del día de fechaDia. */
+  fechaHasta?: Date | null;
 };
 
 export async function buildCierreDiaSnapshot(
   db: Firestore,
   params: BuildCierreDiaSnapshotParams
 ): Promise<CierreDiaSnapshot> {
-  const { empresaId, empleadoUid, rutaId, fechaDia } = params;
+  const { empresaId, empleadoUid, rutaId, fechaDia, fechaDesde, fechaHasta } = params;
   if (!parseFechaDiaColombia(fechaDia).ok) {
     throw new Error("fechaDia inválida");
   }
 
-  const start = inicioDiaColombiaUtc(fechaDia);
-  const end = finDiaColombiaUtc(fechaDia);
-  if (!start || !end) {
-    throw new Error("No se pudo calcular el día en Colombia");
-  }
+  const endDate = fechaHasta ?? finDiaColombiaUtc(fechaDia);
+  if (!endDate) throw new Error("No se pudo calcular el fin del período");
 
-  const startTs = Timestamp.fromDate(start);
-  const endTs = Timestamp.fromDate(end);
+  const startDate = fechaDesde ?? inicioDiaColombiaUtc(fechaDia);
+  if (!startDate) throw new Error("No se pudo calcular el inicio del período");
+
+  const startTs = Timestamp.fromDate(startDate);
+  const endTs = Timestamp.fromDate(endDate);
 
   const prestamosCol = db
     .collection(EMPRESAS_COLLECTION)
@@ -498,8 +517,8 @@ export async function buildCierreDiaSnapshot(
     const creadoEn = x.creadoEn as { toDate?: () => Date } | undefined;
     if (typeof creadoEn?.toDate !== "function") continue;
     const dt = creadoEn.toDate();
-    const dia = fechaDiaCalendarioDesdeISO(dt.toISOString());
-    if (dia !== fechaDia) continue;
+    const creadoTs = Timestamp.fromDate(dt);
+    if (creadoTs < startTs || creadoTs > endTs) continue;
 
     const monto =
       typeof x.monto === "number" && Number.isFinite(x.monto) && x.monto > 0 ? round2(x.monto) : 0;
@@ -534,6 +553,53 @@ export async function buildCierreDiaSnapshot(
   perdidasRaw.sort((a, b) => (b.fecha ?? "").localeCompare(a.fecha ?? ""));
   const totalPerdidasDia = round2(perdidasRaw.reduce((s, p) => s + p.monto, 0));
 
+  const diasMap = new Map<string, DiaPeriodoSnapshot>();
+
+  const agregarDia = (fechaISO: string | null): DiaPeriodoSnapshot => {
+    const dia = fechaISO ? fechaDiaCalendarioDesdeISO(fechaISO) : fechaDia;
+    const key = dia ?? fechaDia;
+    if (!diasMap.has(key)) {
+      diasMap.set(key, {
+        fechaDia: key,
+        cobros: [],
+        noPagos: [],
+        perdidasDelDia: [],
+        gastosDelDia: [],
+        totalCobrosEfectivo: 0,
+        totalCobrosTransferencia: 0,
+        totalGastos: 0,
+        totalCobros: 0,
+      });
+    }
+    return diasMap.get(key)!;
+  };
+
+  for (const c of cobros) {
+    const d = agregarDia(c.fecha);
+    d.cobros.push(c);
+    const m = (c.metodoPago ?? "").toLowerCase();
+    if (m === "efectivo") d.totalCobrosEfectivo = round2(d.totalCobrosEfectivo + c.monto);
+    else if (m === "transferencia") {
+      d.totalCobrosTransferencia = round2(d.totalCobrosTransferencia + c.monto);
+    }
+    d.totalCobros = round2(d.totalCobros + c.monto);
+  }
+  for (const n of noPagos) {
+    agregarDia(n.fecha).noPagos.push(n);
+  }
+  for (const p of perdidasRaw) {
+    agregarDia(p.fecha).perdidasDelDia.push(p);
+  }
+  for (const g of gastosDetalle) {
+    const d = agregarDia(g.fecha);
+    d.gastosDelDia.push(g);
+    d.totalGastos = round2(d.totalGastos + g.monto);
+  }
+
+  const diasDelPeriodo = Array.from(diasMap.values()).sort((a, b) =>
+    a.fechaDia.localeCompare(b.fechaDia)
+  );
+
   return {
     fechaDia,
     rutaId,
@@ -550,5 +616,8 @@ export async function buildCierreDiaSnapshot(
     totalBaseAsignadaDia,
     prestamosDesembolsoDelDia,
     totalPrestamosDesembolsoDia,
+    fechaDesdeISO: startDate ? startDate.toISOString() : null,
+    fechaHastaISO: endDate.toISOString(),
+    diasDelPeriodo,
   };
 }

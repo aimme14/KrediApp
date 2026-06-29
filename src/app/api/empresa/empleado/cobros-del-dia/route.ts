@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAdminFirestore } from "@/lib/firebase-admin";
 import { getApiUser } from "@/lib/api-auth";
 import { buildCierreDiaSnapshot } from "@/lib/cierre-dia-snapshot";
-import { fechaDiaColombiaHoy, parseFechaDiaColombia } from "@/lib/colombia-day-bounds";
+import { fechaDiaColombiaHoy } from "@/lib/colombia-day-bounds";
+import { getInicioPeriodoActual } from "@/lib/periodo-reporte-empleado";
 
 export type CobroDiaItemApi = {
   pagoId: string;
@@ -32,7 +33,7 @@ export type NoPagoDiaItemApi = {
   saldoPendientePrestamoActual: number;
 };
 
-/** GET: cobros del día, «no pagó», totales y base asignada. ?fecha=YYYY-MM-DD (Colombia). */
+/** GET: cobros del período actual, «no pagó», totales y base asignada. */
 export async function GET(request: NextRequest) {
   const apiUser = await getApiUser(request);
   if (!apiUser) {
@@ -45,13 +46,28 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "No tienes ruta asignada" }, { status: 400 });
   }
 
-  const fechaParam = request.nextUrl.searchParams.get("fecha");
-  const fechaDia =
-    fechaParam && parseFechaDiaColombia(fechaParam).ok ? fechaParam : fechaDiaColombiaHoy();
+  const fechaDia = fechaDiaColombiaHoy();
 
   const db = getAdminFirestore();
   const empresaId = apiUser.empresaId;
   const rutaId = apiUser.rutaId.trim();
+
+  const adminId =
+    typeof apiUser.adminId === "string" ? apiUser.adminId.trim() : "";
+
+  let fechaDesde: Date | null = null;
+  let fechaHasta = new Date();
+
+  if (adminId) {
+    const periodo = await getInicioPeriodoActual(db, {
+      empresaId,
+      empleadoUid: apiUser.uid,
+      rutaId,
+      adminId,
+    });
+    fechaDesde = periodo.fechaDesde;
+    fechaHasta = periodo.fechaHasta;
+  }
 
   try {
     const snap = await buildCierreDiaSnapshot(db, {
@@ -59,10 +75,14 @@ export async function GET(request: NextRequest) {
       empleadoUid: apiUser.uid,
       rutaId,
       fechaDia,
+      fechaDesde,
+      fechaHasta,
     });
 
     return NextResponse.json({
       fechaDia: snap.fechaDia,
+      fechaDesdeISO: snap.fechaDesdeISO,
+      fechaHastaISO: snap.fechaHastaISO,
       rutaId: snap.rutaId,
       cobros: snap.cobros,
       noPagos: snap.noPagos,
@@ -77,6 +97,7 @@ export async function GET(request: NextRequest) {
       totalBaseAsignadaDia: snap.totalBaseAsignadaDia,
       prestamosDesembolsoDelDia: snap.prestamosDesembolsoDelDia,
       totalPrestamosDesembolsoDia: snap.totalPrestamosDesembolsoDia,
+      diasDelPeriodo: snap.diasDelPeriodo,
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Error al cargar cobros del día";

@@ -6,6 +6,7 @@ import type { Firestore } from "firebase-admin/firestore";
 import { Timestamp } from "firebase-admin/firestore";
 import { fechaDiaColombiaHoy } from "@/lib/colombia-day-bounds";
 import { buildCierreDiaSnapshot } from "@/lib/cierre-dia-snapshot";
+import { getInicioPeriodoActual } from "@/lib/periodo-reporte-empleado";
 import { buildReporteCierrePdf } from "@/lib/reporte-cierre-pdf";
 import { uploadReporteCierrePdfBuffer } from "@/lib/reporte-cierre-storage";
 import {
@@ -231,6 +232,8 @@ async function appendReporteDia(
     montoEntregado: number;
     adminId: string;
     comentario: string | null;
+    fechaDesde?: Date | null;
+    fechaHasta?: Date | null;
   }
 ): Promise<{ id: string; fechaDia: string }> {
   const fechaDia = fechaDiaColombiaHoy();
@@ -250,6 +253,10 @@ async function appendReporteDia(
     adminId: params.adminId,
     comentario: params.comentario,
     solicitudId: params.solicitudId,
+    fechaDesde: params.fechaDesde ? Timestamp.fromDate(params.fechaDesde) : null,
+    fechaHasta: params.fechaHasta
+      ? Timestamp.fromDate(params.fechaHasta)
+      : Timestamp.now(),
   });
 
   return { id: docRef.id, fechaDia };
@@ -325,6 +332,13 @@ export async function aprobarSolicitudEntregaReporte(
       ? sol.empleadoNombre.trim()
       : "—";
 
+  const { fechaDesde, fechaHasta } = await getInicioPeriodoActual(db, {
+    empresaId,
+    empleadoUid,
+    rutaId: result.rutaId,
+    adminId: adminUid,
+  });
+
   const { id: reporteDiaId, fechaDia } = await appendReporteDia(db, empresaId, {
     solicitudId,
     rutaId: result.rutaId,
@@ -333,6 +347,8 @@ export async function aprobarSolicitudEntregaReporte(
     montoEntregado: result.monto,
     adminId: adminUid,
     comentario: comentarioTrabajador,
+    fechaDesde,
+    fechaHasta,
   });
 
   const reporteRef = db
@@ -346,6 +362,8 @@ export async function aprobarSolicitudEntregaReporte(
     empleadoUid,
     rutaId: result.rutaId,
     fechaDia,
+    fechaDesde,
+    fechaHasta,
   });
 
   try {
