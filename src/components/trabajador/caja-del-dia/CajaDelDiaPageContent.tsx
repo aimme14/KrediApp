@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { useTrabajadorCajaDia } from "@/context/TrabajadorCajaDiaContext";
@@ -9,6 +9,7 @@ import type {
   CobroDiaItem,
   NoPagoDiaItem,
   PrestamoDesembolsoDiaItem,
+  DiaPeriodoItem,
 } from "@/lib/empresa-api";
 import { formatFechaDia } from "@/lib/colombia-day-bounds";
 import { formatoCuotasRestanteTotal } from "@/lib/cuotas-display";
@@ -275,6 +276,7 @@ export default function CajaDelDiaPageContent() {
                   )}
                 </div>
 
+                {/* Préstamos desembolsados en el período */}
                 <h3 style={{ fontSize: "1.05rem", marginBottom: "0.5rem" }}>
                   Préstamos
                 </h3>
@@ -306,249 +308,329 @@ export default function CajaDelDiaPageContent() {
                     </table>
                   </div>
                 )}
-
-                <h3 style={{ fontSize: "1.05rem", marginBottom: "0.5rem" }}>Cuotas pagadas</h3>
-                {cobros.length === 0 ? (
-                  <p style={{ color: "var(--text-muted)" }}>No hay cobros registrados para esta fecha.</p>
-                ) : (
-                  <>
-                    <h4 style={{ marginTop: 0, marginBottom: "0.35rem" }}>
-                      Efectivo ({cobrosEfectivo.length})
-                    </h4>
-                    {cobrosEfectivo.length === 0 ? (
-                      <p style={{ color: "var(--text-muted)", marginBottom: "0.75rem" }}>
-                        No hay cobros en efectivo.
-                      </p>
-                    ) : (
-                      <div className="table-wrap table-wrap-caja-dia" style={{ marginBottom: "0.85rem" }}>
-                        <table className="caja-dia-table-cobros">
-                          <thead>
-                            <tr>
-                              <th>Hora</th>
-                              <th>Cliente</th>
-                              <th className="col-num">Pagado</th>
-                              <th className="col-num" title="Cuotas (rest./total)">
-                                <span className="th-compact-long">Cuotas (rest./total)</span>
-                                <span className="th-compact-short">Cuotas</span>
-                              </th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {cobrosEfectivo.map((c: CobroDiaItem) => (
-                              <tr key={`efectivo-${c.prestamoId}-${c.pagoId}`}>
-                                <td>{formatHora(c.fecha)}</td>
-                                <td>{c.clienteNombre}</td>
-                                <td className="col-num">{formatMonto(c.monto)}</td>
-                                <td className="col-num">
-                                  {formatoCuotasRestanteTotal(c.cuotasFaltantes, c.numeroCuotas)}
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    )}
-
-                    <h4 style={{ marginTop: 0, marginBottom: "0.35rem" }}>
-                      Transferencia ({cobrosTransferencia.length})
-                    </h4>
-                    {cobrosTransferencia.length === 0 ? (
-                      <p style={{ color: "var(--text-muted)", marginBottom: "0.75rem" }}>
-                        No hay cobros por transferencia.
-                      </p>
-                    ) : (
-                      <div className="table-wrap table-wrap-caja-dia" style={{ marginBottom: "0.85rem" }}>
-                        <table className="caja-dia-table-cobros">
-                          <thead>
-                            <tr>
-                              <th>Hora</th>
-                              <th>Cliente</th>
-                              <th className="col-num">Pagado</th>
-                              <th className="col-evidencia">Evidencia</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {cobrosTransferencia.map((c: CobroDiaItem) => (
-                              <tr key={`transfer-${c.prestamoId}-${c.pagoId}`}>
-                                <td>{formatHora(c.fecha)}</td>
-                                <td>{c.clienteNombre}</td>
-                                <td className="col-num">{formatMonto(c.monto)}</td>
-                                <td className="col-evidencia caja-dia-evidencia-cell">
-                                  {c.evidencia ? (
-                                    <button
-                                      type="button"
-                                      className="caja-dia-evidencia-btn"
-                                      onClick={() => setEvidenciaModalUrl(c.evidencia!)}
-                                      aria-label={`Ver evidencia del cobro de ${c.clienteNombre}`}
-                                    >
-                                      <IconoOjo />
-                                    </button>
-                                  ) : (
-                                    <span style={{ color: "var(--text-muted)" }}>—</span>
-                                  )}
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    )}
-
-                    {cobrosOtros.length > 0 && (
-                      <>
-                        <h4 style={{ marginTop: 0, marginBottom: "0.35rem" }}>
-                          Otros ({cobrosOtros.length})
-                        </h4>
-                        <div className="table-wrap table-wrap-caja-dia">
-                          <table className="caja-dia-table-cobros">
-                            <thead>
-                              <tr>
-                                <th>Hora</th>
-                                <th>Cliente</th>
-                                <th className="col-num">Pagado</th>
-                                <th>Método</th>
-                                <th className="col-num" title="Cuotas (rest./total)">
-                                  <span className="th-compact-long">Cuotas (rest./total)</span>
-                                  <span className="th-compact-short">Cuotas</span>
-                                </th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {cobrosOtros.map((c: CobroDiaItem) => (
-                                <tr key={`otros-${c.prestamoId}-${c.pagoId}`}>
-                                  <td>{formatHora(c.fecha)}</td>
-                                  <td>{c.clienteNombre}</td>
-                                  <td className="col-num">{formatMonto(c.monto)}</td>
-                                  <td>{c.metodoPago ?? "—"}</td>
-                                  <td className="col-num">
-                                    {formatoCuotasRestanteTotal(c.cuotasFaltantes, c.numeroCuotas)}
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      </>
-                    )}
-                  </>
-                )}
               </>
             );
           })()}
 
-          <h3
-            style={{
-              fontSize: "1.05rem",
-              marginTop: "1.25rem",
-              marginBottom: "0.5rem",
-            }}
-          >
-            Clientes que no pagaron
-          </h3>
-          <p
-            style={{
-              marginBottom: "0.5rem",
-              fontSize: "0.8125rem",
-              color: "var(--text-muted)",
-              lineHeight: 1.45,
-            }}
-          >
-          </p>
-          {(data.noPagos ?? []).length === 0 ? (
-            <p style={{ color: "var(--text-muted)" }}>
-              No hay registros de no pago para esta fecha.
-            </p>
-          ) : (
-            <div className="table-wrap table-wrap-caja-dia">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Cliente</th>
-                    <th>Motivo</th>
-                    <th>Nota</th>
-                    <th className="col-num" title="Cuotas (pend./total)">
-                      <span className="th-compact-long">Cuotas (pend./total)</span>
-                      <span className="th-compact-short">Cuotas</span>
-                    </th>
-                    <th className="col-num">Total debe</th>
-                    <th className="col-num">Total préstamo</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(data.noPagos ?? []).map((n: NoPagoDiaItem) => (
-                    <tr key={`no-${n.prestamoId}-${n.pagoId}`}>
-                      <td>{n.clienteNombre}</td>
-                      <td>{labelMotivoNoPago(n.motivoNoPago)}</td>
-                      <td>{n.nota ?? "—"}</td>
-                      <td className="col-num">
-                        {formatoCuotasRestanteTotal(n.cuotasPendientes, n.numeroCuotas)}
-                      </td>
-                      <td className="col-num">{formatMonto(n.saldoPendientePrestamoActual)}</td>
-                      <td className="col-num">{formatMonto(n.totalAPagar)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+          {/* Banner período abierto — solo cuando hay más de un día */}
+          {(data.diasDelPeriodo ?? []).length > 1 && data.fechaDesdeISO && (
+            <div
+              style={{
+                marginTop: "1rem",
+                padding: "0.6rem 0.85rem",
+                borderRadius: "8px",
+                background: "var(--input-bg)",
+                border: "1px solid var(--card-border)",
+                fontSize: "0.8125rem",
+                color: "var(--text-muted)",
+              }}
+            >
+              Período abierto desde{" "}
+              <strong style={{ color: "var(--text)" }}>
+                {formatFechaDia(new Date(data.fechaDesdeISO).toISOString().slice(0, 10))}
+              </strong>
+              . Los cobros se muestran separados por fecha. El período cierra cuando
+              el admin aprueba tu reporte.
             </div>
           )}
 
-          {data.gastosDelDia.length > 0 && (
-            <>
-              <h3 style={{ fontSize: "1.05rem", marginTop: "1.25rem", marginBottom: "0.5rem" }}>Gastos del día</h3>
-              <div className="table-wrap table-wrap-caja-dia">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Hora</th>
-                      <th>Motivo</th>
-                      <th>Descripción</th>
-                      <th className="col-num">Monto</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {data.gastosDelDia.map((g) => (
-                      <tr key={g.id}>
-                        <td>{formatHora(g.fecha)}</td>
-                        <td>{g.motivo || "—"}</td>
-                        <td>{g.descripcion || "—"}</td>
-                        <td className="col-num">{formatMonto(g.monto)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </>
-          )}
+          {/* Detalle por día — usa diasDelPeriodo para separar fechas */}
+          {(() => {
+            const dias = [...(data.diasDelPeriodo ?? [])].sort((a, b) =>
+              b.fechaDia.localeCompare(a.fechaDia)
+            );
+            if (dias.length === 0) return null;
+            return (
+              <>
+                {dias.map((dia: DiaPeriodoItem) => {
+                  const cobrosEfectivo = dia.cobros.filter((c) => {
+                    const m = normalizaMetodoPago(c.metodoPago);
+                    return m === "efectivo" || m.includes("efect");
+                  });
+                  const cobrosTransferencia = dia.cobros.filter((c) => {
+                    const m = normalizaMetodoPago(c.metodoPago);
+                    return m === "transferencia" || m.includes("transf") || m.includes("transfer");
+                  });
+                  const cobrosOtros = dia.cobros.filter((c) => {
+                    const m = normalizaMetodoPago(c.metodoPago);
+                    return (
+                      m !== "efectivo" &&
+                      !m.includes("efect") &&
+                      m !== "transferencia" &&
+                      !m.includes("transf") &&
+                      !m.includes("transfer")
+                    );
+                  });
 
-          {(data.perdidasDelDia ?? []).length > 0 && (
-            <>
-              <h3 style={{ fontSize: "1.05rem", marginTop: "1.25rem", marginBottom: "0.5rem" }}>
-                Pérdidas del día
-              </h3>
-              <div className="table-wrap table-wrap-caja-dia">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Cliente</th>
-                      <th>Motivo</th>
-                      <th className="col-num">Monto</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(data.perdidasDelDia ?? []).map((p) => (
-                      <tr key={p.pagoId}>
-                        <td>{p.clienteNombre}</td>
-                        <td>{p.motivoPerdida ?? "—"}</td>
-                        <td className="col-num" style={{ color: "var(--danger, #f87171)" }}>
-                          {formatMonto(p.monto)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </>
-          )}
+                  const hayContenido =
+                    dia.cobros.length > 0 ||
+                    dia.noPagos.length > 0 ||
+                    dia.gastosDelDia.length > 0 ||
+                    dia.perdidasDelDia.length > 0;
+
+                  return (
+                    <section key={dia.fechaDia} style={{ marginTop: "1.5rem" }}>
+                      {/* Encabezado de fecha */}
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "0.75rem",
+                          marginBottom: "0.75rem",
+                        }}
+                      >
+                        <h3 style={{ fontSize: "1.05rem", margin: 0 }}>
+                          {formatFechaDia(dia.fechaDia)}
+                        </h3>
+                        {dia.totalCobros > 0 && (
+                          <span
+                            style={{
+                              fontSize: "0.8rem",
+                              color: "var(--text-muted)",
+                              background: "var(--input-bg)",
+                              border: "1px solid var(--card-border)",
+                              borderRadius: "6px",
+                              padding: "0.15rem 0.5rem",
+                            }}
+                          >
+                            {formatMonto(dia.totalCobros)} cobrado
+                          </span>
+                        )}
+                      </div>
+
+                      {!hayContenido && (
+                        <p style={{ color: "var(--text-muted)" }}>Sin actividad registrada.</p>
+                      )}
+
+                      {/* Cuotas pagadas */}
+                      {dia.cobros.length > 0 && (
+                        <>
+                          <h4 style={{ fontSize: "0.9rem", marginTop: 0, marginBottom: "0.35rem" }}>
+                            Cuotas pagadas ({dia.cobros.length})
+                          </h4>
+
+                          {cobrosEfectivo.length > 0 && (
+                            <>
+                              <p style={{ fontSize: "0.78rem", color: "var(--text-muted)", margin: "0 0 0.25rem" }}>
+                                Efectivo ({cobrosEfectivo.length})
+                              </p>
+                              <div className="table-wrap table-wrap-caja-dia" style={{ marginBottom: "0.75rem" }}>
+                                <table className="caja-dia-table-cobros">
+                                  <thead>
+                                    <tr>
+                                      <th>Hora</th>
+                                      <th>Cliente</th>
+                                      <th className="col-num">Pagado</th>
+                                      <th className="col-num" title="Cuotas (rest./total)">
+                                        <span className="th-compact-long">Cuotas (rest./total)</span>
+                                        <span className="th-compact-short">Cuotas</span>
+                                      </th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {cobrosEfectivo.map((c: CobroDiaItem) => (
+                                      <tr key={`${dia.fechaDia}-ef-${c.pagoId}`}>
+                                        <td>{formatHora(c.fecha)}</td>
+                                        <td>{c.clienteNombre}</td>
+                                        <td className="col-num">{formatMonto(c.monto)}</td>
+                                        <td className="col-num">
+                                          {formatoCuotasRestanteTotal(c.cuotasFaltantes, c.numeroCuotas)}
+                                        </td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </>
+                          )}
+
+                          {cobrosTransferencia.length > 0 && (
+                            <>
+                              <p style={{ fontSize: "0.78rem", color: "var(--text-muted)", margin: "0 0 0.25rem" }}>
+                                Transferencia ({cobrosTransferencia.length})
+                              </p>
+                              <div className="table-wrap table-wrap-caja-dia" style={{ marginBottom: "0.75rem" }}>
+                                <table className="caja-dia-table-cobros">
+                                  <thead>
+                                    <tr>
+                                      <th>Hora</th>
+                                      <th>Cliente</th>
+                                      <th className="col-num">Pagado</th>
+                                      <th className="col-evidencia">Evidencia</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {cobrosTransferencia.map((c: CobroDiaItem) => (
+                                      <tr key={`${dia.fechaDia}-tr-${c.pagoId}`}>
+                                        <td>{formatHora(c.fecha)}</td>
+                                        <td>{c.clienteNombre}</td>
+                                        <td className="col-num">{formatMonto(c.monto)}</td>
+                                        <td className="col-evidencia caja-dia-evidencia-cell">
+                                          {c.evidencia ? (
+                                            <button
+                                              type="button"
+                                              className="caja-dia-evidencia-btn"
+                                              onClick={() => setEvidenciaModalUrl(c.evidencia!)}
+                                              aria-label={`Ver evidencia del cobro de ${c.clienteNombre}`}
+                                            >
+                                              <IconoOjo />
+                                            </button>
+                                          ) : (
+                                            <span style={{ color: "var(--text-muted)" }}>—</span>
+                                          )}
+                                        </td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </>
+                          )}
+
+                          {cobrosOtros.length > 0 && (
+                            <>
+                              <p style={{ fontSize: "0.78rem", color: "var(--text-muted)", margin: "0 0 0.25rem" }}>
+                                Otros ({cobrosOtros.length})
+                              </p>
+                              <div className="table-wrap table-wrap-caja-dia" style={{ marginBottom: "0.75rem" }}>
+                                <table className="caja-dia-table-cobros">
+                                  <thead>
+                                    <tr>
+                                      <th>Hora</th>
+                                      <th>Cliente</th>
+                                      <th className="col-num">Pagado</th>
+                                      <th>Método</th>
+                                      <th className="col-num" title="Cuotas (rest./total)">
+                                        <span className="th-compact-long">Cuotas (rest./total)</span>
+                                        <span className="th-compact-short">Cuotas</span>
+                                      </th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {cobrosOtros.map((c: CobroDiaItem) => (
+                                      <tr key={`${dia.fechaDia}-ot-${c.pagoId}`}>
+                                        <td>{formatHora(c.fecha)}</td>
+                                        <td>{c.clienteNombre}</td>
+                                        <td className="col-num">{formatMonto(c.monto)}</td>
+                                        <td>{c.metodoPago ?? "—"}</td>
+                                        <td className="col-num">
+                                          {formatoCuotasRestanteTotal(c.cuotasFaltantes, c.numeroCuotas)}
+                                        </td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </>
+                          )}
+                        </>
+                      )}
+
+                      {/* No pagaron */}
+                      {dia.noPagos.length > 0 && (
+                        <>
+                          <h4 style={{ fontSize: "0.9rem", marginTop: "0.75rem", marginBottom: "0.35rem" }}>
+                            No pagaron ({dia.noPagos.length})
+                          </h4>
+                          <div className="table-wrap table-wrap-caja-dia" style={{ marginBottom: "0.75rem" }}>
+                            <table>
+                              <thead>
+                                <tr>
+                                  <th>Cliente</th>
+                                  <th>Motivo</th>
+                                  <th>Nota</th>
+                                  <th className="col-num" title="Cuotas (pend./total)">
+                                    <span className="th-compact-long">Cuotas (pend./total)</span>
+                                    <span className="th-compact-short">Cuotas</span>
+                                  </th>
+                                  <th className="col-num">Total debe</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {dia.noPagos.map((n: NoPagoDiaItem) => (
+                                  <tr key={`${dia.fechaDia}-np-${n.pagoId}`}>
+                                    <td>{n.clienteNombre}</td>
+                                    <td>{labelMotivoNoPago(n.motivoNoPago)}</td>
+                                    <td>{n.nota ?? "—"}</td>
+                                    <td className="col-num">
+                                      {formatoCuotasRestanteTotal(n.cuotasPendientes, n.numeroCuotas)}
+                                    </td>
+                                    <td className="col-num">{formatMonto(n.saldoPendientePrestamoActual)}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </>
+                      )}
+
+                      {/* Gastos */}
+                      {dia.gastosDelDia.length > 0 && (
+                        <>
+                          <h4 style={{ fontSize: "0.9rem", marginTop: "0.75rem", marginBottom: "0.35rem" }}>
+                            Gastos ({dia.gastosDelDia.length})
+                          </h4>
+                          <div className="table-wrap table-wrap-caja-dia" style={{ marginBottom: "0.75rem" }}>
+                            <table>
+                              <thead>
+                                <tr>
+                                  <th>Hora</th>
+                                  <th>Motivo</th>
+                                  <th>Descripción</th>
+                                  <th className="col-num">Monto</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {dia.gastosDelDia.map((g) => (
+                                  <tr key={`${dia.fechaDia}-gs-${g.id}`}>
+                                    <td>{formatHora(g.fecha)}</td>
+                                    <td>{g.motivo || "—"}</td>
+                                    <td>{g.descripcion || "—"}</td>
+                                    <td className="col-num">{formatMonto(g.monto)}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </>
+                      )}
+
+                      {/* Pérdidas */}
+                      {dia.perdidasDelDia.length > 0 && (
+                        <>
+                          <h4 style={{ fontSize: "0.9rem", marginTop: "0.75rem", marginBottom: "0.35rem", color: "var(--danger, #f87171)" }}>
+                            Pérdidas ({dia.perdidasDelDia.length})
+                          </h4>
+                          <div className="table-wrap table-wrap-caja-dia" style={{ marginBottom: "0.75rem" }}>
+                            <table>
+                              <thead>
+                                <tr>
+                                  <th>Cliente</th>
+                                  <th>Motivo</th>
+                                  <th className="col-num">Monto</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {dia.perdidasDelDia.map((p) => (
+                                  <tr key={`${dia.fechaDia}-pd-${p.pagoId}`}>
+                                    <td>{p.clienteNombre}</td>
+                                    <td>{p.motivoPerdida ?? "—"}</td>
+                                    <td className="col-num" style={{ color: "var(--danger, #f87171)" }}>
+                                      {formatMonto(p.monto)}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </>
+                      )}
+                    </section>
+                  );
+                })}
+              </>
+            );
+          })()}
         </>
       ) : null}
 
