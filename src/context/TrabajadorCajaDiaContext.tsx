@@ -298,7 +298,10 @@ export function TrabajadorCajaDiaProvider({ children }: { children: ReactNode })
     periodoEnd,
     subscriptionsReady,
   ]);
+<<<<<<< HEAD
 >>>>>>> 0860e16 (reporte)
+=======
+>>>>>>> origin/stagnig
 
   const value = useMemo(
     (): TrabajadorCajaDiaContextValue => ({

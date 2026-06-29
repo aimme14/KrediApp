@@ -128,6 +128,7 @@
       "queryScope": "COLLECTION_GROUP",
       "fields": [
 <<<<<<< HEAD
+<<<<<<< HEAD
         { "fieldPath": "empresaId", "order": "ASCENDING" },
         { "fieldPath": "adminId", "order": "ASCENDING" },
         { "fieldPath": "fecha", "order": "ASCENDING" }
@@ -139,6 +140,8 @@
       "fields": [
 =======
 >>>>>>> 0860e16 (reporte)
+=======
+>>>>>>> origin/stagnig
         { "fieldPath": "empleadoId", "order": "ASCENDING" },
         { "fieldPath": "rutaId", "order": "ASCENDING" },
         { "fieldPath": "fecha", "order": "ASCENDING" }
