@@ -102,12 +102,10 @@ export function TrabajadorCajaDiaProvider({ children }: { children: ReactNode })
     }
 
     const empresaId = profile?.empresaId?.trim();
-    if (!empresaId) return;
+    if (!empresaId || !periodoStart) return;
 
-    const start = inicioDiaColombiaUtc(fechaDia);
-    const end = finDiaColombiaUtc(fechaDia);
-    if (!start || !end) return;
-
+    const start = periodoStart;
+    const end = periodoEnd ?? new Date();
     const rutaId = profile?.rutaId?.trim();
     const startTs = Timestamp.fromDate(start);
     const endTs = Timestamp.fromDate(end);
@@ -120,33 +118,10 @@ export function TrabajadorCajaDiaProvider({ children }: { children: ReactNode })
         const caja = snap.data()?.cajaEmpleado;
         setCajaEmpleadoRT(typeof caja === "number" ? caja : null);
       },
-<<<<<<< HEAD
       (err) => console.warn("[TrabajadorCajaDia] onSnapshot cajaEmpleado:", err)
-=======
-      (err) => {
-        console.warn("[TrabajadorCajaDia] onSnapshot cajaEmpleado:", err);
-      }
     );
 
-    return unsub;
-  }, [user?.uid, profile?.role, profile?.empresaId, subscriptionsReady]);
-
-  useEffect(() => {
-    if (!subscriptionsReady || !db || !user || profile?.role !== "trabajador") return;
-    if (!periodoStart) return;
-
-    const start = periodoStart;
-    const end = periodoEnd ?? new Date();
-
-    const q = query(
-      collectionGroup(db, "pagos"),
-      where("empleadoId", "==", user.uid),
-      where("fecha", ">=", Timestamp.fromDate(start)),
-      where("fecha", "<=", Timestamp.fromDate(end))
->>>>>>> 0860e16 (reporte)
-    );
-
-    // 2 — cobros en efectivo del día
+    // 2 — cobros en efectivo del período
     let initialLoad = true;
     const unsub2 = onSnapshot(
       query(
@@ -178,8 +153,7 @@ export function TrabajadorCajaDiaProvider({ children }: { children: ReactNode })
       (err) => console.warn("[TrabajadorCajaDia] onSnapshot pagos:", err)
     );
 
-<<<<<<< HEAD
-    // 3 — gastos del día
+    // 3 — gastos del período
     const unsub3 = onSnapshot(
       query(
         collection(db, EMPRESAS_COLLECTION, empresaId, GASTOS_EMPLEADO_SUBCOLLECTION),
@@ -187,28 +161,6 @@ export function TrabajadorCajaDiaProvider({ children }: { children: ReactNode })
         where("fecha", ">=", startTs),
         where("fecha", "<=", endTs)
       ),
-=======
-    return unsub;
-  }, [user?.uid, profile?.role, periodoStart, periodoEnd, refresh, subscriptionsReady]);
-
-  useEffect(() => {
-    if (!subscriptionsReady || !db || !user || profile?.role !== "trabajador") return;
-    const empresaId = profile?.empresaId?.trim();
-    if (!empresaId || !periodoStart) return;
-
-    const start = periodoStart;
-    const end = periodoEnd ?? new Date();
-
-    const q = query(
-      collection(db, EMPRESAS_COLLECTION, empresaId, GASTOS_EMPLEADO_SUBCOLLECTION),
-      where("empleadoId", "==", user.uid),
-      where("fecha", ">=", Timestamp.fromDate(start)),
-      where("fecha", "<=", Timestamp.fromDate(end))
-    );
-
-    const unsub = onSnapshot(
-      q,
->>>>>>> 0860e16 (reporte)
       (snap) => {
         let total = 0;
         for (const d of snap.docs) {
@@ -220,8 +172,7 @@ export function TrabajadorCajaDiaProvider({ children }: { children: ReactNode })
       (err) => console.warn("[TrabajadorCajaDia] onSnapshot gastos:", err)
     );
 
-<<<<<<< HEAD
-    // 4 — préstamos desde caja empleado del día (requiere rutaId)
+    // 4 — préstamos desde caja empleado del período (requiere rutaId)
     const unsub4 = rutaId
       ? onSnapshot(
           query(
@@ -250,45 +201,6 @@ export function TrabajadorCajaDiaProvider({ children }: { children: ReactNode })
       unsub3();
       if (unsub4) unsub4();
     };
-  }, [user?.uid, profile?.role, profile?.empresaId, profile?.rutaId, fechaDia, refresh, subscriptionsReady]);
-=======
-    return unsub;
-  }, [user?.uid, profile?.role, profile?.empresaId, periodoStart, periodoEnd, subscriptionsReady]);
-
-  useEffect(() => {
-    if (!subscriptionsReady || !db || !user || profile?.role !== "trabajador") return;
-    const empresaId = profile?.empresaId?.trim();
-    const rutaId = profile?.rutaId?.trim();
-    if (!empresaId || !rutaId || !periodoStart) return;
-
-    const start = periodoStart;
-    const end = periodoEnd ?? new Date();
-
-    const q = query(
-      collection(db, EMPRESAS_COLLECTION, empresaId, PRESTAMOS_SUBCOLLECTION),
-      where("rutaId", "==", rutaId),
-      where("empleadoId", "==", user.uid),
-      where("desembolsoDesde", "==", "caja_empleado"),
-      where("creadoEn", ">=", Timestamp.fromDate(start)),
-      where("creadoEn", "<=", Timestamp.fromDate(end))
-    );
-
-    const unsub = onSnapshot(
-      q,
-      (snap) => {
-        let total = 0;
-        for (const d of snap.docs) {
-          const m = typeof d.data().monto === "number" && d.data().monto > 0 ? d.data().monto : 0;
-          total += m;
-        }
-        setPrestamosRT(Math.round(total * 100) / 100);
-      },
-      (err) => {
-        console.warn("[TrabajadorCajaDia] onSnapshot prestamos:", err);
-      }
-    );
-
-    return unsub;
   }, [
     user?.uid,
     profile?.role,
@@ -296,12 +208,9 @@ export function TrabajadorCajaDiaProvider({ children }: { children: ReactNode })
     profile?.rutaId,
     periodoStart,
     periodoEnd,
+    refresh,
     subscriptionsReady,
   ]);
-<<<<<<< HEAD
->>>>>>> 0860e16 (reporte)
-=======
->>>>>>> origin/stagnig
 
   const value = useMemo(
     (): TrabajadorCajaDiaContextValue => ({
