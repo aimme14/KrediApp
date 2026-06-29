@@ -84,7 +84,7 @@ export function usePagosDiariosAdmin(fechaDia: string) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!db || !user || profile?.role !== "admin") {
+    if (!db || !user || profile?.role !== "admin" || !profile.empresaId) {
       setPagos([]);
       setLoading(false);
       return;
@@ -103,6 +103,7 @@ export function usePagosDiariosAdmin(fechaDia: string) {
 
     const q = query(
       collectionGroup(db, "pagos"),
+      where("empresaId", "==", profile.empresaId),
       where("adminId", "==", user.uid),
       where("fecha", ">=", Timestamp.fromDate(start)),
       where("fecha", "<=", Timestamp.fromDate(end))
@@ -124,7 +125,7 @@ export function usePagosDiariosAdmin(fechaDia: string) {
     );
 
     return unsub;
-  }, [user?.uid, profile?.role, fechaDia]);
+  }, [user?.uid, profile?.role, profile?.empresaId, fechaDia]);
 
   const totales = useMemo((): PagosDiariosAdminTotales => {
     const cobrosActivos = pagos.filter((p) => p.tipo === "pago" && p.estado === "activo");

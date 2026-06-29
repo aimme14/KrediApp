@@ -93,50 +93,45 @@ export function TrabajadorCajaDiaProvider({ children }: { children: ReactNode })
   }, [refresh, subscriptionsReady]);
 
   useEffect(() => {
-    if (!subscriptionsReady || !db || !user || profile?.role !== "trabajador") return;
+    if (!subscriptionsReady || !db || !user || profile?.role !== "trabajador") {
+      setCajaEmpleadoRT(null);
+      setCobrosEfectivoRT(null);
+      setGastosRT(null);
+      setPrestamosRT(null);
+      return;
+    }
+
     const empresaId = profile?.empresaId?.trim();
     if (!empresaId) return;
 
-    const ref = doc(
-      db,
-      EMPRESAS_COLLECTION,
-      empresaId,
-      USUARIOS_SUBCOLLECTION,
-      user.uid
-    );
+    const start = inicioDiaColombiaUtc(fechaDia);
+    const end = finDiaColombiaUtc(fechaDia);
+    if (!start || !end) return;
 
-    const unsub = onSnapshot(
-      ref,
+    const rutaId = profile?.rutaId?.trim();
+    const startTs = Timestamp.fromDate(start);
+    const endTs = Timestamp.fromDate(end);
+
+    // 1 — caja del empleado
+    const unsub1 = onSnapshot(
+      doc(db, EMPRESAS_COLLECTION, empresaId, USUARIOS_SUBCOLLECTION, user.uid),
       (snap) => {
         if (!snap.exists()) return;
         const caja = snap.data()?.cajaEmpleado;
         setCajaEmpleadoRT(typeof caja === "number" ? caja : null);
       },
-      (err) => {
-        console.warn("[TrabajadorCajaDia] onSnapshot cajaEmpleado:", err);
-      }
+      (err) => console.warn("[TrabajadorCajaDia] onSnapshot cajaEmpleado:", err)
     );
 
-    return unsub;
-  }, [user?.uid, profile?.role, profile?.empresaId, subscriptionsReady]);
-
-  useEffect(() => {
-    if (!subscriptionsReady || !db || !user || profile?.role !== "trabajador") return;
-    const start = inicioDiaColombiaUtc(fechaDia);
-    const end = finDiaColombiaUtc(fechaDia);
-    if (!start || !end) return;
-
-    const q = query(
-      collectionGroup(db, "pagos"),
-      where("empleadoId", "==", user.uid),
-      where("fecha", ">=", Timestamp.fromDate(start)),
-      where("fecha", "<=", Timestamp.fromDate(end))
-    );
-
+    // 2 — cobros en efectivo del día
     let initialLoad = true;
-
-    const unsub = onSnapshot(
-      q,
+    const unsub2 = onSnapshot(
+      query(
+        collectionGroup(db, "pagos"),
+        where("empleadoId", "==", user.uid),
+        where("fecha", ">=", startTs),
+        where("fecha", "<=", endTs)
+      ),
       (snap) => {
         let efectivo = 0;
         for (const d of snap.docs) {
@@ -146,47 +141,28 @@ export function TrabajadorCajaDiaProvider({ children }: { children: ReactNode })
           const monto = typeof x.monto === "number" ? x.monto : 0;
           if (monto <= 0) continue;
           const metodo = (x.metodoPago ?? "").toLowerCase();
-          if (metodo === "efectivo" || metodo.includes("efect")) {
-            efectivo += monto;
-          }
+          if (metodo === "efectivo" || metodo.includes("efect")) efectivo += monto;
         }
         setCobrosEfectivoRT(Math.round(efectivo * 100) / 100);
-
         if (!initialLoad) {
           const tieneModificaciones = snap
             .docChanges()
             .some((c) => c.type === "modified" || c.type === "removed");
-          if (tieneModificaciones) {
-            void refresh();
-          }
+          if (tieneModificaciones) void refresh();
         }
         initialLoad = false;
       },
-      (err) => {
-        console.warn("[TrabajadorCajaDia] onSnapshot pagos:", err);
-      }
+      (err) => console.warn("[TrabajadorCajaDia] onSnapshot pagos:", err)
     );
 
-    return unsub;
-  }, [user?.uid, profile?.role, fechaDia, refresh, subscriptionsReady]);
-
-  useEffect(() => {
-    if (!subscriptionsReady || !db || !user || profile?.role !== "trabajador") return;
-    const empresaId = profile?.empresaId?.trim();
-    if (!empresaId) return;
-    const start = inicioDiaColombiaUtc(fechaDia);
-    const end = finDiaColombiaUtc(fechaDia);
-    if (!start || !end) return;
-
-    const q = query(
-      collection(db, EMPRESAS_COLLECTION, empresaId, GASTOS_EMPLEADO_SUBCOLLECTION),
-      where("empleadoId", "==", user.uid),
-      where("fecha", ">=", Timestamp.fromDate(start)),
-      where("fecha", "<=", Timestamp.fromDate(end))
-    );
-
-    const unsub = onSnapshot(
-      q,
+    // 3 — gastos del día
+    const unsub3 = onSnapshot(
+      query(
+        collection(db, EMPRESAS_COLLECTION, empresaId, GASTOS_EMPLEADO_SUBCOLLECTION),
+        where("empleadoId", "==", user.uid),
+        where("fecha", ">=", startTs),
+        where("fecha", "<=", endTs)
+      ),
       (snap) => {
         let total = 0;
         for (const d of snap.docs) {
@@ -195,50 +171,39 @@ export function TrabajadorCajaDiaProvider({ children }: { children: ReactNode })
         }
         setGastosRT(Math.round(total * 100) / 100);
       },
-      (err) => {
-        console.warn("[TrabajadorCajaDia] onSnapshot gastos:", err);
-      }
+      (err) => console.warn("[TrabajadorCajaDia] onSnapshot gastos:", err)
     );
 
-    return unsub;
-  }, [user?.uid, profile?.role, profile?.empresaId, fechaDia, subscriptionsReady]);
+    // 4 — préstamos desde caja empleado del día (requiere rutaId)
+    const unsub4 = rutaId
+      ? onSnapshot(
+          query(
+            collection(db, EMPRESAS_COLLECTION, empresaId, PRESTAMOS_SUBCOLLECTION),
+            where("rutaId", "==", rutaId),
+            where("empleadoId", "==", user.uid),
+            where("desembolsoDesde", "==", "caja_empleado"),
+            where("creadoEn", ">=", startTs),
+            where("creadoEn", "<=", endTs)
+          ),
+          (snap) => {
+            let total = 0;
+            for (const d of snap.docs) {
+              const m = d.data().monto;
+              if (typeof m === "number" && m > 0) total += m;
+            }
+            setPrestamosRT(Math.round(total * 100) / 100);
+          },
+          (err) => console.warn("[TrabajadorCajaDia] onSnapshot prestamos:", err)
+        )
+      : null;
 
-  useEffect(() => {
-    if (!subscriptionsReady || !db || !user || profile?.role !== "trabajador") return;
-    const empresaId = profile?.empresaId?.trim();
-    const rutaId = profile?.rutaId?.trim();
-    if (!empresaId || !rutaId) return;
-
-    const start = inicioDiaColombiaUtc(fechaDia);
-    const end = finDiaColombiaUtc(fechaDia);
-    if (!start || !end) return;
-
-    const q = query(
-      collection(db, EMPRESAS_COLLECTION, empresaId, PRESTAMOS_SUBCOLLECTION),
-      where("rutaId", "==", rutaId),
-      where("empleadoId", "==", user.uid),
-      where("desembolsoDesde", "==", "caja_empleado"),
-      where("creadoEn", ">=", Timestamp.fromDate(start)),
-      where("creadoEn", "<=", Timestamp.fromDate(end))
-    );
-
-    const unsub = onSnapshot(
-      q,
-      (snap) => {
-        let total = 0;
-        for (const d of snap.docs) {
-          const m = typeof d.data().monto === "number" && d.data().monto > 0 ? d.data().monto : 0;
-          total += m;
-        }
-        setPrestamosRT(Math.round(total * 100) / 100);
-      },
-      (err) => {
-        console.warn("[TrabajadorCajaDia] onSnapshot prestamos:", err);
-      }
-    );
-
-    return unsub;
-  }, [user?.uid, profile?.role, profile?.empresaId, profile?.rutaId, fechaDia, subscriptionsReady]);
+    return () => {
+      unsub1();
+      unsub2();
+      unsub3();
+      if (unsub4) unsub4();
+    };
+  }, [user?.uid, profile?.role, profile?.empresaId, profile?.rutaId, fechaDia, refresh, subscriptionsReady]);
 
   const value = useMemo(
     (): TrabajadorCajaDiaContextValue => ({

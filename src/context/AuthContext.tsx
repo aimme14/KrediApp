@@ -347,7 +347,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setState((s) => {
             if (!s.user || s.user.uid !== uid || s.profile?.role !== "superAdmin") return s;
             const nextProf = superAdminDataToProfile(uid, snap.data()!);
-            if (shouldResyncClaims(s.profile, nextProf) && s.user) queueClaimsSync(s.user);
+            if (s.profile && shouldResyncClaims(s.profile, nextProf) && s.user) queueClaimsSync(s.user);
             return { ...s, profile: nextProf, error: null };
           });
         },
@@ -380,7 +380,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setState((s) => {
             if (!s.user || s.user.uid !== uid) return s;
             const nextProf = usersDataToProfile(uid, snap.data()!);
-            if (shouldResyncClaims(s.profile, nextProf) && s.user) queueClaimsSync(s.user);
+            if (s.profile && shouldResyncClaims(s.profile, nextProf) && s.user) queueClaimsSync(s.user);
             return { ...s, profile: nextProf, error: null };
           });
         },

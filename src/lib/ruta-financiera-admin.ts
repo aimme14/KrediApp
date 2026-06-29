@@ -296,3 +296,62 @@ export async function registrarPrestamoDesdeCajaEmpleado(
     await upsertCapitalRutaSnapshot(db, empresaId, rutaId, after.data()!);
   }
 }
+
+/**
+ * Versión transaccional de registrarPrestamoEnRuta.
+ * Debe llamarse dentro de db.runTransaction(), con rutaSnap ya leído via tx.get().
+ * cajaRuta -= monto, inversiones += monto, totalPrestado += monto.
+ * capitalTotal NO cambia (efectivo se convierte en inversión 1:1).
+ *
+ * @throws "Ruta no encontrada" | "Saldo insuficiente en base de la ruta" | "Capital de ruta descuadrado"
+ */
+export function applyRegistrarPrestamoEnRutaEnTx(
+  tx: Transaction,
+  ctx: {
+    rutaSnap: DocumentSnapshot;
+    rutaRef: DocumentReference;
+    monto: number;
+    now: Date;
+  }
+): { cajaRuta: number; inversiones: number } {
+  const { rutaSnap, rutaRef, monto, now } = ctx;
+
+  if (!rutaSnap.exists) throw new Error("Ruta no encontrada");
+
+  const rd = rutaSnap.data() as Record<string, unknown>;
+  const cajaRuta = typeof rd.cajaRuta === "number" ? rd.cajaRuta : 0;
+  const cajasEmpleados = typeof rd.cajasEmpleados === "number" ? rd.cajasEmpleados : 0;
+  const inversiones = typeof rd.inversiones === "number" ? rd.inversiones : 0;
+  const perdidas = typeof rd.perdidas === "number" ? rd.perdidas : 0;
+
+  if (cajaRuta < monto) throw new Error("Saldo insuficiente en base de la ruta");
+
+  const nuevaCajaRuta = round2(cajaRuta - monto);
+  const nuevaInversiones = round2(inversiones + monto);
+
+  // Invariante: capitalTotal no debe cambiar (cash → inversión)
+  const capitalAntes = computeCapitalTotalRutaDesdeSaldos({
+    cajaRuta,
+    cajasEmpleados,
+    inversiones,
+    perdidas,
+  });
+  const capitalDespues = computeCapitalTotalRutaDesdeSaldos({
+    cajaRuta: nuevaCajaRuta,
+    cajasEmpleados,
+    inversiones: nuevaInversiones,
+    perdidas,
+  });
+  if (Math.abs(capitalDespues - capitalAntes) > 0.02) {
+    throw new Error("Capital de ruta descuadrado — revisar operación");
+  }
+
+  tx.update(rutaRef, {
+    cajaRuta: nuevaCajaRuta,
+    inversiones: nuevaInversiones,
+    totalPrestado: FieldValue.increment(monto),
+    ultimaActualizacion: now,
+  });
+
+  return { cajaRuta: nuevaCajaRuta, inversiones: nuevaInversiones };
+}

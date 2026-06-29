@@ -57,15 +57,11 @@ export function TrabajadorRutaProvider({ children }: { children: ReactNode }) {
         let rutaId: string | null = currentProfile.rutaId ?? null;
 
         if (!rutaId) {
-          const q1 = query(rutasCol, where("empleadoId", "==", currentUser.uid));
-          const snap1 = await getDocs(q1);
-          if (!snap1.empty) rutaId = snap1.docs[0].id;
-        }
-
-        if (!rutaId) {
-          const q2 = query(rutasCol, where("empleadosIds", "array-contains", currentUser.uid));
-          const snap2 = await getDocs(q2);
-          if (!snap2.empty) rutaId = snap2.docs[0].id;
+          const [snap1, snap2] = await Promise.all([
+            getDocs(query(rutasCol, where("empleadoId", "==", currentUser.uid))),
+            getDocs(query(rutasCol, where("empleadosIds", "array-contains", currentUser.uid))),
+          ]);
+          rutaId = snap1.docs[0]?.id ?? snap2.docs[0]?.id ?? null;
         }
 
         if (!rutaId) {

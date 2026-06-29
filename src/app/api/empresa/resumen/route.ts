@@ -5,7 +5,6 @@ import { getApiUser } from "@/lib/api-auth";
 import {
   EMPRESAS_COLLECTION,
   RUTAS_SUBCOLLECTION,
-  PRESTAMOS_SUBCOLLECTION,
   USUARIOS_SUBCOLLECTION,
 } from "@/lib/empresas-db";
 import {
@@ -45,28 +44,14 @@ export async function GET(request: NextRequest) {
   const empresaRef = db.collection(EMPRESAS_COLLECTION).doc(apiUser.empresaId);
   const isAdmin = apiUser.role === "admin";
 
-  const [rutasSnap, prestamosSnap, userSnap] = await Promise.all([
-    empresaRef.collection(RUTAS_SUBCOLLECTION).get(),
-    empresaRef
-      .collection(PRESTAMOS_SUBCOLLECTION)
-      .where("adminId", "==", apiUser.uid)
-      .get(),
+  const [rutasSnap, userSnap] = await Promise.all([
+    isAdmin
+      ? empresaRef.collection(RUTAS_SUBCOLLECTION).where("adminId", "==", apiUser.uid).get()
+      : empresaRef.collection(RUTAS_SUBCOLLECTION).get(),
     isAdmin
       ? empresaRef.collection(USUARIOS_SUBCOLLECTION).doc(apiUser.uid).get()
       : Promise.resolve(null as DocumentSnapshot | null),
   ]);
-
-  const prestamosPorRuta = new Map<string, number>();
-  for (const d of prestamosSnap.docs) {
-    const data = d.data();
-    const rutaId = typeof data.rutaId === "string" ? data.rutaId.trim() : "";
-    if (!rutaId) continue;
-    const totalAPagar = typeof data.totalAPagar === "number" ? data.totalAPagar : 0;
-    const saldoPendiente =
-      typeof data.saldoPendiente === "number" ? data.saldoPendiente : 0;
-    const cobrado = totalAPagar - saldoPendiente;
-    prestamosPorRuta.set(rutaId, (prestamosPorRuta.get(rutaId) ?? 0) + cobrado);
-  }
 
   let sumaCapitalRutas = 0;
   const rutas: ResumenRutaItem[] = [];
@@ -75,7 +60,6 @@ export async function GET(request: NextRequest) {
     const data = d.data();
     const rutaId = d.id;
     const adminId = typeof data.adminId === "string" ? data.adminId : "";
-    if (isAdmin && adminId !== apiUser.uid) continue;
 
     const cajaRuta = typeof data.cajaRuta === "number" ? data.cajaRuta : 0;
     const cajasEmpleados = typeof data.cajasEmpleados === "number" ? data.cajasEmpleados : 0;
@@ -83,7 +67,7 @@ export async function GET(request: NextRequest) {
     const ganancias = typeof data.ganancias === "number" ? data.ganancias : 0;
     const perdidas = typeof data.perdidas === "number" ? data.perdidas : 0;
 
-    const ingreso = prestamosPorRuta.get(rutaId) ?? 0;
+    const ingreso = typeof data.cobradoAcumulado === "number" ? data.cobradoAcumulado : 0;
     const gastosRuta = typeof data.gastos === "number" ? data.gastos : 0;
     const utilidad = ganancias - gastosRuta - perdidas;
 

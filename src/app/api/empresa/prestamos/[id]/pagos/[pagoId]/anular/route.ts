@@ -335,6 +335,7 @@ export async function POST(
           inversiones: rev.nuevasInversiones,
           ganancias: rev.nuevasGanancias,
           capitalTotal: rev.nuevoCapitalTotal,
+          cobradoAcumulado: FieldValue.increment(-pago.monto),
           ultimaActualizacion: nowTx,
         });
       }

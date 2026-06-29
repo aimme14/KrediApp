@@ -41,6 +41,15 @@
       ]
     },
     {
+      "collectionGroup": "gastosEmpleado",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "empleadoId", "order": "ASCENDING" },
+        { "fieldPath": "rutaId", "order": "ASCENDING" },
+        { "fieldPath": "fecha", "order": "ASCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "solicitudesEntregaReporte",
       "queryScope": "COLLECTION",
       "fields": [
@@ -115,6 +124,24 @@
       ]
     },
     {
+      "collectionGroup": "pagos",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "empresaId", "order": "ASCENDING" },
+        { "fieldPath": "adminId", "order": "ASCENDING" },
+        { "fieldPath": "fecha", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "pagos",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "empleadoId", "order": "ASCENDING" },
+        { "fieldPath": "rutaId", "order": "ASCENDING" },
+        { "fieldPath": "fecha", "order": "ASCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "reportesDia",
       "queryScope": "COLLECTION",
       "fields": [
@@ -129,6 +156,16 @@
         { "fieldPath": "empleadoId", "order": "ASCENDING" },
         { "fieldPath": "fechaDia", "order": "ASCENDING" },
         { "fieldPath": "adminId", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "reportesDia",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "empleadoId", "order": "ASCENDING" },
+        { "fieldPath": "rutaId", "order": "ASCENDING" },
+        { "fieldPath": "adminId", "order": "ASCENDING" },
+        { "fieldPath": "fecha", "order": "DESCENDING" }
       ]
     },
     {
