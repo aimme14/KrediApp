@@ -475,6 +475,7 @@ export default function GastosAdminPageContent() {
         evidencia: evidenciaUrl || undefined,
         alcance: data.alcance,
         rutaId: data.alcance === "ruta" ? data.rutaId : undefined,
+        creadoPorNombre: user?.displayName ?? undefined,
       });
       setMotivo("");
       setMonto("");

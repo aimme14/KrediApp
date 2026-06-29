@@ -10,7 +10,8 @@ import {
   USERS_COLLECTION,
   USUARIOS_SUBCOLLECTION,
 } from "@/lib/empresas-db";
-import { registrarPrestamoEnRuta } from "@/lib/ruta-financiera-admin";
+import { applyRegistrarPrestamoEnRutaEnTx } from "@/lib/ruta-financiera-admin";
+import { upsertCapitalRutaSnapshot } from "@/lib/capital-ruta-snapshot";
 import {
   crearPrestamoEmpleado,
   mapCrearPrestamoEmpleadoError,
@@ -27,7 +28,6 @@ import {
 } from "@/lib/financial-idempotency";
 import type { ModalidadPago } from "@/types/firestore";
 import { evaluarAprobacionPrestamoEmpleado } from "@/lib/prestamo-aprobacion-empleado";
-import { backfillMorosoPrestamosSinCampo } from "@/lib/sync-prestamo-moroso";
 import { normalizeEstadoPrestamo } from "@/lib/prestamo-estado";
 
 /** GET: lista préstamos. Empleado: los de su ruta. Admin/Jefe: los suyos */
@@ -43,12 +43,6 @@ export async function GET(request: NextRequest) {
     apiUser.role === "empleado" && apiUser.rutaId
       ? await col.where("rutaId", "==", apiUser.rutaId).limit(200).get()
       : await col.where("adminId", "==", apiUser.uid).limit(200).get();
-
-  if (snap.docs.some((d) => d.data().moroso === undefined)) {
-    void backfillMorosoPrestamosSinCampo(db, apiUser.empresaId, snap.docs).catch((e) =>
-      console.warn("[prestamos] backfill moroso:", e)
-    );
-  }
 
   const prestamos = snap.docs.map((d) => {
     const data = d.data();
@@ -323,28 +317,13 @@ export async function POST(request: NextRequest) {
   let ledgerBalanceAfter: number | undefined;
   let ledgerEventType = "";
 
-  if (rutaIdPrestamo) {
-    try {
-      await registrarPrestamoEnRuta(db, apiUser.empresaId, rutaIdPrestamo, monto);
-      ledgerWalletType = "ruta_caja";
-      ledgerWalletId = rutaIdPrestamo;
-      ledgerEventType = "prestamo_desembolso_ruta";
-      const rutaSnap = await db
+  const rutaRefPrestamo = rutaIdPrestamo
+    ? db
         .collection(EMPRESAS_COLLECTION)
         .doc(apiUser.empresaId)
         .collection(RUTAS_SUBCOLLECTION)
         .doc(rutaIdPrestamo)
-        .get();
-      const cajaRuta = rutaSnap.data()?.cajaRuta;
-      if (typeof cajaRuta === "number") {
-        ledgerBalanceAfter = cajaRuta;
-      }
-    } catch (e) {
-      return finalize(400, {
-        error: e instanceof Error ? e.message : "Error al impactar base de la ruta",
-      });
-    }
-  }
+    : null;
 
   const clienteNombre =
     typeof clienteSnap.data()?.nombre === "string"
@@ -353,18 +332,36 @@ export async function POST(request: NextRequest) {
 
   try {
     await db.runTransaction(async (tx) => {
+      // ── Todas las lecturas primero (requisito de Firestore) ──
       const clienteSnapTx = await tx.get(clienteRef);
-      if (!clienteSnapTx.exists) {
-        throw new Error("CLIENTE_NOT_FOUND");
-      }
-      const clienteData = clienteSnapTx.data() as Record<string, unknown>;
-      if (clienteData.moroso === true) {
-        throw new Error("CLIENTE_MOROSO");
-      }
-      if (clienteData.prestamo_activo === true) {
-        throw new Error("CLIENTE_CON_PRESTAMO_ACTIVO");
+      if (!clienteSnapTx.exists) throw new Error("CLIENTE_NOT_FOUND");
+
+      let rutaSnapTx: FirebaseFirestore.DocumentSnapshot | null = null;
+      if (rutaRefPrestamo) {
+        rutaSnapTx = await tx.get(rutaRefPrestamo);
       }
 
+      // ── Validaciones ──
+      const clienteData = clienteSnapTx.data() as Record<string, unknown>;
+      if (clienteData.moroso === true) throw new Error("CLIENTE_MOROSO");
+      if (clienteData.prestamo_activo === true) throw new Error("CLIENTE_CON_PRESTAMO_ACTIVO");
+
+      const now = new Date();
+
+      // ── Desembolso desde caja ruta (dentro de la tx: atómico con la creación del préstamo) ──
+      if (rutaRefPrestamo && rutaSnapTx) {
+        applyRegistrarPrestamoEnRutaEnTx(tx, {
+          rutaSnap: rutaSnapTx,
+          rutaRef: rutaRefPrestamo,
+          monto,
+          now,
+        });
+        ledgerWalletType = "ruta_caja";
+        ledgerWalletId = rutaIdPrestamo;
+        ledgerEventType = "prestamo_desembolso_ruta";
+      }
+
+      // ── Escrituras ──
       tx.set(ref, {
         clienteId: clienteId.trim(),
         clienteNombre,
@@ -409,7 +406,31 @@ export async function POST(request: NextRequest) {
     if (msg === "CLIENTE_CON_PRESTAMO_ACTIVO") {
       return finalize(400, { error: "El cliente ya tiene un préstamo activo" });
     }
+    if (msg === "Saldo insuficiente en base de la ruta" || msg === "Ruta no encontrada" || msg.includes("descuadrado")) {
+      return finalize(400, { error: msg });
+    }
     throw e;
+  }
+
+  // Snapshot de capital de ruta y saldo para ledger — después de la tx, no dentro
+  if (rutaRefPrestamo && rutaIdPrestamo) {
+    try {
+      const rutaAfter = await rutaRefPrestamo.get();
+      if (rutaAfter.exists) {
+        await upsertCapitalRutaSnapshot(
+          db,
+          apiUser.empresaId,
+          rutaIdPrestamo,
+          rutaAfter.data()!
+        );
+        const cajaRuta = rutaAfter.data()?.cajaRuta;
+        if (typeof cajaRuta === "number") {
+          ledgerBalanceAfter = cajaRuta;
+        }
+      }
+    } catch (e) {
+      console.warn("[prestamos] upsertCapitalRutaSnapshot post-tx:", e);
+    }
   }
 
   if (rutaIdPrestamo && ledgerWalletType && ledgerWalletId) {

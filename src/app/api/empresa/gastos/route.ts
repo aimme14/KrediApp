@@ -23,6 +23,9 @@ import {
 import type { TipoGasto } from "@/types/firestore";
 import { fechaGastoDesdeStringCliente } from "@/lib/colombia-day-bounds";
 
+const DEFAULT_GASTOS_LIMIT = 100;
+const MAX_GASTOS_LIMIT = 500;
+
 export type AlcanceGastoAdmin = "ruta" | "admin";
 
 function mapGastoDoc(
@@ -58,27 +61,23 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
+  const limitParam = Number(new URL(request.url).searchParams.get("limit")) || DEFAULT_GASTOS_LIMIT;
+  const limit = Math.min(Math.max(1, limitParam), MAX_GASTOS_LIMIT);
+
   const db = getAdminFirestore();
   const empresaRef = db.collection(EMPRESAS_COLLECTION).doc(apiUser.empresaId);
 
   if (apiUser.role === "jefe") {
-    const snap = await empresaRef.collection(GASTOS_EMPRESA_SUBCOLLECTION).get();
-    const list = snap.docs.map((d) => {
+    const snap = await empresaRef
+      .collection(GASTOS_EMPRESA_SUBCOLLECTION)
+      .orderBy("fecha", "desc")
+      .limit(limit)
+      .get();
+    const gastos = snap.docs.map((d) => {
       const data = d.data() as Record<string, unknown>;
-      return {
-        ...mapGastoDoc(d.id, data, { alcance: "empresa" }),
-        rol: "jefe",
-      };
+      const g = { ...mapGastoDoc(d.id, data, { alcance: "empresa" }), rol: "jefe" };
+      return { ...g, fecha: g.fecha instanceof Date ? g.fecha.toISOString() : (g.fecha as string | null) ?? null };
     });
-    list.sort(
-      (a, b) =>
-        (b.fecha ? new Date(b.fecha).getTime() : 0) -
-        (a.fecha ? new Date(a.fecha).getTime() : 0)
-    );
-    const gastos = list.map((g) => ({
-      ...g,
-      fecha: g.fecha?.toISOString?.() ?? null,
-    }));
     return NextResponse.json({ gastos });
   }
 
@@ -87,28 +86,26 @@ export async function GET(request: NextRequest) {
       empresaRef
         .collection(GASTOS_ADMIN_SUBCOLLECTION)
         .where("adminId", "==", apiUser.uid)
+        .orderBy("fecha", "desc")
+        .limit(limit)
         .get(),
       empresaRef
         .collection(GASTOS_EMPLEADO_SUBCOLLECTION)
         .where("adminId", "==", apiUser.uid)
+        .orderBy("fecha", "desc")
+        .limit(limit)
         .get(),
     ]);
 
     const list: Array<Record<string, unknown>> = [];
     nuevoSnap.docs.forEach((d) => {
-      const data = d.data() as Record<string, unknown>;
-      list.push(mapGastoDoc(d.id, data));
+      list.push(mapGastoDoc(d.id, d.data() as Record<string, unknown>));
     });
     empleadoSnap.docs.forEach((d) => {
-      const data = d.data() as Record<string, unknown>;
-      list.push(
-        mapGastoDoc(d.id, data, {
-          alcance: "empleado",
-        })
-      );
+      list.push(mapGastoDoc(d.id, d.data() as Record<string, unknown>, { alcance: "empleado" }));
     });
 
-    /** Rellena displayName/email para filas sin `creadoPorNombre` (datos viejos o importados). */
+    /** Backfill: rellena displayName/email para filas sin creadoPorNombre (datos legacy). */
     const sinNombre = list.filter((g) => !(g.creadoPorNombre as string)?.trim());
     if (sinNombre.length > 0) {
       const uids = Array.from(
@@ -126,25 +123,21 @@ export async function GET(request: NextRequest) {
         })
       );
       list.forEach((g) => {
-        const gn = String(g.creadoPorNombre ?? "").trim();
-        if (!gn) {
-          g.creadoPorNombre =
-            nombres[String(g.creadoPor)] ?? String(g.creadoPor ?? "");
+        if (!String(g.creadoPorNombre ?? "").trim()) {
+          g.creadoPorNombre = nombres[String(g.creadoPor)] ?? String(g.creadoPor ?? "");
         }
       });
     }
 
+    // Merge de dos colecciones ordenadas → re-ordenar en memoria y limitar
     list.sort(
       (a, b) =>
         (b.fecha ? new Date(b.fecha as Date).getTime() : 0) -
         (a.fecha ? new Date(a.fecha as Date).getTime() : 0)
     );
-    const gastos = list.map((g) => ({
+    const gastos = list.slice(0, limit).map((g) => ({
       ...g,
-      fecha:
-        g.fecha instanceof Date
-          ? g.fecha.toISOString()
-          : (g.fecha as string | null) ?? null,
+      fecha: g.fecha instanceof Date ? g.fecha.toISOString() : (g.fecha as string | null) ?? null,
     }));
     return NextResponse.json({ gastos });
   }
@@ -153,24 +146,14 @@ export async function GET(request: NextRequest) {
   const nuevoSnap = await empresaRef
     .collection(GASTOS_EMPLEADO_SUBCOLLECTION)
     .where("empleadoId", "==", apiUser.uid)
+    .orderBy("fecha", "desc")
+    .limit(limit)
     .get();
 
-  const list: Array<Record<string, unknown>> = nuevoSnap.docs.map((d) =>
-    mapGastoDoc(d.id, d.data() as Record<string, unknown>)
-  );
-
-  list.sort(
-    (a, b) =>
-      (b.fecha ? new Date(b.fecha as Date).getTime() : 0) -
-      (a.fecha ? new Date(a.fecha as Date).getTime() : 0)
-  );
-  const gastos = list.map((g) => ({
-    ...g,
-    fecha:
-      g.fecha instanceof Date
-        ? g.fecha.toISOString()
-        : (g.fecha as string | null) ?? null,
-  }));
+  const gastos = nuevoSnap.docs.map((d) => {
+    const g = mapGastoDoc(d.id, d.data() as Record<string, unknown>);
+    return { ...g, fecha: g.fecha instanceof Date ? g.fecha.toISOString() : (g.fecha as string | null) ?? null };
+  });
   return NextResponse.json({ gastos });
 }
 
@@ -191,6 +174,7 @@ export async function POST(request: NextRequest) {
     alcance: alcanceBody,
     rutaId: rutaIdBody,
     idempotencyKey,
+    creadoPorNombre: creadoPorNombreBody,
   } = body as {
     descripcion?: string;
     monto?: number;
@@ -200,6 +184,7 @@ export async function POST(request: NextRequest) {
     alcance?: AlcanceGastoAdmin | string;
     rutaId?: string;
     idempotencyKey?: string;
+    creadoPorNombre?: string;
   };
 
   if (!descripcion || typeof descripcion !== "string" || !descripcion.trim()) {
@@ -242,12 +227,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(payload, { status });
   };
 
-  const userSnap = await db.collection(USERS_COLLECTION).doc(apiUser.uid).get();
-  const userData = userSnap.data();
-  const creadoPorNombre =
-    (typeof userData?.displayName === "string" && userData.displayName.trim()) ||
-    (typeof userData?.email === "string" && userData.email.trim()) ||
-    apiUser.uid;
+  const creadoPorNombre = creadoPorNombreBody?.trim() || apiUser.uid;
 
   /** ── Jefe: caja empresa + gastosEmpresa ── */
   if (apiUser.role === "jefe") {

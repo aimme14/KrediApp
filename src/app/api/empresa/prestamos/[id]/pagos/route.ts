@@ -782,6 +782,7 @@ export async function POST(
             inversiones,
             ganancias,
             capitalTotal: nuevoCapital,
+            cobradoAcumulado: FieldValue.increment(montoAplicar),
             ultimaActualizacion: nowTx,
           });
         } else {
@@ -795,6 +796,7 @@ export async function POST(
           const { montoAcreditarCajaEmpleado, ...rutaCampos } = rutaUpd;
           tx.update(rutaRef, {
             ...rutaCampos,
+            cobradoAcumulado: FieldValue.increment(montoAplicar),
             ultimaActualizacion: nowTx,
           });
 

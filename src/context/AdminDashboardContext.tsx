@@ -9,14 +9,13 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { collection, doc, getDoc, onSnapshot, query, where } from "firebase/firestore";
+import { collection, doc, onSnapshot, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/context/AuthContext";
 import {
   EMPRESAS_COLLECTION,
   RUTAS_SUBCOLLECTION,
   USUARIOS_SUBCOLLECTION,
-  USERS_COLLECTION,
 } from "@/lib/empresas-db";
 import type { RutaItem, ResumenRutaItem } from "@/lib/empresa-api";
 import { getCajaAdmin } from "@/lib/empresa-api";
@@ -233,34 +232,15 @@ export function AdminDashboardProvider({ children }: { children: ReactNode }) {
 
     const unsub = onSnapshot(
       qEmp,
-      async (snap) => {
-        const uids = snap.docs.map((d) => d.id);
-        const rutaIdPorUid = new Map<string, string>();
-        for (const d of snap.docs) {
-          const rutaId = d.data().rutaId as string | undefined;
-          if (rutaId) rutaIdPorUid.set(d.id, rutaId);
-        }
-
-        const perfiles = await Promise.all(
-          uids.map(async (uid) => {
-            if (!db) return { uid, nombre: "Sin nombre" };
-            try {
-              const userSnap = await getDoc(doc(db, USERS_COLLECTION, uid));
-              const nombre =
-                (userSnap.data()?.displayName as string | undefined)?.trim() || "Sin nombre";
-              return { uid, nombre };
-            } catch {
-              return { uid, nombre: "Sin nombre" };
-            }
-          })
-        );
-
+      (snap) => {
         const map = new Map<string, AdminEmpleadoLive[]>();
-        for (const p of perfiles) {
-          const rutaId = rutaIdPorUid.get(p.uid);
+        for (const d of snap.docs) {
+          const data = d.data() as Record<string, unknown>;
+          const rutaId = data.rutaId as string | undefined;
           if (!rutaId) continue;
+          const nombre = (data.nombre as string | undefined)?.trim() || "Sin nombre";
           const list = map.get(rutaId) ?? [];
-          list.push({ uid: p.uid, nombre: p.nombre });
+          list.push({ uid: d.id, nombre });
           map.set(rutaId, list);
         }
         setEmpleadosPorRuta(map);

@@ -307,6 +307,7 @@ export default function GastosJefePageContent() {
         fecha: fechaDiaColombiaHoy(),
         tipo: data.tipo,
         evidencia: evidenciaUrl || undefined,
+        creadoPorNombre: user?.displayName ?? undefined,
       });
       setMotivo("");
       setMonto("");

@@ -1302,6 +1302,7 @@ export async function createGasto(
     /** Solo administrador: gasto de una ruta o gasto personal/administrativo */
     alcance?: "ruta" | "admin";
     rutaId?: string;
+    creadoPorNombre?: string;
   }
 ): Promise<string> {
   const res = await fetchWithAuth("/api/empresa/gastos", token, {

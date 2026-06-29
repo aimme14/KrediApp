@@ -46,7 +46,12 @@ export async function startIdempotentOperation(params: {
       createdAt: new Date(),
     });
     return { replay: false };
-  } catch {}
+  } catch (e: unknown) {
+    // Código gRPC 6 = ALREADY_EXISTS: el documento ya existe → revisar si es replay.
+    // Cualquier otro error (red, permisos, cuota) se relanza para que el endpoint falle limpio.
+    const code = (e as { code?: number })?.code;
+    if (code !== 6) throw e;
+  }
 
   const snap = await ref.get();
   if (!snap.exists) return { replay: false };
