@@ -35,7 +35,18 @@ function formatHora(iso: string | null): string {
   }
 }
 
-/** Mismas etiquetas que en cobrar → «No pagó». */
+/** Convierte ISO a fecha calendario Colombia (YYYY-MM-DD). */
+function fechaColombiaDeISO(iso: string | null): string | null {
+  if (!iso) return null;
+  try {
+    return new Date(iso).toLocaleDateString("en-CA", {
+      timeZone: "America/Bogota",
+    });
+  } catch {
+    return null;
+  }
+}
+
 const MOTIVO_NO_PAGO_LABEL: Record<string, string> = {
   sin_fondos: "No tenía dinero",
   no_estaba: "No estaba en casa",
@@ -59,7 +70,7 @@ function normalizaMetodoPago(metodo: string | null | undefined): string {
     .trim()
     .toLocaleLowerCase("es-CO")
     .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "");
+    .replace(/[̀-ͯ]/g, "");
 }
 
 function IconoOjo(props: { size?: number }) {
@@ -156,6 +167,7 @@ export default function CajaDelDiaPageContent() {
 
   return (
     <div className="card">
+      {/* Encabezado */}
       <div
         style={{
           display: "flex",
@@ -198,125 +210,85 @@ export default function CajaDelDiaPageContent() {
         <p style={{ color: "var(--text-muted)" }}>Cargando…</p>
       ) : data ? (
         <>
+          {/* ── Tarjetas de resumen del período completo ── */}
           {(() => {
             const cobros = data.cobros ?? [];
-            const cobrosEfectivo = cobros.filter((c) => {
-              const m = normalizaMetodoPago(c.metodoPago);
-              return m === "efectivo" || m.includes("efect");
-            });
-            const cobrosTransferencia = cobros.filter((c) => {
-              const m = normalizaMetodoPago(c.metodoPago);
-              return m === "transferencia" || m.includes("transf") || m.includes("transfer");
-            });
-            const cobrosOtros = cobros.filter((c) => {
-              const m = normalizaMetodoPago(c.metodoPago);
-              const esEfectivo = m === "efectivo" || m.includes("efect");
-              const esTransfer =
-                m === "transferencia" || m.includes("transf") || m.includes("transfer");
-              return !esEfectivo && !esTransfer;
-            });
-
-            const totalEfectivo = cobrosEfectivo.reduce((s, c) => s + c.monto, 0);
-            const totalTransferencia = cobrosTransferencia.reduce((s, c) => s + c.monto, 0);
-            const totalOtros = cobrosOtros.reduce((s, c) => s + c.monto, 0);
+            const totalEfectivo = cobros
+              .filter((c) => {
+                const m = normalizaMetodoPago(c.metodoPago);
+                return m === "efectivo" || m.includes("efect");
+              })
+              .reduce((s, c) => s + c.monto, 0);
+            const totalTransferencia = cobros
+              .filter((c) => {
+                const m = normalizaMetodoPago(c.metodoPago);
+                return m === "transferencia" || m.includes("transf") || m.includes("transfer");
+              })
+              .reduce((s, c) => s + c.monto, 0);
+            const totalOtros = cobros
+              .filter((c) => {
+                const m = normalizaMetodoPago(c.metodoPago);
+                return (
+                  m !== "efectivo" &&
+                  !m.includes("efect") &&
+                  m !== "transferencia" &&
+                  !m.includes("transf") &&
+                  !m.includes("transfer")
+                );
+              })
+              .reduce((s, c) => s + c.monto, 0);
 
             return (
-              <>
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
-                    gap: "0.65rem",
-                    marginBottom: "1.25rem",
-                  }}
-                >
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
+                  gap: "0.65rem",
+                  marginBottom: "1.25rem",
+                }}
+              >
+                <TarjetaResumen etiqueta="Tu caja actual" valor={formatMonto(cajaActual)} />
+                <TarjetaResumen
+                  etiqueta={`Base asignada (${formatFechaDia(data.fechaDia)})`}
+                  valor={formatMonto(data.totalBaseAsignadaDia)}
+                />
+                <TarjetaResumen
+                  etiqueta="Gastos del período"
+                  valor={formatMonto(totalGastosRT ?? data.totalGastosDia ?? 0)}
+                />
+                <TarjetaResumen
+                  etiqueta="Préstamos del período"
+                  valor={formatMonto(totalPrestamosRT ?? data.totalPrestamosDesembolsoDia ?? 0)}
+                />
+                {(data.totalPerdidasDia ?? 0) > 0 && (
                   <TarjetaResumen
-                    etiqueta="Tu caja actual"
-                    valor={formatMonto(cajaActual)}
-                  />
-                  <TarjetaResumen
-                    etiqueta={`Base asignada (${formatFechaDia(data.fechaDia)})`}
-                    valor={formatMonto(data.totalBaseAsignadaDia)}
-                  />
-                  <TarjetaResumen
-                    etiqueta="Gastos del día"
-                    valor={formatMonto(totalGastosRT ?? data.totalGastosDia ?? 0)}
-                  />
-                  <TarjetaResumen
-                    etiqueta={`Préstamos (${formatFechaDia(data.fechaDia)})`}
-                    valor={formatMonto(totalPrestamosRT ?? data.totalPrestamosDesembolsoDia ?? 0)}
-                  />
-                  {(data.totalPerdidasDia ?? 0) > 0 && (
-                    <TarjetaResumen
-                      etiqueta="Pérdidas del día"
-                      valor={formatMonto(data.totalPerdidasDia ?? 0)}
-                      dimmed
-                    />
-                  )}
-                  <TarjetaResumen
-                    etiqueta={`Total cobrado (${formatFechaDia(data.fechaDia)})`}
-                    valor={formatMonto(data.totalCobrosLista)}
-                  />
-                  <TarjetaResumen
-                    etiqueta="↳ En efectivo"
-                    valor={formatMonto(totalEfectivo)}
+                    etiqueta="Pérdidas del período"
+                    valor={formatMonto(data.totalPerdidasDia ?? 0)}
                     dimmed
                   />
-                  <TarjetaResumen
-                    etiqueta="↳ Transferencia"
-                    valor={formatMonto(totalTransferencia)}
-                    dimmed
-                  />
-                  {totalOtros > 0 && (
-                    <TarjetaResumen
-                      etiqueta="↳ Otros métodos"
-                      valor={formatMonto(totalOtros)}
-                      dimmed
-                    />
-                  )}
-                </div>
-
-                {/* Préstamos desembolsados en el período */}
-                <h3 style={{ fontSize: "1.05rem", marginBottom: "0.5rem" }}>
-                  Préstamos
-                </h3>
-                {(data.prestamosDesembolsoDelDia ?? []).length === 0 ? (
-                  <p style={{ color: "var(--text-muted)", marginBottom: "1.25rem" }}>
-                    No hay préstamos para esta fecha.
-                  </p>
-                ) : (
-                  <div className="table-wrap table-wrap-caja-dia" style={{ marginBottom: "1.25rem" }}>
-                    <table>
-                      <thead>
-                        <tr>
-                          <th>Hora</th>
-                          <th>Cliente</th>
-                          <th className="col-num">Capital entregado</th>
-                          <th className="col-num">Total a pagar</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {(data.prestamosDesembolsoDelDia ?? []).map((p: PrestamoDesembolsoDiaItem) => (
-                          <tr key={p.prestamoId}>
-                            <td>{formatHora(p.fecha)}</td>
-                            <td>{p.clienteNombre}</td>
-                            <td className="col-num">{formatMonto(p.monto)}</td>
-                            <td className="col-num">{formatMonto(p.totalAPagar)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
                 )}
-              </>
+                <TarjetaResumen
+                  etiqueta="Total cobrado (período)"
+                  valor={formatMonto(data.totalCobrosLista)}
+                />
+                <TarjetaResumen etiqueta="↳ En efectivo" valor={formatMonto(totalEfectivo)} dimmed />
+                <TarjetaResumen
+                  etiqueta="↳ Transferencia"
+                  valor={formatMonto(totalTransferencia)}
+                  dimmed
+                />
+                {totalOtros > 0 && (
+                  <TarjetaResumen etiqueta="↳ Otros métodos" valor={formatMonto(totalOtros)} dimmed />
+                )}
+              </div>
             );
           })()}
 
-          {/* Banner período abierto — solo cuando hay más de un día */}
+          {/* Banner período abierto */}
           {(data.diasDelPeriodo ?? []).length > 1 && data.fechaDesdeISO && (
             <div
               style={{
-                marginTop: "1rem",
+                marginBottom: "1rem",
                 padding: "0.6rem 0.85rem",
                 borderRadius: "8px",
                 background: "var(--input-bg)",
@@ -327,29 +299,43 @@ export default function CajaDelDiaPageContent() {
             >
               Período abierto desde{" "}
               <strong style={{ color: "var(--text)" }}>
-                {formatFechaDia(new Date(data.fechaDesdeISO).toISOString().slice(0, 10))}
+                {formatFechaDia(fechaColombiaDeISO(data.fechaDesdeISO) ?? "")}
               </strong>
-              . Los cobros se muestran separados por fecha. El período cierra cuando
-              el admin aprueba tu reporte.
+              . El detalle se muestra separado por fecha. El período cierra cuando el admin aprueba tu reporte.
             </div>
           )}
 
-          {/* Detalle por día — usa diasDelPeriodo para separar fechas */}
+          {/* ── Detalle por día ── */}
           {(() => {
             const dias = [...(data.diasDelPeriodo ?? [])].sort((a, b) =>
               b.fechaDia.localeCompare(a.fechaDia)
             );
             if (dias.length === 0) return null;
+
+            // Mapa de préstamos por fecha Colombia
+            const prestamosPorDia = new Map<string, PrestamoDesembolsoDiaItem[]>();
+            for (const p of data.prestamosDesembolsoDelDia ?? []) {
+              const key = fechaColombiaDeISO(p.fecha);
+              if (!key) continue;
+              const list = prestamosPorDia.get(key) ?? [];
+              list.push(p);
+              prestamosPorDia.set(key, list);
+            }
+
             return (
               <>
                 {dias.map((dia: DiaPeriodoItem) => {
+                  const prestamosDia = prestamosPorDia.get(dia.fechaDia) ?? [];
+
                   const cobrosEfectivo = dia.cobros.filter((c) => {
                     const m = normalizaMetodoPago(c.metodoPago);
                     return m === "efectivo" || m.includes("efect");
                   });
                   const cobrosTransferencia = dia.cobros.filter((c) => {
                     const m = normalizaMetodoPago(c.metodoPago);
-                    return m === "transferencia" || m.includes("transf") || m.includes("transfer");
+                    return (
+                      m === "transferencia" || m.includes("transf") || m.includes("transfer")
+                    );
                   });
                   const cobrosOtros = dia.cobros.filter((c) => {
                     const m = normalizaMetodoPago(c.metodoPago);
@@ -366,10 +352,18 @@ export default function CajaDelDiaPageContent() {
                     dia.cobros.length > 0 ||
                     dia.noPagos.length > 0 ||
                     dia.gastosDelDia.length > 0 ||
-                    dia.perdidasDelDia.length > 0;
+                    dia.perdidasDelDia.length > 0 ||
+                    prestamosDia.length > 0;
 
                   return (
-                    <section key={dia.fechaDia} style={{ marginTop: "1.5rem" }}>
+                    <section
+                      key={dia.fechaDia}
+                      style={{
+                        marginTop: "1.5rem",
+                        paddingTop: "1rem",
+                        borderTop: "1px solid var(--card-border)",
+                      }}
+                    >
                       {/* Encabezado de fecha */}
                       <div
                         style={{
@@ -402,6 +396,40 @@ export default function CajaDelDiaPageContent() {
                         <p style={{ color: "var(--text-muted)" }}>Sin actividad registrada.</p>
                       )}
 
+                      {/* Préstamos desembolsados */}
+                      {prestamosDia.length > 0 && (
+                        <>
+                          <h4 style={{ fontSize: "0.9rem", marginTop: 0, marginBottom: "0.35rem" }}>
+                            Préstamos desembolsados ({prestamosDia.length})
+                          </h4>
+                          <div
+                            className="table-wrap table-wrap-caja-dia"
+                            style={{ marginBottom: "0.75rem" }}
+                          >
+                            <table>
+                              <thead>
+                                <tr>
+                                  <th>Hora</th>
+                                  <th>Cliente</th>
+                                  <th className="col-num">Capital entregado</th>
+                                  <th className="col-num">Total a pagar</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {prestamosDia.map((p: PrestamoDesembolsoDiaItem) => (
+                                  <tr key={`${dia.fechaDia}-pr-${p.prestamoId}`}>
+                                    <td>{formatHora(p.fecha)}</td>
+                                    <td>{p.clienteNombre}</td>
+                                    <td className="col-num">{formatMonto(p.monto)}</td>
+                                    <td className="col-num">{formatMonto(p.totalAPagar)}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </>
+                      )}
+
                       {/* Cuotas pagadas */}
                       {dia.cobros.length > 0 && (
                         <>
@@ -411,10 +439,19 @@ export default function CajaDelDiaPageContent() {
 
                           {cobrosEfectivo.length > 0 && (
                             <>
-                              <p style={{ fontSize: "0.78rem", color: "var(--text-muted)", margin: "0 0 0.25rem" }}>
+                              <p
+                                style={{
+                                  fontSize: "0.78rem",
+                                  color: "var(--text-muted)",
+                                  margin: "0 0 0.25rem",
+                                }}
+                              >
                                 Efectivo ({cobrosEfectivo.length})
                               </p>
-                              <div className="table-wrap table-wrap-caja-dia" style={{ marginBottom: "0.75rem" }}>
+                              <div
+                                className="table-wrap table-wrap-caja-dia"
+                                style={{ marginBottom: "0.75rem" }}
+                              >
                                 <table className="caja-dia-table-cobros">
                                   <thead>
                                     <tr>
@@ -434,7 +471,10 @@ export default function CajaDelDiaPageContent() {
                                         <td>{c.clienteNombre}</td>
                                         <td className="col-num">{formatMonto(c.monto)}</td>
                                         <td className="col-num">
-                                          {formatoCuotasRestanteTotal(c.cuotasFaltantes, c.numeroCuotas)}
+                                          {formatoCuotasRestanteTotal(
+                                            c.cuotasFaltantes,
+                                            c.numeroCuotas
+                                          )}
                                         </td>
                                       </tr>
                                     ))}
@@ -446,10 +486,19 @@ export default function CajaDelDiaPageContent() {
 
                           {cobrosTransferencia.length > 0 && (
                             <>
-                              <p style={{ fontSize: "0.78rem", color: "var(--text-muted)", margin: "0 0 0.25rem" }}>
+                              <p
+                                style={{
+                                  fontSize: "0.78rem",
+                                  color: "var(--text-muted)",
+                                  margin: "0 0 0.25rem",
+                                }}
+                              >
                                 Transferencia ({cobrosTransferencia.length})
                               </p>
-                              <div className="table-wrap table-wrap-caja-dia" style={{ marginBottom: "0.75rem" }}>
+                              <div
+                                className="table-wrap table-wrap-caja-dia"
+                                style={{ marginBottom: "0.75rem" }}
+                              >
                                 <table className="caja-dia-table-cobros">
                                   <thead>
                                     <tr>
@@ -489,10 +538,19 @@ export default function CajaDelDiaPageContent() {
 
                           {cobrosOtros.length > 0 && (
                             <>
-                              <p style={{ fontSize: "0.78rem", color: "var(--text-muted)", margin: "0 0 0.25rem" }}>
+                              <p
+                                style={{
+                                  fontSize: "0.78rem",
+                                  color: "var(--text-muted)",
+                                  margin: "0 0 0.25rem",
+                                }}
+                              >
                                 Otros ({cobrosOtros.length})
                               </p>
-                              <div className="table-wrap table-wrap-caja-dia" style={{ marginBottom: "0.75rem" }}>
+                              <div
+                                className="table-wrap table-wrap-caja-dia"
+                                style={{ marginBottom: "0.75rem" }}
+                              >
                                 <table className="caja-dia-table-cobros">
                                   <thead>
                                     <tr>
@@ -514,7 +572,10 @@ export default function CajaDelDiaPageContent() {
                                         <td className="col-num">{formatMonto(c.monto)}</td>
                                         <td>{c.metodoPago ?? "—"}</td>
                                         <td className="col-num">
-                                          {formatoCuotasRestanteTotal(c.cuotasFaltantes, c.numeroCuotas)}
+                                          {formatoCuotasRestanteTotal(
+                                            c.cuotasFaltantes,
+                                            c.numeroCuotas
+                                          )}
                                         </td>
                                       </tr>
                                     ))}
@@ -529,10 +590,19 @@ export default function CajaDelDiaPageContent() {
                       {/* No pagaron */}
                       {dia.noPagos.length > 0 && (
                         <>
-                          <h4 style={{ fontSize: "0.9rem", marginTop: "0.75rem", marginBottom: "0.35rem" }}>
+                          <h4
+                            style={{
+                              fontSize: "0.9rem",
+                              marginTop: "0.75rem",
+                              marginBottom: "0.35rem",
+                            }}
+                          >
                             No pagaron ({dia.noPagos.length})
                           </h4>
-                          <div className="table-wrap table-wrap-caja-dia" style={{ marginBottom: "0.75rem" }}>
+                          <div
+                            className="table-wrap table-wrap-caja-dia"
+                            style={{ marginBottom: "0.75rem" }}
+                          >
                             <table>
                               <thead>
                                 <tr>
@@ -553,9 +623,14 @@ export default function CajaDelDiaPageContent() {
                                     <td>{labelMotivoNoPago(n.motivoNoPago)}</td>
                                     <td>{n.nota ?? "—"}</td>
                                     <td className="col-num">
-                                      {formatoCuotasRestanteTotal(n.cuotasPendientes, n.numeroCuotas)}
+                                      {formatoCuotasRestanteTotal(
+                                        n.cuotasPendientes,
+                                        n.numeroCuotas
+                                      )}
                                     </td>
-                                    <td className="col-num">{formatMonto(n.saldoPendientePrestamoActual)}</td>
+                                    <td className="col-num">
+                                      {formatMonto(n.saldoPendientePrestamoActual)}
+                                    </td>
                                   </tr>
                                 ))}
                               </tbody>
@@ -567,10 +642,19 @@ export default function CajaDelDiaPageContent() {
                       {/* Gastos */}
                       {dia.gastosDelDia.length > 0 && (
                         <>
-                          <h4 style={{ fontSize: "0.9rem", marginTop: "0.75rem", marginBottom: "0.35rem" }}>
+                          <h4
+                            style={{
+                              fontSize: "0.9rem",
+                              marginTop: "0.75rem",
+                              marginBottom: "0.35rem",
+                            }}
+                          >
                             Gastos ({dia.gastosDelDia.length})
                           </h4>
-                          <div className="table-wrap table-wrap-caja-dia" style={{ marginBottom: "0.75rem" }}>
+                          <div
+                            className="table-wrap table-wrap-caja-dia"
+                            style={{ marginBottom: "0.75rem" }}
+                          >
                             <table>
                               <thead>
                                 <tr>
@@ -598,10 +682,20 @@ export default function CajaDelDiaPageContent() {
                       {/* Pérdidas */}
                       {dia.perdidasDelDia.length > 0 && (
                         <>
-                          <h4 style={{ fontSize: "0.9rem", marginTop: "0.75rem", marginBottom: "0.35rem", color: "var(--danger, #f87171)" }}>
+                          <h4
+                            style={{
+                              fontSize: "0.9rem",
+                              marginTop: "0.75rem",
+                              marginBottom: "0.35rem",
+                              color: "var(--danger, #f87171)",
+                            }}
+                          >
                             Pérdidas ({dia.perdidasDelDia.length})
                           </h4>
-                          <div className="table-wrap table-wrap-caja-dia" style={{ marginBottom: "0.75rem" }}>
+                          <div
+                            className="table-wrap table-wrap-caja-dia"
+                            style={{ marginBottom: "0.75rem" }}
+                          >
                             <table>
                               <thead>
                                 <tr>
@@ -615,7 +709,10 @@ export default function CajaDelDiaPageContent() {
                                   <tr key={`${dia.fechaDia}-pd-${p.pagoId}`}>
                                     <td>{p.clienteNombre}</td>
                                     <td>{p.motivoPerdida ?? "—"}</td>
-                                    <td className="col-num" style={{ color: "var(--danger, #f87171)" }}>
+                                    <td
+                                      className="col-num"
+                                      style={{ color: "var(--danger, #f87171)" }}
+                                    >
                                       {formatMonto(p.monto)}
                                     </td>
                                   </tr>
@@ -631,17 +728,18 @@ export default function CajaDelDiaPageContent() {
               </>
             );
           })()}
+
+          <p style={{ marginTop: "1.25rem", fontSize: "0.8125rem", color: "var(--text-muted)" }}>
+            Préstamo: columna técnica en detalle de cobro —{" "}
+            <Link href="/dashboard/trabajador/cobrar" style={{ color: "var(--accent, #c94a4a)" }}>
+              Ir a cobrar
+            </Link>
+            .
+          </p>
         </>
       ) : null}
 
-      <p style={{ marginTop: "1.25rem", fontSize: "0.8125rem", color: "var(--text-muted)" }}>
-        Préstamo: columna técnica en detalle de cobro —{" "}
-        <Link href="/dashboard/trabajador/cobrar" style={{ color: "var(--accent, #c94a4a)" }}>
-          Ir a cobrar
-        </Link>
-        .
-      </p>
-
+      {/* Modal evidencia transferencia */}
       {evidenciaModalUrl ? (
         <div
           className="caja-dia-evidencia-backdrop"
