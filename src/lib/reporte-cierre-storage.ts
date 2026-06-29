@@ -17,7 +17,7 @@ export async function uploadReporteCierrePdfBuffer(
     contentType: "application/pdf",
     resumable: false,
     metadata: {
-      cacheControl: "public, max-age=31536000",
+      cacheControl: "private, max-age=0, must-revalidate",
       metadata: { empresaId, reporteDiaId, tipo: "reporte_cierre" },
     },
   });

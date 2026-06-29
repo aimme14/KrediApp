@@ -302,10 +302,13 @@ export default function ReportesDiaPageContent() {
   }, [previewSolicitudId, user]);
 
   const abrirPdfReporte = async (reporteId: string) => {
+    if (!guardOfflineWrite(online, setError)) return;
     if (!user) return;
     setPdfLoadingId(reporteId);
     try {
       const token = await user.getIdToken();
+      // Regenerar siempre: el PDF en Storage se crea al aprobar y el navegador lo cachea.
+      await regenerarReporteDiaPdf(token, reporteId);
       const { url } = await getReporteDiaPdfUrl(token, reporteId);
       if (url) window.open(url, "_blank", "noopener,noreferrer");
     } catch (e) {
@@ -351,7 +354,7 @@ export default function ReportesDiaPageContent() {
 
   return (
     <div className="card">
-      <h2 style={{ marginTop: 0 }}>Reportes del día</h2>
+      <h2 style={{ marginTop: 0 }}>Reportes</h2>
 
       {solicitudes.length > 0 && (
         <div style={{ marginBottom: "1.5rem" }}>
@@ -464,7 +467,7 @@ export default function ReportesDiaPageContent() {
           className="btn btn-primary reportes-dia-buscar-btn"
           onClick={handleBuscar}
           disabled={loading && fecha === fechaBusqueda}
-          aria-label="Buscar reportes del día"
+          aria-label="Buscar reportes"
           title="Buscar"
           style={{
             display: "inline-flex",
@@ -616,9 +619,9 @@ export default function ReportesDiaPageContent() {
                           type="button"
                           className="btn btn-secondary"
                           aria-label={
-                            pdfLoadingId === row.id ? "Abriendo PDF…" : "Descargar PDF"
+                            pdfLoadingId === row.id ? "Generando PDF…" : "Descargar PDF"
                           }
-                          title={pdfLoadingId === row.id ? "Abriendo…" : "Descargar PDF"}
+                          title={pdfLoadingId === row.id ? "Generando…" : "Descargar PDF"}
                           style={{
                             display: "inline-flex",
                             alignItems: "center",

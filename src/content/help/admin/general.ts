@@ -25,7 +25,7 @@ export const ADMIN_HELP_GENERAL: HelpRoleGeneral = {
     },
     {
       q: "¿Qué hago si un trabajador no cuadra su caja?",
-      a: "Revisa el detalle en Reportes del día antes de aprobar. Puedes rechazar la entrega y pedirle que corrija los cobros o gastos.",
+      a: "Revisa el detalle en Reportes antes de aprobar. Puedes rechazar la entrega y pedirle que corrija los cobros o gastos.",
     },
     {
       q: "¿Cuándo marco un cliente como moroso?",

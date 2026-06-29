@@ -14,7 +14,7 @@ export const ADMIN_HELP_SECTIONS: AdminHelpSection[] = [
   { key: "ruta-del-dia", label: "Ruta del día" },
   { key: "prestamo", label: "Préstamos" },
   { key: "solicitudes-prestamo", label: "Solicitudes préstamo" },
-  { key: "reportes-dia", label: "Reportes del día" },
+  { key: "reportes-dia", label: "Reportes" },
   { key: "cliente", label: "Clientes" },
   { key: "empleado", label: "Empleados" },
   { key: "rutas", label: "Rutas" },

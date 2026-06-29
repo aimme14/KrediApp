@@ -1,5 +1,6 @@
 import { PDFDocument, PDFFont, StandardFonts, rgb } from "pdf-lib";
-import type { CierreDiaSnapshot } from "@/lib/cierre-dia-snapshot";
+import type { CierreDiaSnapshot, DiaPeriodoSnapshot } from "@/lib/cierre-dia-snapshot";
+import { formatFechaDia } from "@/lib/colombia-day-bounds";
 import { formatoCuotasRestanteTotal } from "@/lib/cuotas-display";
 
 /**
@@ -396,9 +397,27 @@ export async function buildReporteCierrePdf(
 
   spacer(8);
 
-  // ——— Resumen: una fila de 6 métricas ———
+  // ——— Resumen por día: una fila de 6 métricas por cada fecha del período ———
   {
-    y = sectionBarDark("Resumen", M, PAGE_W - 2 * M, y);
+    const diasResumen: DiaPeriodoSnapshot[] =
+      snapshot.diasDelPeriodo.length > 0
+        ? snapshot.diasDelPeriodo
+        : [
+            {
+              fechaDia: snapshot.fechaDia,
+              cobros: snapshot.cobros,
+              noPagos: snapshot.noPagos,
+              perdidasDelDia: snapshot.perdidasDelDia,
+              gastosDelDia: snapshot.gastosDelDia,
+              totalCobrosEfectivo: snapshot.totalCobrosEfectivoDia,
+              totalCobrosTransferencia:
+                snapshot.totalCobrosLista - snapshot.totalCobrosEfectivoDia,
+              totalGastos: snapshot.totalGastosDia,
+              totalCobros: snapshot.totalCobrosLista,
+            },
+          ];
+
+    const unicoDia = diasResumen.length === 1;
     const innerW = PAGE_W - 2 * M - 16;
     const x0 = M + 8;
     const nCol = 6;
@@ -417,59 +436,72 @@ export async function buildReporteCierrePdf(
       "Clientes no pagaron",
       "Gastos del día",
     ];
-    const vals = [
-      fmtMoney(snapshot.totalCobrosEfectivoDia),
-      fmtMoney(snapshot.totalCobrosLista - snapshot.totalCobrosEfectivoDia),
-      fmtMoney(cajaEfectivo),
-      String(snapshot.cobros.length),
-      String(snapshot.noPagos.length),
-      fmtMoney(snapshot.totalGastosDia),
-    ];
 
-    ensureBottom(blockH + 16);
-    const blockBottom = y - blockH + 2;
-    page.drawRectangle({
-      x: M + 4,
-      y: blockBottom,
-      width: PAGE_W - 2 * M - 8,
-      height: blockH,
-      color: COL.metaBg,
-      borderColor: COL.rule,
-      borderWidth: 0.45,
-    });
+    for (let d = 0; d < diasResumen.length; d++) {
+      const dia = diasResumen[d];
+      const cajaDia = unicoDia
+        ? cajaEfectivo
+        : Math.round((dia.totalCobrosEfectivo - dia.totalGastos) * 100) / 100;
+      const vals = [
+        fmtMoney(dia.totalCobrosEfectivo),
+        fmtMoney(dia.totalCobrosTransferencia),
+        fmtMoney(cajaDia),
+        String(dia.cobros.length),
+        String(dia.noPagos.length),
+        fmtMoney(dia.totalGastos),
+      ];
+      const tituloResumen = sanitizarTextoPdf(
+        `Resumen - ${formatFechaDia(dia.fechaDia) || dia.fechaDia}`
+      );
 
-    const yTopInner = blockBottom + blockH;
-    const yLabelRow = yTopInner - padTop - 1;
-    const yValRow = blockBottom + padBottom + 6;
-    let cx = x0;
-    for (let i = 0; i < nCol; i++) {
-      const isCaja = i === 2;
-      drawCell(labels[i], cx, yLabelRow, colW, {
-        size: FS.metaLbl,
-        color: COL.muted,
-        align: "center",
+      y = sectionBarDark(tituloResumen, M, PAGE_W - 2 * M, y);
+
+      ensureBottom(blockH + 16);
+      const blockBottom = y - blockH + 2;
+      page.drawRectangle({
+        x: M + 4,
+        y: blockBottom,
+        width: PAGE_W - 2 * M - 8,
+        height: blockH,
+        color: COL.metaBg,
+        borderColor: COL.rule,
+        borderWidth: 0.45,
       });
-      if (isCaja) {
-        page.drawRectangle({
-          x: cx + 3,
-          y: blockBottom + padBottom - 1,
-          width: colW - 6,
-          height: valBand + 2,
-          color: rgb(0.88, 0.93, 0.98),
-          borderColor: NAV_LIGHT,
-          borderWidth: 0.35,
+
+      const yTopInner = blockBottom + blockH;
+      const yLabelRow = yTopInner - padTop - 1;
+      const yValRow = blockBottom + padBottom + 6;
+      let cx = x0;
+      for (let i = 0; i < nCol; i++) {
+        const isCaja = i === 2;
+        drawCell(labels[i], cx, yLabelRow, colW, {
+          size: FS.metaLbl,
+          color: COL.muted,
+          align: "center",
         });
+        if (isCaja) {
+          page.drawRectangle({
+            x: cx + 3,
+            y: blockBottom + padBottom - 1,
+            width: colW - 6,
+            height: valBand + 2,
+            color: rgb(0.88, 0.93, 0.98),
+            borderColor: NAV_LIGHT,
+            borderWidth: 0.35,
+          });
+        }
+        drawCell(vals[i], cx, yValRow, colW, {
+          size: isCaja ? FS.section : FS.meta,
+          bold: true,
+          color: isCaja ? NAV : COL.text,
+          align: "center",
+        });
+        cx += colW;
       }
-      drawCell(vals[i], cx, yValRow, colW, {
-        size: isCaja ? FS.section : FS.meta,
-        bold: true,
-        color: isCaja ? NAV : COL.text,
-        align: "center",
-      });
-      cx += colW;
-    }
 
-    y = blockBottom - 10;
+      y = blockBottom - 10;
+      if (d < diasResumen.length - 1) spacer(8);
+    }
   }
 
   spacer(10);
