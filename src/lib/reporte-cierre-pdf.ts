@@ -113,6 +113,8 @@ const TB = { fs: 7.5, hdr: 8, lh: 10.5 };
 const COL_GAP = 5;
 /** Padding interior izquierdo/derecho dentro de cada celda (pt). */
 const CELL_PAD_X = 2;
+/** Altura del header de cada sección encuadrada (pt). */
+const BOX_HDR_H = 17;
 
 /** Ancho útil entre márgenes interiores del PDF (líneas y tablas alineadas). */
 function tableInnerBounds() {
@@ -287,6 +289,59 @@ export async function buildReporteCierrePdf(
       color: COL.rule,
     });
     y -= 6;
+  };
+
+  /**
+   * Dibuja una sección encuadrada: header relleno (COL.metaBg) + borde exterior al final.
+   * El borde se traza SIN fill sobre el contenido ya renderizado — pdf-lib layering.
+   * Si drawContent provoca un salto de página, el borde sólo aparece en la página inicial.
+   */
+  const withBox = (
+    title: string,
+    subtotal: string | null,
+    drawContent: () => void
+  ): void => {
+    ensureBottom(BOX_HDR_H + 40);
+    const yBoxTop = y;
+    const boxX = M;
+    const boxW = PAGE_W - 2 * M;
+    const startPage = page;
+
+    // Header con fondo
+    page.drawRectangle({ x: boxX, y: yBoxTop - BOX_HDR_H, width: boxW, height: BOX_HDR_H, color: COL.metaBg });
+    // Línea inferior del header
+    page.drawLine({
+      start: { x: boxX, y: yBoxTop - BOX_HDR_H },
+      end:   { x: boxX + boxW, y: yBoxTop - BOX_HDR_H },
+      thickness: 0.4, color: COL.rule,
+    });
+    // Título
+    page.drawText(sanitizarTextoPdf(title), {
+      x: boxX + 8, y: yBoxTop - BOX_HDR_H + 5,
+      size: FS.meta, font: fontBold, color: COL.accentDark,
+    });
+    // Subtotal (alineado a la derecha)
+    if (subtotal) {
+      const st = sanitizarTextoPdf(subtotal);
+      const stW = font.widthOfTextAtSize(st, TB.fs);
+      page.drawText(st, {
+        x: boxX + boxW - 8 - stW, y: yBoxTop - BOX_HDR_H + 5,
+        size: TB.fs, font, color: COL.muted,
+      });
+    }
+
+    y = yBoxTop - BOX_HDR_H - 7; // padding superior del cuerpo
+    drawContent();
+    y -= 6; // padding inferior del cuerpo
+
+    // Borde exterior (stroke-only, sin fill — el contenido ya está en el PDF)
+    if (page === startPage) {
+      page.drawRectangle({
+        x: boxX, y, width: boxW, height: yBoxTop - y,
+        borderColor: COL.rule, borderWidth: 0.5,
+      });
+    }
+    y -= 8; // margen tras el cuadro
   };
 
   // ——— Título (solo texto, sin recuadro — ahorra espacio vertical) ———
@@ -523,17 +578,6 @@ export async function buildReporteCierrePdf(
       b.fechaDia.localeCompare(a.fechaDia)
     );
 
-    const subTitle = (t: string) => {
-      ensureBottom(18);
-      page.drawText(sanitizarTextoPdf(t), {
-        x: M,
-        y,
-        size: FS.meta,
-        font: fontBold,
-        color: COL.accentDark,
-      });
-      y -= 12;
-    };
 
     const innerPad = 2;
     const x0Tbl = tblEdge + innerPad;
@@ -680,344 +724,278 @@ export async function buildReporteCierrePdf(
     };
 
     const renderPrestamos = (rows: DiaPeriodoSnapshot["prestamosDesembolsoDelDia"]) => {
-      subTitle("Préstamos desembolsados");
-      if (rows.length === 0) {
-        line("Sin movimientos este día.", { color: COL.muted, size: FS.meta });
-        spacer(4);
-        return;
-      }
-      ensureBottom(TB.lh + 8);
-      tableRow(
-        [
-          { text: "Cliente", x: xCliPr, w: wCliPr, bold: true, color: COL.tableHead },
-          {
-            text: "Capital entregado",
-            x: xCapPr,
-            w: wCapPr,
-            bold: true,
-            color: COL.tableHead,
-            align: "right",
-          },
-          {
-            text: "Total a pagar",
-            x: xTotPr,
-            w: wTotPr,
-            bold: true,
-            color: COL.tableHead,
-            align: "right",
-          },
-          { text: "Hora", x: xHrPr, w: wHrPr, bold: true, color: COL.tableHead },
-        ],
-        y
+      const sumCap = rows.reduce((s, p) => s + p.monto, 0);
+      withBox(
+        "Préstamos desembolsados",
+        rows.length > 0 ? `Capital: ${fmtMoney(sumCap)}` : null,
+        () => {
+          if (rows.length === 0) {
+            page.drawText(sanitizarTextoPdf("Sin movimientos este día."), {
+              x: M + 8, y, size: FS.meta, font, color: COL.muted,
+            });
+            y -= TB.lh;
+            return;
+          }
+          tableRow([
+            { text: "Cliente", x: xCliPr, w: wCliPr, bold: true, color: COL.tableHead },
+            { text: "Capital entregado", x: xCapPr, w: wCapPr, bold: true, color: COL.tableHead, align: "right" },
+            { text: "Total a pagar", x: xTotPr, w: wTotPr, bold: true, color: COL.tableHead, align: "right" },
+            { text: "Hora", x: xHrPr, w: wHrPr, bold: true, color: COL.tableHead },
+          ], y);
+          advanceY(TB.lh + 4);
+          for (const p of rows) {
+            ensureBottom(TB.lh + 6);
+            tableRow([
+              { text: trunc(p.clienteNombre, 36), x: xCliPr, w: wCliPr },
+              { text: fmtMoney(p.monto), x: xCapPr, w: wCapPr, align: "right" },
+              { text: fmtMoney(p.totalAPagar), x: xTotPr, w: wTotPr, align: "right" },
+              { text: formatHoraPdf(p.fecha), x: xHrPr, w: wHrPr, noTrunc: true },
+            ], y);
+            advanceY(TB.lh);
+          }
+          hrTable();
+          tableRow([
+            { text: "Subtotal capital", x: xCliPr, w: wCliPr, bold: true },
+            { text: fmtMoney(sumCap), x: xCapPr, w: wCapPr, bold: true, align: "right" },
+            { text: "", x: xTotPr, w: wTotPr },
+            { text: "", x: xHrPr, w: wHrPr },
+          ], y);
+          y -= TB.lh;
+        }
       );
-      advanceY(TB.lh + 4);
-      let sumCap = 0;
-      for (const p of rows) {
-        sumCap += p.monto;
-        ensureBottom(TB.lh + 6);
-        tableRow(
-          [
-            { text: trunc(p.clienteNombre, 36), x: xCliPr, w: wCliPr },
-            { text: fmtMoney(p.monto), x: xCapPr, w: wCapPr, align: "right" },
-            { text: fmtMoney(p.totalAPagar), x: xTotPr, w: wTotPr, align: "right" },
-            { text: formatHoraPdf(p.fecha), x: xHrPr, w: wHrPr, noTrunc: true },
-          ],
-          y
-        );
-        advanceY(TB.lh);
-      }
-      ensureBottom(TB.lh + 8);
-      hrTable();
-      tableRow(
-        [
-          { text: "Subtotal capital", x: xCliPr, w: wCliPr, bold: true },
-          { text: fmtMoney(sumCap), x: xCapPr, w: wCapPr, bold: true, align: "right" },
-          { text: "", x: xTotPr, w: wTotPr },
-          { text: "", x: xHrPr, w: wHrPr },
-        ],
-        y
-      );
-      advanceY(TB.lh + 6);
     };
 
     const renderCobrosEfectivo = (cobros: DiaPeriodoSnapshot["cobros"]) => {
-      subTitle("Cobros — Efectivo");
       const rows = cobros.filter((c) => normalizarMetodoPagoPdf(c.metodoPago) === "efectivo");
-      if (rows.length === 0) {
-        line("—", { color: COL.muted, size: FS.meta });
-        spacer(4);
-        return;
-      }
-      drawCobrosHeaderEfectivo();
-      let sum = 0;
-      for (const c of rows) {
-        sum += c.monto;
-        const cuotasTxt = formatoCuotasRestanteTotal(c.cuotasFaltantes, c.numeroCuotas);
-        ensureBottom(TB.lh + 6);
-        tableRow(
-          [
-            { text: trunc(c.clienteNombre, 42), x: xCliEf, w: wCli },
-            { text: fmtMoney(c.monto), x: xCobEf, w: wCob, align: "right" },
-            { text: fmtMoney(c.totalAPagar), x: xTPEf, w: wTP, align: "right" },
-            { text: fmtMoney(c.saldoPendienteTrasPago), x: xDebEf, w: wDeb, align: "right" },
-            { text: cuotasTxt, x: xCuoEf, w: wCuo, align: "right" },
-            { text: formatHoraPdf(c.fecha), x: xHrEf, w: wHr, noTrunc: true },
-          ],
-          y
-        );
-        advanceY(TB.lh);
-      }
-      ensureBottom(TB.lh + 8);
-      hrTable();
-      tableRow(
-        [
-          { text: "Subtotal", x: xCliEf, w: wCli, bold: true },
-          { text: fmtMoney(sum), x: xCobEf, w: wCob, bold: true, align: "right" },
-          { text: "", x: xTPEf, w: wTP },
-          { text: "", x: xDebEf, w: wDeb },
-          { text: "", x: xCuoEf, w: wCuo },
-          { text: "", x: xHrEf, w: wHr },
-        ],
-        y
+      const sum = rows.reduce((s, c) => s + c.monto, 0);
+      withBox(
+        "Cobros — Efectivo",
+        rows.length > 0 ? `Total: ${fmtMoney(sum)}` : null,
+        () => {
+          if (rows.length === 0) {
+            page.drawText(sanitizarTextoPdf("Sin cobros en efectivo este día."), {
+              x: M + 8, y, size: FS.meta, font, color: COL.muted,
+            });
+            y -= TB.lh;
+            return;
+          }
+          drawCobrosHeaderEfectivo();
+          for (const c of rows) {
+            const cuotasTxt = formatoCuotasRestanteTotal(c.cuotasFaltantes, c.numeroCuotas);
+            ensureBottom(TB.lh + 6);
+            tableRow([
+              { text: trunc(c.clienteNombre, 42), x: xCliEf, w: wCli },
+              { text: fmtMoney(c.monto), x: xCobEf, w: wCob, align: "right" },
+              { text: fmtMoney(c.totalAPagar), x: xTPEf, w: wTP, align: "right" },
+              { text: fmtMoney(c.saldoPendienteTrasPago), x: xDebEf, w: wDeb, align: "right" },
+              { text: cuotasTxt, x: xCuoEf, w: wCuo, align: "right" },
+              { text: formatHoraPdf(c.fecha), x: xHrEf, w: wHr, noTrunc: true },
+            ], y);
+            advanceY(TB.lh);
+          }
+          hrTable();
+          tableRow([
+            { text: "Subtotal efectivo", x: xCliEf, w: wCli, bold: true },
+            { text: fmtMoney(sum), x: xCobEf, w: wCob, bold: true, align: "right" },
+            { text: "", x: xTPEf, w: wTP },
+            { text: "", x: xDebEf, w: wDeb },
+            { text: "", x: xCuoEf, w: wCuo },
+            { text: "", x: xHrEf, w: wHr },
+          ], y);
+          y -= TB.lh;
+        }
       );
-      advanceY(TB.lh + 6);
     };
 
     const renderCobrosTransferencia = (cobros: DiaPeriodoSnapshot["cobros"]) => {
-      subTitle("Cobros — Transferencia");
       const rows = cobros.filter((c) => normalizarMetodoPagoPdf(c.metodoPago) === "transferencia");
-      if (rows.length === 0) {
-        line("—", { color: COL.muted, size: FS.meta });
-        spacer(4);
-        return;
-      }
-      drawCobrosHeaderTransferencia();
-      let sum = 0;
-      for (const c of rows) {
-        sum += c.monto;
-        ensureBottom(TB.lh + 6);
-        tableRow(
-          [
-            { text: trunc(c.clienteNombre, 42), x: xCliTr, w: wCliTr },
-            { text: fmtMoney(c.monto), x: xCobTr, w: wCob, align: "right" },
-            { text: fmtMoney(c.totalAPagar), x: xTPTr, w: wTP, align: "right" },
-            { text: fmtMoney(c.saldoPendienteTrasPago), x: xDebTr, w: wDebTr, align: "right" },
-            { text: formatHoraPdf(c.fecha), x: xHrTr, w: wHr, noTrunc: true },
-          ],
-          y
-        );
-        advanceY(TB.lh);
-      }
-      ensureBottom(TB.lh + 8);
-      hrTable();
-      tableRow(
-        [
-          { text: "Subtotal", x: xCliTr, w: wCliTr, bold: true },
-          { text: fmtMoney(sum), x: xCobTr, w: wCob, bold: true, align: "right" },
-          { text: "", x: xTPTr, w: wTP },
-          { text: "", x: xDebTr, w: wDebTr },
-          { text: "", x: xHrTr, w: wHr },
-        ],
-        y
+      const sum = rows.reduce((s, c) => s + c.monto, 0);
+      withBox(
+        "Cobros — Transferencia",
+        rows.length > 0 ? `Total: ${fmtMoney(sum)}` : null,
+        () => {
+          if (rows.length === 0) {
+            page.drawText(sanitizarTextoPdf("Sin cobros por transferencia este día."), {
+              x: M + 8, y, size: FS.meta, font, color: COL.muted,
+            });
+            y -= TB.lh;
+            return;
+          }
+          drawCobrosHeaderTransferencia();
+          for (const c of rows) {
+            ensureBottom(TB.lh + 6);
+            tableRow([
+              { text: trunc(c.clienteNombre, 42), x: xCliTr, w: wCliTr },
+              { text: fmtMoney(c.monto), x: xCobTr, w: wCob, align: "right" },
+              { text: fmtMoney(c.totalAPagar), x: xTPTr, w: wTP, align: "right" },
+              { text: fmtMoney(c.saldoPendienteTrasPago), x: xDebTr, w: wDebTr, align: "right" },
+              { text: formatHoraPdf(c.fecha), x: xHrTr, w: wHr, noTrunc: true },
+            ], y);
+            advanceY(TB.lh);
+          }
+          hrTable();
+          tableRow([
+            { text: "Subtotal transferencia", x: xCliTr, w: wCliTr, bold: true },
+            { text: fmtMoney(sum), x: xCobTr, w: wCob, bold: true, align: "right" },
+            { text: "", x: xTPTr, w: wTP },
+            { text: "", x: xDebTr, w: wDebTr },
+            { text: "", x: xHrTr, w: wHr },
+          ], y);
+          y -= TB.lh;
+        }
       );
-      advanceY(TB.lh + 6);
     };
 
     const renderCobrosOtros = (cobros: DiaPeriodoSnapshot["cobros"]) => {
       const rows = cobros.filter((c) => normalizarMetodoPagoPdf(c.metodoPago) === "otro");
       if (rows.length === 0) return;
-      subTitle("Cobros — Otros");
-      drawCobrosHeaderOtros();
-      let sum = 0;
-      for (const c of rows) {
-        sum += c.monto;
-        ensureBottom(TB.lh + 6);
-        tableRow(
-          [
-            { text: trunc(c.clienteNombre, 42), x: xCliOt, w: wCliOt },
-            { text: fmtMoney(c.monto), x: xCobOt, w: wCobOt, align: "right" },
-            { text: trunc(c.metodoPago ?? "—", 18), x: xMetOt, w: wMetOt },
-            { text: formatHoraPdf(c.fecha), x: xHrOt, w: wHrOt, noTrunc: true },
-          ],
-          y
-        );
-        advanceY(TB.lh);
-      }
-      ensureBottom(TB.lh + 8);
-      hrTable();
-      tableRow(
-        [
-          { text: "Subtotal", x: xCliOt, w: wCliOt, bold: true },
-          { text: fmtMoney(sum), x: xCobOt, w: wCobOt, bold: true, align: "right" },
-          { text: "", x: xMetOt, w: wMetOt },
-          { text: "", x: xHrOt, w: wHrOt },
-        ],
-        y
+      const sum = rows.reduce((s, c) => s + c.monto, 0);
+      withBox(
+        "Cobros — Otros métodos",
+        `Total: ${fmtMoney(sum)}`,
+        () => {
+          drawCobrosHeaderOtros();
+          for (const c of rows) {
+            ensureBottom(TB.lh + 6);
+            tableRow([
+              { text: trunc(c.clienteNombre, 42), x: xCliOt, w: wCliOt },
+              { text: fmtMoney(c.monto), x: xCobOt, w: wCobOt, align: "right" },
+              { text: trunc(c.metodoPago ?? "—", 18), x: xMetOt, w: wMetOt },
+              { text: formatHoraPdf(c.fecha), x: xHrOt, w: wHrOt, noTrunc: true },
+            ], y);
+            advanceY(TB.lh);
+          }
+          hrTable();
+          tableRow([
+            { text: "Subtotal otros", x: xCliOt, w: wCliOt, bold: true },
+            { text: fmtMoney(sum), x: xCobOt, w: wCobOt, bold: true, align: "right" },
+            { text: "", x: xMetOt, w: wMetOt },
+            { text: "", x: xHrOt, w: wHrOt },
+          ], y);
+          y -= TB.lh;
+        }
       );
-      advanceY(TB.lh + 6);
     };
 
     const renderNoPagos = (noPagos: DiaPeriodoSnapshot["noPagos"]) => {
-      subTitle("No pagaron");
-      if (noPagos.length === 0) {
-        line("Sin registros.", { color: COL.muted, size: FS.meta });
-        spacer(4);
-        return;
-      }
-      ensureBottom(TB.lh + 8);
-      tableRow(
-        [
-          { text: "Cliente", x: xCliNp, w: wCliNp, bold: true, color: COL.tableHead },
-          { text: "Motivo", x: xMotNp, w: wMotNp, bold: true, color: COL.tableHead },
-          { text: "Cuotas", x: xCuoNp, w: wCuoNp, bold: true, color: COL.tableHead, align: "right" },
-          { text: "Debe", x: xDebNp, w: wDebNp, bold: true, color: COL.tableHead, align: "right" },
-          {
-            text: "Tot. préstamo",
-            x: xTPNp,
-            w: wTPNp,
-            bold: true,
-            color: COL.tableHead,
-            align: "right",
-          },
-        ],
-        y
+      const sumDebe = noPagos.reduce((s, n) => s + n.saldoPendientePrestamoActual, 0);
+      withBox(
+        "No pagaron",
+        noPagos.length > 0 ? `Saldo total: ${fmtMoney(sumDebe)}` : null,
+        () => {
+          if (noPagos.length === 0) {
+            page.drawText(sanitizarTextoPdf("Todos los clientes pagaron este día."), {
+              x: M + 8, y, size: FS.meta, font, color: COL.muted,
+            });
+            y -= TB.lh;
+            return;
+          }
+          tableRow([
+            { text: "Cliente", x: xCliNp, w: wCliNp, bold: true, color: COL.tableHead },
+            { text: "Motivo", x: xMotNp, w: wMotNp, bold: true, color: COL.tableHead },
+            { text: "Cuotas", x: xCuoNp, w: wCuoNp, bold: true, color: COL.tableHead, align: "right" },
+            { text: "Debe", x: xDebNp, w: wDebNp, bold: true, color: COL.tableHead, align: "right" },
+            { text: "Tot. préstamo", x: xTPNp, w: wTPNp, bold: true, color: COL.tableHead, align: "right" },
+          ], y);
+          advanceY(TB.lh + 4);
+          for (const n of noPagos) {
+            const cuotasNp = formatoCuotasRestanteTotal(n.cuotasPendientes, n.numeroCuotas);
+            ensureBottom(TB.lh + 6);
+            tableRow([
+              { text: trunc(n.clienteNombre, 36), x: xCliNp, w: wCliNp },
+              { text: trunc(n.motivoNoPago, 28), x: xMotNp, w: wMotNp },
+              { text: cuotasNp, x: xCuoNp, w: wCuoNp, align: "right" },
+              { text: fmtMoney(n.saldoPendientePrestamoActual), x: xDebNp, w: wDebNp, align: "right" },
+              { text: fmtMoney(n.totalAPagar), x: xTPNp, w: wTPNp, align: "right" },
+            ], y);
+            advanceY(TB.lh);
+          }
+          hrTable();
+          tableRow([
+            { text: "Total saldo debe", x: xCliNp, w: wTotEtiquetaNp, bold: true },
+            { text: fmtMoney(sumDebe), x: xDebNp, w: wDebNp, bold: true, align: "right" },
+            { text: "", x: xTPNp, w: wTPNp },
+          ], y);
+          y -= TB.lh;
+        }
       );
-      advanceY(TB.lh + 4);
-      let sumDebe = 0;
-      for (const n of noPagos) {
-        sumDebe += n.saldoPendientePrestamoActual;
-        const cuotasNp = formatoCuotasRestanteTotal(n.cuotasPendientes, n.numeroCuotas);
-        ensureBottom(TB.lh + 6);
-        tableRow(
-          [
-            { text: trunc(n.clienteNombre, 36), x: xCliNp, w: wCliNp },
-            { text: trunc(n.motivoNoPago, 28), x: xMotNp, w: wMotNp },
-            { text: cuotasNp, x: xCuoNp, w: wCuoNp, align: "right" },
-            { text: fmtMoney(n.saldoPendientePrestamoActual), x: xDebNp, w: wDebNp, align: "right" },
-            { text: fmtMoney(n.totalAPagar), x: xTPNp, w: wTPNp, align: "right" },
-          ],
-          y
-        );
-        advanceY(TB.lh);
-      }
-      ensureBottom(TB.lh + 8);
-      hrTable();
-      tableRow(
-        [
-          { text: "Total saldo debe", x: xCliNp, w: wTotEtiquetaNp, bold: true },
-          { text: fmtMoney(sumDebe), x: xDebNp, w: wDebNp, bold: true, align: "right" },
-          { text: "", x: xTPNp, w: wTPNp },
-        ],
-        y
-      );
-      advanceY(TB.lh + 6);
     };
 
     const renderGastos = (gastos: DiaPeriodoSnapshot["gastosDelDia"]) => {
-      subTitle("Gastos");
-      if (gastos.length === 0) {
-        line("Sin gastos registrados.", { color: COL.muted, size: FS.meta });
-        spacer(4);
-        return;
-      }
-      ensureBottom(TB.lh + 8);
-      tableRow(
-        [
-          { text: "Monto", x: xGm, w: wMontoG, bold: true, color: COL.tableHead, align: "right" },
-          { text: "Motivo", x: xGt, w: wMotG, bold: true, color: COL.tableHead },
-          { text: "Descripción", x: xGd, w: wDescG, bold: true, color: COL.tableHead },
-        ],
-        y
+      const sumG = gastos.reduce((s, g) => s + g.monto, 0);
+      withBox(
+        "Gastos",
+        gastos.length > 0 ? `Total: ${fmtMoney(sumG)}` : null,
+        () => {
+          if (gastos.length === 0) {
+            page.drawText(sanitizarTextoPdf("Sin gastos registrados."), {
+              x: M + 8, y, size: FS.meta, font, color: COL.muted,
+            });
+            y -= TB.lh;
+            return;
+          }
+          tableRow([
+            { text: "Monto", x: xGm, w: wMontoG, bold: true, color: COL.tableHead, align: "right" },
+            { text: "Motivo", x: xGt, w: wMotG, bold: true, color: COL.tableHead },
+            { text: "Descripción", x: xGd, w: wDescG, bold: true, color: COL.tableHead },
+          ], y);
+          advanceY(TB.lh + 4);
+          for (const g of gastos) {
+            ensureBottom(TB.lh + 6);
+            tableRow([
+              { text: fmtMoney(g.monto), x: xGm, w: wMontoG, align: "right" },
+              { text: trunc(g.motivo, 18), x: xGt, w: wMotG },
+              { text: trunc(g.descripcion, 72), x: xGd, w: wDescG },
+            ], y);
+            advanceY(TB.lh);
+          }
+          hrTable();
+          tableRow([
+            { text: fmtMoney(sumG), x: xGm, w: wMontoG, bold: true, align: "right" },
+            { text: "Total gastos", x: xGt, w: wMotG, bold: true },
+            { text: "", x: xGd, w: wDescG },
+          ], y);
+          y -= TB.lh;
+        }
       );
-      advanceY(TB.lh + 4);
-      let sumG = 0;
-      for (const g of gastos) {
-        sumG += g.monto;
-        ensureBottom(TB.lh + 6);
-        tableRow(
-          [
-            { text: fmtMoney(g.monto), x: xGm, w: wMontoG, align: "right" },
-            { text: trunc(g.motivo, 18), x: xGt, w: wMotG },
-            { text: trunc(g.descripcion, 72), x: xGd, w: wDescG },
-          ],
-          y
-        );
-        advanceY(TB.lh);
-      }
-      ensureBottom(TB.lh + 8);
-      hrTable();
-      tableRow(
-        [
-          { text: fmtMoney(sumG), x: xGm, w: wMontoG, bold: true, align: "right" },
-          { text: "Total gastos", x: xGt, w: wMotG, bold: true },
-          { text: "", x: xGd, w: wDescG },
-        ],
-        y
-      );
-      advanceY(TB.lh + 6);
     };
 
     const renderPerdidas = (perdidas: DiaPeriodoSnapshot["perdidasDelDia"]) => {
-      subTitle("Pérdidas");
-      if (perdidas.length === 0) {
-        line("Sin pérdidas registradas.", { color: COL.muted, size: FS.meta });
-        spacer(4);
-        return;
-      }
-      ensureBottom(TB.lh + 8);
-      tableRow(
-        [
-          { text: "Cliente", x: xCliPerd, w: wCliPerd, bold: true, color: COL.tableHead },
-          { text: "Motivo", x: xMotPerd, w: wMotPerd, bold: true, color: COL.tableHead },
-          {
-            text: "Monto",
-            x: xMonPerd,
-            w: wMontoPerd,
-            bold: true,
-            color: COL.tableHead,
-            align: "right",
-          },
-        ],
-        y
+      const sumP = perdidas.reduce((s, p) => s + p.monto, 0);
+      withBox(
+        "Pérdidas",
+        perdidas.length > 0 ? `Total: ${fmtMoney(sumP)}` : null,
+        () => {
+          if (perdidas.length === 0) {
+            page.drawText(sanitizarTextoPdf("Sin pérdidas registradas."), {
+              x: M + 8, y, size: FS.meta, font, color: COL.muted,
+            });
+            y -= TB.lh;
+            return;
+          }
+          tableRow([
+            { text: "Cliente", x: xCliPerd, w: wCliPerd, bold: true, color: COL.tableHead },
+            { text: "Motivo", x: xMotPerd, w: wMotPerd, bold: true, color: COL.tableHead },
+            { text: "Monto", x: xMonPerd, w: wMontoPerd, bold: true, color: COL.tableHead, align: "right" },
+          ], y);
+          advanceY(TB.lh + 4);
+          for (const p of perdidas) {
+            ensureBottom(TB.lh + 6);
+            tableRow([
+              { text: trunc(p.clienteNombre, 36), x: xCliPerd, w: wCliPerd },
+              { text: trunc(p.motivoPerdida ?? "—", 24), x: xMotPerd, w: wMotPerd },
+              { text: fmtMoney(p.monto), x: xMonPerd, w: wMontoPerd, align: "right", color: rgb(0.8, 0.15, 0.15) },
+            ], y);
+            advanceY(TB.lh);
+          }
+          hrTable();
+          tableRow([
+            { text: "Total pérdidas", x: xCliPerd, w: wCliPerd + wMotPerd + COL_GAP, bold: true },
+            { text: fmtMoney(sumP), x: xMonPerd, w: wMontoPerd, bold: true, align: "right", color: rgb(0.8, 0.15, 0.15) },
+          ], y);
+          y -= TB.lh;
+        }
       );
-      advanceY(TB.lh + 4);
-      let sumP = 0;
-      for (const p of perdidas) {
-        sumP += p.monto;
-        ensureBottom(TB.lh + 6);
-        tableRow(
-          [
-            { text: trunc(p.clienteNombre, 36), x: xCliPerd, w: wCliPerd },
-            { text: trunc(p.motivoPerdida ?? "—", 24), x: xMotPerd, w: wMotPerd },
-            {
-              text: fmtMoney(p.monto),
-              x: xMonPerd,
-              w: wMontoPerd,
-              align: "right",
-              color: rgb(0.8, 0.15, 0.15),
-            },
-          ],
-          y
-        );
-        advanceY(TB.lh);
-      }
-      ensureBottom(TB.lh + 8);
-      hrTable();
-      tableRow(
-        [
-          { text: "Total pérdidas", x: xCliPerd, w: wCliPerd + wMotPerd + COL_GAP, bold: true },
-          {
-            text: fmtMoney(sumP),
-            x: xMonPerd,
-            w: wMontoPerd,
-            bold: true,
-            align: "right",
-            color: rgb(0.8, 0.15, 0.15),
-          },
-        ],
-        y
-      );
-      advanceY(TB.lh + 6);
     };
 
     const separadorEntreDias = () => {
