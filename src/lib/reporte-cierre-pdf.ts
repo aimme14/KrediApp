@@ -44,6 +44,37 @@ function normalizarMetodoPagoPdf(metodo: string | null | undefined): "efectivo" 
   return "otro";
 }
 
+/** Días del período para resumen y detalle del PDF; fallback de un día si no hay desglose. */
+function getDiasParaReporte(snapshot: CierreDiaSnapshot): DiaPeriodoSnapshot[] {
+  if (snapshot.diasDelPeriodo.length > 0) {
+    return snapshot.diasDelPeriodo;
+  }
+  return [
+    {
+      fechaDia: snapshot.fechaDia,
+      cobros: snapshot.cobros,
+      noPagos: snapshot.noPagos,
+      perdidasDelDia: snapshot.perdidasDelDia,
+      gastosDelDia: snapshot.gastosDelDia,
+      prestamosDesembolsoDelDia: snapshot.prestamosDesembolsoDelDia ?? [],
+      totalCobrosEfectivo: snapshot.totalCobrosEfectivoDia,
+      totalCobrosTransferencia: snapshot.totalCobrosLista - snapshot.totalCobrosEfectivoDia,
+      totalGastos: snapshot.totalGastosDia,
+      totalCobros: snapshot.totalCobrosLista,
+    },
+  ];
+}
+
+function formatHoraPdf(fecha: string | null): string {
+  if (!fecha) return "—";
+  return new Date(fecha).toLocaleTimeString("es-CO", {
+    timeZone: "America/Bogota",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+}
+
 export type ReporteCierrePdfMeta = {
   rutaNombre: string;
   empleadoNombre: string;
@@ -77,8 +108,6 @@ const COL = {
   metaBg: rgb(0.96, 0.97, 0.98),
 };
 
-const MAX_ROWS_DETALLE = 80;
-/** Espacio vertical por fila de tabla (texto + respiro). */
 const TB = { fs: 7.5, hdr: 8, lh: 10.5 };
 /** Hueco horizontal entre columnas adyacentes (evita “CuotasMétodo”, etc.). */
 const COL_GAP = 5;
@@ -241,8 +270,6 @@ export async function buildReporteCierrePdf(
     return yRect - 8;
   };
 
-  let rowBudget = MAX_ROWS_DETALLE;
-
   const advanceY = (delta: number) => {
     y -= delta;
     ensureBottom(24);
@@ -399,23 +426,7 @@ export async function buildReporteCierrePdf(
 
   // ——— Resumen por día: una fila de 6 métricas por cada fecha del período ———
   {
-    const diasResumen: DiaPeriodoSnapshot[] =
-      snapshot.diasDelPeriodo.length > 0
-        ? snapshot.diasDelPeriodo
-        : [
-            {
-              fechaDia: snapshot.fechaDia,
-              cobros: snapshot.cobros,
-              noPagos: snapshot.noPagos,
-              perdidasDelDia: snapshot.perdidasDelDia,
-              gastosDelDia: snapshot.gastosDelDia,
-              totalCobrosEfectivo: snapshot.totalCobrosEfectivoDia,
-              totalCobrosTransferencia:
-                snapshot.totalCobrosLista - snapshot.totalCobrosEfectivoDia,
-              totalGastos: snapshot.totalGastosDia,
-              totalCobros: snapshot.totalCobrosLista,
-            },
-          ];
+    const diasResumen = getDiasParaReporte(snapshot);
 
     const unicoDia = diasResumen.length === 1;
     const innerW = PAGE_W - 2 * M - 16;
@@ -506,98 +517,11 @@ export async function buildReporteCierrePdf(
 
   spacer(10);
 
-  // ——— Valor de ruta: 3 tarjetas (capital / invertido / ganancias) ———
+  // ——— Detalle por día (más reciente primero) ———
   {
-    y = sectionBarDark("Valor de ruta", M, PAGE_W - 2 * M, y);
-    const innerW = PAGE_W - 2 * M - 16;
-    const x0 = M + 8;
-    const nCol = 3;
-    const colW = innerW / nCol;
-    const padTop = 11;
-    const padBottom = 11;
-    const gapLabelValor = 10;
-    const valBand = 18;
-    const labelBand = 10;
-    const blockH = padTop + labelBand + gapLabelValor + valBand + padBottom;
-
-    const labels = ["Capital de la ruta", "Invertido en la ruta", "Ganancias de la ruta"];
-    const vals = [fmtMoney(meta.rutaCapitalTotal), fmtMoney(meta.rutaInversiones), fmtMoney(meta.rutaGanancias)];
-
-    ensureBottom(blockH + 16);
-    const blockBottom = y - blockH + 2;
-    page.drawRectangle({
-      x: M + 4,
-      y: blockBottom,
-      width: PAGE_W - 2 * M - 8,
-      height: blockH,
-      color: COL.metaBg,
-      borderColor: COL.rule,
-      borderWidth: 0.45,
-    });
-
-    const yTopInner = blockBottom + blockH;
-    const yLabelRow = yTopInner - padTop - 1;
-    const yValRow = blockBottom + padBottom + 6;
-    let cx = x0;
-    for (let i = 0; i < nCol; i++) {
-      drawCell(labels[i], cx, yLabelRow, colW, {
-        size: FS.metaLbl,
-        color: COL.muted,
-        align: "center",
-      });
-      drawCell(vals[i], cx, yValRow, colW, {
-        size: FS.section,
-        bold: true,
-        color: NAV,
-        align: "center",
-      });
-      cx += colW;
-    }
-
-    y = blockBottom - 10;
-  }
-
-  spacer(10);
-
-  // ——— Cobros del día ———
-  {
-    y = sectionBarDark("Cobros del día", M, PAGE_W - 2 * M, y);
-    const innerPad = 2;
-    const x0 = tblEdge + innerPad;
-    const sumW = tblW - 2 * innerPad;
-    const gapsCobros = 6 * COL_GAP;
-    const wHr = 70;
-    const wMet = 34;
-    const wCuo = 38;
-    const wDeb = 50;
-    const wTP = 58;
-    const wCob = 56;
-    const wCli = sumW - (wHr + wMet + wCuo + wDeb + wTP + wCob + gapsCobros);
-
-    const xCli = x0;
-    const xCob = xCli + wCli + COL_GAP;
-    const xTP = xCob + wCob + COL_GAP;
-    const xDeb = xTP + wTP + COL_GAP;
-    const xCuo = xDeb + wDeb + COL_GAP;
-    const xMet = xCuo + wCuo + COL_GAP;
-    const xHr = xMet + wMet + COL_GAP;
-
-    const drawCobrosHeader = () => {
-      ensureBottom(TB.lh + 8);
-      tableRow(
-        [
-          { text: "Cliente", x: xCli, w: wCli, bold: true, color: COL.tableHead },
-          { text: "Cobro", x: xCob, w: wCob, bold: true, color: COL.tableHead, align: "right" },
-          { text: "Tot. préstamo", x: xTP, w: wTP, bold: true, color: COL.tableHead, align: "right" },
-          { text: "Debe", x: xDeb, w: wDeb, bold: true, color: COL.tableHead, align: "right" },
-          { text: "Cuotas", x: xCuo, w: wCuo, bold: true, color: COL.tableHead, align: "right" },
-          { text: "Método", x: xMet, w: wMet, bold: true, color: COL.tableHead },
-          { text: "Hora", x: xHr, w: wHr, bold: true, color: COL.tableHead },
-        ],
-        y
-      );
-      advanceY(TB.lh + 4);
-    };
+    const diasDetalle = [...getDiasParaReporte(snapshot)].sort((a, b) =>
+      b.fechaDia.localeCompare(a.fechaDia)
+    );
 
     const subTitle = (t: string) => {
       ensureBottom(18);
@@ -611,478 +535,612 @@ export async function buildReporteCierrePdf(
       y -= 12;
     };
 
-    const renderCobrosGroup = (titulo: string, rows: typeof snapshot.cobros) => {
-      subTitle(titulo);
+    const innerPad = 2;
+    const x0Tbl = tblEdge + innerPad;
+    const sumW = tblW - 2 * innerPad;
+
+    const gapsCobrosEf = 5 * COL_GAP;
+    const wHr = 70;
+    const wCuo = 38;
+    const wDeb = 50;
+    const wTP = 58;
+    const wCob = 56;
+    const wCli = sumW - (wHr + wCuo + wDeb + wTP + wCob + gapsCobrosEf);
+
+    const xCliEf = x0Tbl;
+    const xCobEf = xCliEf + wCli + COL_GAP;
+    const xTPEf = xCobEf + wCob + COL_GAP;
+    const xDebEf = xTPEf + wTP + COL_GAP;
+    const xCuoEf = xDebEf + wDeb + COL_GAP;
+    const xHrEf = xCuoEf + wCuo + COL_GAP;
+
+    const cuoShareCli = wCuo * (wCli / (wCli + wDeb));
+    const cuoShareDeb = wCuo - cuoShareCli;
+    const wCliTr = wCli + cuoShareCli;
+    const wDebTr = wDeb + cuoShareDeb;
+    const gapsCobrosTr = 4 * COL_GAP;
+
+    const xCliTr = x0Tbl;
+    const xCobTr = xCliTr + wCliTr + COL_GAP;
+    const xTPTr = xCobTr + wCob + COL_GAP;
+    const xDebTr = xTPTr + wTP + COL_GAP;
+    const xHrTr = xDebTr + wDebTr + COL_GAP;
+
+    const gapsCobrosOt = 3 * COL_GAP;
+    const wMetOt = 66;
+    const wHrOt = wHr;
+    const wCobOt = wCob;
+    const wCliOt = sumW - (wHrOt + wMetOt + wCobOt + gapsCobrosOt);
+
+    const xCliOt = x0Tbl;
+    const xCobOt = xCliOt + wCliOt + COL_GAP;
+    const xMetOt = xCobOt + wCobOt + COL_GAP;
+    const xHrOt = xMetOt + wMetOt + COL_GAP;
+
+    const gapsPrest = 3 * COL_GAP;
+    const wHrPr = Math.max(68, Math.floor((sumW - gapsPrest) * 0.28));
+    const uPr = sumW - gapsPrest - wHrPr;
+    const wCapPr = Math.floor(uPr * 0.28);
+    const wTotPr = Math.floor(uPr * 0.28);
+    const wCliPr = uPr - wCapPr - wTotPr;
+
+    const xCliPr = x0Tbl;
+    const xCapPr = xCliPr + wCliPr + COL_GAP;
+    const xTotPr = xCapPr + wCapPr + COL_GAP;
+    const xHrPr = xTotPr + wTotPr + COL_GAP;
+
+    const gapsNp = 4 * COL_GAP;
+    const innerSumNp = sumW - gapsNp;
+    const wCliNp = Math.max(36, Math.floor(innerSumNp * 0.22));
+    const wMotNp = Math.max(36, Math.floor(innerSumNp * 0.22));
+    const wCuoNp = Math.max(26, Math.floor(innerSumNp * 0.1));
+    const wDebNp = Math.max(42, Math.floor(innerSumNp * 0.23));
+    const wTPNp = innerSumNp - wCliNp - wMotNp - wCuoNp - wDebNp;
+    const wTotEtiquetaNp = wCliNp + wMotNp + wCuoNp + 3 * COL_GAP;
+
+    const xCliNp = x0Tbl;
+    const xMotNp = xCliNp + wCliNp + COL_GAP;
+    const xCuoNp = xMotNp + wMotNp + COL_GAP;
+    const xDebNp = xCuoNp + wCuoNp + COL_GAP;
+    const xTPNp = xDebNp + wDebNp + COL_GAP;
+
+    const gapsG = 2 * COL_GAP;
+    const wMontoG = 58;
+    const wMotG = 66;
+    const wDescG = Math.max(24, sumW - wMontoG - wMotG - gapsG);
+    const xGm = x0Tbl;
+    const xGt = xGm + wMontoG + COL_GAP;
+    const xGd = xGt + wMotG + COL_GAP;
+
+    const gapsPerd = 2 * COL_GAP;
+    const wMontoPerd = 58;
+    const wMotPerd = 80;
+    const wCliPerd = Math.max(24, sumW - wMontoPerd - wMotPerd - gapsPerd);
+    const xCliPerd = x0Tbl;
+    const xMotPerd = xCliPerd + wCliPerd + COL_GAP;
+    const xMonPerd = xMotPerd + wMotPerd + COL_GAP;
+
+    const drawCobrosHeaderEfectivo = () => {
+      ensureBottom(TB.lh + 8);
+      tableRow(
+        [
+          { text: "Cliente", x: xCliEf, w: wCli, bold: true, color: COL.tableHead },
+          { text: "Cobro", x: xCobEf, w: wCob, bold: true, color: COL.tableHead, align: "right" },
+          {
+            text: "Tot. préstamo",
+            x: xTPEf,
+            w: wTP,
+            bold: true,
+            color: COL.tableHead,
+            align: "right",
+          },
+          { text: "Debe", x: xDebEf, w: wDeb, bold: true, color: COL.tableHead, align: "right" },
+          { text: "Cuotas", x: xCuoEf, w: wCuo, bold: true, color: COL.tableHead, align: "right" },
+          { text: "Hora", x: xHrEf, w: wHr, bold: true, color: COL.tableHead },
+        ],
+        y
+      );
+      advanceY(TB.lh + 4);
+    };
+
+    const drawCobrosHeaderTransferencia = () => {
+      ensureBottom(TB.lh + 8);
+      tableRow(
+        [
+          { text: "Cliente", x: xCliTr, w: wCliTr, bold: true, color: COL.tableHead },
+          { text: "Cobro", x: xCobTr, w: wCob, bold: true, color: COL.tableHead, align: "right" },
+          {
+            text: "Tot. préstamo",
+            x: xTPTr,
+            w: wTP,
+            bold: true,
+            color: COL.tableHead,
+            align: "right",
+          },
+          { text: "Debe", x: xDebTr, w: wDebTr, bold: true, color: COL.tableHead, align: "right" },
+          { text: "Hora", x: xHrTr, w: wHr, bold: true, color: COL.tableHead },
+        ],
+        y
+      );
+      advanceY(TB.lh + 4);
+    };
+
+    const drawCobrosHeaderOtros = () => {
+      ensureBottom(TB.lh + 8);
+      tableRow(
+        [
+          { text: "Cliente", x: xCliOt, w: wCliOt, bold: true, color: COL.tableHead },
+          { text: "Cobro", x: xCobOt, w: wCobOt, bold: true, color: COL.tableHead, align: "right" },
+          { text: "Método", x: xMetOt, w: wMetOt, bold: true, color: COL.tableHead },
+          { text: "Hora", x: xHrOt, w: wHrOt, bold: true, color: COL.tableHead },
+        ],
+        y
+      );
+      advanceY(TB.lh + 4);
+    };
+
+    const renderPrestamos = (rows: DiaPeriodoSnapshot["prestamosDesembolsoDelDia"]) => {
+      subTitle("Préstamos desembolsados");
       if (rows.length === 0) {
-        line("—", { color: COL.muted, size: FS.meta });
-        spacer(2);
+        line("Sin movimientos este día.", { color: COL.muted, size: FS.meta });
+        spacer(4);
         return;
       }
-      drawCobrosHeader();
-      let sum = 0;
-      for (const c of rows) {
-        if (rowBudget <= 0) break;
-        sum += c.monto;
-        const hora = c.fecha
-          ? new Date(c.fecha).toLocaleTimeString("es-CO", {
-              timeZone: "America/Bogota",
-              hour: "2-digit",
-              minute: "2-digit",
-              second: "2-digit",
-            })
-          : "—";
-        const cuotasTxt = formatoCuotasRestanteTotal(c.cuotasFaltantes, c.numeroCuotas);
+      ensureBottom(TB.lh + 8);
+      tableRow(
+        [
+          { text: "Cliente", x: xCliPr, w: wCliPr, bold: true, color: COL.tableHead },
+          {
+            text: "Capital entregado",
+            x: xCapPr,
+            w: wCapPr,
+            bold: true,
+            color: COL.tableHead,
+            align: "right",
+          },
+          {
+            text: "Total a pagar",
+            x: xTotPr,
+            w: wTotPr,
+            bold: true,
+            color: COL.tableHead,
+            align: "right",
+          },
+          { text: "Hora", x: xHrPr, w: wHrPr, bold: true, color: COL.tableHead },
+        ],
+        y
+      );
+      advanceY(TB.lh + 4);
+      let sumCap = 0;
+      for (const p of rows) {
+        sumCap += p.monto;
         ensureBottom(TB.lh + 6);
         tableRow(
           [
-            { text: trunc(c.clienteNombre, 42), x: xCli, w: wCli },
-            { text: fmtMoney(c.monto), x: xCob, w: wCob, align: "right" },
-            { text: fmtMoney(c.totalAPagar), x: xTP, w: wTP, align: "right" },
-            { text: fmtMoney(c.saldoPendienteTrasPago), x: xDeb, w: wDeb, align: "right" },
-            { text: cuotasTxt, x: xCuo, w: wCuo, align: "right" },
-            { text: trunc(c.metodoPago ?? "—", 14), x: xMet, w: wMet },
-            { text: hora, x: xHr, w: wHr, noTrunc: true },
+            { text: trunc(p.clienteNombre, 36), x: xCliPr, w: wCliPr },
+            { text: fmtMoney(p.monto), x: xCapPr, w: wCapPr, align: "right" },
+            { text: fmtMoney(p.totalAPagar), x: xTotPr, w: wTotPr, align: "right" },
+            { text: formatHoraPdf(p.fecha), x: xHrPr, w: wHrPr, noTrunc: true },
           ],
           y
         );
         advanceY(TB.lh);
-        rowBudget--;
       }
       ensureBottom(TB.lh + 8);
       hrTable();
       tableRow(
         [
-          { text: "Subtotal", x: xCli, w: wCli, bold: true },
-          { text: fmtMoney(sum), x: xCob, w: wCob, bold: true, align: "right" },
-          { text: "", x: xTP, w: wTP },
-          { text: "", x: xDeb, w: wDeb },
-          { text: "", x: xCuo, w: wCuo },
-          { text: "", x: xMet, w: wMet },
-          { text: "", x: xHr, w: wHr },
+          { text: "Subtotal capital", x: xCliPr, w: wCliPr, bold: true },
+          { text: fmtMoney(sumCap), x: xCapPr, w: wCapPr, bold: true, align: "right" },
+          { text: "", x: xTotPr, w: wTotPr },
+          { text: "", x: xHrPr, w: wHrPr },
         ],
         y
       );
       advanceY(TB.lh + 6);
     };
 
-    const cobrosEfectivo = snapshot.cobros.filter((c) => normalizarMetodoPagoPdf(c.metodoPago) === "efectivo");
-    const cobrosTransferencia = snapshot.cobros.filter(
-      (c) => normalizarMetodoPagoPdf(c.metodoPago) === "transferencia"
-    );
-    const cobrosOtros = snapshot.cobros.filter((c) => normalizarMetodoPagoPdf(c.metodoPago) === "otro");
+    const renderCobrosEfectivo = (cobros: DiaPeriodoSnapshot["cobros"]) => {
+      subTitle("Cobros — Efectivo");
+      const rows = cobros.filter((c) => normalizarMetodoPagoPdf(c.metodoPago) === "efectivo");
+      if (rows.length === 0) {
+        line("—", { color: COL.muted, size: FS.meta });
+        spacer(4);
+        return;
+      }
+      drawCobrosHeaderEfectivo();
+      let sum = 0;
+      for (const c of rows) {
+        sum += c.monto;
+        const cuotasTxt = formatoCuotasRestanteTotal(c.cuotasFaltantes, c.numeroCuotas);
+        ensureBottom(TB.lh + 6);
+        tableRow(
+          [
+            { text: trunc(c.clienteNombre, 42), x: xCliEf, w: wCli },
+            { text: fmtMoney(c.monto), x: xCobEf, w: wCob, align: "right" },
+            { text: fmtMoney(c.totalAPagar), x: xTPEf, w: wTP, align: "right" },
+            { text: fmtMoney(c.saldoPendienteTrasPago), x: xDebEf, w: wDeb, align: "right" },
+            { text: cuotasTxt, x: xCuoEf, w: wCuo, align: "right" },
+            { text: formatHoraPdf(c.fecha), x: xHrEf, w: wHr, noTrunc: true },
+          ],
+          y
+        );
+        advanceY(TB.lh);
+      }
+      ensureBottom(TB.lh + 8);
+      hrTable();
+      tableRow(
+        [
+          { text: "Subtotal", x: xCliEf, w: wCli, bold: true },
+          { text: fmtMoney(sum), x: xCobEf, w: wCob, bold: true, align: "right" },
+          { text: "", x: xTPEf, w: wTP },
+          { text: "", x: xDebEf, w: wDeb },
+          { text: "", x: xCuoEf, w: wCuo },
+          { text: "", x: xHrEf, w: wHr },
+        ],
+        y
+      );
+      advanceY(TB.lh + 6);
+    };
 
-    const totalCobrosTodos = snapshot.cobros.reduce((a, c) => a + c.monto, 0);
+    const renderCobrosTransferencia = (cobros: DiaPeriodoSnapshot["cobros"]) => {
+      subTitle("Cobros — Transferencia");
+      const rows = cobros.filter((c) => normalizarMetodoPagoPdf(c.metodoPago) === "transferencia");
+      if (rows.length === 0) {
+        line("—", { color: COL.muted, size: FS.meta });
+        spacer(4);
+        return;
+      }
+      drawCobrosHeaderTransferencia();
+      let sum = 0;
+      for (const c of rows) {
+        sum += c.monto;
+        ensureBottom(TB.lh + 6);
+        tableRow(
+          [
+            { text: trunc(c.clienteNombre, 42), x: xCliTr, w: wCliTr },
+            { text: fmtMoney(c.monto), x: xCobTr, w: wCob, align: "right" },
+            { text: fmtMoney(c.totalAPagar), x: xTPTr, w: wTP, align: "right" },
+            { text: fmtMoney(c.saldoPendienteTrasPago), x: xDebTr, w: wDebTr, align: "right" },
+            { text: formatHoraPdf(c.fecha), x: xHrTr, w: wHr, noTrunc: true },
+          ],
+          y
+        );
+        advanceY(TB.lh);
+      }
+      ensureBottom(TB.lh + 8);
+      hrTable();
+      tableRow(
+        [
+          { text: "Subtotal", x: xCliTr, w: wCliTr, bold: true },
+          { text: fmtMoney(sum), x: xCobTr, w: wCob, bold: true, align: "right" },
+          { text: "", x: xTPTr, w: wTP },
+          { text: "", x: xDebTr, w: wDebTr },
+          { text: "", x: xHrTr, w: wHr },
+        ],
+        y
+      );
+      advanceY(TB.lh + 6);
+    };
 
-    renderCobrosGroup("Efectivo", cobrosEfectivo);
-    renderCobrosGroup("Transferencia", cobrosTransferencia);
-    if (cobrosOtros.length) renderCobrosGroup("Otros / sin método", cobrosOtros);
+    const renderCobrosOtros = (cobros: DiaPeriodoSnapshot["cobros"]) => {
+      const rows = cobros.filter((c) => normalizarMetodoPagoPdf(c.metodoPago) === "otro");
+      if (rows.length === 0) return;
+      subTitle("Cobros — Otros");
+      drawCobrosHeaderOtros();
+      let sum = 0;
+      for (const c of rows) {
+        sum += c.monto;
+        ensureBottom(TB.lh + 6);
+        tableRow(
+          [
+            { text: trunc(c.clienteNombre, 42), x: xCliOt, w: wCliOt },
+            { text: fmtMoney(c.monto), x: xCobOt, w: wCobOt, align: "right" },
+            { text: trunc(c.metodoPago ?? "—", 18), x: xMetOt, w: wMetOt },
+            { text: formatHoraPdf(c.fecha), x: xHrOt, w: wHrOt, noTrunc: true },
+          ],
+          y
+        );
+        advanceY(TB.lh);
+      }
+      ensureBottom(TB.lh + 8);
+      hrTable();
+      tableRow(
+        [
+          { text: "Subtotal", x: xCliOt, w: wCliOt, bold: true },
+          { text: fmtMoney(sum), x: xCobOt, w: wCobOt, bold: true, align: "right" },
+          { text: "", x: xMetOt, w: wMetOt },
+          { text: "", x: xHrOt, w: wHrOt },
+        ],
+        y
+      );
+      advanceY(TB.lh + 6);
+    };
 
-    if (snapshot.cobros.length > MAX_ROWS_DETALLE) {
-      line(`… y ${snapshot.cobros.length - MAX_ROWS_DETALLE} cobros más (consultar en el sistema).`, {
-        color: COL.muted,
-        size: FS.small,
-      });
-    }
-
-    ensureBottom(TB.lh + 8);
-    tableRow(
-      [
-        { text: "Total cobros", x: xCli, w: wCli, bold: true },
-        { text: fmtMoney(totalCobrosTodos), x: xCob, w: wCob, bold: true, align: "right" },
-        { text: "", x: xTP, w: wTP },
-        { text: "", x: xDeb, w: wDeb },
-        { text: "", x: xCuo, w: wCuo },
-        { text: "", x: xMet, w: wMet },
-        { text: "", x: xHr, w: wHr },
-      ],
-      y
-    );
-    advanceY(TB.lh + 8);
-  }
-
-  spacer(8);
-
-  rowBudget = Math.min(40, MAX_ROWS_DETALLE);
-
-  // ——— Visitas "no pagó" (sin columna Nota, como mock) ———
-  {
-    y = sectionBarDark('Visitas "no pagó"', M, PAGE_W - 2 * M, y);
-    const innerPad = 2;
-    const x0 = tblEdge + innerPad;
-    const sumW = tblW - 2 * innerPad;
-    const gapsNp = 4 * COL_GAP;
-    const innerSum = sumW - gapsNp;
-    const wCli = Math.max(36, Math.floor(innerSum * 0.22));
-    const wMot = Math.max(36, Math.floor(innerSum * 0.22));
-    const wCuo = Math.max(26, Math.floor(innerSum * 0.1));
-    const wDeb = Math.max(42, Math.floor(innerSum * 0.23));
-    const wTP = innerSum - wCli - wMot - wCuo - wDeb;
-
-    const xCli = x0;
-    const xMot = xCli + wCli + COL_GAP;
-    const xCuo = xMot + wMot + COL_GAP;
-    const xDeb = xCuo + wCuo + COL_GAP;
-    const xTP = xDeb + wDeb + COL_GAP;
-
-    const wTotEtiqueta = wCli + wMot + wCuo + 3 * COL_GAP;
-
-    ensureBottom(TB.lh + 8);
-    tableRow(
-      [
-        { text: "Cliente", x: xCli, w: wCli, bold: true, color: COL.tableHead },
-        { text: "Motivo", x: xMot, w: wMot, bold: true, color: COL.tableHead },
-        { text: "Cuotas", x: xCuo, w: wCuo, bold: true, color: COL.tableHead, align: "right" },
-        { text: "Debe", x: xDeb, w: wDeb, bold: true, color: COL.tableHead, align: "right" },
-        {
-          text: "Tot. préstamo",
-          x: xTP,
-          w: wTP,
-          bold: true,
-          color: COL.tableHead,
-          align: "right",
-        },
-      ],
-      y
-    );
-    advanceY(TB.lh + 4);
-    let sumDebe = 0;
-    if (snapshot.noPagos.length === 0) {
-      line("Sin registros.", { color: COL.muted, size: FS.meta });
-    } else {
-      for (const n of snapshot.noPagos) {
-        if (rowBudget <= 0) break;
+    const renderNoPagos = (noPagos: DiaPeriodoSnapshot["noPagos"]) => {
+      subTitle("No pagaron");
+      if (noPagos.length === 0) {
+        line("Sin registros.", { color: COL.muted, size: FS.meta });
+        spacer(4);
+        return;
+      }
+      ensureBottom(TB.lh + 8);
+      tableRow(
+        [
+          { text: "Cliente", x: xCliNp, w: wCliNp, bold: true, color: COL.tableHead },
+          { text: "Motivo", x: xMotNp, w: wMotNp, bold: true, color: COL.tableHead },
+          { text: "Cuotas", x: xCuoNp, w: wCuoNp, bold: true, color: COL.tableHead, align: "right" },
+          { text: "Debe", x: xDebNp, w: wDebNp, bold: true, color: COL.tableHead, align: "right" },
+          {
+            text: "Tot. préstamo",
+            x: xTPNp,
+            w: wTPNp,
+            bold: true,
+            color: COL.tableHead,
+            align: "right",
+          },
+        ],
+        y
+      );
+      advanceY(TB.lh + 4);
+      let sumDebe = 0;
+      for (const n of noPagos) {
         sumDebe += n.saldoPendientePrestamoActual;
         const cuotasNp = formatoCuotasRestanteTotal(n.cuotasPendientes, n.numeroCuotas);
         ensureBottom(TB.lh + 6);
         tableRow(
           [
-            { text: trunc(n.clienteNombre, 36), x: xCli, w: wCli },
-            { text: trunc(n.motivoNoPago, 28), x: xMot, w: wMot },
+            { text: trunc(n.clienteNombre, 36), x: xCliNp, w: wCliNp },
+            { text: trunc(n.motivoNoPago, 28), x: xMotNp, w: wMotNp },
+            { text: cuotasNp, x: xCuoNp, w: wCuoNp, align: "right" },
+            { text: fmtMoney(n.saldoPendientePrestamoActual), x: xDebNp, w: wDebNp, align: "right" },
+            { text: fmtMoney(n.totalAPagar), x: xTPNp, w: wTPNp, align: "right" },
+          ],
+          y
+        );
+        advanceY(TB.lh);
+      }
+      ensureBottom(TB.lh + 8);
+      hrTable();
+      tableRow(
+        [
+          { text: "Total saldo debe", x: xCliNp, w: wTotEtiquetaNp, bold: true },
+          { text: fmtMoney(sumDebe), x: xDebNp, w: wDebNp, bold: true, align: "right" },
+          { text: "", x: xTPNp, w: wTPNp },
+        ],
+        y
+      );
+      advanceY(TB.lh + 6);
+    };
+
+    const renderGastos = (gastos: DiaPeriodoSnapshot["gastosDelDia"]) => {
+      subTitle("Gastos");
+      if (gastos.length === 0) {
+        line("Sin gastos registrados.", { color: COL.muted, size: FS.meta });
+        spacer(4);
+        return;
+      }
+      ensureBottom(TB.lh + 8);
+      tableRow(
+        [
+          { text: "Monto", x: xGm, w: wMontoG, bold: true, color: COL.tableHead, align: "right" },
+          { text: "Motivo", x: xGt, w: wMotG, bold: true, color: COL.tableHead },
+          { text: "Descripción", x: xGd, w: wDescG, bold: true, color: COL.tableHead },
+        ],
+        y
+      );
+      advanceY(TB.lh + 4);
+      let sumG = 0;
+      for (const g of gastos) {
+        sumG += g.monto;
+        ensureBottom(TB.lh + 6);
+        tableRow(
+          [
+            { text: fmtMoney(g.monto), x: xGm, w: wMontoG, align: "right" },
+            { text: trunc(g.motivo, 18), x: xGt, w: wMotG },
+            { text: trunc(g.descripcion, 72), x: xGd, w: wDescG },
+          ],
+          y
+        );
+        advanceY(TB.lh);
+      }
+      ensureBottom(TB.lh + 8);
+      hrTable();
+      tableRow(
+        [
+          { text: fmtMoney(sumG), x: xGm, w: wMontoG, bold: true, align: "right" },
+          { text: "Total gastos", x: xGt, w: wMotG, bold: true },
+          { text: "", x: xGd, w: wDescG },
+        ],
+        y
+      );
+      advanceY(TB.lh + 6);
+    };
+
+    const renderPerdidas = (perdidas: DiaPeriodoSnapshot["perdidasDelDia"]) => {
+      subTitle("Pérdidas");
+      if (perdidas.length === 0) {
+        line("Sin pérdidas registradas.", { color: COL.muted, size: FS.meta });
+        spacer(4);
+        return;
+      }
+      ensureBottom(TB.lh + 8);
+      tableRow(
+        [
+          { text: "Cliente", x: xCliPerd, w: wCliPerd, bold: true, color: COL.tableHead },
+          { text: "Motivo", x: xMotPerd, w: wMotPerd, bold: true, color: COL.tableHead },
+          {
+            text: "Monto",
+            x: xMonPerd,
+            w: wMontoPerd,
+            bold: true,
+            color: COL.tableHead,
+            align: "right",
+          },
+        ],
+        y
+      );
+      advanceY(TB.lh + 4);
+      let sumP = 0;
+      for (const p of perdidas) {
+        sumP += p.monto;
+        ensureBottom(TB.lh + 6);
+        tableRow(
+          [
+            { text: trunc(p.clienteNombre, 36), x: xCliPerd, w: wCliPerd },
+            { text: trunc(p.motivoPerdida ?? "—", 24), x: xMotPerd, w: wMotPerd },
             {
-              text: cuotasNp,
-              x: xCuo,
-              w: wCuo,
+              text: fmtMoney(p.monto),
+              x: xMonPerd,
+              w: wMontoPerd,
               align: "right",
-            },
-            {
-              text: fmtMoney(n.saldoPendientePrestamoActual),
-              x: xDeb,
-              w: wDeb,
-              align: "right",
-            },
-            {
-              text: fmtMoney(n.totalAPagar),
-              x: xTP,
-              w: wTP,
-              align: "right",
+              color: rgb(0.8, 0.15, 0.15),
             },
           ],
           y
         );
         advanceY(TB.lh);
-        rowBudget--;
       }
-    }
-    ensureBottom(TB.lh + 8);
-    hrTable();
-    tableRow(
-      [
-        { text: "Total saldo debe", x: xCli, w: wTotEtiqueta, bold: true },
-        {
-          text: snapshot.noPagos.length ? fmtMoney(sumDebe) : fmtMoney(0),
-          x: xDeb,
-          w: wDeb,
-          bold: true,
-          align: "right",
-        },
-        { text: "", x: xTP, w: wTP },
-      ],
-      y
-    );
-    advanceY(TB.lh + 8);
-  }
-
-  spacer(10);
-
-  // ——— Gastos (arriba) + Préstamos (abajo), ancho completo ———
-  {
-    ensureBottom(160);
-    const blockW = PAGE_W - 2 * M;
-    const xBox = M;
-    const yStart = y;
-
-    const gastos = snapshot.gastosDelDia;
-    const prestamosRows = snapshot.prestamosDesembolsoDelDia ?? [];
-
-    const hrDual = (xx: number, ww: number, yy: number) => {
-      const lift = 7;
-      page.drawLine({
-        start: { x: xx + 4, y: yy + lift },
-        end: { x: xx + ww - 4, y: yy + lift },
-        thickness: 0.35,
-        color: COL.rule,
-      });
-      return yy - 6;
-    };
-
-    const drawPrestamosBlock = (startY: number): number => {
-      y = startY;
-      let yy = sectionBarDark("Préstamos otorgados", xBox, blockW, startY);
-      const innerPad = 2;
-      const px = xBox + innerPad + 4;
-      const usable = blockW - 12 - 2 * innerPad;
-      const gapsP = 3 * COL_GAP;
-      const uInner = usable - gapsP;
-      const wh = Math.max(68, Math.floor(uInner * 0.28));
-      const wc = Math.floor((uInner - wh) * 0.45);
-      const cap = Math.floor((uInner - wh) * 0.28);
-      const wt = uInner - wh - wc - cap;
-
-      const xPc = px;
-      const xPcap = xPc + wc + COL_GAP;
-      const xPtot = xPcap + cap + COL_GAP;
-      const xPh = xPtot + wt + COL_GAP;
-
+      ensureBottom(TB.lh + 8);
+      hrTable();
       tableRow(
         [
-          { text: "Cliente", x: xPc, w: wc, bold: true, color: COL.tableHead },
-          { text: "Capital", x: xPcap, w: cap, bold: true, color: COL.tableHead, align: "right" },
-          { text: "Tot. pagar", x: xPtot, w: wt, bold: true, color: COL.tableHead, align: "right" },
-          { text: "Hora", x: xPh, w: wh, bold: true, color: COL.tableHead },
-        ],
-        yy
-      );
-      yy -= TB.lh + 4;
-      let sumCap = 0;
-      let sumTot = 0;
-      if (prestamosRows.length === 0) {
-        page.drawText(sanitizarTextoPdf("Sin movimientos este día."), {
-          x: px,
-          y: yy,
-          size: FS.meta,
-          font,
-          color: COL.muted,
-        });
-        yy -= TB.lh;
-      } else {
-        for (const p of prestamosRows) {
-          if (rowBudget <= 0) break;
-          sumCap += p.monto;
-          sumTot += p.totalAPagar;
-          const hora = p.fecha
-            ? new Date(p.fecha).toLocaleTimeString("es-CO", {
-                timeZone: "America/Bogota",
-                hour: "2-digit",
-                minute: "2-digit",
-                second: "2-digit",
-              })
-            : "—";
-          tableRow(
-            [
-              { text: trunc(p.clienteNombre, 36), x: xPc, w: wc },
-              {
-                text: fmtMoney(p.monto),
-                x: xPcap,
-                w: cap,
-                align: "right",
-              },
-              {
-                text: fmtMoney(p.totalAPagar),
-                x: xPtot,
-                w: wt,
-                align: "right",
-              },
-              { text: hora, x: xPh, w: wh, noTrunc: true },
-            ],
-            yy
-          );
-          yy -= TB.lh;
-          rowBudget--;
-        }
-      }
-      yy = hrDual(xBox, blockW, yy);
-      tableRow(
-        [
-          { text: "Total", x: xPc, w: wc, bold: true },
+          { text: "Total pérdidas", x: xCliPerd, w: wCliPerd + wMotPerd + COL_GAP, bold: true },
           {
-            text: prestamosRows.length ? fmtMoney(sumCap) : fmtMoney(0),
-            x: xPcap,
-            w: cap,
-            bold: true,
-            align: "right",
-          },
-          {
-            text: prestamosRows.length ? fmtMoney(sumTot) : fmtMoney(0),
-            x: xPtot,
-            w: wt,
-            bold: true,
-            align: "right",
-          },
-          { text: "", x: xPh, w: wh },
-        ],
-        yy
-      );
-      yy -= TB.lh + 6;
-      y = yy;
-      return yy;
-    };
-
-    const drawGastosBlock = (startY: number): number => {
-      y = startY;
-      let yy = sectionBarDark("Gastos del día", xBox, blockW, startY);
-      const innerPad = 2;
-      const px = xBox + innerPad + 4;
-      const usable = blockW - 12 - 2 * innerPad;
-      const gapsG = 2 * COL_GAP;
-      const wMonto = 58;
-      const wMot = 66;
-      const wDesc = Math.max(24, usable - wMonto - wMot - gapsG);
-
-      const xGm = px;
-      const xGt = xGm + wMonto + COL_GAP;
-      const xGd = xGt + wMot + COL_GAP;
-
-      tableRow(
-        [
-          { text: "Monto", x: xGm, w: wMonto, bold: true, color: COL.tableHead, align: "right" },
-          { text: "Motivo", x: xGt, w: wMot, bold: true, color: COL.tableHead },
-          { text: "Descripción", x: xGd, w: wDesc, bold: true, color: COL.tableHead },
-        ],
-        yy
-      );
-      yy -= TB.lh + 4;
-      let sumG = 0;
-      if (gastos.length === 0) {
-        page.drawText(sanitizarTextoPdf("Sin gastos registrados."), {
-          x: px,
-          y: yy,
-          size: FS.meta,
-          font,
-          color: COL.muted,
-        });
-        yy -= TB.lh;
-      } else {
-        for (const g of gastos) {
-          if (rowBudget <= 0) break;
-          sumG += g.monto;
-          tableRow(
-            [
-              {
-                text: fmtMoney(g.monto),
-                x: xGm,
-                w: wMonto,
-                align: "right",
-              },
-              { text: trunc(g.motivo, 18), x: xGt, w: wMot },
-              { text: trunc(g.descripcion, 72), x: xGd, w: wDesc },
-            ],
-            yy
-          );
-          yy -= TB.lh;
-          rowBudget--;
-        }
-      }
-      yy = hrDual(xBox, blockW, yy);
-      tableRow(
-        [
-          {
-            text: gastos.length ? fmtMoney(sumG) : fmtMoney(0),
-            x: xGm,
-            w: wMonto,
-            bold: true,
-            align: "right",
-          },
-          { text: "Total gastos", x: xGt, w: wMot, bold: true },
-          { text: "", x: xGd, w: wDesc },
-        ],
-        yy
-      );
-      yy -= TB.lh + 6;
-      y = yy;
-      return yy;
-    };
-
-    const drawPerdidasBlock = (startY: number): number => {
-      y = startY;
-      let yy = sectionBarDark("Pérdidas del día", xBox, blockW, startY);
-      const innerPad = 2;
-      const px = xBox + innerPad + 4;
-      const usable = blockW - 12 - 2 * innerPad;
-      const gapsP = 2 * COL_GAP;
-      const wMonto = 58;
-      const wMot = 80;
-      const wCli = Math.max(24, usable - wMonto - wMot - gapsP);
-
-      const xCli = px;
-      const xMot = xCli + wCli + COL_GAP;
-      const xMon = xMot + wMot + COL_GAP;
-
-      tableRow(
-        [
-          { text: "Cliente", x: xCli, w: wCli, bold: true, color: COL.tableHead },
-          { text: "Motivo", x: xMot, w: wMot, bold: true, color: COL.tableHead },
-          { text: "Monto", x: xMon, w: wMonto, bold: true, color: COL.tableHead, align: "right" },
-        ],
-        yy
-      );
-      yy -= TB.lh + 4;
-
-      const perdidas = snapshot.perdidasDelDia ?? [];
-      let sumP = 0;
-      if (perdidas.length === 0) {
-        page.drawText(sanitizarTextoPdf("Sin pérdidas registradas."), {
-          x: px,
-          y: yy,
-          size: FS.meta,
-          font,
-          color: COL.muted,
-        });
-        yy -= TB.lh;
-      } else {
-        for (const p of perdidas) {
-          sumP += p.monto;
-          tableRow(
-            [
-              { text: trunc(p.clienteNombre, 36), x: xCli, w: wCli },
-              { text: trunc(p.motivoPerdida ?? "—", 24), x: xMot, w: wMot },
-              {
-                text: fmtMoney(p.monto),
-                x: xMon,
-                w: wMonto,
-                align: "right",
-                color: rgb(0.8, 0.15, 0.15),
-              },
-            ],
-            yy
-          );
-          yy -= TB.lh;
-        }
-      }
-      yy = hrDual(xBox, blockW, yy);
-      tableRow(
-        [
-          { text: "Total pérdidas", x: xCli, w: wCli + wMot + COL_GAP, bold: true },
-          {
-            text: perdidas.length ? fmtMoney(sumP) : fmtMoney(0),
-            x: xMon,
-            w: wMonto,
+            text: fmtMoney(sumP),
+            x: xMonPerd,
+            w: wMontoPerd,
             bold: true,
             align: "right",
             color: rgb(0.8, 0.15, 0.15),
           },
         ],
-        yy
+        y
       );
-      yy -= TB.lh + 6;
-      y = yy;
-      return yy;
+      advanceY(TB.lh + 6);
     };
 
-    drawGastosBlock(yStart);
-    spacer(8);
-    drawPerdidasBlock(y);
-    spacer(8);
-    drawPrestamosBlock(y);
+    const separadorEntreDias = () => {
+      ensureBottom(14);
+      y -= 4;
+      page.drawLine({
+        start: { x: M + 16, y },
+        end: { x: PAGE_W - M - 16, y },
+        thickness: 0.35,
+        color: COL.rule,
+      });
+      y -= 12;
+    };
+
+    for (let di = 0; di < diasDetalle.length; di++) {
+      const dia = diasDetalle[di];
+      const tituloDetalle = sanitizarTextoPdf(
+        `Detalle — ${formatFechaDia(dia.fechaDia) || dia.fechaDia}`
+      );
+      y = sectionBarDark(tituloDetalle, M, PAGE_W - 2 * M, y);
+
+      renderPrestamos(dia.prestamosDesembolsoDelDia);
+      renderCobrosEfectivo(dia.cobros);
+      renderCobrosTransferencia(dia.cobros);
+      renderCobrosOtros(dia.cobros);
+      renderNoPagos(dia.noPagos);
+      renderGastos(dia.gastosDelDia);
+      renderPerdidas(dia.perdidasDelDia);
+
+      if (di < diasDetalle.length - 1) {
+        separadorEntreDias();
+      }
+    }
+  }
+  spacer(10);
+
+  // ——— Cuadre de caja ———
+  {
+    y = sectionBarDark("Cuadre de caja", M, PAGE_W - 2 * M, y);
+
+    const filas: { lbl: string; signo: string; val: number; esTotal?: boolean }[] = [
+      { lbl: "Base asignada",            signo: "+", val: snapshot.totalBaseAsignadaDia },
+      { lbl: "Cobros efectivo",          signo: "+", val: snapshot.totalCobrosEfectivoDia },
+      { lbl: "Gastos",                   signo: "-", val: snapshot.totalGastosDia },
+      { lbl: "Prestamos desembolsados",      signo: "-", val: snapshot.totalPrestamosDesembolsoDia ?? 0 },
+      { lbl: "A entregar en efectivo",   signo: "=", val: cajaEfectivo, esTotal: true },
+    ];
+
+    const boxPad = 10;
+    const rowH = TB.lh + 2;
+    const sepH = 8;
+    const boxH = boxPad * 2 + filas.length * rowH + sepH;
+    ensureBottom(boxH + 16);
+    const boxBottom = y - boxH + 2;
+
+    page.drawRectangle({
+      x: M + 4,
+      y: boxBottom,
+      width: PAGE_W - 2 * M - 8,
+      height: boxH,
+      color: COL.metaBg,
+      borderColor: COL.rule,
+      borderWidth: 0.45,
+    });
+
+    const wSigno = 14;
+    const wValCuadre = 90;
+    const xSigno = M + 16;
+    const xLblCuadre = xSigno + wSigno + 4;
+    const xValCuadre = PAGE_W - M - 16 - wValCuadre;
+
+    let yCuadre = boxBottom + boxH - boxPad - 2;
+
+    for (let i = 0; i < filas.length; i++) {
+      const f = filas[i];
+      if (f.esTotal) {
+        page.drawLine({
+          start: { x: xSigno, y: yCuadre + rowH - 2 },
+          end:   { x: PAGE_W - M - 16, y: yCuadre + rowH - 2 },
+          thickness: 0.4,
+          color: COL.rule,
+        });
+        yCuadre -= 4;
+        page.drawText(sanitizarTextoPdf(f.signo), {
+          x: xSigno,
+          y: yCuadre,
+          size: TB.fs,
+          font: fontBold,
+          color: NAV,
+        });
+        drawCell(f.lbl, xLblCuadre, yCuadre, xValCuadre - xLblCuadre - 4, {
+          bold: true,
+          color: NAV,
+          size: TB.fs,
+        });
+        drawCell(fmtMoney(f.val), xValCuadre, yCuadre, wValCuadre, {
+          bold: true,
+          color: NAV,
+          align: "right",
+          size: FS.meta,
+        });
+      } else {
+        page.drawText(sanitizarTextoPdf(f.signo), {
+          x: xSigno,
+          y: yCuadre,
+          size: TB.fs,
+          font,
+          color: COL.muted,
+        });
+        drawCell(f.lbl, xLblCuadre, yCuadre, xValCuadre - xLblCuadre - 4, {
+          color: COL.text,
+          size: TB.fs,
+        });
+        drawCell(fmtMoney(f.val), xValCuadre, yCuadre, wValCuadre, {
+          color: COL.text,
+          align: "right",
+          size: TB.fs,
+        });
+      }
+      yCuadre -= rowH;
+    }
+
+    y = boxBottom - 10;
   }
 
   hr();
