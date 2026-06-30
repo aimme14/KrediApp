@@ -112,6 +112,7 @@ export type DiaPeriodoSnapshot = {
   noPagos: NoPagoDiaSnapshotItem[];
   perdidasDelDia: PerdidaDiaSnapshotItem[];
   gastosDelDia: GastoDiaSnapshotItem[];
+  prestamosDesembolsoDelDia: PrestamoDesembolsoDiaSnapshotItem[];
   totalCobrosEfectivo: number;
   totalCobrosTransferencia: number;
   totalGastos: number;
@@ -565,6 +566,7 @@ export async function buildCierreDiaSnapshot(
         noPagos: [],
         perdidasDelDia: [],
         gastosDelDia: [],
+        prestamosDesembolsoDelDia: [],
         totalCobrosEfectivo: 0,
         totalCobrosTransferencia: 0,
         totalGastos: 0,
@@ -594,6 +596,9 @@ export async function buildCierreDiaSnapshot(
     const d = agregarDia(g.fecha);
     d.gastosDelDia.push(g);
     d.totalGastos = round2(d.totalGastos + g.monto);
+  }
+  for (const p of prestamosDesembolsoDelDia) {
+    agregarDia(p.fecha).prestamosDesembolsoDelDia.push(p);
   }
 
   const diasDelPeriodo = Array.from(diasMap.values()).sort((a, b) =>
