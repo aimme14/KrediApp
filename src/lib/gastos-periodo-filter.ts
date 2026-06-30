@@ -123,6 +123,17 @@ export function periodoAbiertoAdmin(
   return periodos.find((p) => p.estado === "abierto") ?? null;
 }
 
+/** True si la fecha del cobro cae dentro del periodo contable abierto del admin. */
+export function pagoOcurreEnPeriodoAbierto(
+  fechaIso: string | null | undefined,
+  periodos: PeriodoAdminListaItem[],
+  ahora: Date = new Date()
+): boolean {
+  const rango = resolverRangoFiltroContable({ modo: "actual" }, periodos, ahora);
+  if (!rango) return false;
+  return gastoOcurreEnRangoContable(fechaIso, rango.desde, rango.hasta);
+}
+
 export function periodosCerradosAdmin(
   periodos: PeriodoAdminListaItem[]
 ): PeriodoAdminListaItem[] {

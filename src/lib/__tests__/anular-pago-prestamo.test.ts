@@ -45,7 +45,7 @@ describe("validarElegibilidadAnulacion", () => {
     expect(
       validarElegibilidadAnulacion({
         pago: pagoBase,
-        esMismoDia: true,
+        enPeriodoAbierto: true,
         esUltimoPago: true,
         reporteAprobado: false,
       })
@@ -56,7 +56,7 @@ describe("validarElegibilidadAnulacion", () => {
     expect(
       validarElegibilidadAnulacion({
         pago: { ...pagoBase, estado: "anulado" },
-        esMismoDia: true,
+        enPeriodoAbierto: true,
         esUltimoPago: true,
         reporteAprobado: false,
       })
@@ -67,29 +67,29 @@ describe("validarElegibilidadAnulacion", () => {
     expect(
       validarElegibilidadAnulacion({
         pago: { ...pagoBase, tipo: "no_pago" },
-        esMismoDia: true,
+        enPeriodoAbierto: true,
         esUltimoPago: true,
         reporteAprobado: false,
       })
     ).toBe("PAGO_TIPO_INVALIDO");
   });
 
-  it("rechaza pago de otro día", () => {
+  it("rechaza pago fuera del periodo abierto", () => {
     expect(
       validarElegibilidadAnulacion({
         pago: pagoBase,
-        esMismoDia: false,
+        enPeriodoAbierto: false,
         esUltimoPago: true,
         reporteAprobado: false,
       })
-    ).toBe("PAGO_NO_ES_HOY");
+    ).toBe("PAGO_FUERA_DE_PERIODO_ABIERTO");
   });
 
   it("rechaza si no es el último pago", () => {
     expect(
       validarElegibilidadAnulacion({
         pago: pagoBase,
-        esMismoDia: true,
+        enPeriodoAbierto: true,
         esUltimoPago: false,
         reporteAprobado: false,
       })
@@ -100,7 +100,7 @@ describe("validarElegibilidadAnulacion", () => {
     expect(
       validarElegibilidadAnulacion({
         pago: pagoBase,
-        esMismoDia: true,
+        enPeriodoAbierto: true,
         esUltimoPago: true,
         reporteAprobado: true,
       })

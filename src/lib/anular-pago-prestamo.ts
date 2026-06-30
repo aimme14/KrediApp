@@ -4,7 +4,7 @@ import { computeCapitalTotalRutaDesdeSaldos } from "@/lib/capital-formulas";
 export type AnulacionElegibilidadError =
   | "PAGO_NO_ACTIVO"
   | "PAGO_TIPO_INVALIDO"
-  | "PAGO_NO_ES_HOY"
+  | "PAGO_FUERA_DE_PERIODO_ABIERTO"
   | "PAGO_NO_ES_ULTIMO"
   | "SIN_SNAPSHOTS_NI_FALLBACK"
   | "REPORTE_APROBADO"
@@ -65,11 +65,11 @@ export type DatosEmpleado = {
 
 export function validarElegibilidadAnulacion(params: {
   pago: DatosPago;
-  esMismoDia: boolean;
+  enPeriodoAbierto: boolean;
   esUltimoPago: boolean;
   reporteAprobado: boolean;
 }): AnulacionElegibilidadError | null {
-  const { pago, esMismoDia, esUltimoPago, reporteAprobado } = params;
+  const { pago, enPeriodoAbierto, esUltimoPago, reporteAprobado } = params;
 
   if (pago.estado !== "activo" && pago.estado !== undefined) {
     return "PAGO_NO_ACTIVO";
@@ -77,8 +77,8 @@ export function validarElegibilidadAnulacion(params: {
   if (pago.tipo !== "pago") {
     return "PAGO_TIPO_INVALIDO";
   }
-  if (!esMismoDia) {
-    return "PAGO_NO_ES_HOY";
+  if (!enPeriodoAbierto) {
+    return "PAGO_FUERA_DE_PERIODO_ABIERTO";
   }
   if (!esUltimoPago) {
     return "PAGO_NO_ES_ULTIMO";
@@ -206,8 +206,8 @@ export function mensajeElegibilidad(error: AnulacionElegibilidadError): string {
       return "Este pago ya fue anulado.";
     case "PAGO_TIPO_INVALIDO":
       return "Solo se pueden anular cobros registrados como pago.";
-    case "PAGO_NO_ES_HOY":
-      return "Solo se pueden anular pagos del día actual.";
+    case "PAGO_FUERA_DE_PERIODO_ABIERTO":
+      return "Solo se pueden anular cobros del periodo contable abierto. Cierra el periodo solo cuando ya no necesites corregir cobros.";
     case "PAGO_NO_ES_ULTIMO":
       return "No se puede anular este pago porque hay cobros posteriores en el mismo préstamo. Anula primero el cobro más reciente.";
     case "SIN_SNAPSHOTS_NI_FALLBACK":

@@ -5,15 +5,16 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { getEmpresa } from "@/lib/empresa";
+import { listPeriodosAdmin, type PeriodoAdminListaItem } from "@/lib/empresa-api";
 import {
   usePagosDiariosAdmin,
   type PagoDiarioAdminItem,
 } from "@/hooks/usePagosDiariosAdmin";
 import {
-  fechaDiaCalendarioDesdeISO,
   fechaDiaColombiaHoy,
   parseFechaDiaColombia,
 } from "@/lib/colombia-day-bounds";
+import { pagoOcurreEnPeriodoAbierto } from "@/lib/gastos-periodo-filter";
 import {
   formatFechaImpresionPagosDiarios,
   formatHoraPagosDiarios,
@@ -45,9 +46,27 @@ export default function PagosDiariosPageContent() {
   const [fecha, setFecha] = useState(hoy);
   const [fechaBusqueda, setFechaBusqueda] = useState(hoy);
   const [errorFiltro, setErrorFiltro] = useState<string | null>(null);
-  const { pagos, totales, loading, error, fechaHoy } = usePagosDiariosAdmin(fechaBusqueda);
+  const { pagos, totales, loading, error } = usePagosDiariosAdmin(fechaBusqueda);
   const [modal, setModal] = useState<EstadoModal>({ abierto: false });
   const [nombreEmpresa, setNombreEmpresa] = useState("");
+  const [periodos, setPeriodos] = useState<PeriodoAdminListaItem[]>([]);
+
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    user
+      .getIdToken()
+      .then((token) => listPeriodosAdmin(token))
+      .then((list) => {
+        if (!cancelled) setPeriodos(list);
+      })
+      .catch(() => {
+        if (!cancelled) setPeriodos([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
 
   useEffect(() => {
     const empresaId = profile?.empresaId;
@@ -313,7 +332,7 @@ export default function PagosDiariosPageContent() {
                     <PagoDiarioRow
                       key={`${item.prestamoId}-${item.id}`}
                       item={item}
-                      fechaHoy={fechaHoy}
+                      periodos={periodos}
                       onAnular={abrirModal}
                     />
                   ))}
@@ -337,7 +356,7 @@ export default function PagosDiariosPageContent() {
                     <PagoDiarioRow
                       key={`${item.prestamoId}-${item.id}`}
                       item={item}
-                      fechaHoy={fechaHoy}
+                      periodos={periodos}
                       onAnular={abrirModal}
                     />
                   ))}
@@ -387,20 +406,20 @@ function TarjetaResumen({
 
 function PagoDiarioRow({
   item,
-  fechaHoy,
+  periodos,
   onAnular,
 }: {
   item: PagoDiarioAdminItem;
-  fechaHoy: string;
+  periodos: PeriodoAdminListaItem[];
   onAnular: (item: PagoDiarioAdminItem) => void;
 }) {
   const anulado = item.estado === "anulado";
 
-  const esAnulableHoy =
+  const esAnulableEnPeriodo =
     item.tipo === "pago" &&
     !anulado &&
     item.fecha !== null &&
-    fechaDiaCalendarioDesdeISO(item.fecha) === fechaHoy;
+    pagoOcurreEnPeriodoAbierto(item.fecha, periodos);
 
   const monto =
     item.tipo === "pago"
@@ -467,7 +486,7 @@ function PagoDiarioRow({
           }}
         >
           <span style={{ fontWeight: 600 }}>{monto}</span>
-          {esAnulableHoy && (
+          {esAnulableEnPeriodo && (
             <button type="button" className="pagos-diarios-btn-anular" onClick={() => onAnular(item)}>
               Anular
             </button>

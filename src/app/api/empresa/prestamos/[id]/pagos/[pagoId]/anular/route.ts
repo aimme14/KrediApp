@@ -10,6 +10,7 @@ import {
   USUARIOS_SUBCOLLECTION,
   CLIENTES_SUBCOLLECTION,
   REPORTES_DIA_SUBCOLLECTION,
+  PERIODOS_ADMIN_SUBCOLLECTION,
 } from "@/lib/empresas-db";
 import {
   startIdempotentOperation,
@@ -21,6 +22,7 @@ import {
   fechaDiaColombiaHoy,
   fechaDiaCalendarioDesdeISO,
 } from "@/lib/colombia-day-bounds";
+import { gastoOcurreEnRangoContable } from "@/lib/gastos-periodo-filter";
 import {
   validarElegibilidadAnulacion,
   validarCoherenciaPrestamoConPago,
@@ -38,7 +40,7 @@ import {
 const ELEGIBILIDAD_CODES = [
   "PAGO_NO_ACTIVO",
   "PAGO_TIPO_INVALIDO",
-  "PAGO_NO_ES_HOY",
+  "PAGO_FUERA_DE_PERIODO_ABIERTO",
   "PAGO_NO_ES_ULTIMO",
   "SIN_SNAPSHOTS_NI_FALLBACK",
   "REPORTE_APROBADO",
@@ -75,6 +77,34 @@ function mapDatosPago(pd: Record<string, unknown>): DatosPago {
     fecha: fechaDesdeFirestore(pd.fecha),
     empleadoId: typeof pd.empleadoId === "string" ? pd.empleadoId : "",
   };
+}
+
+async function obtenerRangoPeriodoAbiertoAdmin(
+  empresaId: string,
+  adminUid: string
+): Promise<{ desde: Date; hasta: Date } | null> {
+  const db = getAdminFirestore();
+  const snap = await db
+    .collection(EMPRESAS_COLLECTION)
+    .doc(empresaId)
+    .collection(PERIODOS_ADMIN_SUBCOLLECTION)
+    .where("adminId", "==", adminUid)
+    .where("estado", "==", "abierto")
+    .limit(1)
+    .get();
+
+  if (snap.empty) return null;
+
+  const fechaAperturaRaw = snap.docs[0].data().fechaApertura;
+  const desde =
+    fechaAperturaRaw instanceof Timestamp
+      ? fechaAperturaRaw.toDate()
+      : fechaAperturaRaw instanceof Date
+        ? fechaAperturaRaw
+        : null;
+  if (!desde) return null;
+
+  return { desde, hasta: new Date() };
 }
 
 async function existeReporteAprobadoParaEmpleado(
@@ -173,8 +203,17 @@ export async function POST(
   const pagoPre = mapDatosPago(pagoPreSnap.data() as Record<string, unknown>);
   const fechaDiaPago = fechaDiaCalendarioDesdeISO(pagoPre.fecha.toISOString());
 
-  if (fechaDiaPago !== hoy) {
-    return finalize(409, { error: mensajeElegibilidad("PAGO_NO_ES_HOY") });
+  const rangoPeriodoAbierto = await obtenerRangoPeriodoAbiertoAdmin(empresaId, apiUser.uid);
+  const enPeriodoAbierto =
+    rangoPeriodoAbierto !== null &&
+    gastoOcurreEnRangoContable(
+      pagoPre.fecha.toISOString(),
+      rangoPeriodoAbierto.desde,
+      rangoPeriodoAbierto.hasta
+    );
+
+  if (!enPeriodoAbierto) {
+    return finalize(409, { error: mensajeElegibilidad("PAGO_FUERA_DE_PERIODO_ABIERTO") });
   }
 
   const pagosActivosSnap = await prestamoRef
@@ -225,11 +264,17 @@ export async function POST(
         fechaCierre: pr.fechaCierre ?? null,
       };
 
-      const esMismoDia = fechaDiaCalendarioDesdeISO(pago.fecha.toISOString()) === hoy;
+      const enPeriodoAbiertoTx =
+        rangoPeriodoAbierto !== null &&
+        gastoOcurreEnRangoContable(
+          pago.fecha.toISOString(),
+          rangoPeriodoAbierto.desde,
+          rangoPeriodoAbierto.hasta
+        );
 
       const elegibilidadError = validarElegibilidadAnulacion({
         pago,
-        esMismoDia,
+        enPeriodoAbierto: enPeriodoAbiertoTx,
         esUltimoPago: true,
         reporteAprobado: false,
       });
