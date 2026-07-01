@@ -11,6 +11,7 @@
     "test": "jest",
     "test:watch": "jest --watchAll",
     "test:coverage": "jest --coverage",
+    "test:rules": "node scripts/run-firestore-rules-tests.js",
     "create-super-admin": "node scripts/create-super-admin.js",
     "migrate-super-admin": "node scripts/migrate-super-admin-to-collection.js",
     "migrate-empresas": "node scripts/migrate-to-empresas-structure.js"
@@ -26,6 +27,7 @@
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
+    "@firebase/rules-unit-testing": "^4.0.1",
     "@next/bundle-analyzer": "^14.2.15",
     "@types/jest": "^30.0.0",
     "cross-env": "^7.0.3",

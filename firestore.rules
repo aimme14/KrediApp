@@ -1,86 +1,203 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Super Admin: fuera de empresas
+
+    // ─── Helpers ──────────────────────────────────────────────────────────────
+    // isSuperAdmin: lee el propio doc /superAdmin/{uid} del solicitante.
+    // La regla de /superAdmin permite self-read, por lo que el exists() es válido.
+    function isSuperAdmin() {
+      return exists(/databases/$(database)/documents/superAdmin/$(request.auth.uid));
+    }
+
+    // belongsToEmpresa: token.empresaId == path empresaId.
+    // Para jefe: token.empresaId == jefeUid == empresaId ✓
+    // Para admin/empleado: token.empresaId == jefeUid == empresaId ✓
+    // Para usuario de otra empresa: token.empresaId != empresaId → false ✓
+    function belongsToEmpresa(empresaId) {
+      return request.auth.token.empresaId == empresaId;
+    }
+
+    // isJefe: rol jefe Y uid == empresaId (el UID del jefe es la clave de empresa).
+    function isJefe(empresaId) {
+      return request.auth.token.role == 'jefe'
+          && request.auth.uid == empresaId;
+    }
+
+    function isAdmin() {
+      return request.auth.token.role == 'admin';
+    }
+
+    function isEmpleado() {
+      return request.auth.token.role == 'empleado';
+    }
+
+    // isEnabled: usa .get() con default para no romper cuentas sin el claim.
+    function isEnabled() {
+      return request.auth.token.get('enabled', false) == true;
+    }
+
+    // ─── Super Admin ──────────────────────────────────────────────────────────
+    // Self-read para que isSuperAdmin() pueda llamar exists().
     match /superAdmin/{adminID} {
-      allow read: if request.auth != null;
+      allow read: if request.auth != null && request.auth.uid == adminID;
       allow write: if false;
     }
-    // Índice de auth para usuarios de empresas (jefe, admin, empleado).
-    // Leer: propio doc, o superAdmin lee todos, o el doc fue creado por ti (jefe ve sus admins, admin ve sus empleados).
+
+    // ─── Users (índice de auth) ───────────────────────────────────────────────
     match /users/{userId} {
       allow read: if request.auth != null
         && (request.auth.uid == userId
-            || (exists(/databases/$(database)/documents/superAdmin/$(request.auth.uid))
-                && get(/databases/$(database)/documents/superAdmin/$(request.auth.uid)).data.role == 'superAdmin')
+            || isSuperAdmin()
             || resource.data.createdBy == request.auth.uid);
       allow write: if false;
     }
+
+    // ─── Pagos (collectionGroup) ──────────────────────────────────────────────
+    // Cubre usePagosDiariosAdmin (collectionGroup "pagos").
+    // La regla anidada en /prestamos/{id}/pagos se elimina para que ésta no
+    // sea anulada por la unión de reglas de Firestore.
     match /{path=**}/pagos/{pagoId} {
-      allow read: if request.auth != null
-        && (resource.data.empleadoId == request.auth.uid
-            || resource.data.adminId == request.auth.uid);
+      allow read: if request.auth != null && isEnabled() && (
+        resource.data.empleadoId == request.auth.uid
+        || resource.data.adminId  == request.auth.uid
+        || (request.auth.token.role == 'jefe'
+            && resource.data.empresaId == request.auth.uid)
+      );
       allow write: if false;
     }
-    // Empresas y todas sus subcolecciones
+
+    // ─── Empresas y subcolecciones ────────────────────────────────────────────
     match /empresas/{empresaId} {
-      allow read: if request.auth != null;
+
+      // Doc raíz de empresa: cualquier miembro de esa empresa o superAdmin.
+      allow read: if request.auth != null && (
+        isSuperAdmin()
+        || (isEnabled() && belongsToEmpresa(empresaId))
+      );
       allow write: if false;
+
+      // Usuarios internos
+      // Jefe: todos sus usuarios.
+      // Admin: empleados bajo su adminId.
+      // Empleado: sólo su propio doc.
       match /usuarios/{usuarioId} {
-        allow read: if request.auth != null;
+        allow read: if request.auth != null && (
+          isSuperAdmin()
+          || (isEnabled() && (
+            isJefe(empresaId)
+            || (isAdmin()    && belongsToEmpresa(empresaId) && resource.data.adminId == request.auth.uid)
+            || (belongsToEmpresa(empresaId) && request.auth.uid == usuarioId)
+          ))
+        );
         allow write: if false;
+
         match /asignacionesBase/{asigId} {
-          allow read: if request.auth != null
+          allow read: if request.auth != null && isEnabled()
+            && belongsToEmpresa(empresaId)
             && request.auth.uid == usuarioId;
           allow write: if false;
         }
       }
+
+      // Rutas
+      // Jefe: todas. Admin: las suyas. Empleado: la suya (por rutaId del path).
       match /rutas/{rutaId} {
-        allow read: if request.auth != null;
+        allow read: if request.auth != null && (
+          isSuperAdmin()
+          || (isEnabled() && (
+            isJefe(empresaId)
+            || (isAdmin()    && belongsToEmpresa(empresaId) && resource.data.adminId == request.auth.uid)
+            || (isEmpleado() && belongsToEmpresa(empresaId) && request.auth.token.rutaId == rutaId)
+          ))
+        );
         allow write: if false;
       }
+
+      // Clientes
+      // Jefe: todos. Admin: los suyos (adminId). Empleado: los de su ruta (rutaId del doc).
       match /clientes/{clienteId} {
-        allow read: if request.auth != null;
+        allow read: if request.auth != null && (
+          isSuperAdmin()
+          || (isEnabled() && (
+            isJefe(empresaId)
+            || (isAdmin()    && belongsToEmpresa(empresaId) && resource.data.adminId == request.auth.uid)
+            || (isEmpleado() && belongsToEmpresa(empresaId) && resource.data.rutaId == request.auth.token.rutaId)
+          ))
+        );
         allow write: if false;
       }
+
+      // Préstamos — misma lógica que clientes.
+      // IMPORTANTE: NO hay match /pagos anidado; el matcher global /{path=**}/pagos
+      // lo cubre sin ser anulado.
       match /prestamos/{prestamoId} {
-        allow read: if request.auth != null;
+        allow read: if request.auth != null && (
+          isSuperAdmin()
+          || (isEnabled() && (
+            isJefe(empresaId)
+            || (isAdmin()    && belongsToEmpresa(empresaId) && resource.data.adminId == request.auth.uid)
+            || (isEmpleado() && belongsToEmpresa(empresaId) && resource.data.rutaId == request.auth.token.rutaId)
+          ))
+        );
         allow write: if false;
-        match /pagos/{pagoId} {
-          allow read: if request.auth != null;
-          allow write: if false;
-        }
       }
+
+      // Gastos genéricos — Level A: sólo miembros de la empresa.
+      // Level B (por adminId) se añade en iteración posterior al auditar queries.
       match /gastos/{gastoId} {
-        allow read: if request.auth != null;
+        allow read: if request.auth != null && isEnabled()
+          && belongsToEmpresa(empresaId);
         allow write: if false;
       }
+
+      // Gastos empleado — jefe o (adminId || empleadoId propios).
       match /gastosEmpleado/{gastoId} {
-        allow read: if request.auth != null;
+        allow read: if request.auth != null && isEnabled() && (
+          isJefe(empresaId)
+          || (belongsToEmpresa(empresaId) && (
+            resource.data.adminId    == request.auth.uid
+            || resource.data.empleadoId == request.auth.uid
+          ))
+        );
         allow write: if false;
       }
+
+      // Gastos administrador — jefe o admin propio.
       match /gastosAdministrador/{gastoId} {
-        allow read: if request.auth != null;
+        allow read: if request.auth != null && isEnabled() && (
+          isJefe(empresaId)
+          || (isAdmin() && belongsToEmpresa(empresaId) && resource.data.adminId == request.auth.uid)
+        );
         allow write: if false;
       }
+
+      // Gastos empresa — jefe o cualquier admin de la empresa.
       match /gastosEmpresa/{gastoId} {
-        allow read: if request.auth != null;
+        allow read: if request.auth != null && isEnabled() && (
+          isJefe(empresaId)
+          || (isAdmin() && belongsToEmpresa(empresaId))
+        );
         allow write: if false;
       }
+
+      // Solicitudes y reportes: ya estaban bien scopeados; se añade belongsToEmpresa.
       match /solicitudesEntregaReporte/{solicitudId} {
-        allow read: if request.auth != null
+        allow read: if request.auth != null && isEnabled()
+          && belongsToEmpresa(empresaId)
           && (resource.data.empleadoUid == request.auth.uid
-              || resource.data.adminId == request.auth.uid);
+              || resource.data.adminId  == request.auth.uid);
         allow write: if false;
       }
       match /solicitudesPrestamo/{solicitudId} {
-        allow read: if request.auth != null
+        allow read: if request.auth != null && isEnabled()
+          && belongsToEmpresa(empresaId)
           && (resource.data.empleadoUid == request.auth.uid
-              || resource.data.adminId == request.auth.uid);
+              || resource.data.adminId  == request.auth.uid);
         allow write: if false;
       }
       match /reportesDia/{reporteId} {
-        allow read: if request.auth != null
+        allow read: if request.auth != null && isEnabled()
+          && belongsToEmpresa(empresaId)
           && resource.data.adminId == request.auth.uid;
         allow write: if false;
       }

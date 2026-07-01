@@ -30,7 +30,8 @@ import {
   type PrestamoFiltroEstado,
 } from "@/lib/prestamo-periodo-filter";
 import {
-  filtrarPrestamosParaListado,
+  aplicarFiltroNombrePrestamos,
+  filtrarPrestamosConConteos,
   prestamoCoincideRuta,
 } from "@/lib/prestamo-list-filter";
 import { getEmpresa } from "@/lib/empresa";
@@ -493,35 +494,41 @@ export default function PrestamoAdminPageContent() {
     [filtroContable, periodos]
   );
 
-  const contadoresPorFiltro = useMemo(() => {
-    const contar = (estado: PrestamoFiltroEstado) =>
-      filtrarPrestamosParaListado({
+  /**
+   * Pase único sobre la colección: fusiona, deduplica, aplica filtroContable +
+   * filtroRutaId + filtroEstado, y clasifica conteos en un solo bucle.
+   * NO depende de filtroNombre para que el buscador no relance esta operación
+   * en cada tecla — ver memo de prestamosFiltrados abajo.
+   */
+  const { listaEstado, conteos: contadoresPorFiltro } = useMemo(
+    () =>
+      filtrarPrestamosConConteos({
         prestamos,
         prestamosPagados,
         prestamosCastigados,
         filtroContable,
-        filtroEstado: estado,
+        filtroEstado,
         filtroRutaId,
         clientePorId,
         periodos,
-      }).length;
+      }),
+    [
+      prestamos,
+      prestamosPagados,
+      prestamosCastigados,
+      filtroContable,
+      filtroEstado,
+      filtroRutaId,
+      clientePorId,
+      periodos,
+    ]
+  );
 
-    return {
-      todos: contar("todos"),
-      activo: contar("activo"),
-      pagado: contar("pagado"),
-      castigado: contar("castigado"),
-      moroso: contar("moroso"),
-    };
-  }, [
-    prestamos,
-    prestamosPagados,
-    prestamosCastigados,
-    filtroContable,
-    filtroRutaId,
-    clientePorId,
-    periodos,
-  ]);
+  /** Aplica el buscador sobre la lista ya filtrada por estado. */
+  const prestamosFiltrados = useMemo(
+    () => aplicarFiltroNombrePrestamos(listaEstado, filtroNombre, clientePorId),
+    [listaEstado, filtroNombre, clientePorId]
+  );
 
   const formatContadorFiltro = (est: PrestamoFiltroEstado) => {
     const n = contadoresPorFiltro[est];
@@ -538,32 +545,6 @@ export default function PrestamoAdminPageContent() {
   ];
 
   const filtroNombreLower = filtroNombre.trim().toLowerCase();
-
-  const prestamosFiltrados = useMemo(
-    () =>
-      filtrarPrestamosParaListado({
-        prestamos,
-        prestamosPagados,
-        prestamosCastigados,
-        filtroContable,
-        filtroEstado,
-        filtroRutaId,
-        filtroNombre,
-        clientePorId,
-        periodos,
-      }),
-    [
-      prestamos,
-      prestamosPagados,
-      prestamosCastigados,
-      filtroContable,
-      filtroEstado,
-      filtroRutaId,
-      filtroNombre,
-      clientePorId,
-      periodos,
-    ]
-  );
 
   const resumenPerdidas = useMemo(() => {
     const castigados = prestamosFiltrados.filter((p) => p.estado === "castigado");
@@ -1250,6 +1231,7 @@ export default function PrestamoAdminPageContent() {
           onCerrar={() => setShowExportModal(false)}
         />
       )}
+
     </div>
   );
 }
