@@ -27,7 +27,7 @@
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
-    "@firebase/rules-unit-testing": "^4.0.1",
+    "@firebase/rules-unit-testing": "3.0.4",
     "@next/bundle-analyzer": "^14.2.15",
     "@types/jest": "^30.0.0",
     "cross-env": "^7.0.3",
