@@ -35,7 +35,6 @@ import {
 } from "@/lib/prestamo-list-filter";
 import { getEmpresa } from "@/lib/empresa";
 import { isPrestamoEnCobro, labelEstadoPrestamo } from "@/lib/prestamo-estado";
-import { GastosPeriodoContableFilter } from "@/components/GastosPeriodoContableFilter";
 import { interiorDecimalCOPToNumber } from "@/lib/monto-input-es";
 import {
   formatMonedaPrestamoAdmin,
@@ -225,8 +224,8 @@ export default function PrestamoAdminPageContent() {
   const [showExportModal, setShowExportModal] = useState(false);
   const [nombreEmpresa, setNombreEmpresa] = useState("KrediApp");
   const [confirmarMontoAlto, setConfirmarMontoAlto] = useState(false);
-  const [filtroContable, setFiltroContable] = useState<PrestamoFiltroContable>({ modo: "hoy" });
-  const [filtroEstado, setFiltroEstado] = useState<PrestamoFiltroEstado>("todos");
+  const [filtroContable, setFiltroContable] = useState<PrestamoFiltroContable>({ modo: "todo" });
+  const [filtroEstado, setFiltroEstado] = useState<PrestamoFiltroEstado>("activo");
   const [filtroNombre, setFiltroNombre] = useState("");
   const [filtroRutaId, setFiltroRutaId] = useState("");
   const [periodos, setPeriodos] = useState<PeriodoAdminListaItem[]>([]);
@@ -835,23 +834,7 @@ export default function PrestamoAdminPageContent() {
           <p className="prestamo-admin-empty">No hay préstamos en el historial.</p>
         ) : (
           <>
-            <div
-              className={`gastos-admin-periodo-banner prestamo-admin-periodo-banner gastos-admin-periodo-banner--${bannerPeriodo.tone}`}
-              role="status"
-            >
-              <div className="gastos-admin-periodo-banner-text">
-                <strong>{bannerPeriodo.titulo}</strong>
-                {bannerPeriodo.detalle ? <span>{bannerPeriodo.detalle}</span> : null}
-              </div>
-            </div>
-
             <div className="prestamo-admin-filtros-wrap">
-              <GastosPeriodoContableFilter
-                filtro={filtroContable}
-                onChange={setFiltroContable}
-                periodos={periodos}
-              />
-
               <div className="prestamo-admin-filtro-estado-section">
                 <p id="prestamo-filtro-estado-label" className="prestamo-admin-filtro-legend">
                   Estado
@@ -862,18 +845,31 @@ export default function PrestamoAdminPageContent() {
                   aria-labelledby="prestamo-filtro-estado-label"
                 >
                 {FILTROS_PRESTAMO.map(({ est, label }) => (
-                  <button
-                    key={est}
-                    type="button"
-                    role="tab"
-                    aria-selected={filtroEstado === est}
-                    className={`prestamo-admin-tab${filtroEstado === est ? " prestamo-admin-tab--active" : ""}`}
-                    onClick={() => setFiltroEstado(est)}
-                    aria-label={`${label}, ${contadoresPorFiltro[est]} préstamo${contadoresPorFiltro[est] !== 1 ? "s" : ""}`}
-                  >
-                    {label}
-                    <span className="prestamo-admin-tab-count">({formatContadorFiltro(est)})</span>
-                  </button>
+                  <Fragment key={est}>
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={filtroEstado === est && filtroContable.modo !== "hoy"}
+                      className={`prestamo-admin-tab${filtroEstado === est && filtroContable.modo !== "hoy" ? " prestamo-admin-tab--active" : ""}`}
+                      onClick={() => { setFiltroContable({ modo: "todo" }); setFiltroEstado(est); }}
+                      aria-label={`${label}, ${contadoresPorFiltro[est]} préstamo${contadoresPorFiltro[est] !== 1 ? "s" : ""}`}
+                    >
+                      {label}
+                      <span className="prestamo-admin-tab-count">({formatContadorFiltro(est)})</span>
+                    </button>
+                    {est === "activo" && (
+                      <button
+                        type="button"
+                        role="tab"
+                        aria-selected={filtroContable.modo === "hoy"}
+                        className={`prestamo-admin-tab${filtroContable.modo === "hoy" ? " prestamo-admin-tab--active" : ""}`}
+                        onClick={() => { setFiltroContable({ modo: "hoy" }); setFiltroEstado("todos"); }}
+                        aria-label="Desembolsados hoy"
+                      >
+                        Hoy
+                      </button>
+                    )}
+                  </Fragment>
                 ))}
                 </div>
               </div>
@@ -1232,7 +1228,7 @@ export default function PrestamoAdminPageContent() {
           </p>
           {cajaRuta > 0 && (
             <p>
-              Se descontará de la caja de la ruta: <strong>$ {formatMonedaPrestamoAdmin(montoNum)}</strong>
+              Se descontará de la caja de la ruta: <strong>$ {formatMonedaPrestamoAdmin(cajaRuta - montoNum)}</strong> restantes.
             </p>
           )}
         </ModalConfirmar>
@@ -1240,7 +1236,7 @@ export default function PrestamoAdminPageContent() {
 
       {showExportModal && (
         <ExportPrestamosModal
-          onCerrar={() => setShowExportModal(false)}
+          nombreEmpresa={nombreEmpresa}
           prestamos={prestamos}
           prestamosPagados={prestamosPagados}
           prestamosCastigados={prestamosCastigados}
@@ -1250,13 +1246,8 @@ export default function PrestamoAdminPageContent() {
           hayMasPagados={hayMasPagados}
           onCargarTodosPagados={cargarTodosPagados}
           loadingPagados={loadingPagados}
-          nombreEmpresa={nombreEmpresa}
-          filtrosIniciales={{
-            filtroContable,
-            filtroEstado,
-            filtroRutaId,
-            filtroNombre,
-          }}
+          filtrosIniciales={{ filtroContable, filtroEstado, filtroRutaId, filtroNombre }}
+          onCerrar={() => setShowExportModal(false)}
         />
       )}
     </div>
