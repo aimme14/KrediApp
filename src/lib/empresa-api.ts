@@ -1154,6 +1154,8 @@ export async function createPrestamo(
     modalidad?: "diario" | "semanal" | "mensual";
     numeroCuotas: number;
     fechaInicio?: string;
+    /** Clave de idempotencia — el backend deduplica si la operación ya fue procesada. */
+    idempotencyKey?: string;
   }
 ): Promise<string> {
   const res = await fetchWithAuth("/api/empresa/prestamos", token, {

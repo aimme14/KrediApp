@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo, Fragment, type ReactNode } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef, Fragment, type ReactNode } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -232,16 +232,28 @@ export default function PrestamoAdminPageContent() {
   const [periodos, setPeriodos] = useState<PeriodoAdminListaItem[]>([]);
   const [periodosLoading, setPeriodosLoading] = useState(true);
   const [historialEconomicoColapsado, setHistorialEconomicoColapsado] = useState(true);
+  /** Clave de idempotencia para el intento de creación actual — persiste entre reintentos en la misma sesión de formulario. */
+  const prestamoCreateKeyRef = useRef<string | null>(null);
+  /** Checkbox de confirmación dentro del modal de creación (separado de confirmarMontoAlto del formulario). */
+  const [confirmarModalPrestamo, setConfirmarModalPrestamo] = useState(false);
 
   useEffect(() => {
     setConfirmarMontoAlto(false);
   }, [rutaIdForm, clienteId, monto, numeroCuotas, interes, modalidad]);
 
   const abrirFormularioCrear = useCallback(() => {
+    // Nueva key por cada intento de creación; retiros en la misma sesión reusan la misma key
+    prestamoCreateKeyRef.current = crypto.randomUUID();
     setConfirmarMontoAlto(false);
+    setConfirmarModalPrestamo(false);
     setShowModalPrestamo(false);
     setError(null);
     setShowCreateForm(true);
+  }, []);
+
+  const cerrarFormularioCrear = useCallback(() => {
+    prestamoCreateKeyRef.current = null;
+    setShowCreateForm(false);
   }, []);
 
   useEffect(() => {
@@ -363,11 +375,14 @@ export default function PrestamoAdminPageContent() {
       setError("Selecciona un cliente");
       return;
     }
+    setConfirmarModalPrestamo(false);
     setError(null);
     setShowModalPrestamo(true);
   };
 
   const handleEjecutarPrestamo = async () => {
+    // Guard doble-clic: el modal deshabilita el botón, pero previene race conditions en el primer frame
+    if (creating) return;
     if (!online) {
       setError(OFFLINE_MSG);
       return;
@@ -375,6 +390,10 @@ export default function PrestamoAdminPageContent() {
     if (!user || !confirmarMontoAlto) return;
     const montoNum = interiorDecimalCOPToNumber(monto);
     const nCuotas = Math.max(1, parseInt(numeroCuotas, 10) || 1);
+
+    // Reutiliza key del intento actual (si red cayó y el usuario reintenta, el backend deduplica)
+    const idempotencyKey = prestamoCreateKeyRef.current ?? crypto.randomUUID();
+    prestamoCreateKeyRef.current = idempotencyKey;
 
     setError(null);
     setCreating(true);
@@ -387,7 +406,9 @@ export default function PrestamoAdminPageContent() {
         modalidad,
         numeroCuotas: nCuotas,
         fechaInicio: new Date().toISOString().slice(0, 10),
+        idempotencyKey,
       });
+      prestamoCreateKeyRef.current = null;
       setRutaIdForm("");
       setClienteId("");
       setMonto("");
@@ -395,6 +416,7 @@ export default function PrestamoAdminPageContent() {
       setInteres("");
       setModalidad("mensual");
       setConfirmarMontoAlto(false);
+      setConfirmarModalPrestamo(false);
       setShowModalPrestamo(false);
       setShowCreateForm(false);
       await refresh();
@@ -700,7 +722,7 @@ export default function PrestamoAdminPageContent() {
           creating={creating}
           online={online}
           onSubmit={() => handleSubmit()}
-          onClose={() => setShowCreateForm(false)}
+          onClose={cerrarFormularioCrear}
         />
       )}
 
@@ -1168,13 +1190,23 @@ export default function PrestamoAdminPageContent() {
           labelConfirmar="Sí, crear préstamo"
           confirmando={creating}
           confirmarDeshabilitado={!online}
+          confirmacionMarcada={confirmarModalPrestamo}
+          onConfirmacionMarcadaChange={setConfirmarModalPrestamo}
+          labelConfirmacion={
+            <>
+              Confirmo el desembolso de{" "}
+              <strong>$ {formatMonedaPrestamoAdmin(montoNum)}</strong> a{" "}
+              <strong>{clienteSeleccionado?.nombre ?? "—"}</strong>
+            </>
+          }
           onCancelar={() => {
             if (creating) return;
+            setConfirmarModalPrestamo(false);
             setShowModalPrestamo(false);
           }}
           onConfirmar={() => { void handleEjecutarPrestamo(); }}
         >
-          <p>¿Estás seguro de crear este préstamo?</p>
+          <p>Revisa los datos antes de desembolsar:</p>
           <p>
             Cliente: <strong>{clienteSeleccionado?.nombre ?? "—"}</strong>
           </p>
