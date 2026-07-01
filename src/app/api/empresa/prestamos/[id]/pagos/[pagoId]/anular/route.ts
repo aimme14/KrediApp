@@ -76,7 +76,27 @@ function mapDatosPago(pd: Record<string, unknown>): DatosPago {
       typeof pd.estadoPrestamoDespues === "string" ? pd.estadoPrestamoDespues : undefined,
     fecha: fechaDesdeFirestore(pd.fecha),
     empleadoId: typeof pd.empleadoId === "string" ? pd.empleadoId : "",
+    intentosFallidosAntes:
+      typeof pd.intentosFallidosAntes === "number" ? pd.intentosFallidosAntes : 0,
+    ultimoPagoIdAnterior:
+      typeof pd.ultimoPagoIdAnterior === "string" ? pd.ultimoPagoIdAnterior : null,
   };
+}
+
+/** Extrae el rango [fechaApertura, ahora] de un QuerySnapshot de periodos. */
+function buildRangoDesdeQuerySnap(
+  snap: FirebaseFirestore.QuerySnapshot
+): { desde: Date; hasta: Date } | null {
+  if (snap.empty) return null;
+  const fechaAperturaRaw = snap.docs[0].data().fechaApertura;
+  const desde =
+    fechaAperturaRaw instanceof Timestamp
+      ? fechaAperturaRaw.toDate()
+      : fechaAperturaRaw instanceof Date
+        ? fechaAperturaRaw
+        : null;
+  if (!desde) return null;
+  return { desde, hasta: new Date() };
 }
 
 async function obtenerRangoPeriodoAbiertoAdmin(
@@ -92,19 +112,7 @@ async function obtenerRangoPeriodoAbiertoAdmin(
     .where("estado", "==", "abierto")
     .limit(1)
     .get();
-
-  if (snap.empty) return null;
-
-  const fechaAperturaRaw = snap.docs[0].data().fechaApertura;
-  const desde =
-    fechaAperturaRaw instanceof Timestamp
-      ? fechaAperturaRaw.toDate()
-      : fechaAperturaRaw instanceof Date
-        ? fechaAperturaRaw
-        : null;
-  if (!desde) return null;
-
-  return { desde, hasta: new Date() };
+  return buildRangoDesdeQuerySnap(snap);
 }
 
 async function existeReporteAprobadoParaEmpleado(
@@ -264,19 +272,53 @@ export async function POST(
         fechaCierre: pr.fechaCierre ?? null,
       };
 
+      // ── Re-read open period inside tx (elimina TOCTOU sobre el periodo) ──
+      const periodoQueryTx = db
+        .collection(EMPRESAS_COLLECTION)
+        .doc(empresaId)
+        .collection(PERIODOS_ADMIN_SUBCOLLECTION)
+        .where("adminId", "==", apiUser.uid)
+        .where("estado", "==", "abierto")
+        .limit(1);
+      const periodoSnapTx = await tx.get(periodoQueryTx);
+      const rangoPeriodoAbiertoTx = buildRangoDesdeQuerySnap(periodoSnapTx);
       const enPeriodoAbiertoTx =
-        rangoPeriodoAbierto !== null &&
+        rangoPeriodoAbiertoTx !== null &&
         gastoOcurreEnRangoContable(
           pago.fecha.toISOString(),
-          rangoPeriodoAbierto.desde,
-          rangoPeriodoAbierto.hasta
+          rangoPeriodoAbiertoTx.desde,
+          rangoPeriodoAbiertoTx.hasta
         );
+
+      // ── Re-check reporte dentro de tx (solo para cobros de empleado en efectivo) ──
+      let reporteAprobadoTx = false;
+      if (!pago.acreditaCajaRuta && pago.empleadoId) {
+        // Nota: requiere índice compuesto (empleadoId, fechaDia, adminId) en reportes_dia
+        const reporteQueryTx = db
+          .collection(EMPRESAS_COLLECTION)
+          .doc(empresaId)
+          .collection(REPORTES_DIA_SUBCOLLECTION)
+          .where("empleadoId", "==", pago.empleadoId)
+          .where("fechaDia", "==", fechaDiaPago ?? hoy)
+          .where("adminId", "==", apiUser.uid)
+          .limit(1);
+        const reporteSnapTx = await tx.get(reporteQueryTx);
+        reporteAprobadoTx = !reporteSnapTx.empty;
+      }
+
+      // ── Verificar último pago dentro de tx usando ultimoPagoId (O(1) para préstamos nuevos) ──
+      const ultimoPagoIdEnPrestamo =
+        typeof pr.ultimoPagoId === "string" ? pr.ultimoPagoId : null;
+      const esUltimoPagoTx =
+        ultimoPagoIdEnPrestamo !== null
+          ? ultimoPagoIdEnPrestamo === pagoId
+          : true; // Legacy: préstamos sin ultimoPagoId → confiar en el chequeo pre-tx
 
       const elegibilidadError = validarElegibilidadAnulacion({
         pago,
         enPeriodoAbierto: enPeriodoAbiertoTx,
-        esUltimoPago: true,
-        reporteAprobado: false,
+        esUltimoPago: esUltimoPagoTx,
+        reporteAprobado: reporteAprobadoTx,
       });
       if (elegibilidadError) {
         throw new Error(elegibilidadError);
@@ -352,6 +394,9 @@ export async function POST(
       const rev = calcularReversion({ pago, prestamo, ruta, empleado, modo });
       const nowTx = new Date();
 
+      // ultimoPagoFecha: usa el snapshot guardado en el pago (nuevo), con fallback al query pre-tx (legacy)
+      const ultimoPagoFechaAnteriorTx = pd.ultimoPagoFechaAnterior ?? ultimoPagoFechaRestaurar;
+
       tx.update(pagoRef, {
         estado: "anulado",
         anuladoEn: nowTx,
@@ -365,7 +410,9 @@ export async function POST(
         adelantoCuota: rev.nuevoAdelantoCuota,
         estado: rev.nuevoEstadoPrestamo,
         updatedAt: nowTx,
-        ultimoPagoFecha: ultimoPagoFechaRestaurar ?? FieldValue.delete(),
+        intentosFallidos: rev.intentosFallidosRestaurados,
+        ultimoPagoFecha: ultimoPagoFechaAnteriorTx ?? FieldValue.delete(),
+        ultimoPagoId: pago.ultimoPagoIdAnterior ?? FieldValue.delete(),
       };
       if (rev.reabrePrestamo) {
         prestamoUpdate.fechaCierre = FieldValue.delete();

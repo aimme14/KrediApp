@@ -24,6 +24,7 @@ export type ResultadoReversion = {
   nuevoCapitalTotal: number;
   nuevaCajaEmpleado: number | null;
   modo: ModoReversion;
+  intentosFallidosRestaurados: number;
 };
 
 export type DatosRuta = {
@@ -50,6 +51,10 @@ export type DatosPago = {
   estadoPrestamoDespues?: string;
   fecha: Date;
   empleadoId: string;
+  /** Snapshot: valor de intentosFallidos del préstamo justo antes de este pago. */
+  intentosFallidosAntes?: number;
+  /** Snapshot: ultimoPagoId del préstamo justo antes de este pago (para restaurar en anulación). */
+  ultimoPagoIdAnterior?: string | null;
 };
 
 export type DatosPrestamo = {
@@ -145,7 +150,7 @@ export function calcularReversion(params: {
     nuevoEstadoPrestamo = pago.estadoPrestamoAntes!;
   } else {
     nuevoSaldoPendiente = round2(prestamo.saldoPendiente + pago.monto);
-    nuevoAdelantoCuota = round2(prestamo.adelantoCuota);
+    nuevoAdelantoCuota = 0;
     nuevoEstadoPrestamo = "activo";
   }
 
@@ -197,6 +202,7 @@ export function calcularReversion(params: {
     nuevoCapitalTotal,
     nuevaCajaEmpleado,
     modo,
+    intentosFallidosRestaurados: pago.intentosFallidosAntes ?? 0,
   };
 }
 

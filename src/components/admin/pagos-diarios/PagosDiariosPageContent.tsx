@@ -138,7 +138,7 @@ export default function PagosDiariosPageContent() {
             "Content-Type": "application/json",
             Authorization: `Bearer ${token}`,
           },
-          body: JSON.stringify({ motivo: motivo.trim() }),
+          body: JSON.stringify({ motivo: motivo.trim(), idempotencyKey: `anular:${item.id}` }),
         }
       );
 

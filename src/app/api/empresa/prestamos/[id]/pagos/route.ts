@@ -735,6 +735,10 @@ export async function POST(
         estadoPrestamoDespues: resolucionPago.estado,
         acreditaCajaRuta,
         tieneSnapshotsCompletos: true,
+        // Snapshots para reversión O(1) sin queries externas
+        ultimoPagoIdAnterior: typeof d.ultimoPagoId === "string" ? d.ultimoPagoId : null,
+        ultimoPagoFechaAnterior: d.ultimoPagoFecha ?? null,
+        intentosFallidosAntes: typeof d.intentosFallidos === "number" ? d.intentosFallidos : 0,
         ...buildCamposAuditoria({
           adminId: adminIdPrestamo,
           empresaId: apiUser.empresaId,
@@ -756,6 +760,7 @@ export async function POST(
         updatedAt: nowTx,
         adelantoCuota: adelantoParaGuardar,
         ultimoPagoFecha: FieldValue.serverTimestamp(),
+        ultimoPagoId: pagoRef.id,
         intentosFallidos: 0,
         ...(resolucionPago.cierraPrestamo
           ? { fechaCierre: nowTx, cerradoPor: resolucionPago.cerradoPor }
