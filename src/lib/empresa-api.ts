@@ -1092,6 +1092,8 @@ export async function registrarNoPago(
     nota?: string;
     registradoPorUid?: string;
     registradoPorNombre?: string;
+    /** Clave de idempotencia — el backend deduplica si la operación ya fue procesada. */
+    idempotencyKey?: string;
   }
 ): Promise<void> {
   const res = await fetchWithAuth(`/api/empresa/prestamos/${encodeURIComponent(prestamoId)}/pagos`, token, {
@@ -1102,6 +1104,7 @@ export async function registrarNoPago(
       nota: params.nota?.trim() || undefined,
       registradoPorUid: params.registradoPorUid,
       registradoPorNombre: params.registradoPorNombre,
+      idempotencyKey: params.idempotencyKey,
     }),
   });
   const data = await res.json();

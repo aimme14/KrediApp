@@ -34,10 +34,13 @@ import {
 } from "@/lib/colombia-day-bounds";
 import {
   clearCobroSnapshot,
+  clearNoPagoSnapshot,
   formatCurrencyCobro,
   getCobroSnapshot,
+  getNoPagoSnapshot,
   MOTIVOS_NO_PAGO,
   setCobroSnapshot,
+  setNoPagoSnapshot,
 } from "@/lib/cobrar-utils";
 
 const ModalConfirmar = dynamic(
@@ -247,9 +250,15 @@ function CobrarClientePageContent() {
       return;
     }
 
-    const snapshot = getCobroSnapshot(prestamoId, user.uid);
-    if (!snapshot?.key || snapshot.prestamoId !== prestamoId) {
-      if (snapshot) clearCobroSnapshot(prestamoId, user.uid);
+    const cobroSnap = getCobroSnapshot(prestamoId, user.uid);
+    const noPagoSnap = getNoPagoSnapshot(prestamoId, user.uid);
+
+    const tieneCobroSnap = !!cobroSnap?.key && cobroSnap.prestamoId === prestamoId;
+    const tieneNoPagoSnap = !!noPagoSnap?.key && noPagoSnap.prestamoId === prestamoId;
+
+    // Sin snapshots pendientes → no hay nada que recuperar
+    if (!tieneCobroSnap && !tieneNoPagoSnap) {
+      if (cobroSnap) clearCobroSnapshot(prestamoId, user.uid);
       setRecoveryChecked(true);
       return;
     }
@@ -258,38 +267,57 @@ function CobrarClientePageContent() {
     void (async () => {
       try {
         const token = await user.getIdToken();
-        const result = await checkCobroIdempotency(token, prestamoId, snapshot.key);
-        if (cancelled) return;
 
-        if (result.processed && result.payload) {
-          clearCobroSnapshot(prestamoId, user.uid);
-          const montoRecuperado = result.payload.montoAplicado ?? snapshot.monto;
-          cobroConfirmadoRef.current = {
-            cliente,
-            prestamo,
-            montoAplicar: montoRecuperado,
-          };
-          setNuevoSaldoPendiente(result.payload.saldoPendiente);
-          setPrestamo((p) =>
-            p
-              ? {
-                  ...p,
-                  saldoPendiente: result.payload!.saldoPendiente,
-                  estado: normalizeEstadoPrestamo(result.payload!.estado),
-                }
-              : p
-          );
-          setConfirmado(true);
-          void refreshLista();
-          void refreshCajaDia();
-        } else if (result.failed) {
-          clearCobroSnapshot(prestamoId, user.uid);
-          setError(result.error ?? "El cobro anterior falló. Intenta de nuevo.");
-        } else if (result.processing) {
-          setError("");
+        if (tieneCobroSnap) {
+          // Recovery de cobro
+          const result = await checkCobroIdempotency(token, prestamoId, cobroSnap!.key);
+          if (cancelled) return;
+
+          if (result.processed && result.payload) {
+            clearCobroSnapshot(prestamoId, user.uid);
+            const montoRecuperado = result.payload.montoAplicado ?? cobroSnap!.monto;
+            cobroConfirmadoRef.current = {
+              cliente,
+              prestamo,
+              montoAplicar: montoRecuperado,
+            };
+            setNuevoSaldoPendiente(result.payload.saldoPendiente);
+            setPrestamo((p) =>
+              p
+                ? {
+                    ...p,
+                    saldoPendiente: result.payload!.saldoPendiente,
+                    estado: normalizeEstadoPrestamo(result.payload!.estado),
+                  }
+                : p
+            );
+            setConfirmado(true);
+            void refreshLista();
+            void refreshCajaDia();
+          } else if (result.failed) {
+            clearCobroSnapshot(prestamoId, user.uid);
+            setError(result.error ?? "El cobro anterior falló. Intenta de nuevo.");
+          } else if (result.processing) {
+            setError("");
+          }
+        } else if (tieneNoPagoSnap) {
+          // Recovery de no_pago
+          const result = await checkCobroIdempotency(token, prestamoId, noPagoSnap!.key);
+          if (cancelled) return;
+
+          if (result.processed) {
+            clearNoPagoSnapshot(prestamoId, user.uid);
+            setNoPagoRegistrado(true);
+            void refreshLista();
+            void refreshCajaDia();
+          } else if (result.failed) {
+            clearNoPagoSnapshot(prestamoId, user.uid);
+            setError(result.error ?? "El no pago anterior falló. Intenta de nuevo.");
+          }
+          // result.processing → mantener snapshot; el usuario puede reintentar manualmente
         }
       } catch {
-        /* Error de red — mantener snapshot para reintento */
+        /* Error de red — mantener snapshots para reintento */
       } finally {
         if (!cancelled) setRecoveryChecked(true);
       }
@@ -460,7 +488,6 @@ function CobrarClientePageContent() {
         registradoPorNombre: nombreRegistro || undefined,
         idempotencyKey,
       });
-      clearCobroSnapshot(prestamoId, user.uid);
       const prestamoActualizado: PrestamoItem = {
         ...prestamoAlCobrar,
         saldoPendiente: res.saldoPendiente,
@@ -489,6 +516,9 @@ function CobrarClientePageContent() {
       setUltimosPagos((prev) => [nuevoPago, ...prev]);
       await refreshLista();
       void refreshCajaDia();
+      // Borrar snapshot al final — si el proceso muere antes de esta línea,
+      // el recovery detecta processed:true y reconstruye el comprobante sin reenviar.
+      clearCobroSnapshot(prestamoId, user.uid);
     } catch (e) {
       const msg = e instanceof Error ? e.message : "";
       if (
@@ -539,6 +569,15 @@ function CobrarClientePageContent() {
     if (!motivoNoPago || !user || !prestamoId || !profile) return;
     setSubmittingNoPago(true);
     setError(null);
+
+    // Reutiliza key existente (reintento en misma sesión) o genera una nueva
+    const noPagoKey = (() => {
+      const existing = getNoPagoSnapshot(prestamoId, user.uid);
+      if (existing?.prestamoId === prestamoId) return existing.key;
+      return crypto.randomUUID();
+    })();
+    setNoPagoSnapshot({ key: noPagoKey, prestamoId, motivoNoPago }, user.uid);
+
     try {
       const token = await user.getIdToken();
       const nombreRegistro = profile.displayName ?? profile.email ?? "";
@@ -547,13 +586,26 @@ function CobrarClientePageContent() {
         nota: notaNoPago.trim() || undefined,
         registradoPorUid: user.uid,
         registradoPorNombre: nombreRegistro || undefined,
+        idempotencyKey: noPagoKey,
       });
+      clearNoPagoSnapshot(prestamoId, user.uid);
       setShowModalNoPago(false);
       setNoPagoRegistrado(true);
       await refreshLista();
       void refreshCajaDia();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Error al registrar no pago");
+      // Snapshot permanece — próximo reintento reutiliza la misma key sin duplicar
+      const msg = e instanceof Error ? e.message : "";
+      if (
+        msg.includes("fetch") ||
+        msg.includes("network") ||
+        msg.includes("NetworkError") ||
+        msg.includes("Failed to fetch")
+      ) {
+        setError("Sin conexión. Puedes reintentar — el no pago no se duplicará.");
+      } else {
+        setError(msg || "Error al registrar no pago");
+      }
     } finally {
       setSubmittingNoPago(false);
     }
@@ -621,7 +673,7 @@ function CobrarClientePageContent() {
   if (!recoveryChecked) {
     return (
       <div className="card">
-        <p>Verificando estado del cobro...</p>
+        <p>Verificando operación pendiente...</p>
       </div>
     );
   }

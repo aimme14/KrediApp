@@ -55,6 +55,38 @@ export function clearCobroSnapshot(pid: string, uid: string): void {
   }
 }
 
+export type NoPagoSnapshot = {
+  key: string;
+  prestamoId: string;
+  /** Motivo elegido — solo informativo; el backend no lo reutiliza en replay. */
+  motivoNoPago: string;
+};
+
+export function getNoPagoSnapshot(pid: string, uid: string): NoPagoSnapshot | null {
+  try {
+    const raw = localStorage.getItem(`kredi:nopago:${pid}:${uid}`);
+    return raw ? (JSON.parse(raw) as NoPagoSnapshot) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function setNoPagoSnapshot(s: NoPagoSnapshot, uid: string): void {
+  try {
+    localStorage.setItem(`kredi:nopago:${s.prestamoId}:${uid}`, JSON.stringify(s));
+  } catch {
+    /* localStorage no disponible */
+  }
+}
+
+export function clearNoPagoSnapshot(pid: string, uid: string): void {
+  try {
+    localStorage.removeItem(`kredi:nopago:${pid}:${uid}`);
+  } catch {
+    /* localStorage no disponible */
+  }
+}
+
 /** Escala de captura: mínimo 2× para nitidez en móviles. */
 export function getComprobanteCaptureScale(): number {
   if (typeof window === "undefined") return 2;
