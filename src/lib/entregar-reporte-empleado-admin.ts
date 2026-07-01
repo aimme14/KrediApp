@@ -119,7 +119,6 @@ export async function entregarReporteTrabajadorARuta(
     const udx = uSnapTx.data() as Record<string, unknown>;
     const cEmp = typeof udx?.cajaEmpleado === "number" ? udx.cajaEmpleado : 0;
     const monto = round2(cEmp);
-    if (monto <= 0) throw new Error("No hay efectivo en tu base para entregar");
 
     cajaRuta = round2(cajaRuta + monto);
     cajasEmpleados = round2(Math.max(0, cajasEmpleados - monto));
@@ -222,7 +221,6 @@ export async function entregarReporteTrabajadorARutaConValidacion(
     const udx = uSnapTx.data() as Record<string, unknown>;
     const cEmp = typeof udx?.cajaEmpleado === "number" ? udx.cajaEmpleado : 0;
     const monto = round2(cEmp);
-    if (monto <= 0) throw new Error("No hay efectivo en tu base para entregar");
 
     cajaRuta = round2(cajaRuta + monto);
     cajasEmpleados = round2(Math.max(0, cajasEmpleados - monto));

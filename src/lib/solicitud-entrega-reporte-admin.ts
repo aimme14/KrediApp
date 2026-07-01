@@ -185,9 +185,6 @@ export async function crearSolicitudEntregaReporte(
   }
 
   const preview = await getPreviewEntregaReporteTrabajador(db, empresaId, empleadoUid);
-  if (preview.monto <= 0) {
-    throw new Error("No hay efectivo en tu base para entregar");
-  }
   if (!preview.adminId) {
     throw new Error("La ruta no tiene administrador asignado");
   }
@@ -316,10 +313,6 @@ export async function aprobarSolicitudEntregaReporte(
       solRef,
       adminUid
     );
-  }
-
-  if (result.monto <= 0) {
-    throw new Error("No hubo efectivo que transferir. Es posible que el trabajador ya no tenga saldo.");
   }
 
   const comentarioTrabajador =
