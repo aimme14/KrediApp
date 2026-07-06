@@ -17,6 +17,7 @@ import type { EmpresaProfile } from "@/types/empresa";
 
 const DashboardHelp = dynamic(() => import("@/components/help/DashboardHelp"), { ssr: false });
 const DashboardSettings = dynamic(() => import("@/components/DashboardSettings"), { ssr: false });
+const TrialReminderCard = dynamic(() => import("@/components/TrialReminderCard"), { ssr: false });
 
 export default function DashboardLayout({
   children,
@@ -105,6 +106,7 @@ export default function DashboardLayout({
   return (
     <InactivityLock>
       <OfflineRootEffect />
+      {(isJefe || isAdmin || isTrabajador) ? <TrialReminderCard /> : null}
       <GastoFcmCampanitaProvider>
         <DashboardHeaderProvider value={setHeaderLeftSlot}>
           <div

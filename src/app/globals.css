@@ -835,6 +835,126 @@ button {
   justify-content: flex-end;
 }
 
+/* Tarjeta motivacional — fin de periodo gratuito */
+.trial-reminder-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 250;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: max(1rem, env(safe-area-inset-top)) 1rem max(1rem, env(safe-area-inset-bottom));
+}
+
+.trial-reminder-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+}
+
+.trial-reminder-card {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 400px;
+  padding: 1.5rem 1.35rem 1.25rem;
+  border-radius: calc(var(--radius) + 4px);
+  border: 1px solid color-mix(in srgb, #f59e0b 35%, var(--card-border));
+  background:
+    radial-gradient(ellipse 120% 80% at 50% -20%, color-mix(in srgb, #f59e0b 18%, transparent), transparent 55%),
+    var(--card-bg);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
+  text-align: center;
+}
+
+.trial-reminder-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  margin-bottom: 0.5rem;
+  border-radius: 50%;
+  font-size: 1.1rem;
+  background: color-mix(in srgb, #f59e0b 22%, var(--card-bg));
+  border: 1px solid color-mix(in srgb, #f59e0b 40%, transparent);
+  color: #fbbf24;
+}
+
+[data-theme="light"] .trial-reminder-badge {
+  color: #d97706;
+}
+
+.trial-reminder-eyebrow {
+  margin: 0 0 0.35rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #f59e0b;
+}
+
+.trial-reminder-titulo {
+  margin: 0 0 1rem;
+  font-size: 1.2rem;
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--text);
+}
+
+.trial-reminder-body {
+  margin-bottom: 1.15rem;
+  text-align: left;
+  font-size: 0.9rem;
+  line-height: 1.55;
+  color: var(--text-muted);
+}
+
+.trial-reminder-mensaje {
+  margin: 0 0 0.85rem;
+  padding: 0.75rem 0.85rem;
+  border-radius: 8px;
+  background: color-mix(in srgb, #f59e0b 10%, var(--btn-secondary-bg));
+  border-left: 3px solid #f59e0b;
+  color: var(--text);
+  font-style: italic;
+}
+
+.trial-reminder-countdown {
+  margin: 0 0 0.5rem;
+  font-size: 1rem;
+}
+
+.trial-reminder-countdown strong {
+  color: #f59e0b;
+  font-size: 1.05rem;
+}
+
+[data-theme="light"] .trial-reminder-countdown strong {
+  color: #d97706;
+}
+
+.trial-reminder-fecha {
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.trial-reminder-fecha strong {
+  color: var(--text);
+}
+
+.trial-reminder-btn {
+  width: 100%;
+  margin-bottom: 0.65rem;
+}
+
+.trial-reminder-nota {
+  margin: 0;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  opacity: 0.85;
+}
+
 /* Modal anular cobro — admin pagos diarios (tema claro/oscuro) */
 .pagos-diarios-anular-resumen {
   background: var(--btn-secondary-bg);
