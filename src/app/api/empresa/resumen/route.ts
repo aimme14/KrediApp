@@ -7,6 +7,7 @@ import {
   RUTAS_SUBCOLLECTION,
   USUARIOS_SUBCOLLECTION,
 } from "@/lib/empresas-db";
+import { isAdminPanelApiUser } from "@/lib/admin-panel-role";
 import {
   computeCapitalAdmin,
   computeCapitalRutaFromRutaFields,
@@ -42,7 +43,7 @@ export async function GET(request: NextRequest) {
 
   const db = getAdminFirestore();
   const empresaRef = db.collection(EMPRESAS_COLLECTION).doc(apiUser.empresaId);
-  const isAdmin = apiUser.role === "admin";
+  const isAdmin = isAdminPanelApiUser(apiUser);
 
   const [rutasSnap, userSnap] = await Promise.all([
     isAdmin

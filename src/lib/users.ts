@@ -69,6 +69,23 @@ export async function setJefeEnabled(
 }
 
 /**
+ * Habilita o deshabilita un administrador de empresa. Solo superAdmin.
+ */
+export async function setAdminEmpresaEnabled(
+  adminEmpresaUid: string,
+  enabled: boolean,
+  superAdminUid: string
+): Promise<void> {
+  const res = await fetch(`/api/admin-empresa/${adminEmpresaUid}/enabled`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ enabled, superAdminUid }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error ?? "Error al actualizar administrador de empresa");
+}
+
+/**
  * Habilita o deshabilita un administrador. Solo el jefe que lo creó puede hacerlo.
  */
 export async function setAdminEnabled(
@@ -127,9 +144,34 @@ export async function listUsersByCreator(
 }
 
 /**
+ * Lista todos los administradores de empresa (para superAdmin).
+ */
+export async function listAllAdminEmpresa(): Promise<UserProfile[]> {
+  if (!db) return [];
+  const q = query(
+    collection(db, USERS_COLLECTION),
+    where("role", "==", "adminEmpresa")
+  );
+  const snap = await getDocsFromServer(q);
+  return snap.docs.map((d) => {
+    const data = d.data();
+    return {
+      uid: d.id,
+      email: data.email ?? "",
+      displayName: data.displayName,
+      role: "adminEmpresa" as const,
+      enabled: data.enabled !== false,
+      createdBy: data.createdBy ?? "",
+      createdAt: data.createdAt?.toDate?.() ?? new Date(),
+      updatedAt: data.updatedAt?.toDate?.(),
+      empresaId: data.empresaId,
+      codigo: data.codigo,
+    };
+  });
+}
+
+/**
  * Lista todos los jefes (para superAdmin).
- * Usa getDocsFromServer para que los jefes creados por la API (servidor) se vean de inmediato,
- * ya que getDocs() puede devolver caché local que aún no tiene esos documentos.
  */
 export async function listAllJefes(): Promise<UserProfile[]> {
   if (!db) return [];

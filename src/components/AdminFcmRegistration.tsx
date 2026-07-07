@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import { getMessaging, getToken, isSupported, onMessage } from "firebase/messaging";
 import { app } from "@/lib/firebase";
 import { useAuth } from "@/context/AuthContext";
+import { isAdminPanelRole } from "@/lib/admin-panel-role";
 import {
   useGastoFcmCampanita,
   type OperativoFcmKind,
@@ -31,7 +32,7 @@ export function AdminFcmRegistration() {
   addFcmItemRef.current = addFcmItem;
 
   useEffect(() => {
-    if (!app || !user || profile?.role !== "admin") return;
+    if (!app || !user || !isAdminPanelRole(profile?.role)) return;
     if (typeof window === "undefined" || !("serviceWorker" in navigator)) return;
 
     let cancelled = false;

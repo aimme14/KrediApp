@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAdminFirestore } from "@/lib/firebase-admin";
 import { getApiUser } from "@/lib/api-auth";
 import { asignarBaseCajaRutaAEmpleado } from "@/lib/asignar-base-ruta-empleado-admin";
+import { isAdminPanelApiUser } from "@/lib/admin-panel-role";
 
 /** POST: traspasa efectivo de la base de la ruta (cajaRuta) a la base del trabajador. Solo admin dueño de la ruta. */
 export async function POST(
@@ -12,7 +13,7 @@ export async function POST(
   if (!apiUser) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
-  if (apiUser.role !== "admin") {
+  if (!isAdminPanelApiUser(apiUser)) {
     return NextResponse.json({ error: "Solo administradores" }, { status: 403 });
   }
 

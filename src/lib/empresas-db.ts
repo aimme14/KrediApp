@@ -69,6 +69,12 @@ export const INVERSIONES_CAJA_RUTA_SUBCOLLECTION = "inversionesCajaRuta";
  */
 export const INVERSIONES_RUTA_CAJA_ADMIN_SUBCOLLECTION = "inversionesRutaCajaAdmin";
 
+/**
+ * Ingresos de liquidez externa a base del admin empresa (solo rol adminEmpresa).
+ * empresas/{empresaId}/usuarios/{adminUid}/ingresosBaseAdminEmpresa/{id}
+ */
+export const INGRESOS_BASE_ADMIN_EMPRESA_SUBCOLLECTION = "ingresosBaseAdminEmpresa";
+
 export const USERS_COLLECTION = "users"; // Índice de auth
 
 /** Ledger financiero append-only por empresa. */

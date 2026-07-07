@@ -11,8 +11,8 @@ service cloud.firestore {
 
     // belongsToEmpresa: token.empresaId == path empresaId.
     // Para jefe: token.empresaId == jefeUid == empresaId ✓
-    // Para admin/empleado: token.empresaId == jefeUid == empresaId ✓
-    // Para usuario de otra empresa: token.empresaId != empresaId → false ✓
+    // Para admin bajo jefe: token.empresaId == jefeUid == empresaId ✓
+    // Para adminEmpresa: token.empresaId == su propio uid == empresaId ✓
     function belongsToEmpresa(empresaId) {
       return request.auth.token.empresaId == empresaId;
     }
@@ -23,8 +23,10 @@ service cloud.firestore {
           && request.auth.uid == empresaId;
     }
 
+    // Admin de panel: dependiente del jefe o administrador de empresa (super admin).
     function isAdmin() {
-      return request.auth.token.role == 'admin';
+      return request.auth.token.role == 'admin'
+          || request.auth.token.role == 'adminEmpresa';
     }
 
     function isEmpleado() {

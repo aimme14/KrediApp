@@ -17,6 +17,7 @@ import {
   EMPRESAS_COLLECTION,
   SOLICITUDES_PRESTAMO_SUBCOLLECTION,
 } from "@/lib/empresas-db";
+import { isAdminPanelRole } from "@/lib/admin-panel-role";
 import {
   mapClienteEmpleadoNotif,
   mapSolicitudPrestamoNotif,
@@ -102,7 +103,7 @@ export function AdminNotificacionesRealtimeListener() {
   }, [clientes]);
 
   useEffect(() => {
-    if (!db || !user || profile?.role !== "admin" || !profile.empresaId) {
+    if (!db || !user || !isAdminPanelRole(profile?.role) || !profile?.empresaId) {
       setSolicitudesCountRef.current(0);
       return;
     }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminFirestore } from "@/lib/firebase-admin";
 import { getApiUser } from "@/lib/api-auth";
+import { isAdminPanelApiUser } from "@/lib/admin-panel-role";
 import {
   EMPRESAS_COLLECTION,
   INVERSIONES_CAJA_RUTA_SUBCOLLECTION,
@@ -23,7 +24,7 @@ export async function GET(request: NextRequest) {
   if (!apiUser) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
-  if (apiUser.role !== "admin") {
+  if (!isAdminPanelApiUser(apiUser)) {
     return NextResponse.json({ error: "Solo administradores" }, { status: 403 });
   }
 

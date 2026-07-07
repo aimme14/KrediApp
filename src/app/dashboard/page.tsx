@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import SuperAdminDashboard from "@/components/dashboard/SuperAdminDashboard";
+import { isAdminPanelRole } from "@/lib/admin-panel-role";
 
 export default function DashboardPage() {
   const { profile, loading } = useAuth();
@@ -14,7 +15,7 @@ export default function DashboardPage() {
       router.replace("/dashboard/jefe");
       return;
     }
-    if (profile?.role === "admin") {
+    if (isAdminPanelRole(profile?.role)) {
       router.replace("/dashboard/admin");
       return;
     }
@@ -39,7 +40,7 @@ export default function DashboardPage() {
       </div>
     );
   }
-  if (profile.role === "admin") {
+  if (isAdminPanelRole(profile.role)) {
     return <div className="card"><p>Redirigiendo al panel administrador...</p></div>;
   }
   if (profile.role === "trabajador") {

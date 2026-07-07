@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { isAdminPanelApiUser } from "@/lib/admin-panel-role";
 
 import { getAdminFirestore, getAdminMessaging } from "@/lib/firebase-admin";
 
@@ -62,7 +63,7 @@ export async function POST(request: NextRequest) {
 
   const apiUser = await getApiUser(request);
 
-  if (!apiUser || apiUser.role !== "admin") {
+  if (!apiUser || !isAdminPanelApiUser(apiUser)) {
 
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
@@ -132,7 +133,7 @@ export async function DELETE(request: NextRequest) {
 
   const apiUser = await getApiUser(request);
 
-  if (!apiUser || apiUser.role !== "admin") {
+  if (!apiUser || !isAdminPanelApiUser(apiUser)) {
 
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 

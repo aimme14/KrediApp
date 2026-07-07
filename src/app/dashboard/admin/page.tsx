@@ -7,6 +7,7 @@ import { useAdminDashboard } from "@/context/AdminDashboardContext";
 import { useTrabajadorLista } from "@/context/TrabajadorListaContext";
 import { AdminRutaStatsGrid } from "@/components/AdminRutaStatsGrid";
 import { computeSaldoPorRecogerPorRuta } from "@/lib/prestamo-display";
+import { isAdminPanelRole } from "@/lib/admin-panel-role";
 
 function formatMoneda(value: number): string {
   const hasDecimals = Math.round(value * 100) % 100 !== 0;
@@ -92,7 +93,7 @@ export default function AdminDashboardPage() {
 
   const panelLoading = loading;
 
-  if (!profile || profile.role !== "admin") return null;
+  if (!profile || !isAdminPanelRole(profile.role)) return null;
 
   if (panelLoading) {
     return (

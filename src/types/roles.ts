@@ -1,11 +1,12 @@
 /**
  * Roles de la aplicación con jerarquía:
- * superAdmin -> crea y habilita/deshabilita jefes
+ * superAdmin -> crea jefes y adminEmpresa
  * jefe -> crea admins
- * admin -> crea trabajadores
+ * adminEmpresa -> empresa propia, ingresa a su base; crea trabajadores
+ * admin -> creado por jefe; crea trabajadores
  * trabajador -> rol final
  */
-export type Role = "superAdmin" | "jefe" | "admin" | "trabajador";
+export type Role = "superAdmin" | "jefe" | "admin" | "adminEmpresa" | "trabajador";
 
 export interface UserProfile {
   uid: string;
@@ -36,8 +37,9 @@ export interface UserProfile {
 
 /** Quién puede crear a quién */
 export const ROLE_HIERARCHY: Record<Role, Role[] | null> = {
-  superAdmin: ["jefe"],
+  superAdmin: ["jefe", "adminEmpresa"],
   jefe: ["admin"],
+  adminEmpresa: ["trabajador"],
   admin: ["trabajador"],
   trabajador: null,
 };
@@ -52,6 +54,7 @@ export function roleLabel(role: Role): string {
     superAdmin: "Super Administrador",
     jefe: "Jefe",
     admin: "Administrador",
+    adminEmpresa: "Administrador de empresa",
     trabajador: "Trabajador",
   };
   return labels[role];

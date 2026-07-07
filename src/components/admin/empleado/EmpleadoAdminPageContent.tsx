@@ -7,6 +7,7 @@ import { listRutas, type RutaItem } from "@/lib/empresa-api";
 import type { UserProfile } from "@/types/roles";
 import PasswordCreateFields from "@/components/PasswordCreateFields";
 import { guardOfflineWrite, useOnline } from "@/hooks/useOnline";
+import { isAdminPanelRole } from "@/lib/admin-panel-role";
 
 export default function EmpleadoAdminPageContent() {
   const { user, profile } = useAuth();
@@ -102,7 +103,7 @@ export default function EmpleadoAdminPageContent() {
     }
   };
 
-  if (!profile || profile.role !== "admin") return null;
+  if (!profile || !isAdminPanelRole(profile.role)) return null;
 
   return (
     <div className="card">

@@ -20,14 +20,16 @@ import { syncCustomClaimsForUid } from "@/lib/sync-custom-claims";
 /** Colección de contadores para códigos secuenciales (JF-001, AD-001 por jefe) */
 const COUNTERS_COLLECTION = "counters";
 const JEFES_COUNTER_ID = "jefes";
+const ADMIN_EMPRESA_COUNTER_ID = "adminEmpresa";
 /** ID del contador de admins: por jefe, ej. counters/admins_{jefeUid} */
 function getAdminsCounterId(jefeUid: string): string {
   return `admins_${jefeUid}`;
 }
 
 /** Mapea Role de la app a rol en Firestore (empleado vs trabajador) */
-function toRolFirestore(role: Role): "jefe" | "admin" | "empleado" {
+function toRolFirestore(role: Role): "jefe" | "admin" | "adminEmpresa" | "empleado" {
   if (role === "trabajador") return "empleado";
+  if (role === "adminEmpresa") return "adminEmpresa";
   if (role === "jefe" || role === "admin") return role;
   return "empleado";
 }
@@ -114,6 +116,22 @@ export async function POST(request: NextRequest) {
       codigoJefe = `JF-${String(nextNum).padStart(3, "0")}`;
     }
 
+    // Código secuencial para adminEmpresa (AE-001, AE-002, ...) — solo super admin
+    let codigoAdminEmpresa: string | null = null;
+    let adminEmpresaNum: number | null = null;
+    if (role === "adminEmpresa") {
+      const counterRef = adminDb.collection(COUNTERS_COLLECTION).doc(ADMIN_EMPRESA_COUNTER_ID);
+      const nextNum = await adminDb.runTransaction(async (tx) => {
+        const snap = await tx.get(counterRef);
+        const lastNum = snap.exists ? (snap.data()?.lastNum ?? 0) : 0;
+        const next = lastNum + 1;
+        tx.set(counterRef, { lastNum: next }, { merge: true });
+        return next;
+      });
+      adminEmpresaNum = nextNum;
+      codigoAdminEmpresa = `AE-${String(nextNum).padStart(3, "0")}`;
+    }
+
     // Código secuencial para admin (AD-001, AD-002, ...) por jefe + código del jefe creador + adminNum para rutas RT-XXX-YYY
     let codigoAdmin: string | null = null;
     let jefeCodigo: string | null = null;
@@ -134,9 +152,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Determinar empresaId
-    if (role === "jefe") {
-      empresaId = uid; // El jefe es dueño, empresaId = su uid
-      // Crear documento de empresa
+    if (role === "jefe" || role === "adminEmpresa") {
+      empresaId = uid;
       await adminDb.collection(EMPRESAS_COLLECTION).doc(empresaId).set(
         {
           nombre: "",
@@ -146,6 +163,7 @@ export async function POST(request: NextRequest) {
           fechaCreacion: now,
           activa: true,
           dueñoUid: uid,
+          ...(role === "adminEmpresa" ? { tipoEmpresa: "adminEmpresa" as const } : {}),
         },
         { merge: true }
       );
@@ -204,13 +222,17 @@ export async function POST(request: NextRequest) {
     if (base !== undefined) usuarioEmpresaData.base = base;
     if (rolFirestore === "empleado" && rutaId) usuarioEmpresaData.rutaId = rutaId;
     if (rolFirestore === "empleado") {
-      const empleadoAdminId = adminId || (creatorRole === "admin" ? createdByUid : undefined);
+      const empleadoAdminId =
+        adminId ||
+        (creatorRole === "admin" || creatorRole === "adminEmpresa" ? createdByUid : undefined);
       if (empleadoAdminId) usuarioEmpresaData.adminId = empleadoAdminId;
     }
     if (codigoJefe) usuarioEmpresaData.codigo = codigoJefe;
     if (codigoAdmin) usuarioEmpresaData.codigo = codigoAdmin;
+    if (codigoAdminEmpresa) usuarioEmpresaData.codigo = codigoAdminEmpresa;
     if (jefeCodigo) usuarioEmpresaData.jefeCodigo = jefeCodigo;
     if (adminNum !== null) usuarioEmpresaData.adminNum = adminNum;
+    if (adminEmpresaNum !== null) usuarioEmpresaData.adminNum = adminEmpresaNum;
 
     const montoDesdeBase = parseMontoBase(base);
     const montoParaAdmin =
@@ -237,6 +259,9 @@ export async function POST(request: NextRequest) {
       usuarioEmpresaData.ultimaActualizacionCapital = now;
     } else if (role === "admin") {
       usuarioEmpresaData.cajaAdmin = 0;
+    } else if (role === "adminEmpresa") {
+      usuarioEmpresaData.cajaAdmin = 0;
+      usuarioEmpresaData.ultimaActualizacionCapital = now;
     }
     if (rolFirestore === "empleado") {
       if (montoDesdeBase && montoDesdeBase > 0) {
@@ -311,7 +336,6 @@ export async function POST(request: NextRequest) {
       await persistAggregatedCapitalDocs(adminDb, empresaId);
     }
 
-    // Índice de auth en /users/{uid}
     const userAuthData: Record<string, unknown> = {
       empresaId,
       role: rolFirestore,
@@ -329,13 +353,17 @@ export async function POST(request: NextRequest) {
     if (base !== undefined) userAuthData.base = base;
     if (rolFirestore === "empleado" && rutaId) userAuthData.rutaId = rutaId;
     if (rolFirestore === "empleado") {
-      const empleadoAdminId = adminId || (creatorRole === "admin" ? createdByUid : undefined);
+      const empleadoAdminId =
+        adminId ||
+        (creatorRole === "admin" || creatorRole === "adminEmpresa" ? createdByUid : undefined);
       if (empleadoAdminId) userAuthData.adminId = empleadoAdminId;
     }
     if (codigoJefe) userAuthData.codigo = codigoJefe;
     if (codigoAdmin) userAuthData.codigo = codigoAdmin;
+    if (codigoAdminEmpresa) userAuthData.codigo = codigoAdminEmpresa;
     if (jefeCodigo) userAuthData.jefeCodigo = jefeCodigo;
     if (adminNum !== null) userAuthData.adminNum = adminNum;
+    if (adminEmpresaNum !== null) userAuthData.adminNum = adminEmpresaNum;
 
     await adminDb.collection(USERS_COLLECTION).doc(uid).set(userAuthData);
 

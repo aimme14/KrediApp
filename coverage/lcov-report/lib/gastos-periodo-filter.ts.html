@@ -23,30 +23,30 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">76.23% </span>
+                <span class="strong">73.58% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>77/101</span>
+                <span class='fraction'>78/106</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">59.55% </span>
+                <span class="strong">57.6% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>53/89</span>
+                <span class='fraction'>53/92</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">86.95% </span>
+                <span class="strong">83.33% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>20/23</span>
+                <span class='fraction'>20/24</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">86.84% </span>
+                <span class="strong">83.75% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>66/76</span>
+                <span class='fraction'>67/80</span>
             </div>
         
             
@@ -282,7 +282,18 @@
 <a name='L217'></a><a href='#L217'>217</a>
 <a name='L218'></a><a href='#L218'>218</a>
 <a name='L219'></a><a href='#L219'>219</a>
-<a name='L220'></a><a href='#L220'>220</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L220'></a><a href='#L220'>220</a>
+<a name='L221'></a><a href='#L221'>221</a>
+<a name='L222'></a><a href='#L222'>222</a>
+<a name='L223'></a><a href='#L223'>223</a>
+<a name='L224'></a><a href='#L224'>224</a>
+<a name='L225'></a><a href='#L225'>225</a>
+<a name='L226'></a><a href='#L226'>226</a>
+<a name='L227'></a><a href='#L227'>227</a>
+<a name='L228'></a><a href='#L228'>228</a>
+<a name='L229'></a><a href='#L229'>229</a>
+<a name='L230'></a><a href='#L230'>230</a>
+<a name='L231'></a><a href='#L231'>231</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">3x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -407,6 +418,17 @@
 <span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">3x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -455,7 +477,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">9x</span>
+<span class="cline-any cline-yes">17x</span>
 <span class="cline-any cline-yes">5x</span>
 <span class="cline-any cline-yes">5x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -626,6 +648,17 @@ export function periodoAbiertoAdmin(
   return periodos.find((p) =&gt; p.estado === "abierto") ?? <span class="branch-1 cbranch-no" title="branch not covered" >null;</span>
 }
 &nbsp;
+/** True si la fecha del cobro cae dentro del periodo contable abierto del admin. */
+export function <span class="fstat-no" title="function not covered" >pagoOcurreEnPeriodoAbierto(</span>
+  fechaIso: string | null | undefined,
+  periodos: PeriodoAdminListaItem[],
+  ahora: Date = <span class="branch-0 cbranch-no" title="branch not covered" >new Date()</span>
+): boolean {
+  const rango = <span class="cstat-no" title="statement not covered" >resolverRangoFiltroContable({ modo: "actual" }, periodos, ahora);</span>
+<span class="cstat-no" title="statement not covered" >  if (!rango) <span class="cstat-no" title="statement not covered" >return false;</span></span>
+<span class="cstat-no" title="statement not covered" >  return gastoOcurreEnRangoContable(fechaIso, rango.desde, rango.hasta);</span>
+}
+&nbsp;
 export function <span class="fstat-no" title="function not covered" >periodosCerradosAdmin(</span>
   periodos: PeriodoAdminListaItem[]
 ): PeriodoAdminListaItem[] {
@@ -727,11 +760,7 @@ export function <span class="fstat-no" title="function not covered" >mensajeGast
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-<<<<<<< HEAD
-                at 2026-06-26T17:49:43.030Z
-=======
-                at 2026-06-25T21:12:59.273Z
->>>>>>> 0860e16 (reporte)
+                at 2026-07-07T19:41:13.977Z
             </div>
         <script src="../prettify.js"></script>
         <script>

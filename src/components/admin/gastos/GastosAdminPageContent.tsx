@@ -35,6 +35,7 @@ import {
 import { GastosPeriodoContableFilter } from "@/components/GastosPeriodoContableFilter";
 import { OFFLINE_MSG, useOnline } from "@/hooks/useOnline";
 import dynamic from "next/dynamic";
+import { isAdminPanelRole } from "@/lib/admin-panel-role";
 
 const ModalConfirmar = dynamic(
   () => import("@/components/trabajador/ModalConfirmar").then((m) => ({ default: m.ModalConfirmar })),
@@ -498,7 +499,7 @@ export default function GastosAdminPageContent() {
   const alcanceGastoLabel = (alcance: PendingGastoData["alcance"]) =>
     alcance === "ruta" ? "Ruta" : "Administrador";
 
-  if (!profile || profile.role !== "admin") return null;
+  if (!profile || !isAdminPanelRole(profile.role)) return null;
 
   const bannerPeriodo = (() => {
     if (filtroContable.modo === "hoy") {

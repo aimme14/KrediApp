@@ -9,6 +9,7 @@ import {
 import { descontarCajaAdmin } from "@/lib/admin-capital";
 import { computeCapitalTotalRutaDesdeSaldos } from "@/lib/capital-formulas";
 import { upsertCapitalRutaSnapshot } from "@/lib/capital-ruta-snapshot";
+import { isAdminPanelApiUser } from "@/lib/admin-panel-role";
 
 const COUNTERS_COLLECTION = "counters";
 
@@ -42,7 +43,7 @@ export async function GET(request: NextRequest) {
     .collection(RUTAS_SUBCOLLECTION);
 
   const snap =
-    apiUser.role === "admin"
+    isAdminPanelApiUser(apiUser)
       ? await rutasCol.where("adminId", "==", apiUser.uid).get()
       : await rutasCol.get();
 

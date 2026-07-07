@@ -2,13 +2,17 @@
 
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { useAuth } from "@/context/AuthContext";
+import { isAdminEmpresaRole, isAdminPanelRole } from "@/lib/admin-panel-role";
 import {
   getCajaAdmin,
   getResumenEconomico,
+  ingresarBaseAdminEmpresa,
   invertirEnCajaAdmin,
   invertirEnCajaRuta,
+  listIngresosBaseAdminEmpresa,
   listInversionesCajaAdmin,
   listInversionesCajaRuta,
+  type IngresoBaseAdminEmpresaItem,
   type InversionCajaRutaItem,
   type InversionRutaCajaAdminItem,
   type ResumenRutaItem,
@@ -86,8 +90,15 @@ export default function GestionFinancieraPageContent() {
   const [invertirAdminOk, setInvertirAdminOk] = useState(false);
   const [tabInversion, setTabInversion] = useState<TabInversion>("ruta");
 
+  const esAdminEmpresa = isAdminEmpresaRole(profile?.role);
+  const [ingresoMonto, setIngresoMonto] = useState("");
+  const [ingresoError, setIngresoError] = useState<string | null>(null);
+  const [ingresoOk, setIngresoOk] = useState(false);
+  const [ingresoSaving, setIngresoSaving] = useState(false);
+  const [ingresosBase, setIngresosBase] = useState<IngresoBaseAdminEmpresaItem[]>([]);
+
   const load = useCallback(async () => {
-    if (!user || !profile || profile.role !== "admin") return;
+    if (!user || !profile || !isAdminPanelRole(profile.role)) return;
 
     setLoading(true);
     setError(null);
@@ -97,15 +108,23 @@ export default function GestionFinancieraPageContent() {
       setCajaAdmin(caja);
       setRutas(resumen.rutas ?? []);
       try {
-        const [listaRuta, listaAdmin] = await Promise.all([
+        const promises: [
+          Promise<InversionCajaRutaItem[]>,
+          Promise<InversionRutaCajaAdminItem[]>,
+          Promise<IngresoBaseAdminEmpresaItem[] | null>,
+        ] = [
           listInversionesCajaRuta(token),
           listInversionesCajaAdmin(token),
-        ]);
+          isAdminEmpresaRole(profile.role) ? listIngresosBaseAdminEmpresa(token) : Promise.resolve(null),
+        ];
+        const [listaRuta, listaAdmin, listaIngresos] = await Promise.all(promises);
         setInversiones(listaRuta ?? []);
         setInversionesAdmin(listaAdmin ?? []);
+        setIngresosBase(listaIngresos ?? []);
       } catch {
         setInversiones([]);
         setInversionesAdmin([]);
+        setIngresosBase([]);
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al cargar gestión financiera");
@@ -132,7 +151,7 @@ export default function GestionFinancieraPageContent() {
   const ejecutarInversionConfirmada = useCallback(async () => {
     const pending = inversionModal;
     if (!guardOfflineWrite(online, setError)) return;
-    if (!user || !profile || profile.role !== "admin" || !pending) return;
+    if (!user || !profile || !isAdminPanelRole(profile.role) || !pending) return;
     setInvertirSaving(true);
     try {
       const token = await user.getIdToken();
@@ -168,7 +187,7 @@ export default function GestionFinancieraPageContent() {
   const handleInvertirEnRuta = (e: FormEvent) => {
     e.preventDefault();
     if (!guardOfflineWrite(online, setInvertirError)) return;
-    if (!user || !profile || profile.role !== "admin") return;
+    if (!user || !profile || !isAdminPanelRole(profile.role)) return;
     setInvertirError(null);
     setInvertirOk(false);
     if (!invertirRutaId.trim()) {
@@ -197,7 +216,7 @@ export default function GestionFinancieraPageContent() {
   const handleInvertirEnAdmin = (e: FormEvent) => {
     e.preventDefault();
     if (!guardOfflineWrite(online, setInvertirAdminError)) return;
-    if (!user || !profile || profile.role !== "admin") return;
+    if (!user || !profile || !isAdminPanelRole(profile.role)) return;
     setInvertirAdminError(null);
     setInvertirAdminOk(false);
     if (!invertirAdminRutaId.trim()) {
@@ -224,7 +243,33 @@ export default function GestionFinancieraPageContent() {
     });
   };
 
-  if (!profile || profile.role !== "admin") return null;
+  const handleIngresarBase = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!guardOfflineWrite(online, setIngresoError)) return;
+    if (!user || !profile || !isAdminEmpresaRole(profile.role)) return;
+    setIngresoError(null);
+    setIngresoOk(false);
+    const { num, valid } = parseMontoInvertir(ingresoMonto);
+    if (!valid) {
+      setIngresoError("Ingresa un monto válido mayor a 0.");
+      return;
+    }
+    setIngresoSaving(true);
+    try {
+      const token = await user.getIdToken();
+      await ingresarBaseAdminEmpresa(token, { monto: num });
+      setIngresoMonto("");
+      setIngresoOk(true);
+      setTimeout(() => setIngresoOk(false), 3200);
+      await load();
+    } catch (err) {
+      setIngresoError(err instanceof Error ? err.message : "Error al ingresar a la base");
+    } finally {
+      setIngresoSaving(false);
+    }
+  };
+
+  if (!profile || !isAdminPanelRole(profile.role)) return null;
 
   return (
     <>
@@ -252,6 +297,94 @@ export default function GestionFinancieraPageContent() {
                 </span>
               </div>
             </div>
+
+            {esAdminEmpresa ? (
+              <div className="gf-salidas-card card" style={{ marginTop: "1rem" }}>
+                <div className="gf-salidas-header">
+                  <span className="gf-salidas-icon" aria-hidden>
+                    💵
+                  </span>
+                  <h2 className="gf-salidas-title">Ingresar dinero a tu base</h2>
+                </div>
+                <p className="gf-salidas-desc">
+                  Registra liquidez externa en tu base de administrador de empresa (similar a la
+                  inversión del jefe en su caja).
+                </p>
+                <form onSubmit={handleIngresarBase} className="gf-capital-form" style={{ maxWidth: "22rem" }}>
+                  <label htmlFor="gf-ingreso-base-monto" className="gf-capital-form-label">
+                    MONTO A INGRESAR
+                  </label>
+                  <div className="gf-capital-input-wrap">
+                    <input
+                      id="gf-ingreso-base-monto"
+                      type="text"
+                      inputMode="decimal"
+                      value={ingresoMonto}
+                      onChange={(e) => {
+                        setIngresoMonto(formatMontoEnteroInput(e.target.value));
+                        setIngresoError(null);
+                      }}
+                      placeholder="Ej. 500000"
+                      className={`gf-capital-input ${ingresoError ? "gf-capital-input-error" : ""}`}
+                      disabled={ingresoSaving || !online}
+                      autoComplete="off"
+                    />
+                  </div>
+                  {ingresoError && (
+                    <p className="gf-capital-input-msg-error" role="alert">
+                      {ingresoError}
+                    </p>
+                  )}
+                  {ingresoOk && (
+                    <p className="gf-msg" style={{ color: "#22c55e", fontSize: "0.875rem" }}>
+                      Ingreso registrado correctamente.
+                    </p>
+                  )}
+                  <button type="submit" className="gf-btn-actualizar" disabled={ingresoSaving || !online}>
+                    Registrar ingreso en base
+                  </button>
+                </form>
+              </div>
+            ) : null}
+
+            {esAdminEmpresa ? (
+              <div className="gf-historial-card card" style={{ marginTop: "1rem" }}>
+                <div className="gf-historial-header">
+                  <h2 className="gf-historial-title">
+                    <span className="gf-historial-icon" aria-hidden>
+                      📒
+                    </span>
+                    Historial de ingresos a base
+                  </h2>
+                </div>
+                {ingresosBase.length === 0 ? (
+                  <p className="gf-historial-empty">Aún no hay ingresos registrados.</p>
+                ) : (
+                  <div className="table-wrap">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th className="col-num">Monto</th>
+                          <th className="col-num">Base anterior</th>
+                          <th className="col-num">Base nueva</th>
+                          <th>Fecha</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {ingresosBase.map((ing) => (
+                          <tr key={ing.id}>
+                            <td className="col-num">{formatMoneda(ing.monto)}</td>
+                            <td className="col-num">{formatMoneda(ing.cajaAnterior)}</td>
+                            <td className="col-num">{formatMoneda(ing.cajaNueva)}</td>
+                            <td>{formatFechaCorta(ing.at)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            ) : null}
 
             <nav
               className="gf-tabs"

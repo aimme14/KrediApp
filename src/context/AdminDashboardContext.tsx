@@ -19,6 +19,7 @@ import {
 } from "@/lib/empresas-db";
 import type { RutaItem, ResumenRutaItem } from "@/lib/empresa-api";
 import { getCajaAdmin } from "@/lib/empresa-api";
+import { isAdminPanelRole } from "@/lib/admin-panel-role";
 import { computeCapitalRutaFromRutaFields } from "@/lib/capital-formulas";
 import { useDeferredMount } from "@/hooks/useDeferredMount";
 
@@ -72,7 +73,7 @@ export function AdminDashboardProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null);
 
   const refreshCaja = useCallback(async () => {
-    if (!user || profile?.role !== "admin") return;
+    if (!user || !isAdminPanelRole(profile?.role)) return;
     try {
       const token = await user.getIdToken();
       const caja = await getCajaAdmin(token);
@@ -90,7 +91,7 @@ export function AdminDashboardProvider({ children }: { children: ReactNode }) {
       setLoading(false);
       return;
     }
-    if (!user || !profile || profile.role !== "admin" || !profile.empresaId) {
+    if (!user || !profile || !isAdminPanelRole(profile.role) || !profile.empresaId) {
       setRutasBase([]);
       setLoading(false);
       return;
@@ -171,7 +172,7 @@ export function AdminDashboardProvider({ children }: { children: ReactNode }) {
   const rutas = rutasBase;
 
   useEffect(() => {
-    if (!subscriptionsReady || !db || !user || !profile || profile.role !== "admin" || !profile.empresaId) {
+    if (!subscriptionsReady || !db || !user || !profile || !isAdminPanelRole(profile.role) || !profile.empresaId) {
       setCajaAdmin(0);
       setGastosAdminPeriodo(0);
       setTotalClientes(0);
@@ -217,7 +218,7 @@ export function AdminDashboardProvider({ children }: { children: ReactNode }) {
   }, [user, profile, subscriptionsReady]);
 
   useEffect(() => {
-    if (!subscriptionsReady || !db || !user || !profile || profile.role !== "admin" || !profile.empresaId) {
+    if (!subscriptionsReady || !db || !user || !profile || !isAdminPanelRole(profile.role) || !profile.empresaId) {
       setEmpleadosPorRuta(new Map());
       return;
     }

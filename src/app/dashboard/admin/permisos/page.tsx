@@ -6,6 +6,7 @@ import { listUsersByCreator } from "@/lib/users";
 import { setEmpleadoEnabled } from "@/lib/empresa-api";
 import type { UserProfile } from "@/types/roles";
 import { guardOfflineWrite, useOnline } from "@/hooks/useOnline";
+import { isAdminPanelRole } from "@/lib/admin-panel-role";
 
 export default function PermisosPage() {
   const { user, profile } = useAuth();
@@ -49,7 +50,7 @@ export default function PermisosPage() {
     }
   };
 
-  if (!profile || profile.role !== "admin") return null;
+  if (!profile || !isAdminPanelRole(profile.role)) return null;
 
   return (
     <div className="card">

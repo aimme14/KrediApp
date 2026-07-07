@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAdminFirestore } from "@/lib/firebase-admin";
 import { getApiUser } from "@/lib/api-auth";
 import { aprobarSolicitudEntregaReporte } from "@/lib/solicitud-entrega-reporte-admin";
+import { isAdminPanelApiUser } from "@/lib/admin-panel-role";
 
 export async function POST(
   _request: NextRequest,
@@ -11,7 +12,7 @@ export async function POST(
   if (!apiUser) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
-  if (apiUser.role !== "admin") {
+  if (!isAdminPanelApiUser(apiUser)) {
     return NextResponse.json({ error: "Solo administradores" }, { status: 403 });
   }
 

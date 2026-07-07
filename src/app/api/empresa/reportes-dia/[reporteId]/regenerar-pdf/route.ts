@@ -3,6 +3,7 @@ import { getAdminFirestore } from "@/lib/firebase-admin";
 import { getApiUser } from "@/lib/api-auth";
 import { EMPRESAS_COLLECTION, REPORTES_DIA_SUBCOLLECTION } from "@/lib/empresas-db";
 import { regenerarPdfReporteCierreDia } from "@/lib/regenerar-reporte-cierre-pdf-admin";
+import { isAdminPanelApiUser } from "@/lib/admin-panel-role";
 
 /** POST: regenera y sube el PDF del reporte (admin dueño del documento). */
 export async function POST(
@@ -13,7 +14,7 @@ export async function POST(
   if (!apiUser) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
-  if (apiUser.role !== "admin") {
+  if (!isAdminPanelApiUser(apiUser)) {
     return NextResponse.json({ error: "Solo administradores" }, { status: 403 });
   }
 

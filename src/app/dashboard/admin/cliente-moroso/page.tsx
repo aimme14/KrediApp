@@ -9,6 +9,7 @@ import {
   type ClienteItem,
 } from "@/lib/empresa-api";
 import { guardOfflineWrite, useOnline } from "@/hooks/useOnline";
+import { isAdminPanelRole } from "@/lib/admin-panel-role";
 
 function codigoSinCL(codigo: string | undefined): string {
   return formatClienteCodigoRutaYNumero(codigo).replace(/^CL-/i, "");
@@ -85,7 +86,7 @@ export default function ClienteMorosoPage() {
   );
   const totalFiltrados = morososFiltrados.length + noMorososFiltrados.length;
 
-  if (!profile || profile.role !== "admin") return null;
+  if (!profile || !isAdminPanelRole(profile.role)) return null;
 
   return (
     <div className="card">

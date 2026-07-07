@@ -87,7 +87,7 @@ export async function computeSumaCapitalAdminsDetalle(
   const empresaRef = db.collection(EMPRESAS_COLLECTION).doc(empresaId);
 
   const [adminsSnap, rutasSnap] = await Promise.all([
-    empresaRef.collection(USUARIOS_SUBCOLLECTION).where("rol", "==", "admin").get(),
+    empresaRef.collection(USUARIOS_SUBCOLLECTION).where("rol", "in", ["admin", "adminEmpresa"]).get(),
     rutasSnapOpcional
       ? Promise.resolve(rutasSnapOpcional)
       : empresaRef.collection(RUTAS_SUBCOLLECTION).get(),

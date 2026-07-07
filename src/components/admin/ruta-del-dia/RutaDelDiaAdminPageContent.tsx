@@ -7,6 +7,7 @@ import { useAdminDashboard } from "@/context/AdminDashboardContext";
 import { asignarBaseEmpleadoDesdeRuta } from "@/lib/empresa-api";
 import { formatMontoEnteroInput, parseMontoEnteroFormatted } from "@/lib/monto-input-es";
 import { guardOfflineWrite, useOnline } from "@/hooks/useOnline";
+import { isAdminPanelRole } from "@/lib/admin-panel-role";
 
 type AsignarBasePendiente = {
   rutaId: string;
@@ -102,7 +103,7 @@ export default function RutaDelDiaAdminPageContent() {
     }
   };
 
-  if (!profile || profile.role !== "admin") return null;
+  if (!profile || !isAdminPanelRole(profile.role)) return null;
 
   const displayError = error ?? ctxError;
 

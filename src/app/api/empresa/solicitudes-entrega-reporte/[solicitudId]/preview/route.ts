@@ -8,6 +8,7 @@ import {
 import { buildCierreDiaSnapshot } from "@/lib/cierre-dia-snapshot";
 import { fechaDiaColombiaHoy } from "@/lib/colombia-day-bounds";
 import { getInicioPeriodoActual } from "@/lib/periodo-reporte-empleado";
+import { isAdminPanelApiUser } from "@/lib/admin-panel-role";
 
 /**
  * GET: previsualización del cierre del día (misma lógica que cobros del día del trabajador).
@@ -21,7 +22,7 @@ export async function GET(
   if (!apiUser) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
-  if (apiUser.role !== "admin") {
+  if (!isAdminPanelApiUser(apiUser)) {
     return NextResponse.json({ error: "Solo administradores" }, { status: 403 });
   }
 

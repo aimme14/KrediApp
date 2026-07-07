@@ -29,6 +29,7 @@ import {
 import { auth, db } from "@/lib/firebase";
 import { revokeAdminFcmOnDevice } from "@/lib/fcm-client";
 import type { UserProfile, Role } from "@/types/roles";
+import { isAdminPanelRole } from "@/lib/admin-panel-role";
 import { SUPER_ADMIN_COLLECTION } from "@/types/superAdmin";
 
 const USERS_COLLECTION = "users";
@@ -410,7 +411,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = async () => {
     const currentUser = auth?.currentUser;
-    const isAdmin = state.profile?.role === "admin";
+    const isAdmin = isAdminPanelRole(state.profile?.role);
     if (currentUser && isAdmin) {
       try {
         await revokeAdminFcmOnDevice(currentUser);

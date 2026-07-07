@@ -23,6 +23,7 @@ import {
   fechaDiaCalendarioDesdeISO,
 } from "@/lib/colombia-day-bounds";
 import { gastoOcurreEnRangoContable } from "@/lib/gastos-periodo-filter";
+import { isAdminPanelApiUser } from "@/lib/admin-panel-role";
 import {
   validarElegibilidadAnulacion,
   validarCoherenciaPrestamoConPago,
@@ -142,7 +143,7 @@ export async function POST(
   if (!apiUser) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
-  if (apiUser.role !== "admin") {
+  if (!isAdminPanelApiUser(apiUser)) {
     return NextResponse.json(
       { error: "Solo el administrador puede anular pagos." },
       { status: 403 }

@@ -23,6 +23,7 @@ import {
   type QueryDocumentSnapshot,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { isAdminPanelRole } from "@/lib/admin-panel-role";
 import { useAuth } from "@/context/AuthContext";
 import {
   esPrestamoDeClienteMoroso,
@@ -157,7 +158,7 @@ export function TrabajadorListaProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!user || !profile) return;
-    const canUse = profile.role === "trabajador" || profile.role === "admin";
+    const canUse = profile.role === "trabajador" || isAdminPanelRole(profile.role);
     if (!canUse || syncMorosoHechoRef.current) return;
 
     syncMorosoHechoRef.current = true;
@@ -194,7 +195,7 @@ export function TrabajadorListaProvider({ children }: { children: ReactNode }) {
     if (!subscriptionsReady || !db || !user || !profile) return;
     const empresaId = profile.empresaId?.trim();
     if (!empresaId) return;
-    const canUse = profile.role === "trabajador" || profile.role === "admin";
+    const canUse = profile.role === "trabajador" || isAdminPanelRole(profile.role);
     if (!canUse) return;
 
     setLoading(true);
@@ -250,7 +251,7 @@ export function TrabajadorListaProvider({ children }: { children: ReactNode }) {
     if (!subscriptionsReady || !db || !user || !profile) return;
     const empresaId = profile.empresaId?.trim();
     if (!empresaId) return;
-    const canUse = profile.role === "trabajador" || profile.role === "admin";
+    const canUse = profile.role === "trabajador" || isAdminPanelRole(profile.role);
     if (!canUse) return;
 
     const prestamosCol = collection(db, EMPRESAS_COLLECTION, empresaId, PRESTAMOS_SUBCOLLECTION);
@@ -284,7 +285,7 @@ export function TrabajadorListaProvider({ children }: { children: ReactNode }) {
     if (!subscriptionsReady || !db || !user || !profile) return;
     const empresaId = profile.empresaId?.trim();
     if (!empresaId) return;
-    const canUse = profile.role === "trabajador" || profile.role === "admin";
+    const canUse = profile.role === "trabajador" || isAdminPanelRole(profile.role);
     if (!canUse) return;
 
     const prestamosCol = collection(db, EMPRESAS_COLLECTION, empresaId, PRESTAMOS_SUBCOLLECTION);

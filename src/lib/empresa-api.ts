@@ -1182,6 +1182,37 @@ export async function getCajaAdmin(token: string): Promise<number> {
   return typeof data.cajaAdmin === "number" ? data.cajaAdmin : 0;
 }
 
+export interface IngresoBaseAdminEmpresaItem {
+  id: string;
+  monto: number;
+  cajaAnterior: number;
+  cajaNueva: number;
+  at: string;
+}
+
+/** Ingreso externo a la base (solo adminEmpresa). */
+export async function ingresarBaseAdminEmpresa(
+  token: string,
+  params: { monto: number }
+): Promise<{ cajaAdmin: number }> {
+  const res = await fetchWithAuth("/api/admin-empresa/ingresar-base", token, {
+    method: "POST",
+    body: JSON.stringify(params),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error ?? "Error al ingresar a la base");
+  return { cajaAdmin: typeof data.cajaAdmin === "number" ? data.cajaAdmin : 0 };
+}
+
+export async function listIngresosBaseAdminEmpresa(
+  token: string
+): Promise<IngresoBaseAdminEmpresaItem[]> {
+  const res = await fetchWithAuth("/api/admin-empresa/ingresos-base", token);
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error ?? "Error al cargar historial de ingresos");
+  return data.ingresos ?? [];
+}
+
 /** Transfiere monto de la base del admin a la base de una ruta (solo rutas propias). */
 export async function invertirEnCajaRuta(
   token: string,

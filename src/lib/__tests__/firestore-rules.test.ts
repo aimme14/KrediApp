@@ -50,6 +50,10 @@ function tokenAdmin(jefeUid: string) {
   return { role: "admin", empresaId: jefeUid, enabled: true };
 }
 
+function tokenAdminEmpresa(adminEmpresaUid: string) {
+  return { role: "adminEmpresa", empresaId: adminEmpresaUid, enabled: true };
+}
+
 function tokenEmpleado(jefeUid: string, rutaId: string, adminId: string) {
   return { role: "empleado", empresaId: jefeUid, enabled: true, rutaId, adminId };
 }
@@ -458,5 +462,66 @@ describe("query compatibility — queries del cliente", () => {
         where("empresaId", "==", JEFE_A)
       ))
     );
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 7. ADMIN EMPRESA — empresa propia (empresaId == uid)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const ADMIN_E = "admin-empresa-e";
+const RUTA_E1 = "ruta-e1";
+
+async function seedAdminEmpresaFixtures() {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    const db = ctx.firestore();
+    await setDoc(doc(db, "empresas", ADMIN_E), { nombre: "Empresa propia", activa: true, tipoEmpresa: "adminEmpresa" });
+    await setDoc(doc(db, "empresas", ADMIN_E, "usuarios", ADMIN_E), {
+      rol: "adminEmpresa",
+      nombre: "Admin Empresa",
+      cajaAdmin: 10_000_000,
+    });
+    await setDoc(doc(db, "empresas", ADMIN_E, "rutas", RUTA_E1), {
+      adminId: ADMIN_E,
+      nombre: "Ruta E1",
+    });
+    await setDoc(doc(db, "empresas", ADMIN_E, "clientes", "cliente-e1"), {
+      nombre: "Cliente E1",
+      adminId: ADMIN_E,
+      rutaId: RUTA_E1,
+      empresaId: ADMIN_E,
+    });
+  });
+}
+
+describe("adminEmpresa — empresa propia", () => {
+  test("adminEmpresa lee doc raíz de su empresa", async () => {
+    await seedAdminEmpresaFixtures();
+    const db = testEnv.authenticatedContext(ADMIN_E, tokenAdminEmpresa(ADMIN_E)).firestore();
+    await assertSucceeds(getDoc(doc(db, "empresas", ADMIN_E)));
+  });
+
+  test("adminEmpresa: rutas where adminId == uid", async () => {
+    await seedAdminEmpresaFixtures();
+    const db = testEnv.authenticatedContext(ADMIN_E, tokenAdminEmpresa(ADMIN_E)).firestore();
+    await assertSucceeds(
+      getDocs(query(
+        collection(db, "empresas", ADMIN_E, "rutas"),
+        where("adminId", "==", ADMIN_E)
+      ))
+    );
+  });
+
+  test("adminEmpresa lee su propio cliente", async () => {
+    await seedAdminEmpresaFixtures();
+    const db = testEnv.authenticatedContext(ADMIN_E, tokenAdminEmpresa(ADMIN_E)).firestore();
+    await assertSucceeds(getDoc(doc(db, "empresas", ADMIN_E, "clientes", "cliente-e1")));
+  });
+
+  test("adminEmpresa no lee empresa de un jefe ajeno", async () => {
+    await seedFixtures();
+    await seedAdminEmpresaFixtures();
+    const db = testEnv.authenticatedContext(ADMIN_E, tokenAdminEmpresa(ADMIN_E)).firestore();
+    await assertFails(getDoc(doc(db, "empresas", JEFE_A)));
   });
 });

@@ -16,7 +16,7 @@ import { USERS_COLLECTION } from "@/lib/empresas-db";
 export interface ApiUser {
   uid: string;
   empresaId: string;
-  role: "jefe" | "admin" | "empleado";
+  role: "jefe" | "admin" | "adminEmpresa" | "empleado";
   /** Solo para empleado: ruta asignada */
   rutaId?: string;
   /** Solo para empleado: admin al que reporta */
@@ -42,7 +42,10 @@ export async function getApiUser(request: NextRequest): Promise<ApiUser | null> 
 
     // ── Fast path: claims presentes → sin lectura a Firestore ──
     if (
-      (claimRole === "jefe" || claimRole === "admin" || claimRole === "empleado") &&
+      (claimRole === "jefe" ||
+        claimRole === "admin" ||
+        claimRole === "adminEmpresa" ||
+        claimRole === "empleado") &&
       claimEmpresaId
     ) {
       if (claimRole === "empleado") {
@@ -54,7 +57,7 @@ export async function getApiUser(request: NextRequest): Promise<ApiUser | null> 
           adminId: typeof decoded.adminId === "string" && decoded.adminId ? decoded.adminId : undefined,
         };
       }
-      return { uid, empresaId: claimEmpresaId, role: claimRole };
+      return { uid, empresaId: claimEmpresaId, role: claimRole as ApiUser["role"] };
     }
 
     // ── Fallback: claims ausentes o incompletos → leer Firestore ──
@@ -65,7 +68,13 @@ export async function getApiUser(request: NextRequest): Promise<ApiUser | null> 
 
     const data = userDoc.data()!;
     const role = data.role as string;
-    if (role !== "jefe" && role !== "admin" && role !== "empleado") return null;
+    if (
+      role !== "jefe" &&
+      role !== "admin" &&
+      role !== "adminEmpresa" &&
+      role !== "empleado"
+    )
+      return null;
 
     const empresaId = (data.empresaId as string) ?? "";
     if (!empresaId) return null;
@@ -79,7 +88,7 @@ export async function getApiUser(request: NextRequest): Promise<ApiUser | null> 
         adminId: data.adminId ?? undefined,
       };
     }
-    return { uid, empresaId, role: role as "jefe" | "admin" };
+    return { uid, empresaId, role: role as ApiUser["role"] };
   } catch {
     return null;
   }

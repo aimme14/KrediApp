@@ -13,6 +13,7 @@ import { TrabajadorCajaDiaProvider } from "@/context/TrabajadorCajaDiaContext";
 import { AdminDashboardProvider } from "@/context/AdminDashboardContext";
 import { ADMIN_NAV_ITEMS, AdminNavIcon } from "@/components/admin/adminNavConfig";
 import { TrabajadorSyncBanner } from "@/components/TrabajadorSyncBanner";
+import { isAdminPanelRole } from "@/lib/admin-panel-role";
 
 const AdminFcmRegistration = dynamic(
   () => import("@/components/AdminFcmRegistration").then((m) => ({ default: m.AdminFcmRegistration })),
@@ -43,7 +44,7 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
       router.push("/");
       return;
     }
-    if (profile.role !== "admin") {
+    if (!isAdminPanelRole(profile.role)) {
       router.push("/dashboard");
       return;
     }
@@ -94,7 +95,7 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (profile.role !== "admin") {
+  if (!isAdminPanelRole(profile.role)) {
     return (
       <div className="container" style={{ paddingTop: "4rem", textAlign: "center" }}>
         <p>Redirigiendo al panel…</p>

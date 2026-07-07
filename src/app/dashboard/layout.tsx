@@ -14,6 +14,7 @@ import { OfflineRootEffect } from "@/components/OfflineRootEffect";
 import { getEmpresa } from "@/lib/empresa";
 import type { ReactNode } from "react";
 import type { EmpresaProfile } from "@/types/empresa";
+import { isAdminPanelRole } from "@/lib/admin-panel-role";
 
 const DashboardHelp = dynamic(() => import("@/components/help/DashboardHelp"), { ssr: false });
 const DashboardSettings = dynamic(() => import("@/components/DashboardSettings"), { ssr: false });
@@ -38,7 +39,7 @@ export default function DashboardLayout({
     (pathname?.startsWith("/dashboard/trabajador") ?? false);
   const isJefe = profile?.role === "jefe";
   const isTrabajador = profile?.role === "trabajador";
-  const isAdmin = profile?.role === "admin";
+  const isAdmin = isAdminPanelRole(profile?.role);
 
   useEffect(() => {
     if (loading) return;

@@ -10,6 +10,7 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/context/AuthContext";
+import { isAdminPanelRole } from "@/lib/admin-panel-role";
 import {
   inicioDiaColombiaUtc,
   finDiaColombiaUtc,
@@ -84,7 +85,7 @@ export function usePagosDiariosAdmin(fechaDia: string) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!db || !user || profile?.role !== "admin" || !profile.empresaId) {
+    if (!db || !user || !isAdminPanelRole(profile?.role) || !profile?.empresaId) {
       setPagos([]);
       setLoading(false);
       return;

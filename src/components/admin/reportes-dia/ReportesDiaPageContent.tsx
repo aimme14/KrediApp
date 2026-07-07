@@ -27,6 +27,7 @@ import {
 } from "@/lib/empresa-api";
 import { formatMontoReporteDia, type ReporteDiaPreviewMeta } from "@/lib/reportes-dia-display";
 import { guardOfflineWrite, useOnline } from "@/hooks/useOnline";
+import { isAdminPanelRole } from "@/lib/admin-panel-role";
 
 const ModalConfirmar = dynamic(
   () => import("@/components/trabajador/ModalConfirmar").then((m) => ({ default: m.ModalConfirmar })),
@@ -350,7 +351,7 @@ export default function ReportesDiaPageContent() {
     }
   };
 
-  if (!profile || profile.role !== "admin") return null;
+  if (!profile || !isAdminPanelRole(profile.role)) return null;
 
   return (
     <div className="card">

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAdminFirestore } from "@/lib/firebase-admin";
 import { getApiUser } from "@/lib/api-auth";
 import { backfillMorosoEmpresa } from "@/lib/sync-prestamo-moroso";
+import { isAdminPanelApiUser } from "@/lib/admin-panel-role";
 
 /** POST: sincroniza moroso de clientes morosos hacia sus préstamos (migración / reparación). */
 export async function POST(request: NextRequest) {
@@ -10,7 +11,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
-  if (apiUser.role !== "admin" && apiUser.role !== "jefe" && apiUser.role !== "empleado") {
+  if (!isAdminPanelApiUser(apiUser) && apiUser.role !== "jefe" && apiUser.role !== "empleado") {
     return NextResponse.json({ error: "No autorizado" }, { status: 403 });
   }
 

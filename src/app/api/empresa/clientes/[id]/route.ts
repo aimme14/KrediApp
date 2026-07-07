@@ -8,6 +8,7 @@ import {
   USUARIOS_SUBCOLLECTION,
 } from "@/lib/empresas-db";
 import { syncMorosoEnPrestamosCliente } from "@/lib/sync-prestamo-moroso";
+import { isAdminPanelApiUser } from "@/lib/admin-panel-role";
 
 type ClienteRef = DocumentReference;
 type ClienteSnap = DocumentSnapshot;
@@ -96,7 +97,7 @@ export async function PATCH(
     );
   }
 
-  if (apiUser.role !== "admin") {
+  if (!isAdminPanelApiUser(apiUser)) {
     return NextResponse.json(
       { error: "Solo el administrador puede actualizar los datos del cliente" },
       { status: 403 }

@@ -11,7 +11,7 @@ import { SUPER_ADMIN_COLLECTION } from "@/types/superAdmin";
 
 /** Claims que escribimos en Auth (alineados con verifyIdToken / getIdTokenResult().claims) */
 export type AppAuthCustomClaims = {
-  role: "superAdmin" | "jefe" | "admin" | "empleado";
+  role: "superAdmin" | "jefe" | "admin" | "adminEmpresa" | "empleado";
   empresaId: string;
   enabled: boolean;
   rutaId?: string;
@@ -46,14 +46,19 @@ export async function syncCustomClaimsForUid(uid: string): Promise<void> {
 
   const data = userSnap.data()!;
   const roleRaw = data.role as string;
-  if (roleRaw !== "jefe" && roleRaw !== "admin" && roleRaw !== "empleado") {
+  if (
+    roleRaw !== "jefe" &&
+    roleRaw !== "admin" &&
+    roleRaw !== "adminEmpresa" &&
+    roleRaw !== "empleado"
+  ) {
     await auth.setCustomUserClaims(uid, null);
     return;
   }
 
   const empresaId = typeof data.empresaId === "string" ? data.empresaId : "";
   const claims: AppAuthCustomClaims = {
-    role: roleRaw as "jefe" | "admin" | "empleado",
+    role: roleRaw as AppAuthCustomClaims["role"],
     empresaId,
     enabled: data.enabled !== false,
   };

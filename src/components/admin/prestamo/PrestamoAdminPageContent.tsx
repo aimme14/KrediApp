@@ -43,6 +43,7 @@ import {
   PRESTAMO_ADMIN_MODALIDADES,
 } from "@/lib/prestamo-admin-format";
 import { OFFLINE_MSG, useOnline } from "@/hooks/useOnline";
+import { isAdminPanelRole } from "@/lib/admin-panel-role";
 
 const ExportPrestamosModal = dynamic(
   () => import("@/components/ExportPrestamosModal").then((m) => ({ default: m.ExportPrestamosModal })),
@@ -616,7 +617,7 @@ export default function PrestamoAdminPageContent() {
     return ordenarPrestamosParaPrincipal(merged);
   }, [prestamos, prestamosPagados, prestamosCastigados, clienteId]);
 
-  if (!profile || profile.role !== "admin") return null;
+  if (!profile || !isAdminPanelRole(profile.role)) return null;
 
   const bannerPeriodo = (() => {
     if (filtroContable.modo === "hoy") {

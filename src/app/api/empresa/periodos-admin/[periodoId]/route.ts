@@ -4,6 +4,7 @@ import { getApiUser } from "@/lib/api-auth";
 import { EMPRESAS_COLLECTION, PERIODOS_ADMIN_SUBCOLLECTION } from "@/lib/empresas-db";
 import { enrichSnapshotGastosDelPeriodo } from "@/lib/periodo-admin-gastos";
 import type { PeriodoAdminSnapshot } from "@/lib/periodo-admin-snapshot";
+import { isAdminPanelApiUser } from "@/lib/admin-panel-role";
 
 function tsToIso(v: unknown): string | null {
   if (v && typeof (v as { toDate?: () => Date }).toDate === "function") {
@@ -28,7 +29,7 @@ export async function GET(
   if (!apiUser) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
-  if (apiUser.role !== "admin") {
+  if (!isAdminPanelApiUser(apiUser)) {
     return NextResponse.json({ error: "Solo administrador" }, { status: 403 });
   }
 

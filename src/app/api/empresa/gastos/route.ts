@@ -22,6 +22,7 @@ import {
 } from "@/lib/financial-idempotency";
 import type { TipoGasto } from "@/types/firestore";
 import { fechaGastoDesdeStringCliente } from "@/lib/colombia-day-bounds";
+import { isAdminPanelApiUser } from "@/lib/admin-panel-role";
 
 const DEFAULT_GASTOS_LIMIT = 100;
 const MAX_GASTOS_LIMIT = 500;
@@ -81,7 +82,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ gastos });
   }
 
-  if (apiUser.role === "admin") {
+  if (isAdminPanelApiUser(apiUser)) {
     const [nuevoSnap, empleadoSnap] = await Promise.all([
       empresaRef
         .collection(GASTOS_ADMIN_SUBCOLLECTION)
@@ -296,7 +297,7 @@ export async function POST(request: NextRequest) {
   }
 
   /** ── Admin: caja admin + gastosAdministrador ── */
-  if (apiUser.role === "admin") {
+  if (isAdminPanelApiUser(apiUser)) {
     const alcance: AlcanceGastoAdmin =
       alcanceBody === "ruta" ? "ruta" : "admin";
     let rutaIdValue = "";

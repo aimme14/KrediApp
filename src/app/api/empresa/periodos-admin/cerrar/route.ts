@@ -10,6 +10,7 @@ import {
 } from "@/lib/empresas-db";
 import { buildPeriodoAdminSnapshot } from "@/lib/periodo-admin-snapshot";
 import { upsertCapitalRutaSnapshot } from "@/lib/capital-ruta-snapshot";
+import { isAdminPanelApiUser } from "@/lib/admin-panel-role";
 
 /** POST: cierra el periodo abierto del admin (snapshot actual). */
 export async function POST(_request: NextRequest) {
@@ -17,7 +18,7 @@ export async function POST(_request: NextRequest) {
   if (!apiUser) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
-  if (apiUser.role !== "admin") {
+  if (!isAdminPanelApiUser(apiUser)) {
     return NextResponse.json({ error: "Solo administrador" }, { status: 403 });
   }
 

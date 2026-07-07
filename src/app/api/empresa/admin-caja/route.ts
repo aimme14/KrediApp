@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAdminFirestore } from "@/lib/firebase-admin";
 import { getApiUser } from "@/lib/api-auth";
 import { getCajaAdmin } from "@/lib/admin-capital";
+import { isAdminPanelApiUser } from "@/lib/admin-panel-role";
 
 /** GET: caja del administrador (solo role admin). */
 export async function GET(request: NextRequest) {
@@ -10,7 +11,7 @@ export async function GET(request: NextRequest) {
     if (!apiUser) {
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
-    if (apiUser.role !== "admin") {
+    if (!isAdminPanelApiUser(apiUser)) {
       return NextResponse.json({ error: "Solo el admin puede ver la base" }, { status: 403 });
     }
 

@@ -14,6 +14,7 @@ import {
   type PeriodoAdminSnapshotRuta,
 } from "@/lib/empresa-api";
 import dynamic from "next/dynamic";
+import { isAdminPanelRole } from "@/lib/admin-panel-role";
 
 const ModalConfirmar = dynamic(
   () => import("@/components/trabajador/ModalConfirmar").then((m) => ({ default: m.ModalConfirmar })),
@@ -160,7 +161,7 @@ export default function ResumenAdminPageContent() {
     });
   };
 
-  if (!profile || profile.role !== "admin") return null;
+  if (!profile || !isAdminPanelRole(profile.role)) return null;
 
   const ap = detalle?.apertura ?? null;
   const ci = detalle?.cierre ?? null;

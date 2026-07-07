@@ -30,9 +30,9 @@
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">65.07% </span>
+                <span class="strong">65.67% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>41/63</span>
+                <span class='fraction'>44/67</span>
             </div>
         
             
@@ -290,8 +290,19 @@
 <a name='L225'></a><a href='#L225'>225</a>
 <a name='L226'></a><a href='#L226'>226</a>
 <a name='L227'></a><a href='#L227'>227</a>
-<a name='L228'></a><a href='#L228'>228</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">1x</span>
+<a name='L228'></a><a href='#L228'>228</a>
+<a name='L229'></a><a href='#L229'>229</a>
+<a name='L230'></a><a href='#L230'>230</a>
+<a name='L231'></a><a href='#L231'>231</a>
+<a name='L232'></a><a href='#L232'>232</a>
+<a name='L233'></a><a href='#L233'>233</a>
+<a name='L234'></a><a href='#L234'>234</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -492,6 +503,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -523,7 +535,7 @@ import { computeCapitalTotalRutaDesdeSaldos } from "@/lib/capital-formulas";
 export type AnulacionElegibilidadError =
   | "PAGO_NO_ACTIVO"
   | "PAGO_TIPO_INVALIDO"
-  | "PAGO_NO_ES_HOY"
+  | "PAGO_FUERA_DE_PERIODO_ABIERTO"
   | "PAGO_NO_ES_ULTIMO"
   | "SIN_SNAPSHOTS_NI_FALLBACK"
   | "REPORTE_APROBADO"
@@ -543,6 +555,7 @@ export type ResultadoReversion = {
   nuevoCapitalTotal: number;
   nuevaCajaEmpleado: number | null;
   modo: ModoReversion;
+  intentosFallidosRestaurados: number;
 };
 &nbsp;
 export type DatosRuta = {
@@ -569,6 +582,10 @@ export type DatosPago = {
   estadoPrestamoDespues?: string;
   fecha: Date;
   empleadoId: string;
+  /** Snapshot: valor de intentosFallidos del préstamo justo antes de este pago. */
+  intentosFallidosAntes?: number;
+  /** Snapshot: ultimoPagoId del préstamo justo antes de este pago (para restaurar en anulación). */
+  ultimoPagoIdAnterior?: string | null;
 };
 &nbsp;
 export type DatosPrestamo = {
@@ -584,11 +601,11 @@ export type DatosEmpleado = {
 &nbsp;
 export function validarElegibilidadAnulacion(params: {
   pago: DatosPago;
-  esMismoDia: boolean;
+  enPeriodoAbierto: boolean;
   esUltimoPago: boolean;
   reporteAprobado: boolean;
 }): AnulacionElegibilidadError | null {
-  const { pago, esMismoDia, esUltimoPago, reporteAprobado } = params;
+  const { pago, enPeriodoAbierto, esUltimoPago, reporteAprobado } = params;
 &nbsp;
   if (pago.estado !== "activo" &amp;&amp; pago.estado !== undefined) {
     return "PAGO_NO_ACTIVO";
@@ -596,8 +613,8 @@ export function validarElegibilidadAnulacion(params: {
   if (pago.tipo !== "pago") {
     return "PAGO_TIPO_INVALIDO";
   }
-  if (!esMismoDia) {
-    return "PAGO_NO_ES_HOY";
+  if (!enPeriodoAbierto) {
+    return "PAGO_FUERA_DE_PERIODO_ABIERTO";
   }
   if (!esUltimoPago) {
     return "PAGO_NO_ES_ULTIMO";
@@ -664,7 +681,7 @@ export function calcularReversion(params: {
     nuevoEstadoPrestamo = pago.estadoPrestamoAntes!;
   } else {
     nuevoSaldoPendiente = round2(prestamo.saldoPendiente + pago.monto);
-    nuevoAdelantoCuota = round2(prestamo.adelantoCuota);
+    nuevoAdelantoCuota = 0;
     nuevoEstadoPrestamo = "activo";
   }
 &nbsp;
@@ -716,6 +733,7 @@ export function calcularReversion(params: {
     nuevoCapitalTotal,
     nuevaCajaEmpleado,
     modo,
+    intentosFallidosRestaurados: pago.intentosFallidosAntes<span class="branch-0 cbranch-no" title="branch not covered" > ?? 0</span>,
   };
 }
 &nbsp;
@@ -725,8 +743,8 @@ export function <span class="fstat-no" title="function not covered" >mensajeEleg
 <span class="cstat-no" title="statement not covered" >      return "Este pago ya fue anulado.";</span>
     case "PAGO_TIPO_INVALIDO":
 <span class="cstat-no" title="statement not covered" >      return "Solo se pueden anular cobros registrados como pago.";</span>
-    case "PAGO_NO_ES_HOY":
-<span class="cstat-no" title="statement not covered" >      return "Solo se pueden anular pagos del día actual.";</span>
+    case "PAGO_FUERA_DE_PERIODO_ABIERTO":
+<span class="cstat-no" title="statement not covered" >      return "Solo se pueden anular cobros del periodo contable abierto. Cierra el periodo solo cuando ya no necesites corregir cobros.";</span>
     case "PAGO_NO_ES_ULTIMO":
 <span class="cstat-no" title="statement not covered" >      return "No se puede anular este pago porque hay cobros posteriores en el mismo préstamo. Anula primero el cobro más reciente.";</span>
     case "SIN_SNAPSHOTS_NI_FALLBACK":
@@ -751,11 +769,7 @@ export function <span class="fstat-no" title="function not covered" >inferirAcre
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-<<<<<<< HEAD
-                at 2026-06-26T17:49:43.030Z
-=======
-                at 2026-06-25T21:12:59.273Z
->>>>>>> 0860e16 (reporte)
+                at 2026-07-07T19:41:13.977Z
             </div>
         <script src="../prettify.js"></script>
         <script>

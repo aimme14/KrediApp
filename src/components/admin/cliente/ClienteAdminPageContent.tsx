@@ -14,6 +14,7 @@ import { filtrarClientesParaExport } from "@/lib/export-clientes";
 import { getEmpresa } from "@/lib/empresa";
 import { ExportClientesModal } from "@/components/ExportClientesModal";
 import { guardOfflineWrite, OFFLINE_MSG, useOnline } from "@/hooks/useOnline";
+import { isAdminPanelRole } from "@/lib/admin-panel-role";
 
 export default function ClienteAdminPageContent() {
   const { user, profile } = useAuth();
@@ -203,7 +204,7 @@ export default function ClienteAdminPageContent() {
     }
   };
 
-  if (!profile || profile.role !== "admin") return null;
+  if (!profile || !isAdminPanelRole(profile.role)) return null;
 
   return (
     <div className="card">

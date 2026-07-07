@@ -7,6 +7,7 @@ import {
   RUTAS_SUBCOLLECTION,
 } from "@/lib/empresas-db";
 import { fechaDiaColombiaHoy } from "@/lib/colombia-day-bounds";
+import { isAdminPanelApiUser } from "@/lib/admin-panel-role";
 
 /** GET: reportes de entrega del día (admin: rutas que administra). ?fecha=YYYY-MM-DD opcional (hoy por defecto). */
 export async function GET(request: NextRequest) {
@@ -14,7 +15,7 @@ export async function GET(request: NextRequest) {
   if (!apiUser) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
-  if (apiUser.role !== "admin") {
+  if (!isAdminPanelApiUser(apiUser)) {
     return NextResponse.json(
       { error: "Solo administradores" },
       { status: 403 },

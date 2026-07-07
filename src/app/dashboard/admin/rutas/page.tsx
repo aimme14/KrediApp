@@ -6,6 +6,7 @@ import { useAdminDashboard } from "@/context/AdminDashboardContext";
 import { AdminRutaStatsGrid } from "@/components/AdminRutaStatsGrid";
 import { createRuta } from "@/lib/empresa-api";
 import { guardOfflineWrite, useOnline } from "@/hooks/useOnline";
+import { isAdminPanelRole } from "@/lib/admin-panel-role";
 
 export default function RutasPage() {
   const { user, profile } = useAuth();
@@ -47,7 +48,7 @@ export default function RutasPage() {
     }
   };
 
-  if (!profile || profile.role !== "admin") return null;
+  if (!profile || !isAdminPanelRole(profile.role)) return null;
 
   const error = formError ?? ctxError;
 

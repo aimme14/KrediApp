@@ -31,6 +31,7 @@ import {
   resolverEstadoTrasMovimiento,
 } from "@/lib/prestamo-estado";
 import type { EstadoPrestamo } from "@/types/firestore";
+import { isAdminPanelApiUser } from "@/lib/admin-panel-role";
 
 const MOTIVOS_NO_PAGO = ["sin_fondos", "no_estaba", "promesa_pago", "otro"] as const;
 const MOTIVOS_PERDIDA = [
@@ -675,7 +676,7 @@ export async function POST(
        * Efectivo: admin → cajaRuta; empleado → cajaEmpleado del cobrador.
        * Transferencia: siempre cajaRuta (no pasa por el bolsillo del empleado).
        */
-      const acreditaCajaRuta = apiUser.role === "admin" || metodo === "transferencia";
+      const acreditaCajaRuta = isAdminPanelApiUser(apiUser) || metodo === "transferencia";
       const cobradorEmpleadoUid = acreditaCajaRuta ? null : apiUser.uid;
       const usuarioEmpRef = cobradorEmpleadoUid
         ? db

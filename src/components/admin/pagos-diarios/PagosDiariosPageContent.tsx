@@ -15,6 +15,7 @@ import {
   parseFechaDiaColombia,
 } from "@/lib/colombia-day-bounds";
 import { pagoOcurreEnPeriodoAbierto } from "@/lib/gastos-periodo-filter";
+import { isAdminPanelRole } from "@/lib/admin-panel-role";
 import {
   formatFechaImpresionPagosDiarios,
   formatHoraPagosDiarios,
@@ -167,7 +168,7 @@ export default function PagosDiariosPageContent() {
     }
   }, [modal, cerrarModal, user]);
 
-  if (!profile || profile.role !== "admin") return null;
+  if (!profile || !isAdminPanelRole(profile.role)) return null;
 
   return (
     <>

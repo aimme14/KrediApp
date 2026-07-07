@@ -2,13 +2,23 @@
 
 import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
-import { listAllJefes, setJefeEnabled, createUser } from "@/lib/users";
+import {
+  listAllJefes,
+  listAllAdminEmpresa,
+  setJefeEnabled,
+  setAdminEmpresaEnabled,
+  createUser,
+} from "@/lib/users";
 import type { UserProfile } from "@/types/roles";
 import PasswordCreateFields from "@/components/PasswordCreateFields";
 
+type SuperAdminTab = "jefes" | "adminEmpresa";
+
 export default function SuperAdminDashboard() {
   const { profile } = useAuth();
+  const [tab, setTab] = useState<SuperAdminTab>("jefes");
   const [jefes, setJefes] = useState<UserProfile[]>([]);
+  const [adminEmpresa, setAdminEmpresa] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
@@ -18,23 +28,28 @@ export default function SuperAdminDashboard() {
   const [displayName, setDisplayName] = useState("");
   const [creating, setCreating] = useState(false);
 
+  const loadLists = async () => {
+    const [jefesList, adminEmpresaList] = await Promise.all([listAllJefes(), listAllAdminEmpresa()]);
+    setJefes(jefesList);
+    setAdminEmpresa(adminEmpresaList);
+  };
+
   useEffect(() => {
     if (!profile || profile.role !== "superAdmin") return;
     let cancelled = false;
-    listAllJefes()
-      .then((list) => {
-        if (!cancelled) setJefes(list);
-      })
+    loadLists()
       .catch((e) => {
         if (!cancelled) setError(e instanceof Error ? e.message : "Error al cargar");
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [profile]);
 
-  const handleToggle = async (jefe: UserProfile) => {
+  const handleToggleJefe = async (jefe: UserProfile) => {
     if (!profile) return;
     setError(null);
     try {
@@ -47,7 +62,20 @@ export default function SuperAdminDashboard() {
     }
   };
 
-  const handleCreateJefe = async (e: React.FormEvent) => {
+  const handleToggleAdminEmpresa = async (admin: UserProfile) => {
+    if (!profile) return;
+    setError(null);
+    try {
+      await setAdminEmpresaEnabled(admin.uid, !admin.enabled, profile.uid);
+      setAdminEmpresa((prev) =>
+        prev.map((u) => (u.uid === admin.uid ? { ...u, enabled: !u.enabled } : u))
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Error al actualizar");
+    }
+  };
+
+  const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!profile) return;
     setError(null);
@@ -57,7 +85,7 @@ export default function SuperAdminDashboard() {
         email,
         password,
         displayName: displayName || undefined,
-        role: "jefe",
+        role: tab === "jefes" ? "jefe" : "adminEmpresa",
         createdByUid: profile.uid,
       });
       setEmail("");
@@ -65,36 +93,78 @@ export default function SuperAdminDashboard() {
       setPasswordConfirm("");
       setDisplayName("");
       setShowForm(false);
-      const list = await listAllJefes();
-      setJefes(list);
+      await loadLists();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Error al crear jefe");
+      setError(
+        e instanceof Error
+          ? e.message
+          : tab === "jefes"
+            ? "Error al crear jefe"
+            : "Error al crear administrador de empresa"
+      );
     } finally {
       setCreating(false);
     }
   };
 
-  if (loading) return <div className="card"><p>Cargando jefes...</p></div>;
+  const createLabel = tab === "jefes" ? "Crear jefe" : "Crear administrador de empresa";
+  const formTitle = tab === "jefes" ? "Nuevo jefe" : "Nuevo administrador de empresa";
+
+  if (loading) return <div className="card"><p>Cargando panel...</p></div>;
 
   return (
     <>
       <div className="card">
-        <div className="card-header-row">
+        <div className="card-header-row" style={{ flexWrap: "wrap", gap: "0.75rem" }}>
+          <nav role="tablist" aria-label="Gestión super admin" style={{ display: "flex", gap: "0.5rem" }}>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={tab === "jefes"}
+              className={`btn ${tab === "jefes" ? "btn-primary" : "btn-secondary"}`}
+              onClick={() => {
+                setTab("jefes");
+                setShowForm(false);
+                setError(null);
+              }}
+            >
+              Jefes
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={tab === "adminEmpresa"}
+              className={`btn ${tab === "adminEmpresa" ? "btn-primary" : "btn-secondary"}`}
+              onClick={() => {
+                setTab("adminEmpresa");
+                setShowForm(false);
+                setError(null);
+              }}
+            >
+              Administradores de empresa
+            </button>
+          </nav>
           <span style={{ flex: 1 }} />
           <button
             type="button"
             className="btn btn-primary"
             onClick={() => setShowForm((v) => !v)}
           >
-            {showForm ? "Cancelar" : "Crear jefe"}
+            {showForm ? "Cancelar" : createLabel}
           </button>
         </div>
       </div>
 
       {showForm && (
         <div className="card">
-          <h3 style={{ marginTop: 0 }}>Nuevo jefe</h3>
-          <form onSubmit={handleCreateJefe}>
+          <h3 style={{ marginTop: 0 }}>{formTitle}</h3>
+          {tab === "adminEmpresa" ? (
+            <p style={{ color: "var(--text-muted)", fontSize: "0.9rem", marginTop: 0 }}>
+              Cuenta independiente del jefe: opera como administrador y puede ingresar dinero a su
+              propia base.
+            </p>
+          ) : null}
+          <form onSubmit={handleCreate}>
             <div className="form-group">
               <label>Correo</label>
               <input
@@ -110,8 +180,8 @@ export default function SuperAdminDashboard() {
               onPasswordChange={setPassword}
               onPasswordConfirmChange={setPasswordConfirm}
               disabled={creating}
-              passwordId="super-jefe-password"
-              confirmId="super-jefe-password-confirm"
+              passwordId={`super-${tab}-password`}
+              confirmId={`super-${tab}-password-confirm`}
             />
             <div className="form-group">
               <label>Nombre (opcional)</label>
@@ -123,7 +193,7 @@ export default function SuperAdminDashboard() {
             </div>
             {error && <p className="error-msg">{error}</p>}
             <button type="submit" className="btn btn-primary" disabled={creating}>
-              {creating ? "Creando..." : "Crear jefe"}
+              {creating ? "Creando..." : createLabel}
             </button>
           </form>
         </div>
@@ -132,7 +202,9 @@ export default function SuperAdminDashboard() {
       {!showForm && error && <p className="error-msg">{error}</p>}
 
       <div className="card">
-        <h3 style={{ marginTop: 0 }}>Jefes</h3>
+        <h3 style={{ marginTop: 0 }}>
+          {tab === "jefes" ? "Jefes" : "Administradores de empresa"}
+        </h3>
         <div className="table-wrap">
           <table>
             <thead>
@@ -145,17 +217,19 @@ export default function SuperAdminDashboard() {
               </tr>
             </thead>
             <tbody>
-              {jefes.length === 0 ? (
+              {(tab === "jefes" ? jefes : adminEmpresa).length === 0 ? (
                 <tr>
                   <td colSpan={5} style={{ color: "var(--text-muted)" }}>
-                    No hay jefes. Crea uno con el botón &quot;Crear jefe&quot;.
+                    {tab === "jefes"
+                      ? 'No hay jefes. Crea uno con el botón "Crear jefe".'
+                      : 'No hay administradores de empresa. Crea uno con el botón correspondiente.'}
                   </td>
                 </tr>
-              ) : (
+              ) : tab === "jefes" ? (
                 jefes.map((j) => (
                   <tr key={j.uid}>
                     <td>
-                      <code className="user-code" title="JF = Jefe, número secuencial">
+                      <code className="user-code" title="JF = Jefe">
                         {j.codigo ?? "—"}
                       </code>
                     </td>
@@ -170,9 +244,35 @@ export default function SuperAdminDashboard() {
                       <button
                         type="button"
                         className={`btn ${j.enabled ? "btn-danger" : "btn-success"}`}
-                        onClick={() => handleToggle(j)}
+                        onClick={() => handleToggleJefe(j)}
                       >
                         {j.enabled ? "Deshabilitar" : "Habilitar"}
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                adminEmpresa.map((a) => (
+                  <tr key={a.uid}>
+                    <td>
+                      <code className="user-code" title="AE = Administrador de empresa">
+                        {a.codigo ?? "—"}
+                      </code>
+                    </td>
+                    <td>{a.email}</td>
+                    <td>{a.displayName ?? "—"}</td>
+                    <td>
+                      <span className={a.enabled ? "badge badge-enabled" : "badge badge-disabled"}>
+                        {a.enabled ? "Habilitado" : "Deshabilitado"}
+                      </span>
+                    </td>
+                    <td>
+                      <button
+                        type="button"
+                        className={`btn ${a.enabled ? "btn-danger" : "btn-success"}`}
+                        onClick={() => handleToggleAdminEmpresa(a)}
+                      >
+                        {a.enabled ? "Deshabilitar" : "Habilitar"}
                       </button>
                     </td>
                   </tr>

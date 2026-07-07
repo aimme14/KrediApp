@@ -32,6 +32,7 @@ import {
   fechaDiaCalendarioDesdeISO,
   fechaDiaColombiaHoy,
 } from "@/lib/colombia-day-bounds";
+import { isAdminPanelRole } from "@/lib/admin-panel-role";
 import {
   clearCobroSnapshot,
   clearNoPagoSnapshot,
@@ -658,7 +659,7 @@ function CobrarClientePageContent() {
     }
   };
 
-  if (!profile || (profile.role !== "trabajador" && profile.role !== "admin")) return null;
+  if (!profile || (profile.role !== "trabajador" && !isAdminPanelRole(profile.role))) return null;
   const backHref = fromAdmin ? "/dashboard/admin/prestamo" : "/dashboard/trabajador/ruta";
   const backLabel = fromAdmin ? "Volver a Préstamos" : "Ruta del día";
   const renovarPrestamoHref = `/dashboard/${fromAdmin ? "admin" : "trabajador"}/prestamo?clienteId=${encodeURIComponent(clienteId ?? "")}`;
@@ -796,7 +797,7 @@ function CobrarClientePageContent() {
       <div className="cobrar-header">
         <div className="cobrar-header-top">
           <Link href={backHref} className="cobrar-back">← {backLabel}</Link>
-          {profile?.role === "admin" && prestamo.saldoPendiente > 0 && (
+          {isAdminPanelRole(profile?.role) && prestamo.saldoPendiente > 0 && (
             <button
               type="button"
               className="btn btn-secondary cobrar-btn-perdida"

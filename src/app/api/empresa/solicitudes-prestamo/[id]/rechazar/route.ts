@@ -6,6 +6,7 @@ import {
   SOLICITUDES_PRESTAMO_SUBCOLLECTION,
 } from "@/lib/empresas-db";
 import { rechazarSolicitudPrestamo } from "@/lib/solicitud-prestamo-empleado";
+import { isAdminPanelApiUser } from "@/lib/admin-panel-role";
 
 const MAX_MOTIVO = 500;
 
@@ -17,7 +18,7 @@ export async function POST(
   if (!apiUser) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
-  if (apiUser.role !== "admin") {
+  if (!isAdminPanelApiUser(apiUser)) {
     return NextResponse.json({ error: "Solo administradores" }, { status: 403 });
   }
 

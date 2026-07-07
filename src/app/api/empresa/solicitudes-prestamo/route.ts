@@ -18,6 +18,7 @@ import {
   evaluarAprobacionPrestamoEmpleado,
   validarClienteElegibleParaPrestamo,
 } from "@/lib/prestamo-aprobacion-empleado";
+import { isAdminPanelApiUser } from "@/lib/admin-panel-role";
 import {
   crearPrestamoEmpleado,
   mapCrearPrestamoEmpleadoError,
@@ -54,7 +55,7 @@ export async function GET(_request: NextRequest) {
 
   const db = getAdminFirestore();
   try {
-    if (apiUser.role === "admin") {
+    if (isAdminPanelApiUser(apiUser)) {
       const items = await listSolicitudesPendientesAdmin(db, apiUser.empresaId, apiUser.uid);
       return NextResponse.json({
         solicitudes: items.map(serializeSolicitud),

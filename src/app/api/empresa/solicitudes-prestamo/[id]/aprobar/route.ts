@@ -17,6 +17,7 @@ import {
   FESTIVOS,
 } from "@/lib/fechas-laborables";
 import type { ModalidadPago } from "@/types/firestore";
+import { isAdminPanelApiUser } from "@/lib/admin-panel-role";
 
 function addMonths(date: Date, months: number): Date {
   const d = new Date(date);
@@ -38,7 +39,7 @@ export async function POST(
   if (!apiUser) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
-  if (apiUser.role !== "admin") {
+  if (!isAdminPanelApiUser(apiUser)) {
     return NextResponse.json({ error: "Solo administrador" }, { status: 403 });
   }
 

@@ -6,7 +6,7 @@
  */
 
 /** Rol dentro de una empresa (empleado = trabajador en la UI) */
-export type RolEmpresa = "jefe" | "admin" | "empleado";
+export type RolEmpresa = "jefe" | "admin" | "adminEmpresa" | "empleado";
 
 /** Documento principal de empresa */
 export interface EmpresaDoc {
@@ -40,7 +40,7 @@ export interface UsuarioEmpresaDoc {
 /** Índice de auth: /users/{uid} - para búsqueda rápida al iniciar sesión */
 export interface UserAuthIndex {
   empresaId: string;
-  role: "jefe" | "admin" | "empleado";
+  role: "jefe" | "admin" | "adminEmpresa" | "empleado";
   email: string;
   displayName?: string;
   enabled: boolean;

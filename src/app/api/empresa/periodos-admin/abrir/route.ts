@@ -4,6 +4,7 @@ import { getAdminFirestore } from "@/lib/firebase-admin";
 import { getApiUser } from "@/lib/api-auth";
 import { EMPRESAS_COLLECTION, PERIODOS_ADMIN_SUBCOLLECTION } from "@/lib/empresas-db";
 import { buildPeriodoAdminSnapshot } from "@/lib/periodo-admin-snapshot";
+import { isAdminPanelApiUser } from "@/lib/admin-panel-role";
 
 /** POST: abre un periodo (snapshot actual). No si ya hay uno abierto. */
 export async function POST(_request: NextRequest) {
@@ -11,7 +12,7 @@ export async function POST(_request: NextRequest) {
   if (!apiUser) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
-  if (apiUser.role !== "admin") {
+  if (!isAdminPanelApiUser(apiUser)) {
     return NextResponse.json({ error: "Solo administrador" }, { status: 403 });
   }
 
