@@ -1,8 +1,8 @@
 /** Fin del periodo gratuito de la app (inclusive). */
 export const FREE_TRIAL_END_DATE = "2026-07-20";
 
-/** Cada cuánto puede mostrarse de nuevo tras cerrarla (2 horas). */
-export const TRIAL_REMINDER_INTERVAL_MS = 2 * 60 * 60 * 1000;
+/** Cada cuánto puede mostrarse de nuevo tras cerrarla (12 h ≈ 2 veces al día). */
+export const TRIAL_REMINDER_INTERVAL_MS = 12 * 60 * 60 * 1000;
 
 const STORAGE_KEY = "krediapp-trial-reminder-last-dismissed";
 
@@ -35,7 +35,7 @@ function readLastDismissed(): number | null {
   }
 }
 
-/** True si han pasado al menos 2 h desde el último cierre (o nunca se mostró). */
+/** True si han pasado al menos 12 h desde el último cierre (o nunca se mostró). */
 export function debeMostrarTrialReminder(ahora = Date.now()): boolean {
   if (!trialAunVigente(new Date(ahora))) return false;
   const last = readLastDismissed();

@@ -107,7 +107,7 @@ export default function DashboardLayout({
   return (
     <InactivityLock>
       <OfflineRootEffect />
-      {(isJefe || isAdmin || isTrabajador) ? <TrialReminderCard /> : null}
+      {(isJefe || isAdmin) ? <TrialReminderCard /> : null}
       <GastoFcmCampanitaProvider>
         <DashboardHeaderProvider value={setHeaderLeftSlot}>
           <div
