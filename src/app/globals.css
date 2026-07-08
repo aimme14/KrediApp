@@ -8922,6 +8922,69 @@ a.admin-inicio-link-btn {
   border: 1px dashed var(--card-border);
 }
 
+/* Tarjeta de inversión expandible */
+.gf-salidas-card--collapsible {
+  padding: 0;
+  overflow: hidden;
+}
+
+.gf-salidas-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.9rem 1rem;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+}
+
+.gf-salidas-toggle:hover {
+  background: var(--btn-secondary-hover, rgba(0 0 0 / 0.06));
+}
+
+.gf-salidas-toggle:focus-visible {
+  outline: 2px solid var(--link);
+  outline-offset: -2px;
+}
+
+.gf-salidas-card--open .gf-salidas-toggle {
+  border-bottom: 1px solid var(--card-border);
+}
+
+.gf-salidas-toggle-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.gf-salidas-toggle .gf-salidas-title {
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.gf-salidas-toggle-hint {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.gf-salidas-chevron {
+  flex-shrink: 0;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  line-height: 1;
+}
+
+.gf-salidas-body {
+  padding: 0.85rem 1rem 1rem;
+}
+
 /* Ingresos placeholder (mismo patrón que Salidas) */
 .gf-ingresos-card { margin-bottom: 1rem; }
 .gf-ingresos-header { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.35rem; }
@@ -9525,6 +9588,54 @@ a.admin-inicio-link-btn {
 }
 
 .gf-historial-icon { font-size: 1rem; }
+
+/* Historial expandible */
+.gf-historial-card--collapsible {
+  padding: 0;
+  overflow: hidden;
+}
+
+.gf-historial-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.9rem 1rem;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+}
+
+.gf-historial-toggle:hover {
+  background: var(--btn-secondary-hover, rgba(0 0 0 / 0.06));
+}
+
+.gf-historial-toggle:focus-visible {
+  outline: 2px solid var(--link);
+  outline-offset: -2px;
+}
+
+.gf-historial-card--open .gf-historial-toggle {
+  border-bottom: 1px solid var(--card-border);
+}
+
+.gf-historial-toggle-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.gf-historial-toggle .gf-historial-title {
+  font-size: 0.9375rem;
+}
+
+.gf-historial-body {
+  padding: 0.85rem 1rem 1rem;
+}
 
 .gf-historial-empty {
   text-align: center;
