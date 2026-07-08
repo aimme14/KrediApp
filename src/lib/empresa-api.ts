@@ -945,6 +945,19 @@ export async function listClientes(
   return data.clientes ?? [];
 }
 
+/** Búsqueda puntual en servidor por cédula o código (1–2 lecturas). */
+export async function searchClientes(
+  token: string,
+  q: string
+): Promise<ClienteItem[]> {
+  const params = new URLSearchParams();
+  params.set("q", q.trim());
+  const res = await fetchWithAuth(`/api/empresa/clientes?${params}`, token);
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error ?? "Error al buscar cliente");
+  return data.clientes ?? [];
+}
+
 export async function createCliente(
   token: string,
   params: {

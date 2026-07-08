@@ -7,6 +7,7 @@ import { useTrabajadorLista } from "@/context/TrabajadorListaContext";
 import {
   createCliente,
   updateCliente,
+  searchClientes,
   formatClienteCodigoRutaYNumero,
   type ClienteItem,
 } from "@/lib/empresa-api";
@@ -15,6 +16,17 @@ import { getEmpresa } from "@/lib/empresa";
 import { ExportClientesModal } from "@/components/ExportClientesModal";
 import { guardOfflineWrite, OFFLINE_MSG, useOnline } from "@/hooks/useOnline";
 import { isAdminPanelRole } from "@/lib/admin-panel-role";
+
+/** true si el texto parece cédula o código (búsqueda server-side viable). */
+function esBusquedaExactaServidor(q: string): boolean {
+  const t = q.trim();
+  if (!t) return false;
+  if (/^CL-\d{1,3}-\d{1,3}-\d{1,3}$/i.test(t)) return true;
+  if (/^\d{1,3}-\d{1,3}$/.test(t)) return true;
+  // Cédula: al menos 5 dígitos (con o sin puntos/guiones)
+  const digits = t.replace(/\D/g, "");
+  return digits.length >= 5 && /^[\d.\-\s]+$/.test(t);
+}
 
 export default function ClienteAdminPageContent() {
   const { user, profile } = useAuth();
@@ -46,6 +58,10 @@ export default function ClienteAdminPageContent() {
   const [filtroRutaId, setFiltroRutaId] = useState("");
   const [showExportModal, setShowExportModal] = useState(false);
   const [nombreEmpresa, setNombreEmpresa] = useState("KrediApp");
+  const [hallazgosServidor, setHallazgosServidor] = useState<ClienteItem[]>([]);
+  const [busquedaServidorQ, setBusquedaServidorQ] = useState<string | null>(null);
+  const [buscandoServidor, setBuscandoServidor] = useState(false);
+  const [errorBusquedaServidor, setErrorBusquedaServidor] = useState<string | null>(null);
 
   const rutaPorId = useMemo(() => {
     const m: Record<string, string> = {};
@@ -77,7 +93,7 @@ export default function ClienteAdminPageContent() {
     { value: "no" as const, label: "Sin préstamo" },
   ];
 
-  const clientesFiltrados = useMemo(
+  const clientesFiltradosLocal = useMemo(
     () =>
       filtrarClientesParaExport(
         clientes,
@@ -87,6 +103,27 @@ export default function ClienteAdminPageContent() {
       ),
     [clientes, filtroNombre, filtroRutaId, filtroPrestamoActivo]
   );
+
+  const mostrarHallazgosServidor =
+    busquedaServidorQ !== null &&
+    busquedaServidorQ === filtroNombre.trim() &&
+    clientesFiltradosLocal.length === 0;
+
+  const clientesFiltrados = useMemo(() => {
+    if (!mostrarHallazgosServidor) return clientesFiltradosLocal;
+    return filtrarClientesParaExport(
+      hallazgosServidor,
+      undefined,
+      filtroRutaId,
+      filtroPrestamoActivo
+    );
+  }, [
+    mostrarHallazgosServidor,
+    clientesFiltradosLocal,
+    hallazgosServidor,
+    filtroRutaId,
+    filtroPrestamoActivo,
+  ]);
 
   const clientesExportables = useMemo(
     () => filtrarClientesParaExport(clientes, filtroNombre, filtroRutaId, "todos"),
@@ -103,9 +140,46 @@ export default function ClienteAdminPageContent() {
 
   const hayMas = clientesPaginados.length < clientesFiltrados.length;
 
+  const yaBuscoEsteQ =
+    busquedaServidorQ !== null && busquedaServidorQ === filtroNombre.trim();
+
+  const puedeBuscarEnServidor =
+    Boolean(filtroNombreLower) &&
+    clientesFiltradosLocal.length === 0 &&
+    esBusquedaExactaServidor(filtroNombre) &&
+    !yaBuscoEsteQ;
+
   useEffect(() => {
     setPagina(1);
+    setHallazgosServidor([]);
+    setBusquedaServidorQ(null);
+    setErrorBusquedaServidor(null);
   }, [filtroNombre, filtroPrestamoActivo, filtroRutaId]);
+
+  const handleBuscarEnServidor = useCallback(async () => {
+    if (!user || !esBusquedaExactaServidor(filtroNombre)) return;
+    if (!online) {
+      setErrorBusquedaServidor(OFFLINE_MSG);
+      return;
+    }
+    setBuscandoServidor(true);
+    setErrorBusquedaServidor(null);
+    try {
+      const token = await user.getIdToken();
+      const found = await searchClientes(token, filtroNombre.trim());
+      setHallazgosServidor(found);
+      setBusquedaServidorQ(filtroNombre.trim());
+      setPagina(1);
+    } catch (e) {
+      setErrorBusquedaServidor(
+        e instanceof Error ? e.message : "No se pudo buscar en el servidor"
+      );
+      setHallazgosServidor([]);
+      setBusquedaServidorQ(filtroNombre.trim());
+    } finally {
+      setBuscandoServidor(false);
+    }
+  }, [user, filtroNombre, online]);
 
   useEffect(() => {
     if (!profile?.empresaId) return;
@@ -334,13 +408,21 @@ export default function ClienteAdminPageContent() {
                     type="search"
                     value={filtroNombre}
                     onChange={(e) => setFiltroNombre(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && puedeBuscarEnServidor && !buscandoServidor) {
+                        e.preventDefault();
+                        void handleBuscarEnServidor();
+                      }
+                    }}
                     placeholder="Buscar por nombre, código o cédula..."
                     aria-label="Buscar clientes por nombre, código o cédula"
                   />
                 </div>
                 {hayFiltrosActivos ? (
                   <p className="prestamo-admin-search-hint">
-                    {clientesFiltrados.length} cliente{clientesFiltrados.length !== 1 ? "s" : ""} encontrado{clientesFiltrados.length !== 1 ? "s" : ""}
+                    {mostrarHallazgosServidor
+                      ? `${clientesFiltrados.length} en servidor`
+                      : `${clientesFiltrados.length} cliente${clientesFiltrados.length !== 1 ? "s" : ""} encontrado${clientesFiltrados.length !== 1 ? "s" : ""}`}
                   </p>
                 ) : null}
               </div>
@@ -388,11 +470,47 @@ export default function ClienteAdminPageContent() {
               </div>
             </div>
             {clientesFiltrados.length === 0 ? (
-              <p className="prestamo-admin-filtro-vacio">
-                {filtroNombreLower
-                  ? `No hay clientes que coincidan con «${filtroNombre.trim()}».`
-                  : "No hay clientes que coincidan con los filtros seleccionados."}
-              </p>
+              <div className="prestamo-admin-filtro-vacio admin-clientes-busqueda-vacia">
+                <p style={{ margin: 0 }}>
+                  {filtroNombreLower
+                    ? `No hay clientes en esta vista que coincidan con «${filtroNombre.trim()}».`
+                    : "No hay clientes que coincidan con los filtros seleccionados."}
+                </p>
+                {puedeBuscarEnServidor ? (
+                  <div className="admin-clientes-busqueda-servidor">
+                    <p className="admin-clientes-busqueda-servidor-hint">
+                      Puede estar fuera de la lista cargada. Busca por cédula o código en el servidor
+                      (una consulta puntual).
+                    </p>
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      disabled={buscandoServidor || !online}
+                      onClick={() => void handleBuscarEnServidor()}
+                    >
+                      {buscandoServidor ? "Buscando…" : "Buscar en servidor"}
+                    </button>
+                    {errorBusquedaServidor ? (
+                      <p className="admin-clientes-busqueda-servidor-error" role="alert">
+                        {errorBusquedaServidor}
+                      </p>
+                    ) : null}
+                  </div>
+                ) : null}
+                {mostrarHallazgosServidor && hallazgosServidor.length === 0 && !buscandoServidor ? (
+                  <p className="admin-clientes-busqueda-servidor-hint" style={{ marginTop: "0.5rem" }}>
+                    Tampoco hay coincidencia exacta en el servidor para esa cédula/código.
+                  </p>
+                ) : null}
+                {mostrarHallazgosServidor &&
+                hallazgosServidor.length > 0 &&
+                clientesFiltrados.length === 0 &&
+                !buscandoServidor ? (
+                  <p className="admin-clientes-busqueda-servidor-hint" style={{ marginTop: "0.5rem" }}>
+                    Se encontró en el servidor, pero no coincide con el filtro de ruta o préstamo activo.
+                  </p>
+                ) : null}
+              </div>
             ) : (
             <>
             <div className="table-wrap admin-clientes-table-wrap">

@@ -3742,6 +3742,33 @@ td {
   color: var(--text-muted);
 }
 
+.admin-clientes-busqueda-vacia {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.admin-clientes-busqueda-servidor {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.45rem;
+  max-width: 28rem;
+}
+
+.admin-clientes-busqueda-servidor-hint {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+.admin-clientes-busqueda-servidor-error {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--danger, #c62828);
+}
+
 .prestamo-admin-filtros-wrap .prestamo-admin-tabs {
   margin-bottom: 0;
 }

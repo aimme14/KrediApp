@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { FieldValue } from "firebase-admin/firestore";
+import { FieldValue, type CollectionReference, type DocumentReference, type QuerySnapshot, type DocumentData } from "firebase-admin/firestore";
 import { getAdminFirestore } from "@/lib/firebase-admin";
-import { getApiUser } from "@/lib/api-auth";
+import { getApiUser, type ApiUser } from "@/lib/api-auth";
 import {
   EMPRESAS_COLLECTION,
   CLIENTES_SUBCOLLECTION,
@@ -23,7 +23,136 @@ function parseRutaCodigo(codigo: string | undefined): { adminNumStr: string; rut
   };
 }
 
-/** GET: lista clientes. Empleado: solo los de su ruta. Admin/Jefe: ?rutaId= opcional */
+type ClienteListRow = {
+  id: string;
+  nombre: string;
+  ubicacion: string;
+  direccion: string;
+  telefono: string;
+  cedula: string;
+  rutaId: string;
+  adminId: string;
+  prestamo_activo: boolean;
+  moroso: boolean;
+  fechaCreacion: Date | null;
+  codigo?: string;
+};
+
+function mapClienteDoc(d: { id: string; data: () => DocumentData | undefined }): ClienteListRow {
+  const data = d.data() ?? {};
+  const fc = data.fechaCreacion as { toDate?: () => Date } | Date | null | undefined;
+  let fechaCreacion: Date | null = null;
+  if (fc && typeof (fc as { toDate?: () => Date }).toDate === "function") {
+    fechaCreacion = (fc as { toDate: () => Date }).toDate();
+  } else if (fc instanceof Date) {
+    fechaCreacion = fc;
+  }
+  return {
+    id: d.id,
+    nombre: String(data.nombre ?? ""),
+    ubicacion: String(data.ubicacion ?? ""),
+    direccion: String(data.direccion ?? ""),
+    telefono: String(data.telefono ?? ""),
+    cedula: String(data.cedula ?? ""),
+    rutaId: String(data.rutaId ?? ""),
+    adminId: String(data.adminId ?? ""),
+    prestamo_activo: data.prestamo_activo === true,
+    moroso: data.moroso === true,
+    fechaCreacion,
+    codigo: data.codigo != null ? String(data.codigo) : undefined,
+  };
+}
+
+function clienteInScope(
+  c: ClienteListRow,
+  apiUser: ApiUser,
+  rutaIdsDelAdmin?: Set<string>
+): boolean {
+  if (apiUser.role === "empleado") {
+    return Boolean(apiUser.rutaId && c.rutaId === apiUser.rutaId);
+  }
+  if (apiUser.role === "jefe") return true;
+  if (c.adminId === apiUser.uid) return true;
+  if (rutaIdsDelAdmin && c.rutaId && rutaIdsDelAdmin.has(c.rutaId)) return true;
+  return false;
+}
+
+/**
+ * Búsqueda puntual por cédula o código (igualdad). 1–2 queries, sin scan.
+ * Códigos cortos "002-045" se expanden a CL-{adminNum}-002-045.
+ */
+async function buscarClienteExacto(
+  apiUser: ApiUser,
+  col: CollectionReference,
+  empresaRef: DocumentReference,
+  qRaw: string
+): Promise<NextResponse> {
+  const q = qRaw.trim();
+  if (!q) {
+    return NextResponse.json({ error: "Indica cédula o código para buscar" }, { status: 400 });
+  }
+
+  let rutaIdsDelAdmin: Set<string> | undefined;
+  if (apiUser.role === "admin" || apiUser.role === "adminEmpresa") {
+    const rutasSnap = await empresaRef
+      .collection(RUTAS_SUBCOLLECTION)
+      .where("adminId", "==", apiUser.uid)
+      .get();
+    rutaIdsDelAdmin = new Set(rutasSnap.docs.map((d) => d.id));
+  }
+
+  const byId = new Map<string, ClienteListRow>();
+  const addSnap = (snap: QuerySnapshot) => {
+    for (const doc of snap.docs) {
+      const row = mapClienteDoc(doc);
+      if (clienteInScope(row, apiUser, rutaIdsDelAdmin)) byId.set(row.id, row);
+    }
+  };
+
+  const codigoFull = q.match(/^CL-(\d{1,3})-(\d{1,3})-(\d{1,3})$/i);
+  const codigoCorto = q.match(/^(\d{1,3})-(\d{1,3})$/);
+
+  if (codigoFull || codigoCorto) {
+    let codigoExact: string;
+    if (codigoFull) {
+      codigoExact = `CL-${codigoFull[1].padStart(3, "0")}-${codigoFull[2].padStart(3, "0")}-${codigoFull[3].padStart(3, "0")}`;
+    } else {
+      const adminSnap = await empresaRef.collection(USUARIOS_SUBCOLLECTION).doc(apiUser.uid).get();
+      const adminData = adminSnap.data() as { adminNum?: number; codigo?: string } | undefined;
+      let adminNum = 0;
+      if (typeof adminData?.adminNum === "number") adminNum = adminData.adminNum;
+      else if (typeof adminData?.codigo === "string") {
+        const m = adminData.codigo.match(/^(?:AD|AE)-(\d+)$/i);
+        if (m) adminNum = parseInt(m[1], 10);
+      }
+      codigoExact = `CL-${String(adminNum).padStart(3, "0")}-${codigoCorto![1].padStart(3, "0")}-${codigoCorto![2].padStart(3, "0")}`;
+    }
+    addSnap(await col.where("codigo", "==", codigoExact).limit(5).get());
+  } else {
+    const variants = Array.from(
+      new Set([q, q.replace(/\D/g, "")].filter((v) => v.length > 0))
+    );
+    const snaps = await Promise.all(
+      variants.map((ced) => col.where("cedula", "==", ced).limit(5).get())
+    );
+    for (const snap of snaps) addSnap(snap);
+  }
+
+  const list = Array.from(byId.values()).sort(
+    (a, b) =>
+      (b.fechaCreacion ? b.fechaCreacion.getTime() : 0) -
+      (a.fechaCreacion ? a.fechaCreacion.getTime() : 0)
+  );
+  const clientes = list.map((c) => ({
+    ...c,
+    fechaCreacion: c.fechaCreacion?.toISOString?.() ?? null,
+  }));
+
+  return NextResponse.json({ clientes });
+}
+
+/** GET: lista clientes. Empleado: solo los de su ruta. Admin/Jefe: ?rutaId= opcional.
+ *  ?q= cédula o código exacto → búsqueda puntual barata (sin listar 200). */
 export async function GET(request: NextRequest) {
   const apiUser = await getApiUser(request);
   if (!apiUser) {
@@ -33,10 +162,15 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const rutaIdParam = searchParams.get("rutaId");
   const soloMorosos = searchParams.get("moroso") === "true";
+  const qParam = searchParams.get("q")?.trim() ?? "";
 
   const db = getAdminFirestore();
   const empresaRef = db.collection(EMPRESAS_COLLECTION).doc(apiUser.empresaId);
   const col = empresaRef.collection(CLIENTES_SUBCOLLECTION);
+
+  if (qParam) {
+    return buscarClienteExacto(apiUser, col, empresaRef, qParam);
+  }
 
   let list: Array<{
     id: string;

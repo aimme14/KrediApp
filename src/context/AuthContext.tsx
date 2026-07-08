@@ -361,7 +361,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return unsub;
     }
 
-    if (role === "jefe" || role === "admin" || role === "trabajador") {
+    if (role === "jefe" || role === "admin" || role === "adminEmpresa" || role === "trabajador") {
       const ref = doc(db, USERS_COLLECTION, uid);
       const unsub = onSnapshot(
         ref,
