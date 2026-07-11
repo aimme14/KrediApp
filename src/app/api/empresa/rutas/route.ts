@@ -107,6 +107,9 @@ export async function POST(request: NextRequest) {
   if (!apiUser) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
+  if (!isAdminPanelApiUser(apiUser)) {
+    return NextResponse.json({ error: "Solo administradores" }, { status: 403 });
+  }
 
   const body = await request.json().catch(() => ({}));
   const { nombre, ubicacion, capitalInicial: capitalInicialBody } = body as {
