@@ -18,7 +18,6 @@ import { isAdminPanelRole } from "@/lib/admin-panel-role";
 
 const DashboardHelp = dynamic(() => import("@/components/help/DashboardHelp"), { ssr: false });
 const DashboardSettings = dynamic(() => import("@/components/DashboardSettings"), { ssr: false });
-const TrialReminderCard = dynamic(() => import("@/components/TrialReminderCard"), { ssr: false });
 
 export default function DashboardLayout({
   children,
@@ -107,7 +106,6 @@ export default function DashboardLayout({
   return (
     <InactivityLock>
       <OfflineRootEffect />
-      {(isJefe || isAdmin) ? <TrialReminderCard /> : null}
       <GastoFcmCampanitaProvider>
         <DashboardHeaderProvider value={setHeaderLeftSlot}>
           <div

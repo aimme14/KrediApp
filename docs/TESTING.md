@@ -22,7 +22,7 @@ Si todos pasan ✅ → puedes hacer deploy con confianza.
 Si alguno falla ❌ → revisa tu cambio antes de continuar.
 
 > Los tests de **reglas Firestore** no se ejecutan con `npm test` / `test:coverage`
-> (necesitan el emulador). Para ellos: `npm run tesnpm testt:rules`.
+> (necesitan el emulador). Para ellos: `npm run test:rules`.
 
 ### 2. Si modificaste una función financiera
 
