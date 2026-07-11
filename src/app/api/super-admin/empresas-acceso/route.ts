@@ -32,7 +32,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
 
-    const uniqueIds = [...new Set(empresaIds.filter((id) => typeof id === "string" && id.trim()))];
+    const uniqueIds = Array.from(
+      new Set(empresaIds.filter((id) => typeof id === "string" && id.trim()))
+    );
     const accesos: Record<string, ReturnType<typeof buildEmpresaAccesoInfo>> = {};
     const empresasDeshabilitadas: string[] = [];
 
