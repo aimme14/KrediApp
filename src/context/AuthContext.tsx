@@ -303,10 +303,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }));
         try {
           const idToken = await user.getIdToken();
-          await fetch("/api/users/me/sync-claims", {
+          const syncRes = await fetch("/api/users/me/sync-claims", {
             method: "POST",
             headers: { Authorization: `Bearer ${idToken}` },
           });
+          const syncData = (await syncRes.json().catch(() => ({}))) as {
+            accesoVencido?: boolean;
+          };
+          if (syncData.accesoVencido) {
+            const refreshed = await fetchUserProfile(user.uid, user.email ?? undefined);
+            setState((s) => ({
+              ...s,
+              user,
+              profile: refreshed,
+              profileLoading: false,
+              error: null,
+            }));
+          }
           await user.getIdToken(true);
         } catch {
           /* claims opcionales si la API falla */

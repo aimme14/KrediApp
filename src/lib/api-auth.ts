@@ -48,6 +48,8 @@ export async function getApiUser(request: NextRequest): Promise<ApiUser | null> 
         claimRole === "empleado") &&
       claimEmpresaId
     ) {
+      if (decoded.enabled === false) return null;
+
       if (claimRole === "empleado") {
         return {
           uid,
@@ -78,6 +80,7 @@ export async function getApiUser(request: NextRequest): Promise<ApiUser | null> 
 
     const empresaId = (data.empresaId as string) ?? "";
     if (!empresaId) return null;
+    if (data.enabled === false) return null;
 
     if (role === "empleado") {
       return {

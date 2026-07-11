@@ -77,7 +77,7 @@ const env = refreshPathEnv();
 assertJavaAvailable(env);
 
 const jestCommand =
-  "npx jest src/lib/__tests__/firestore-rules.test.ts --testEnvironment node --no-coverage";
+  "npx jest src/lib/__tests__/firestore-rules.test.ts --testEnvironment node --no-coverage --testPathIgnorePatterns=[]";
 
 const fullCommand = `npx firebase-tools emulators:exec --only firestore "${jestCommand}"`;
 

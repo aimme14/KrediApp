@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminFirestore } from "@/lib/firebase-admin";
-import { syncCustomClaimsForUid } from "@/lib/sync-custom-claims";
-import { SUPER_ADMIN_COLLECTION } from "@/types/superAdmin";
-import { EMPRESAS_COLLECTION, USUARIOS_SUBCOLLECTION, USERS_COLLECTION } from "@/lib/empresas-db";
+import { setEmpresaAccesoCompleto } from "@/lib/empresa-acceso";
+import { assertSuperAdmin } from "@/lib/super-admin-auth";
+import { USERS_COLLECTION } from "@/lib/empresas-db";
 
 export async function PATCH(
   _request: NextRequest,
@@ -21,13 +21,9 @@ export async function PATCH(
     }
 
     const db = getAdminFirestore();
-    const superRef = db.collection(SUPER_ADMIN_COLLECTION).doc(superAdminUid);
-    const superSnap = await superRef.get();
-    if (!superSnap.exists || superSnap.data()?.role !== "superAdmin") {
-      return NextResponse.json(
-        { error: "Solo el Super Administrador puede habilitar o deshabilitar administradores de empresa" },
-        { status: 403 }
-      );
+    const auth = await assertSuperAdmin(db, superAdminUid);
+    if (!auth.ok) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
 
     const userRef = db.collection(USERS_COLLECTION).doc(adminEmpresaUid);
@@ -39,28 +35,9 @@ export async function PATCH(
       );
     }
 
-    const now = new Date();
-    await userRef.update({ enabled, updatedAt: now });
+    const { uidsActualizados } = await setEmpresaAccesoCompleto(db, adminEmpresaUid, enabled);
 
-    const usuarioRef = db
-      .collection(EMPRESAS_COLLECTION)
-      .doc(adminEmpresaUid)
-      .collection(USUARIOS_SUBCOLLECTION)
-      .doc(adminEmpresaUid);
-    const usuarioSnap = await usuarioRef.get();
-    if (usuarioSnap.exists) {
-      await usuarioRef.update({ activo: enabled });
-    }
-
-    const empRef = db.collection(EMPRESAS_COLLECTION).doc(adminEmpresaUid);
-    const empSnap = await empRef.get();
-    if (empSnap.exists) {
-      await empRef.update({ activa: enabled });
-    }
-
-    await syncCustomClaimsForUid(adminEmpresaUid);
-
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, uidsActualizados });
   } catch (e) {
     const message = e instanceof Error ? e.message : "Error al actualizar";
     return NextResponse.json({ error: message }, { status: 500 });

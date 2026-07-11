@@ -3,15 +3,15 @@
 <html lang="en">
 
 <head>
-    <title>Code coverage report for content/help/admin/general.ts</title>
+    <title>Code coverage report for types/superAdmin.ts</title>
     <meta charset="utf-8" />
-    <link rel="stylesheet" href="../../../prettify.css" />
-    <link rel="stylesheet" href="../../../base.css" />
-    <link rel="shortcut icon" type="image/x-icon" href="../../../favicon.png" />
+    <link rel="stylesheet" href="../prettify.css" />
+    <link rel="stylesheet" href="../base.css" />
+    <link rel="shortcut icon" type="image/x-icon" href="../favicon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <style type='text/css'>
         .coverage-summary .sorter {
-            background-image: url(../../../sort-arrow-sprite.png);
+            background-image: url(../sort-arrow-sprite.png);
         }
     </style>
 </head>
@@ -19,7 +19,7 @@
 <body>
 <div class='wrapper'>
     <div class='pad1'>
-        <h1><a href="../../../index.html">All files</a> / <a href="index.html">content/help/admin</a> general.ts</h1>
+        <h1><a href="../index.html">All files</a> / <a href="index.html">types</a> superAdmin.ts</h1>
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
@@ -93,12 +93,11 @@
 <a name='L28'></a><a href='#L28'>28</a>
 <a name='L29'></a><a href='#L29'>29</a>
 <a name='L30'></a><a href='#L30'>30</a>
-<a name='L31'></a><a href='#L31'>31</a>
-<a name='L32'></a><a href='#L32'>32</a>
-<a name='L33'></a><a href='#L33'>33</a>
-<a name='L34'></a><a href='#L34'>34</a>
-<a name='L35'></a><a href='#L35'>35</a>
-<a name='L36'></a><a href='#L36'>36</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L31'></a><a href='#L31'>31</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -124,50 +123,36 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import type { HelpRoleGeneral } from "../types";
+<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">/**
+ * Colección Firestore: /superAdmin/{adminID}
+ *
+ * Almacena los datos del Super Administrador.
+ * La contraseña NUNCA se guarda aquí; Firebase Auth la gestiona de forma segura.
+ */
+export const SUPER_ADMIN_COLLECTION = "superAdmin";
 &nbsp;
-export const ADMIN_HELP_GENERAL: HelpRoleGeneral = {
-  title: "Guía del administrador",
-  intro:
-    "Como administrador coordinas rutas, empleados, préstamos y el cierre diario. Tu trabajo conecta la operación en campo con el control financiero de la empresa.",
-  dailyFlow: [
-    "Al iniciar el día, revisa que los saldos estén correctos: caja, inversiones, total invertido. Las que sean necesarias.",
-    "Coordínate con el empleado: comunícate con él y confirma que va a iniciar su jornada laboral.",
-    "En Ruta del día, asigna el efectivo que recibirá antes de salir a trabajar.",
-    "En Permisos (al final del panel lateral), habilíta al empleado para que pueda ingresar al sistema.",
-    "Durante el día, gestiona clientes e inversiones; también puedes seguir el avance del empleado desde las notificaciones.",
-    "Al cierre, el empleado te entrega un reporte del día. Revisa que todo cuadre —cajas, efectivo a entregar, cobros y demás— antes de aceptarlo.",
-    "Confirma que las transacciones y las cajas quedaron cuadradas despues de aceptar el reporte del día del empleado.",
-    "Cierra la jornada laboral del trabajador desde Permisos, la misma sección del paso 4.",
-  ],
-  faqs: [
-    {
-      q: "¿Cuál es mi primera acción al iniciar el día?",
-      a: "Abre Inicio para ver el estado general y luego Ruta del día para repartir efectivo a los trabajadores antes de que salgan a cobrar.",
-    },
-    {
-      q: "¿Dónde apruebo un préstamo que pidió un trabajador?",
-      a: "En Solicitudes préstamo. Si lo apruebas, el préstamo se crea automáticamente. También puedes crear préstamos directamente en Préstamos.",
-    },
-    {
-      q: "¿Qué hago si un trabajador no cuadra su caja?",
-      a: "Revisa el detalle en Reportes antes de aprobar. Puedes rechazar la entrega y pedirle que corrija los cobros o gastos.",
-    },
-    {
-      q: "¿Cuándo marco un cliente como moroso?",
-      a: "En Clientes morosos, cuando deba dejar de aparecer en la ruta normal hasta regularizar su situación.",
-    },
-  ],
-};
+export interface SuperAdminProfile {
+  /** UID de Firebase Auth (mismo que el ID del documento) */
+  uid: string;
+  /** Correo electrónico */
+  email: string;
+  /** Nombre para mostrar (opcional) */
+  displayName?: string;
+  /** Siempre "superAdmin" */
+  role: "superAdmin";
+  /** Si la cuenta está activa */
+  enabled: boolean;
+  /** UID de quien creó este super admin (vacío para el primero) */
+  createdBy: string;
+  /** Fecha de creación */
+  createdAt: Date;
+  /** Última actualización */
+  updatedAt: Date;
+  /** Si el correo está verificado en Auth */
+  emailVerified: boolean;
+  /** Último inicio de sesión (auditoría) */
+  lastLoginAt?: Date;
+}
 &nbsp;</pre></td></tr></table></pre>
 
                 <div class='push'></div><!-- for sticky footer -->
@@ -177,14 +162,14 @@ export const ADMIN_HELP_GENERAL: HelpRoleGeneral = {
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
                 at 2026-07-11T15:05:44.251Z
             </div>
-        <script src="../../../prettify.js"></script>
+        <script src="../prettify.js"></script>
         <script>
             window.onload = function () {
                 prettyPrint();
             };
         </script>
-        <script src="../../../sorter.js"></script>
-        <script src="../../../block-navigation.js"></script>
+        <script src="../sorter.js"></script>
+        <script src="../block-navigation.js"></script>
     </body>
 </html>
     

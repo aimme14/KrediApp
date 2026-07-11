@@ -8,6 +8,8 @@ export interface EmpresaProfile {
   fechaCreacion?: Date;
   activa?: boolean;
   dueñoUid?: string;
+  /** Fecha límite de acceso YYYY-MM-DD (inclusive, hora Colombia). null = sin límite. */
+  accesoHasta?: string | null;
 }
 
 /** Capital de empresa: empresas/{jefeUid}/capital/cajaEmpresa y agregados (cajaAdmin, cajaEmpleado, capital/root/rutas). */

@@ -85,6 +85,51 @@ export async function setAdminEmpresaEnabled(
   if (!res.ok) throw new Error(data.error ?? "Error al actualizar administrador de empresa");
 }
 
+export interface EmpresaAccesoInfo {
+  empresaId: string;
+  accesoHasta: string | null;
+  activa: boolean;
+  vencido: boolean;
+  diasRestantes: number | null;
+}
+
+export async function fetchEmpresasAcceso(
+  superAdminUid: string,
+  empresaIds: string[]
+): Promise<{
+  accesos: Record<string, EmpresaAccesoInfo>;
+  empresasDeshabilitadas: string[];
+}> {
+  const res = await fetch("/api/super-admin/empresas-acceso", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ superAdminUid, empresaIds }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error ?? "Error al cargar fechas de acceso");
+  return {
+    accesos: data.accesos ?? {},
+    empresasDeshabilitadas: Array.isArray(data.empresasDeshabilitadas)
+      ? data.empresasDeshabilitadas
+      : [],
+  };
+}
+
+export async function setEmpresaAccesoHasta(
+  empresaId: string,
+  accesoHasta: string | null,
+  superAdminUid: string
+): Promise<EmpresaAccesoInfo & { deshabilitadoPorVencimiento?: boolean }> {
+  const res = await fetch(`/api/empresa/${encodeURIComponent(empresaId)}/acceso`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ accesoHasta, superAdminUid }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error ?? "Error al guardar fecha de acceso");
+  return data;
+}
+
 /**
  * Habilita o deshabilita un administrador. Solo el jefe que lo creó puede hacerlo.
  */

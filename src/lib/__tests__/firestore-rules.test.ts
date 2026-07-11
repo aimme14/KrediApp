@@ -6,9 +6,11 @@
  *   JDK 21+ en PATH (firebase-tools emulador Firestore)
  *   npm run test:rules                (levanta emulador + corre este archivo)
  *
- * O manualmente:
+ * No se incluye en `npm test` / `test:coverage` (testPathIgnorePatterns en jest.config.js).
+ *
+ * O manualmente (con emulador ya levantado):
  *   firebase emulators:start --only firestore &
- *   jest src/lib/__tests__/firestore-rules.test.ts --testEnvironment node
+ *   npx jest src/lib/__tests__/firestore-rules.test.ts --testEnvironment node --testPathIgnorePatterns=[]
  *
  * Convenciones:
  *   assertSucceeds / assertFails de @firebase/rules-unit-testing

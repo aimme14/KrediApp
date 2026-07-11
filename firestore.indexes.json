@@ -237,6 +237,14 @@
         { "fieldPath": "desembolsoDesde", "order": "ASCENDING" },
         { "fieldPath": "creadoEn", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "empresas",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "activa", "order": "ASCENDING" },
+        { "fieldPath": "accesoHasta", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

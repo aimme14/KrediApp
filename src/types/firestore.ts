@@ -16,8 +16,10 @@ export interface EmpresaDoc {
   sedePrincipal: string;
   fechaCreacion: Date;
   activa: boolean;
-  /** UID del jefe dueño de la empresa */
+  /** Fecha límite de acceso YYYY-MM-DD (inclusive, hora Colombia). */
   dueñoUid: string;
+  /** Fin del acceso por pago; null si no hay límite programado. */
+  accesoHasta?: string | null;
 }
 
 /** Usuario dentro de una empresa (subcolección usuarios) */
