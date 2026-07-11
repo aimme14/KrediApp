@@ -16,9 +16,12 @@ export async function GET(request: NextRequest) {
     );
   }
 
+  const cursorRaw = request.nextUrl.searchParams.get("cursor");
+  const cursor = cursorRaw ? new Date(cursorRaw) : undefined;
+
   const db = getAdminFirestore();
   try {
-    const list = await listIngresosBaseAdminEmpresa(db, apiUser.empresaId, apiUser.uid);
+    const list = await listIngresosBaseAdminEmpresa(db, apiUser.empresaId, apiUser.uid, cursor);
     return NextResponse.json({
       ingresos: list.map((i) => ({
         id: i.id,
@@ -27,6 +30,7 @@ export async function GET(request: NextRequest) {
         cajaNueva: i.cajaNueva,
         at: i.at.toISOString(),
       })),
+      hasMore: list.length === 10,
     });
   } catch (e) {
     return NextResponse.json(

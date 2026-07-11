@@ -12,9 +12,8 @@ export interface EmpresaProfile {
   accesoHasta?: string | null;
 }
 
-/** Capital de empresa: empresas/{jefeUid}/capital/cajaEmpresa y agregados (cajaAdmin, cajaEmpleado, capital/root/rutas). */
-export interface CapitalEmpresa {
-  monto: number;
-  jefeUid: string;
-  updatedAt: Date;
+/** Capital de empresa: empresas/{{jefeUid}}/capital/cajaEmpresa y agregados (cajaAdmin, cajaEmpleados). */
+export interface EmpresaCapitalDoc {
+  valor: number;
+  updatedAt?: Date;
 }

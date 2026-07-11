@@ -20,16 +20,19 @@ export async function POST(request: NextRequest) {
     const decoded = await auth.verifyIdToken(token);
     const db = getAdminFirestore();
 
-    const superSnap = await db.collection(SUPER_ADMIN_COLLECTION).doc(decoded.uid).get();
-    let accesoVencido = false;
-    if (!superSnap.exists) {
-      const result = await verificarYProcesarAccesoEmpresaUsuario(db, decoded.uid);
-      accesoVencido = result.deshabilitado;
+    // Super Admin: no tiene empresa, solo sincronizar claims
+    const superSnap = await db.collection("superAdmin").doc(decoded.uid).get();
+    if (superSnap.exists) {
+      await syncCustomClaimsForUid(decoded.uid);
+      return NextResponse.json({ ok: true });
     }
 
+    // Usuarios de empresa: verificar accesoHasta y sincronizar
+    const { deshabilitado } = await verificarYProcesarAccesoEmpresaUsuario(db, decoded.uid);
     await syncCustomClaimsForUid(decoded.uid);
-    return NextResponse.json({ ok: true, accesoVencido });
-  } catch {
-    return NextResponse.json({ error: "Token inválido" }, { status: 401 });
+    return NextResponse.json({ ok: true, accesoVencido: deshabilitado });
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "Error al sincronizar";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
