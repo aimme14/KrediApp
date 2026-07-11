@@ -84,7 +84,15 @@ export default function GestionFinancieraPageContent() {
   const [invertirError, setInvertirError] = useState<string | null>(null);
   const [invertirOk, setInvertirOk] = useState(false);
   const [inversiones, setInversiones] = useState<InversionCajaRutaItem[]>([]);
+  const [inversionesCursor, setInversionesCursor] = useState<string | undefined>(undefined);
+  const [inversionesHasMore, setInversionesHasMore] = useState(false);
+  const [inversionesLoadingMore, setInversionesLoadingMore] = useState(false);
+
   const [inversionesAdmin, setInversionesAdmin] = useState<InversionRutaCajaAdminItem[]>([]);
+  const [inversionesAdminCursor, setInversionesAdminCursor] = useState<string | undefined>(undefined);
+  const [inversionesAdminHasMore, setInversionesAdminHasMore] = useState(false);
+  const [inversionesAdminLoadingMore, setInversionesAdminLoadingMore] = useState(false);
+
   const [inversionModal, setInversionModal] = useState<InversionPendienteModal | null>(null);
   const [confirmarInversionMarcado, setConfirmarInversionMarcado] = useState(false);
 
@@ -106,6 +114,9 @@ export default function GestionFinancieraPageContent() {
   const [ingresoOk, setIngresoOk] = useState(false);
   const [ingresoSaving, setIngresoSaving] = useState(false);
   const [ingresosBase, setIngresosBase] = useState<IngresoBaseAdminEmpresaItem[]>([]);
+  const [ingresosBaseCursor, setIngresosBaseCursor] = useState<string | undefined>(undefined);
+  const [ingresosBaseHasMore, setIngresosBaseHasMore] = useState(false);
+  const [ingresosBaseLoadingMore, setIngresosBaseLoadingMore] = useState(false);
   const [ingresoModal, setIngresoModal] = useState<IngresoBasePendienteModal | null>(null);
   const [confirmarIngresoMarcado, setConfirmarIngresoMarcado] = useState(false);
 
@@ -119,25 +130,6 @@ export default function GestionFinancieraPageContent() {
       const [caja, resumen] = await Promise.all([getCajaAdmin(token), getResumenEconomico(token)]);
       setCajaAdmin(caja);
       setRutas(resumen.rutas ?? []);
-      try {
-        const promises: [
-          Promise<InversionCajaRutaItem[]>,
-          Promise<InversionRutaCajaAdminItem[]>,
-          Promise<IngresoBaseAdminEmpresaItem[] | null>,
-        ] = [
-          listInversionesCajaRuta(token),
-          listInversionesCajaAdmin(token),
-          isAdminEmpresaRole(profile.role) ? listIngresosBaseAdminEmpresa(token) : Promise.resolve(null),
-        ];
-        const [listaRuta, listaAdmin, listaIngresos] = await Promise.all(promises);
-        setInversiones(listaRuta ?? []);
-        setInversionesAdmin(listaAdmin ?? []);
-        setIngresosBase(listaIngresos ?? []);
-      } catch {
-        setInversiones([]);
-        setInversionesAdmin([]);
-        setIngresosBase([]);
-      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al cargar gestión financiera");
     } finally {
@@ -148,6 +140,47 @@ export default function GestionFinancieraPageContent() {
   useEffect(() => {
     load();
   }, [load]);
+
+  // ── Carga lazy de historiales (solo al abrir la sección) ──────────────────
+
+  const cargarHistorialRuta = useCallback(async (cursor?: string) => {
+    if (!user) return;
+    const token = await user.getIdToken();
+    const { items, hasMore } = await listInversionesCajaRuta(token, cursor);
+    if (cursor) {
+      setInversiones((prev) => [...prev, ...items]);
+    } else {
+      setInversiones(items);
+    }
+    setInversionesCursor(items.at(-1)?.fecha ?? undefined);
+    setInversionesHasMore(hasMore);
+  }, [user]);
+
+  const cargarHistorialAdmin = useCallback(async (cursor?: string) => {
+    if (!user) return;
+    const token = await user.getIdToken();
+    const { items, hasMore } = await listInversionesCajaAdmin(token, cursor);
+    if (cursor) {
+      setInversionesAdmin((prev) => [...prev, ...items]);
+    } else {
+      setInversionesAdmin(items);
+    }
+    setInversionesAdminCursor(items.at(-1)?.fecha ?? undefined);
+    setInversionesAdminHasMore(hasMore);
+  }, [user]);
+
+  const cargarHistorialIngresos = useCallback(async (cursor?: string) => {
+    if (!user) return;
+    const token = await user.getIdToken();
+    const { ingresos, hasMore } = await listIngresosBaseAdminEmpresa(token, cursor);
+    if (cursor) {
+      setIngresosBase((prev) => [...prev, ...ingresos]);
+    } else {
+      setIngresosBase(ingresos);
+    }
+    setIngresosBaseCursor(ingresos.at(-1)?.at ?? undefined);
+    setIngresosBaseHasMore(hasMore);
+  }, [user]);
 
   const rutasPropias = useMemo(
     () => (user ? rutas.filter((r) => r.adminId === user.uid) : []),
@@ -416,7 +449,13 @@ export default function GestionFinancieraPageContent() {
                   aria-expanded={historialIngresosAbierto}
                   aria-controls="gf-historial-ingresos-base"
                   id="gf-toggle-historial-ingresos"
-                  onClick={() => setHistorialIngresosAbierto((v) => !v)}
+                  onClick={() => {
+                    setHistorialIngresosAbierto((v) => {
+                      const next = !v;
+                      if (next && ingresosBase.length === 0) void cargarHistorialIngresos();
+                      return next;
+                    });
+                  }}
                 >
                   <span className="gf-historial-toggle-text">
                     <span className="gf-historial-title">
@@ -464,6 +503,20 @@ export default function GestionFinancieraPageContent() {
                           ))}
                         </tbody>
                       </table>
+                      {ingresosBaseHasMore && (
+                        <button
+                          type="button"
+                          className="gf-btn-mas"
+                          disabled={ingresosBaseLoadingMore}
+                          onClick={async () => {
+                            setIngresosBaseLoadingMore(true);
+                            try { await cargarHistorialIngresos(ingresosBaseCursor); }
+                            finally { setIngresosBaseLoadingMore(false); }
+                          }}
+                        >
+                          {ingresosBaseLoadingMore ? "Cargando..." : "Mostrar más"}
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>
@@ -623,7 +676,13 @@ export default function GestionFinancieraPageContent() {
                   aria-expanded={historialRutaAbierto}
                   aria-controls="gf-historial-inversiones-ruta"
                   id="gf-toggle-historial-ruta"
-                  onClick={() => setHistorialRutaAbierto((v) => !v)}
+                  onClick={() => {
+                    setHistorialRutaAbierto((v) => {
+                      const next = !v;
+                      if (next && inversiones.length === 0) void cargarHistorialRuta();
+                      return next;
+                    });
+                  }}
                 >
                   <span className="gf-historial-toggle-text">
                     <span className="gf-historial-title">
@@ -671,6 +730,20 @@ export default function GestionFinancieraPageContent() {
                           ))}
                         </tbody>
                       </table>
+                      {inversionesHasMore && (
+                        <button
+                          type="button"
+                          className="gf-btn-mas"
+                          disabled={inversionesLoadingMore}
+                          onClick={async () => {
+                            setInversionesLoadingMore(true);
+                            try { await cargarHistorialRuta(inversionesCursor); }
+                            finally { setInversionesLoadingMore(false); }
+                          }}
+                        >
+                          {inversionesLoadingMore ? "Cargando..." : "Mostrar más"}
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>
@@ -808,7 +881,13 @@ export default function GestionFinancieraPageContent() {
                   aria-expanded={historialAdminAbierto}
                   aria-controls="gf-historial-inversiones-admin"
                   id="gf-toggle-historial-admin"
-                  onClick={() => setHistorialAdminAbierto((v) => !v)}
+                  onClick={() => {
+                    setHistorialAdminAbierto((v) => {
+                      const next = !v;
+                      if (next && inversionesAdmin.length === 0) void cargarHistorialAdmin();
+                      return next;
+                    });
+                  }}
                 >
                   <span className="gf-historial-toggle-text">
                     <span className="gf-historial-title">
@@ -856,6 +935,20 @@ export default function GestionFinancieraPageContent() {
                           ))}
                         </tbody>
                       </table>
+                      {inversionesAdminHasMore && (
+                        <button
+                          type="button"
+                          className="gf-btn-mas"
+                          disabled={inversionesAdminLoadingMore}
+                          onClick={async () => {
+                            setInversionesAdminLoadingMore(true);
+                            try { await cargarHistorialAdmin(inversionesAdminCursor); }
+                            finally { setInversionesAdminLoadingMore(false); }
+                          }}
+                        >
+                          {inversionesAdminLoadingMore ? "Cargando..." : "Mostrar más"}
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>

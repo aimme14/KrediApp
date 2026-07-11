@@ -9,12 +9,7 @@ const config = {
   // Requiere emulador Firestore — usar `npm run test:rules`
   testPathIgnorePatterns: ["<rootDir>/src/lib/__tests__/firestore-rules\\.test\\.ts$"],
   transform: {
-    "^.+\\.tsx?$": [
-      "ts-jest",
-      {
-        tsconfig: "src/lib/__tests__/tsconfig.json",
-      },
-    ],
+    "^\.+\.(ts|tsx)$": "ts-jest",
   },
 };
 

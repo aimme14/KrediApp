@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Timestamp } from "firebase-admin/firestore";
 import { getAdminFirestore } from "@/lib/firebase-admin";
 import { getApiUser } from "@/lib/api-auth";
 import { isAdminPanelApiUser } from "@/lib/admin-panel-role";
@@ -36,7 +37,12 @@ export async function GET(request: NextRequest) {
     .doc(apiUser.uid)
     .collection(INVERSIONES_CAJA_RUTA_SUBCOLLECTION);
 
-  const snap = await col.orderBy("fecha", "desc").limit(80).get();
+  const cursorRaw = request.nextUrl.searchParams.get("cursor");
+  const base = col.orderBy("fecha", "desc");
+  const snap = await (cursorRaw
+    ? base.startAfter(Timestamp.fromDate(new Date(cursorRaw))).limit(10)
+    : base.limit(10)
+  ).get();
 
   const items: InversionCajaRutaItem[] = snap.docs.map((d) => {
     const data = d.data();
@@ -57,11 +63,5 @@ export async function GET(request: NextRequest) {
     };
   });
 
-  items.sort((a, b) => {
-    const ta = a.fecha ? new Date(a.fecha).getTime() : 0;
-    const tb = b.fecha ? new Date(b.fecha).getTime() : 0;
-    return tb - ta;
-  });
-
-  return NextResponse.json({ items });
+  return NextResponse.json({ items, hasMore: items.length === 10 });
 }

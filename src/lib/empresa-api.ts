@@ -1218,12 +1218,16 @@ export async function ingresarBaseAdminEmpresa(
 }
 
 export async function listIngresosBaseAdminEmpresa(
-  token: string
-): Promise<IngresoBaseAdminEmpresaItem[]> {
-  const res = await fetchWithAuth("/api/admin-empresa/ingresos-base", token);
+  token: string,
+  cursor?: string
+): Promise<{ ingresos: IngresoBaseAdminEmpresaItem[]; hasMore: boolean }> {
+  const url = cursor
+    ? `/api/admin-empresa/ingresos-base?cursor=${encodeURIComponent(cursor)}`
+    : "/api/admin-empresa/ingresos-base";
+  const res = await fetchWithAuth(url, token);
   const data = await res.json();
   if (!res.ok) throw new Error(data.error ?? "Error al cargar historial de ingresos");
-  return data.ingresos ?? [];
+  return { ingresos: data.ingresos ?? [], hasMore: data.hasMore === true };
 }
 
 /** Transfiere monto de la base del admin a la base de una ruta (solo rutas propias). */
@@ -1254,11 +1258,17 @@ export type InversionCajaRutaItem = {
   invertidoPorNombre: string;
 };
 
-export async function listInversionesCajaRuta(token: string): Promise<InversionCajaRutaItem[]> {
-  const res = await fetchWithAuth("/api/empresa/inversiones-caja-ruta", token);
+export async function listInversionesCajaRuta(
+  token: string,
+  cursor?: string
+): Promise<{ items: InversionCajaRutaItem[]; hasMore: boolean }> {
+  const url = cursor
+    ? `/api/empresa/inversiones-caja-ruta?cursor=${encodeURIComponent(cursor)}`
+    : "/api/empresa/inversiones-caja-ruta";
+  const res = await fetchWithAuth(url, token);
   const data = await res.json();
   if (!res.ok) throw new Error(data.error ?? "Error al cargar historial de inversiones");
-  return Array.isArray(data.items) ? data.items : [];
+  return { items: Array.isArray(data.items) ? data.items : [], hasMore: data.hasMore === true };
 }
 
 /** Transfiere monto de la base de una ruta a la base del administrador (solo rutas propias). */
@@ -1290,12 +1300,16 @@ export type InversionRutaCajaAdminItem = {
 };
 
 export async function listInversionesCajaAdmin(
-  token: string
-): Promise<InversionRutaCajaAdminItem[]> {
-  const res = await fetchWithAuth("/api/empresa/inversiones-caja-admin", token);
+  token: string,
+  cursor?: string
+): Promise<{ items: InversionRutaCajaAdminItem[]; hasMore: boolean }> {
+  const url = cursor
+    ? `/api/empresa/inversiones-caja-admin?cursor=${encodeURIComponent(cursor)}`
+    : "/api/empresa/inversiones-caja-admin";
+  const res = await fetchWithAuth(url, token);
   const data = await res.json();
   if (!res.ok) throw new Error(data.error ?? "Error al cargar historial de inversiones al admin");
-  return Array.isArray(data.items) ? data.items : [];
+  return { items: Array.isArray(data.items) ? data.items : [], hasMore: data.hasMore === true };
 }
 
 export type ResumenRutaItem = {

@@ -68,17 +68,21 @@ export async function ingresarBaseAdminEmpresa(
 export async function listIngresosBaseAdminEmpresa(
   db: Firestore,
   empresaId: string,
-  adminUid: string
+  adminUid: string,
+  cursor?: Date
 ): Promise<IngresoBaseAdminEmpresaEntry[]> {
-  const snap = await db
+  const base = db
     .collection(EMPRESAS_COLLECTION)
     .doc(empresaId)
     .collection(USUARIOS_SUBCOLLECTION)
     .doc(adminUid)
     .collection(INGRESOS_BASE_ADMIN_EMPRESA_SUBCOLLECTION)
-    .orderBy("at", "desc")
-    .limit(100)
-    .get();
+    .orderBy("at", "desc");
+
+  const snap = await (cursor
+    ? base.startAfter(Timestamp.fromDate(cursor)).limit(10)
+    : base.limit(10)
+  ).get();
 
   return snap.docs.map((d) => {
     const data = d.data();

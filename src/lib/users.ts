@@ -204,13 +204,12 @@ export async function listAllAdminEmpresa(): Promise<UserProfile[]> {
       uid: d.id,
       email: data.email ?? "",
       displayName: data.displayName,
-      role: "adminEmpresa" as const,
+      role: fromRolFirestore(data.role ?? "") as UserProfile["role"],
       enabled: data.enabled !== false,
       createdBy: data.createdBy ?? "",
       createdAt: data.createdAt?.toDate?.() ?? new Date(),
       updatedAt: data.updatedAt?.toDate?.(),
       empresaId: data.empresaId,
-      codigo: data.codigo,
     };
   });
 }
@@ -231,13 +230,12 @@ export async function listAllJefes(): Promise<UserProfile[]> {
       uid: d.id,
       email: data.email ?? "",
       displayName: data.displayName,
-      role: fromRolFirestore(data.role ?? ""),
+      role: fromRolFirestore(data.role ?? "") as UserProfile["role"],
       enabled: data.enabled !== false,
       createdBy: data.createdBy ?? "",
       createdAt: data.createdAt?.toDate?.() ?? new Date(),
       updatedAt: data.updatedAt?.toDate?.(),
       empresaId: data.empresaId,
-      codigo: data.codigo,
     };
   });
 }

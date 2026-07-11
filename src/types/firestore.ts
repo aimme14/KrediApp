@@ -198,8 +198,5 @@ export interface GastoDoc {
   rol: "admin" | "empleado";
   rutaId?: string; // si aplica
   adminId: string;
-  empleadoId?: string; // null si lo hace el admin
-  /** URL de la foto del comprobante/factura */
-  evidencia?: string;
+  empresaId?: string;
 }
-
