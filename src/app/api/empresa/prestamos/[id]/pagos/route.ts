@@ -32,6 +32,9 @@ import {
 } from "@/lib/prestamo-estado";
 import type { EstadoPrestamo } from "@/types/firestore";
 import { isAdminPanelApiUser } from "@/lib/admin-panel-role";
+import { withRateLimit } from "@/lib/with-rate-limit";
+import { pagosLimiterUser } from "@/lib/rate-limit";
+
 
 const MOTIVOS_NO_PAGO = ["sin_fondos", "no_estaba", "promesa_pago", "otro"] as const;
 const MOTIVOS_PERDIDA = [
@@ -209,7 +212,7 @@ export async function GET(
 }
 
 /** POST: registrar un pago (cobro) o un intento sin pago. Empleado o admin. */
-export async function POST(
+async function postHandler(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -1005,3 +1008,5 @@ export async function POST(
     return finalize(400, { error: msg || "No se pudo registrar el pago" });
   }
 }
+
+export const POST = withRateLimit(pagosLimiterUser, postHandler);

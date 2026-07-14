@@ -3,9 +3,12 @@ import { getAdminFirestore } from "@/lib/firebase-admin";
 import { getApiUser } from "@/lib/api-auth";
 import { invertirAdminEnCajaRuta } from "@/lib/invertir-caja-ruta-admin";
 import { isAdminPanelApiUser } from "@/lib/admin-panel-role";
+import { withRateLimit } from "@/lib/with-rate-limit";
+import { financialWriteLimiterUser } from "@/lib/rate-limit";
+
 
 /** POST: transfiere monto de caja del admin a caja de una ruta (solo admin dueño de la ruta). */
-export async function POST(request: NextRequest) {
+async function postHandler(request: NextRequest) {
   const apiUser = await getApiUser(request);
   if (!apiUser) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
@@ -41,3 +44,5 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: msg }, { status });
   }
 }
+
+export const POST = withRateLimit(financialWriteLimiterUser, postHandler);

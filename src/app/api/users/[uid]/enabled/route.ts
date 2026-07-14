@@ -3,6 +3,7 @@ import { getAdminFirestore } from "@/lib/firebase-admin";
 import { syncCustomClaimsForUid } from "@/lib/sync-custom-claims";
 import { EMPRESAS_COLLECTION, USUARIOS_SUBCOLLECTION, USERS_COLLECTION } from "@/lib/empresas-db";
 
+
 /**
  * Permite al jefe habilitar o deshabilitar administradores que él creó.
  */
@@ -67,4 +68,4 @@ export async function PATCH(
     const message = e instanceof Error ? e.message : "Error al actualizar";
     return NextResponse.json({ error: message }, { status: 500 });
   }
-}
+}

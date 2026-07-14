@@ -3,11 +3,14 @@ import { getAdminFirestore } from "@/lib/firebase-admin";
 import { syncCustomClaimsForUid } from "@/lib/sync-custom-claims";
 import { getApiUser } from "@/lib/api-auth";
 import { EMPRESAS_COLLECTION, USUARIOS_SUBCOLLECTION, USERS_COLLECTION } from "@/lib/empresas-db";
+import { withRateLimit } from "@/lib/with-rate-limit";
+import { adminOpsLimiterUser } from "@/lib/rate-limit";
+
 
 /**
  * Permite al admin habilitar o deshabilitar empleados (trabajadores) que él creó.
  */
-export async function PATCH(
+async function patchHandler(
   request: NextRequest,
   { params }: { params: Promise<{ uid: string }> }
 ) {
@@ -62,3 +65,5 @@ export async function PATCH(
 
   return NextResponse.json({ ok: true });
 }
+
+export const PATCH = withRateLimit(adminOpsLimiterUser, patchHandler);

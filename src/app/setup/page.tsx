@@ -11,14 +11,25 @@ export default function SetupSuperAdminPage() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  /**
+   * El operador debe pegar aquí el valor de SETUP_SECRET (variable de servidor).
+   * Este campo NUNCA se expone como NEXT_PUBLIC_* — el secret solo existe en el
+   * servidor y el operador lo copia manualmente en este campo al hacer el setup.
+   */
+  const [setupSecret, setSetupSecret] = useState("");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
+  const buildHeaders = (): HeadersInit => ({
+    "Content-Type": "application/json",
+    ...(setupSecret.trim() ? { "x-setup-secret": setupSecret.trim() } : {}),
+  });
+
   useEffect(() => {
     let cancelled = false;
     setServerError("");
-    fetch("/api/setup/super-admin")
+    fetch("/api/setup/super-admin", { headers: { "Content-Type": "application/json" } })
       .then((res) => res.json().then((data) => ({ ok: res.ok, status: res.status, data })))
       .then(({ ok, data }) => {
         if (cancelled) return;
@@ -55,7 +66,7 @@ export default function SetupSuperAdminPage() {
     try {
       const res = await fetch("/api/setup/super-admin", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: buildHeaders(),
         body: JSON.stringify({ email: email.trim(), password }),
       });
       const data = await res.json();
@@ -153,6 +164,21 @@ export default function SetupSuperAdminPage() {
         </p>
         <form onSubmit={handleSubmit}>
           <div className="form-group">
+            <label htmlFor="setup-secret">Clave de configuración (SETUP_SECRET)</label>
+            <input
+              id="setup-secret"
+              type="password"
+              value={setupSecret}
+              onChange={(e) => setSetupSecret(e.target.value)}
+              required
+              autoComplete="off"
+              placeholder="Pega aquí el valor de SETUP_SECRET del servidor"
+            />
+            <p style={{ fontSize: "0.78rem", color: "var(--text-muted)", marginTop: "0.25rem" }}>
+              Cópiala del archivo <code>.env</code> del servidor. Nunca la publiques ni la guardes en el navegador.
+            </p>
+          </div>
+          <div className="form-group">
             <label htmlFor="setup-email">Correo</label>
             <input
               id="setup-email"
@@ -212,7 +238,7 @@ export default function SetupSuperAdminPage() {
           </button>
         </form>
         <p style={{ marginTop: "1rem", marginBottom: 0, fontSize: "0.875rem" }}>
-          <Link href="/">¿Ya tienes cuenta? Inicia sesión</Link>
+          <a href="/">¿Ya tienes cuenta? Inicia sesión</a>
         </p>
       </div>
     </div>

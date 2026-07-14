@@ -171,4 +171,4 @@ export function normalizarAccesoHastaInput(value: unknown): string | null {
   const trimmed = value.trim().slice(0, 10);
   if (!parseFechaDiaColombia(trimmed).ok) return null;
   return trimmed;
-}
+}

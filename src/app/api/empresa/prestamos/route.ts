@@ -29,6 +29,9 @@ import {
 import type { ModalidadPago } from "@/types/firestore";
 import { evaluarAprobacionPrestamoEmpleado } from "@/lib/prestamo-aprobacion-empleado";
 import { normalizeEstadoPrestamo } from "@/lib/prestamo-estado";
+import { withRateLimit } from "@/lib/with-rate-limit";
+import { financialWriteLimiterUser } from "@/lib/rate-limit";
+
 
 /** GET: lista préstamos. Empleado: los de su ruta. Admin/Jefe: los suyos */
 export async function GET(request: NextRequest) {
@@ -87,7 +90,7 @@ function addDays(date: Date, days: number): Date {
 }
 
 /** POST: crea un préstamo */
-export async function POST(request: NextRequest) {
+async function postHandler(request: NextRequest) {
   const apiUser = await getApiUser(request);
   if (!apiUser) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
@@ -464,3 +467,5 @@ export async function POST(request: NextRequest) {
 
   return finalize(200, { id: ref.id });
 }
+
+export const POST = withRateLimit(financialWriteLimiterUser, postHandler);

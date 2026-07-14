@@ -6,6 +6,8 @@ import {
   transferirBaseEmpresaAAdmin,
   historialCapitalEmpresaToJson,
 } from "@/lib/jefe-capital";
+import { withRateLimit } from "@/lib/with-rate-limit";
+import { financialWriteLimiterUser } from "@/lib/rate-limit";
 
 function jsonDoc(doc: Awaited<ReturnType<typeof getCapitalEmpresa>>) {
   const historial = (doc.historial ?? []).map((h) =>
@@ -29,7 +31,7 @@ function jsonDoc(doc: Awaited<ReturnType<typeof getCapitalEmpresa>>) {
  * POST: inversión a caja de administrador (base empresa → cajaAdmin).
  * Body: { adminUid: string, monto: number }
  */
-export async function POST(request: NextRequest) {
+async function postHandler(request: NextRequest) {
   const apiUser = await getApiUser(request);
   if (!apiUser) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
@@ -78,3 +80,5 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: msg }, { status });
   }
 }
+
+export const POST = withRateLimit(financialWriteLimiterUser, postHandler);

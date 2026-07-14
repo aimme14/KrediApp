@@ -69,4 +69,4 @@ export async function syncCustomClaimsForUid(uid: string): Promise<void> {
   if (typeof adminId === "string" && adminId.trim()) claims.adminId = adminId.trim();
 
   await auth.setCustomUserClaims(uid, claims as Record<string, unknown>);
-}
+}

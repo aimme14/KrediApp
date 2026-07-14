@@ -3,12 +3,14 @@ import { getAdminAuth, getAdminFirestore } from "@/lib/firebase-admin";
 import { verificarYProcesarAccesoEmpresaUsuario } from "@/lib/empresa-acceso";
 import { syncCustomClaimsForUid } from "@/lib/sync-custom-claims";
 import { SUPER_ADMIN_COLLECTION } from "@/types/superAdmin";
+import { withRateLimit } from "@/lib/with-rate-limit";
+import { authLimiterUser } from "@/lib/rate-limit";
 
 /**
  * POST: alinea los custom claims del JWT con Firestore para el usuario del token.
  * También verifica vencimiento de accesoHasta de la empresa (red de seguridad).
  */
-export async function POST(request: NextRequest) {
+async function handler(request: NextRequest) {
   const authHeader = request.headers.get("Authorization");
   const token = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
   if (!token) {
@@ -36,3 +38,5 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
+
+export const POST = withRateLimit(authLimiterUser, handler);

@@ -4,6 +4,21 @@
  */
 
 import { isPrestamoCerrado, normalizeEstadoPrestamo } from "@/lib/prestamo-estado";
+
+/**
+ * Error específico para respuestas 429 (rate limit).
+ * Incluye retryAfter en segundos para que la UI pueda mostrar un mensaje claro.
+ */
+export class RateLimitError extends Error {
+  constructor(public readonly retryAfter: number) {
+    super(
+      retryAfter > 0
+        ? `Demasiadas solicitudes. Por favor espera ${retryAfter} segundo${retryAfter !== 1 ? "s" : ""} antes de intentarlo de nuevo.`
+        : "Demasiadas solicitudes. Por favor espera un momento antes de intentarlo de nuevo."
+    );
+    this.name = "RateLimitError";
+  }
+}
 import type { EstadoPrestamo } from "@/types/firestore";
 
 export type RutaItem = {
@@ -165,8 +180,23 @@ async function fetchWithAuth(
   });
 }
 
-/** Evita el error críptico «Unexpected token '<'» cuando el servidor devuelve HTML en lugar de JSON. */
+/** Evita el error críptico «Unexpected token '<'» cuando el servidor devuelve HTML en lugar de JSON.
+ *  También lanza RateLimitError si el servidor responde 429 o 503 (Redis caído). */
 async function parseJsonResponse(res: Response): Promise<Record<string, unknown>> {
+  // 429: rate limit superado → RateLimitError con retryAfter en segundos.
+  if (res.status === 429) {
+    const retryAfterHeader = res.headers.get("Retry-After");
+    const retryAfter = retryAfterHeader ? parseInt(retryAfterHeader, 10) : 0;
+    throw new RateLimitError(isNaN(retryAfter) ? 0 : retryAfter);
+  }
+
+  // 503: Redis caído (fail-closed) → misma clase, retryAfter=30 como indica el header.
+  if (res.status === 503) {
+    const retryAfterHeader = res.headers.get("Retry-After");
+    const retryAfter = retryAfterHeader ? parseInt(retryAfterHeader, 10) : 30;
+    throw new RateLimitError(isNaN(retryAfter) ? 30 : retryAfter);
+  }
+
   const text = await res.text();
   try {
     return JSON.parse(text) as Record<string, unknown>;
@@ -1497,28 +1527,38 @@ export async function cerrarPeriodoAdmin(
     headers: { "Content-Type": "application/json" },
     body: "{}",
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error ?? "Error al cerrar periodo");
-  return data;
+  const data = await parseJsonResponse(res);
+  if (!res.ok) throw new Error(String(data.error ?? "Error al cerrar periodo"));
+  return data as {
+    id: string;
+    estado: string;
+    fechaApertura: string | null;
+    fechaCierre: string | null;
+    apertura: PeriodoAdminSnapshot;
+    cierre: PeriodoAdminSnapshot;
+  };
 }
 
-/** Descarga el PDF comparativo (apertura | cierre). Solo periodos ya cerrados; si no, la API responde 400. */
-export async function downloadPeriodoAdminPdf(token: string, periodoId: string, filename?: string): Promise<void> {
-  const res = await fetch(`/api/empresa/periodos-admin/${encodeURIComponent(periodoId)}/pdf`, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: "application/pdf",
-    },
-  });
+/** Admin: descarga directamente en el navegador el PDF del período. */
+export async function downloadPeriodoAdminPdf(
+  token: string,
+  periodoId: string
+): Promise<void> {
+  const res = await fetchWithAuth(
+    `/api/empresa/periodos-admin/${encodeURIComponent(periodoId)}/pdf`,
+    token
+  );
   if (!res.ok) {
-    const data = await res.json().catch(() => ({}));
-    throw new Error((data as { error?: string }).error ?? "Error al generar PDF");
+    const data = (await res.json()) as { error?: string };
+    throw new Error(data.error ?? "Error al descargar PDF del período");
   }
   const blob = await res.blob();
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = filename ?? `periodo-admin-${periodoId}.pdf`;
+  a.download = `periodo-admin-${periodoId}.pdf`;
+  document.body.appendChild(a);
   a.click();
+  document.body.removeChild(a);
   URL.revokeObjectURL(url);
 }

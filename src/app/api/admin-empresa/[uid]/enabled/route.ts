@@ -4,6 +4,7 @@ import { setEmpresaAccesoCompleto } from "@/lib/empresa-acceso";
 import { assertSuperAdmin } from "@/lib/super-admin-auth";
 import { USERS_COLLECTION } from "@/lib/empresas-db";
 
+
 export async function PATCH(
   _request: NextRequest,
   { params }: { params: Promise<{ uid: string }> }

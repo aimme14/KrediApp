@@ -1,12 +1,51 @@
 import { NextRequest, NextResponse } from "next/server";
+import { timingSafeEqual } from "crypto";
 import { getAdminAuth, getAdminFirestore } from "@/lib/firebase-admin";
 import { SUPER_ADMIN_COLLECTION } from "@/types/superAdmin";
 import { syncCustomClaimsForUid } from "@/lib/sync-custom-claims";
 
 /**
- * GET: Indica si aún se puede crear el primer Super Admin (no existe ninguno).
+ * SEGURIDAD: El POST requiere el header X-Setup-Secret igual a SETUP_SECRET.
+ *
+ * El GET no requiere secret porque solo revela si ya existe un superAdmin
+ * (1 bit de información, sin riesgo de takeover). La acción sensible es el POST.
+ *
+ * timingSafeEqual previene timing attacks en la comparación del secret.
+ *
+ * Genera un secret fuerte antes de desplegar:
+ *   node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+ * Agrégalo como SETUP_SECRET en .env.local y en Vercel.
  */
-export async function GET() {
+function assertSetupSecret(request: NextRequest): NextResponse | null {
+  const secret = process.env.SETUP_SECRET;
+  if (!secret) {
+    // Si no hay secret configurado, bloqueamos siempre (fail-closed).
+    return NextResponse.json(
+      { error: "Endpoint de setup no disponible." },
+      { status: 403 }
+    );
+  }
+  const provided = request.headers.get("x-setup-secret") ?? "";
+  // Comparación en tiempo constante para evitar timing attacks.
+  const secretBuf = Buffer.from(secret);
+  const providedBuf = Buffer.from(provided);
+  const match =
+    secretBuf.length === providedBuf.length &&
+    timingSafeEqual(secretBuf, providedBuf);
+  if (!match) {
+    return NextResponse.json(
+      { error: "No autorizado." },
+      { status: 403 }
+    );
+  }
+  return null; // OK
+}
+
+/**
+ * GET: Indica si aún se puede crear el primer Super Admin (no existe ninguno).
+ * No requiere X-Setup-Secret — solo revela available: true/false.
+ */
+export async function GET(_request: NextRequest) {
   try {
     const db = getAdminFirestore();
     const snapshot = await db.collection(SUPER_ADMIN_COLLECTION).limit(1).get();
@@ -27,6 +66,8 @@ export async function GET() {
  * La contraseña se envía a Firebase Auth únicamente; NUNCA se almacena en Firestore.
  */
 export async function POST(request: NextRequest) {
+  const denied = assertSetupSecret(request);
+  if (denied) return denied;
   try {
     const body = await request.json();
     const { email, password } = body as { email?: string; password?: string };

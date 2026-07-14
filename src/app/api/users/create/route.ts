@@ -17,6 +17,7 @@ import { upsertCapitalRutaSnapshot } from "@/lib/capital-ruta-snapshot";
 import { rutaTieneEmpleadoAsignado } from "@/lib/ruta-empleado-ocupada";
 import { syncCustomClaimsForUid } from "@/lib/sync-custom-claims";
 
+
 /** Colección de contadores para códigos secuenciales (JF-001, AD-001 por jefe) */
 const COUNTERS_COLLECTION = "counters";
 const JEFES_COUNTER_ID = "jefes";

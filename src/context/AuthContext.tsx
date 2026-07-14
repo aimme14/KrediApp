@@ -5,6 +5,7 @@ import React, {
   useCallback,
   useContext,
   useEffect,
+  useRef,
   useState,
 } from "react";
 import {
@@ -26,6 +27,7 @@ import {
   onSnapshot,
   type DocumentData,
 } from "firebase/firestore";
+import { useRouter } from "next/navigation";
 import { auth, db } from "@/lib/firebase";
 import { revokeAdminFcmOnDevice } from "@/lib/fcm-client";
 import type { UserProfile, Role } from "@/types/roles";
@@ -42,6 +44,29 @@ const PROFILE_TIMEOUT_MESSAGE =
   "La conexión tardó demasiado al cargar tu perfil. Comprueba tu internet, desactiva VPN o bloqueadores y recarga la página.";
 const AUTH_INIT_TIMEOUT_MESSAGE =
   "No se pudo iniciar la sesión a tiempo. Recarga la página, prueba otro navegador o desactiva extensiones que bloqueen almacenamiento.";
+
+/** Mensaje único al deshabilitar acceso (cualquier rol). Coincide con auth/user-disabled. */
+export const HORARIO_NO_LABORAL_MESSAGE = "Horario no laboral.";
+
+const AUTH_ERROR_STORAGE_KEY = "krediapp_auth_error";
+
+function persistAuthError(message: string) {
+  try {
+    sessionStorage.setItem(AUTH_ERROR_STORAGE_KEY, message);
+  } catch {
+    /* ignore */
+  }
+}
+
+function consumeAuthError(): string | null {
+  try {
+    const msg = sessionStorage.getItem(AUTH_ERROR_STORAGE_KEY);
+    if (msg) sessionStorage.removeItem(AUTH_ERROR_STORAGE_KEY);
+    return msg;
+  } catch {
+    return null;
+  }
+}
 
 function profileFetchTimeoutError(): Error {
   const e = new Error("AUTH_PROFILE_TIMEOUT");
@@ -75,7 +100,7 @@ export function getAuthErrorMessage(e: unknown, opts?: { mode?: "signIn" | "reau
     case "auth/invalid-email":
       return "El correo no es válido.";
     case "auth/user-disabled":
-      return "Horario no laboral.";
+      return HORARIO_NO_LABORAL_MESSAGE;
     case "auth/user-not-found":
     case "auth/wrong-password":
     case "auth/invalid-credential":
@@ -227,6 +252,7 @@ function queueClaimsSync(user: User) {
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const router = useRouter();
   const [state, setState] = useState<AuthState>({
     user: null,
     profile: null,
@@ -234,6 +260,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     profileLoading: false,
     error: null,
   });
+
+  /** Conserva el error al hacer signOut (onAuthStateChanged limpiaría error: null). */
+  const pendingSignOutErrorRef = useRef<string | null>(null);
+
+  const signOutWithMessage = useCallback(
+    async (message: string) => {
+      pendingSignOutErrorRef.current = message;
+      persistAuthError(message);
+      if (auth) await firebaseSignOut(auth);
+      router.replace("/");
+    },
+    [router]
+  );
 
   useEffect(() => {
     if (!auth) {
@@ -256,12 +295,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const unsub = onAuthStateChanged(auth, async (user) => {
       window.clearTimeout(failsafeId);
       if (!user) {
+        const fromPending = pendingSignOutErrorRef.current;
+        pendingSignOutErrorRef.current = null;
+        const preservedError = fromPending ?? consumeAuthError();
+        if (fromPending) {
+          try {
+            sessionStorage.removeItem(AUTH_ERROR_STORAGE_KEY);
+          } catch {
+            /* ignore */
+          }
+        }
         setState({
           user: null,
           profile: null,
           authInitializing: false,
           profileLoading: false,
-          error: null,
+          error: preservedError,
         });
         return;
       }
@@ -294,6 +343,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               reject(err instanceof Error ? err : new Error(String(err)));
             });
         });
+        if (profile && profile.enabled === false) {
+          try {
+            const idToken = await user.getIdToken();
+            await fetch("/api/users/me/sync-claims", {
+              method: "POST",
+              headers: { Authorization: `Bearer ${idToken}` },
+            });
+          } catch {
+            /* Auth se alinea si el sync alcanza; el mensaje al usuario no depende de ello */
+          }
+          pendingSignOutErrorRef.current = HORARIO_NO_LABORAL_MESSAGE;
+          persistAuthError(HORARIO_NO_LABORAL_MESSAGE);
+          if (auth) await firebaseSignOut(auth);
+          router.replace("/");
+          return;
+        }
         setState((s) => ({
           ...s,
           user,
@@ -312,6 +377,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           };
           if (syncData.accesoVencido) {
             const refreshed = await fetchUserProfile(user.uid, user.email ?? undefined);
+            if (refreshed && refreshed.enabled === false) {
+              pendingSignOutErrorRef.current = HORARIO_NO_LABORAL_MESSAGE;
+              persistAuthError(HORARIO_NO_LABORAL_MESSAGE);
+              if (auth) await firebaseSignOut(auth);
+              router.replace("/");
+              return;
+            }
             setState((s) => ({
               ...s,
               user,
@@ -343,7 +415,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       window.clearTimeout(failsafeId);
       unsub();
     };
-  }, []);
+  }, [router]);
 
   /** Escucha cambios en el documento del usuario (p. ej. enabled) sin polling. */
   useEffect(() => {
@@ -358,9 +430,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         ref,
         (snap) => {
           if (!snap.exists()) return;
+          const nextProf = superAdminDataToProfile(uid, snap.data()!);
+          if (nextProf.enabled === false) {
+            void signOutWithMessage(HORARIO_NO_LABORAL_MESSAGE);
+            return;
+          }
           setState((s) => {
             if (!s.user || s.user.uid !== uid || s.profile?.role !== "superAdmin") return s;
-            const nextProf = superAdminDataToProfile(uid, snap.data()!);
             if (s.profile && shouldResyncClaims(s.profile, nextProf) && s.user) queueClaimsSync(s.user);
             return { ...s, profile: nextProf, error: null };
           });
@@ -391,9 +467,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             );
             return;
           }
+          const nextProf = usersDataToProfile(uid, snap.data()!);
+          if (nextProf.enabled === false) {
+            void signOutWithMessage(HORARIO_NO_LABORAL_MESSAGE);
+            return;
+          }
           setState((s) => {
             if (!s.user || s.user.uid !== uid) return s;
-            const nextProf = usersDataToProfile(uid, snap.data()!);
             if (s.profile && shouldResyncClaims(s.profile, nextProf) && s.user) queueClaimsSync(s.user);
             return { ...s, profile: nextProf, error: null };
           });
@@ -408,7 +488,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     return undefined;
-  }, [state.user?.uid, state.profile?.role]);
+  }, [state.user?.uid, state.profile?.role, signOutWithMessage]);
 
   const signIn = async (email: string, password: string) => {
     if (!auth) throw new Error("Firebase no está configurado. Revisa las variables de entorno.");

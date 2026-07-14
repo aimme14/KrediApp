@@ -17,6 +17,8 @@
     "migrate-empresas": "node scripts/migrate-to-empresas-structure.js"
   },
   "dependencies": {
+    "@upstash/ratelimit": "^2.0.5",
+    "@upstash/redis": "^1.34.3",
     "exceljs": "^4.4.0",
     "firebase": "^10.14.0",
     "firebase-admin": "^12.7.0",

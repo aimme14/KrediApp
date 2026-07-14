@@ -37,6 +37,8 @@ import {
   type DatosEmpleado,
   type AnulacionElegibilidadError,
 } from "@/lib/anular-pago-prestamo";
+import { withRateLimit } from "@/lib/with-rate-limit";
+import { anularLimiterUser } from "@/lib/rate-limit";
 
 const ELEGIBILIDAD_CODES = [
   "PAGO_NO_ACTIVO",
@@ -135,7 +137,7 @@ async function existeReporteAprobadoParaEmpleado(
   return !snap.empty;
 }
 
-export async function POST(
+async function postHandler(
   request: NextRequest,
   { params }: { params: Promise<{ id: string; pagoId: string }> }
 ) {
@@ -562,3 +564,5 @@ export async function POST(
     return finalize(500, { error: "Error interno al anular el pago." });
   }
 }
+
+export const POST = withRateLimit(anularLimiterUser, postHandler);
