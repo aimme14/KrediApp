@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import ThemeToggle from "@/components/ThemeToggle";
@@ -17,43 +18,84 @@ function WhatsAppIcon() {
   );
 }
 
+function LockIcon() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+      <rect x="5" y="11" width="14" height="10" rx="2" />
+      <path d="M8 11V8a4 4 0 0 1 8 0v3" />
+    </svg>
+  );
+}
+
 export default function DeshabilitadoPage() {
   const router = useRouter();
-  const { user, signOut } = useAuth();
+  const { user, profile, loading, isEnabled, signOut } = useAuth();
+  const esTrabajador = profile?.role === "trabajador";
 
-  if (!user) {
-    router.replace("/login");
-    return null;
-  }
+  useEffect(() => {
+    if (loading) return;
+    if (!user) {
+      router.replace("/");
+      return;
+    }
+    if (profile && isEnabled()) {
+      router.replace("/dashboard");
+    }
+  }, [user, profile, loading, isEnabled, router]);
 
-  const handleSignOut = async () => {
+  const handleCerrarSesion = async () => {
     await signOut();
-    router.replace("/login");
+    router.replace("/");
   };
 
   return (
-    <div className="deshabilitado-page">
+    <div className="deshabilitado-wrap">
       <div className="deshabilitado-theme-toggle">
         <ThemeToggle />
       </div>
-      <div className="deshabilitado-card card">
-        <h1 className="deshabilitado-title">Cuenta deshabilitada</h1>
-        <p className="deshabilitado-desc">
-          Tu cuenta está temporalmente deshabilitada. Comunícate con el administrador para
-          reactivarla.
-        </p>
-        <a
-          href={WHATSAPP_URL}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="btn btn-primary deshabilitado-wa-btn"
-        >
-          <WhatsAppIcon />
-          Contactar por WhatsApp
-        </a>
-        <button type="button" className="btn deshabilitado-signout-btn" onClick={handleSignOut}>
-          Cerrar sesión
-        </button>
+
+      <div className="card deshabilitado-card">
+        {loading || !profile ? (
+          <p style={{ color: "var(--text-muted)", margin: 0 }}>Cargando…</p>
+        ) : esTrabajador ? (
+          <>
+            <div className="deshabilitado-icon" aria-hidden>
+              <LockIcon />
+            </div>
+            <h1 className="deshabilitado-titulo">Horario laboral no disponible</h1>
+            <p className="deshabilitado-body" style={{ marginBottom: 0 }}>
+              En este momento no puedes acceder al panel de trabajo.
+            </p>
+          </>
+        ) : (
+          <>
+            <div className="deshabilitado-icon" aria-hidden>
+              <LockIcon />
+            </div>
+            <h1 className="deshabilitado-titulo">Cuenta deshabilitada</h1>
+            <p className="deshabilitado-body">
+              Tu cuenta está temporalmente deshabilitada. Comunícate con el administrador para
+              reactivarla.
+            </p>
+            <a
+              href={WHATSAPP_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="deshabilitado-wa-btn"
+            >
+              <WhatsAppIcon />
+              Contactar por WhatsApp
+            </a>
+          </>
+        )}
+
+        {!loading && profile ? (
+          <div className="deshabilitado-actions">
+            <button type="button" className="btn btn-secondary" onClick={handleCerrarSesion}>
+              Cerrar sesión
+            </button>
+          </div>
+        ) : null}
       </div>
     </div>
   );
