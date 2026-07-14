@@ -307,64 +307,105 @@ export default function SuperAdminDashboard() {
 
       {error && !showForm && <p className="sa-error">{error}</p>}
 
-      <div className="sa-stats">
-        <span className="sa-stat">
-          {habilitados} de {listaActual.length} habilitado{habilitados !== 1 ? "s" : ""}
-        </span>
-      </div>
+      <div className="card sa-list-card">
+        <div className="sa-list-head">
+          <div>
+            <h3 className="sa-list-title">
+              {tab === "jefes" ? "Jefes" : "Administradores de empresa"}
+            </h3>
+            <p className="sa-list-sub">
+              {habilitados} de {listaActual.length} habilitado{habilitados !== 1 ? "s" : ""}
+            </p>
+          </div>
+        </div>
 
-      <ul className="sa-list">
-        {listaActual.map((u) => {
-          const info = accesos[u.uid];
-          return (
-            <li key={u.uid} className={`sa-card card${u.enabled ? "" : " sa-card--disabled"}`}>
-              <div className="sa-user-header">
-                <span className="sa-avatar" aria-hidden>{inicialNombre(u)}</span>
-                <div className="sa-user-info">
-                  <strong className="sa-user-name">{u.displayName ?? u.email}</strong>
-                  <span className="sa-user-email">{u.email}</span>
-                </div>
-                <span className={claseBadgeAcceso(info)}>{etiquetaAcceso(info)}</span>
-              </div>
-              <div className="sa-user-acceso">
-                <label className="sa-acceso-label">Acceso hasta</label>
-                <input
-                  type="date"
-                  className="sa-acceso-input"
-                  value={fechasEdit[u.uid] ?? ""}
-                  onChange={(e) =>
-                    setFechasEdit((prev) => ({ ...prev, [u.uid]: e.target.value }))
-                  }
-                />
-                <button
-                  type="button"
-                  className="btn btn-sm btn-secondary"
-                  disabled={savingFechaUid === u.uid}
-                  onClick={() => void handleGuardarFecha(u.uid)}
+        {listaActual.length === 0 ? (
+          <div className="sa-empty">
+            <p className="sa-empty-title">Sin registros</p>
+            <p className="sa-empty-text">
+              Crea el primero con el botón de arriba.
+            </p>
+          </div>
+        ) : (
+          <ul className="sa-list">
+            {listaActual.map((u) => {
+              const info = accesos[u.uid];
+              const fechaGuardada = accesos[u.uid]?.accesoHasta ?? "";
+              const fechaEdit = fechasEdit[u.uid] ?? "";
+              const fechaDirty = fechaEdit !== fechaGuardada;
+              return (
+                <li
+                  key={u.uid}
+                  className={`sa-item${u.enabled ? "" : " sa-item--off"}`}
                 >
-                  {savingFechaUid === u.uid ? "Guardando…" : "Guardar"}
-                </button>
-              </div>
-              <div className="sa-user-toggle">
-                <button
-                  type="button"
-                  className={`btn btn-sm ${u.enabled ? "btn-danger" : "btn-success"}`}
-                  disabled={togglingUid === u.uid}
-                  onClick={() =>
-                    void (tab === "jefes" ? handleToggleJefe(u) : handleToggleAdminEmpresa(u))
-                  }
-                >
-                  {togglingUid === u.uid
-                    ? "Actualizando…"
-                    : u.enabled
-                      ? "Deshabilitar"
-                      : "Habilitar"}
-                </button>
-              </div>
-            </li>
-          );
-        })}
-      </ul>
+                  <div className="sa-item-main">
+                    <span className="sa-avatar" aria-hidden>
+                      {inicialNombre(u)}
+                    </span>
+                    <div className="sa-item-identity">
+                      <div className="sa-item-name-row">
+                        <strong className="sa-item-name">
+                          {u.displayName?.trim() || u.email}
+                        </strong>
+                      </div>
+                      {u.displayName?.trim() ? (
+                        <span className="sa-item-email">{u.email}</span>
+                      ) : null}
+                      <div className="sa-item-badges">
+                        <span className={claseBadgeAcceso(info)}>
+                          {etiquetaAcceso(info)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="sa-item-controls">
+                    <label className="sa-date-field">
+                      <span className="sa-date-label">Acceso hasta</span>
+                      <span className="sa-date-row">
+                        <input
+                          type="date"
+                          className="sa-date-input"
+                          value={fechaEdit}
+                          onChange={(e) =>
+                            setFechasEdit((prev) => ({
+                              ...prev,
+                              [u.uid]: e.target.value,
+                            }))
+                          }
+                        />
+                        <button
+                          type="button"
+                          className={`btn btn-sm btn-secondary sa-save-btn${fechaDirty ? " sa-save-btn--dirty" : ""}`}
+                          disabled={savingFechaUid === u.uid || !fechaDirty}
+                          onClick={() => void handleGuardarFecha(u.uid)}
+                        >
+                          {savingFechaUid === u.uid ? "Guardando…" : "Guardar"}
+                        </button>
+                      </span>
+                    </label>
+                    <button
+                      type="button"
+                      className={`btn btn-sm sa-toggle-btn ${u.enabled ? "btn-danger" : "btn-success"}`}
+                      disabled={togglingUid === u.uid}
+                      onClick={() =>
+                        void (tab === "jefes"
+                          ? handleToggleJefe(u)
+                          : handleToggleAdminEmpresa(u))
+                      }
+                    >
+                      {togglingUid === u.uid
+                        ? "Actualizando…"
+                        : u.enabled
+                          ? "Deshabilitar"
+                          : "Habilitar"}
+                    </button>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
     </div>
   );
 }
