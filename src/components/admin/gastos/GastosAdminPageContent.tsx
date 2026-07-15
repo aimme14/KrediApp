@@ -1,8 +1,18 @@
 "use client";
 
-import { useState, useEffect, useRef, useMemo, type ReactNode } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback, type ReactNode } from "react";
 import Link from "next/link";
-import { collection, query, where, onSnapshot } from "firebase/firestore";
+import {
+  collection,
+  query,
+  where,
+  orderBy,
+  limit,
+  startAfter,
+  getDocs,
+  type QueryDocumentSnapshot,
+  type QueryConstraint,
+} from "firebase/firestore";
 import { useAuth } from "@/context/AuthContext";
 import { useAdminDashboard } from "@/context/AdminDashboardContext";
 import { db } from "@/lib/firebase";
@@ -42,6 +52,57 @@ const TIPOS = [
 ] as const;
 
 const LISTA_PAGE_SIZE = 10;
+
+type GastoSource = "admin" | "empleado";
+
+type BufferedGasto = {
+  key: string;
+  source: GastoSource;
+  item: GastoItem;
+};
+
+function mapGastoDoc(
+  d: QueryDocumentSnapshot,
+  alcanceOverride?: string
+): GastoItem {
+  const data = d.data();
+  return {
+    id: d.id,
+    descripcion: String(data.descripcion ?? ""),
+    monto: typeof data.monto === "number" ? data.monto : 0,
+    fecha:
+      typeof (data.fecha as { toDate?: () => Date })?.toDate === "function"
+        ? (data.fecha as { toDate: () => Date }).toDate().toISOString()
+        : null,
+    tipo: String(data.tipo ?? "otro"),
+    creadoPor: String(data.creadoPor ?? ""),
+    creadoPorNombre: String(data.creadoPorNombre ?? ""),
+    rol: String(data.rol ?? "admin"),
+    rutaId: String(data.rutaId ?? ""),
+    adminId: String(data.adminId ?? ""),
+    empleadoId: String(data.empleadoId ?? ""),
+    evidencia: String(data.evidencia ?? ""),
+    alcance: alcanceOverride ?? String(data.alcance ?? ""),
+  };
+}
+
+function sortBufferedByFechaDesc(items: BufferedGasto[]): BufferedGasto[] {
+  return [...items].sort(
+    (a, b) =>
+      (b.item.fecha ? new Date(b.item.fecha).getTime() : 0) -
+      (a.item.fecha ? new Date(a.item.fecha).getTime() : 0)
+  );
+}
+
+function mergeBufferedUnique(
+  existing: BufferedGasto[],
+  incoming: BufferedGasto[]
+): BufferedGasto[] {
+  const byKey = new Map<string, BufferedGasto>();
+  existing.forEach((g) => byKey.set(g.key, g));
+  incoming.forEach((g) => byKey.set(g.key, g));
+  return sortBufferedByFechaDesc(Array.from(byKey.values()));
+}
 
 type TipoGasto = (typeof TIPOS)[number]["value"];
 
@@ -153,6 +214,9 @@ export default function GastosAdminPageContent() {
   const online = useOnline();
   const [gastos, setGastos] = useState<GastoItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hayMasGastos, setHayMasGastos] = useState(false);
+  const [proximaCantidad, setProximaCantidad] = useState(LISTA_PAGE_SIZE);
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [motivo, setMotivo] = useState("");
@@ -165,7 +229,6 @@ export default function GastosAdminPageContent() {
   const [gastoDetalle, setGastoDetalle] = useState<GastoItem | null>(null);
   const [soloHoy, setSoloHoy] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [listaVisible, setListaVisible] = useState(LISTA_PAGE_SIZE);
   const [alcanceGasto, setAlcanceGasto] = useState<"admin" | "ruta">("admin");
   const [rutaIdGasto, setRutaIdGasto] = useState("");
   const [showModalGasto, setShowModalGasto] = useState(false);
@@ -177,7 +240,162 @@ export default function GastosAdminPageContent() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
-  const gastosOrdenados = useMemo(() => {
+  const bufferRef = useRef<BufferedGasto[]>([]);
+  const lastDocAdminRef = useRef<QueryDocumentSnapshot | null>(null);
+  const lastDocEmpleadoRef = useRef<QueryDocumentSnapshot | null>(null);
+  const exhaustedAdminRef = useRef(false);
+  const exhaustedEmpleadoRef = useRef(false);
+  const loadingMoreRef = useRef(false);
+  const gastoKeysRef = useRef<Set<string>>(new Set());
+
+  const syncHayMas = useCallback(() => {
+    const bufLen = bufferRef.current.length;
+    const hasMore =
+      bufLen > 0 || !exhaustedAdminRef.current || !exhaustedEmpleadoRef.current;
+    setHayMasGastos(hasMore);
+    if (bufLen > 0) setProximaCantidad(Math.min(LISTA_PAGE_SIZE, bufLen));
+    else if (hasMore) setProximaCantidad(LISTA_PAGE_SIZE);
+    else setProximaCantidad(0);
+  }, []);
+
+  const pullSourceBatch = useCallback(
+    async (source: GastoSource, empresaId: string, adminUid: string) => {
+      if (!db) return;
+      if (source === "admin" && exhaustedAdminRef.current) return;
+      if (source === "empleado" && exhaustedEmpleadoRef.current) return;
+
+      const colName =
+        source === "admin" ? GASTOS_ADMIN_SUBCOLLECTION : GASTOS_EMPLEADO_SUBCOLLECTION;
+      const lastDoc = source === "admin" ? lastDocAdminRef.current : lastDocEmpleadoRef.current;
+
+      const constraints: QueryConstraint[] = [
+        where("adminId", "==", adminUid),
+        orderBy("fecha", "desc"),
+      ];
+      if (lastDoc) constraints.push(startAfter(lastDoc));
+      constraints.push(limit(LISTA_PAGE_SIZE));
+
+      const snap = await getDocs(
+        query(collection(db, EMPRESAS_COLLECTION, empresaId, colName), ...constraints)
+      );
+
+      if (snap.docs.length < LISTA_PAGE_SIZE) {
+        if (source === "admin") exhaustedAdminRef.current = true;
+        else exhaustedEmpleadoRef.current = true;
+      }
+      if (snap.docs.length > 0) {
+        const last = snap.docs[snap.docs.length - 1] ?? null;
+        if (source === "admin") lastDocAdminRef.current = last;
+        else lastDocEmpleadoRef.current = last;
+      } else if (source === "admin") {
+        exhaustedAdminRef.current = true;
+      } else {
+        exhaustedEmpleadoRef.current = true;
+      }
+
+      const mapped: BufferedGasto[] = snap.docs.map((d) => ({
+        key: `${source}-${d.id}`,
+        source,
+        item: mapGastoDoc(d, source === "empleado" ? "empleado" : undefined),
+      }));
+      bufferRef.current = mergeBufferedUnique(bufferRef.current, mapped);
+    },
+    []
+  );
+
+  const ensureBuffer = useCallback(
+    async (minSize: number, empresaId: string, adminUid: string) => {
+      while (
+        bufferRef.current.length < minSize &&
+        (!exhaustedAdminRef.current || !exhaustedEmpleadoRef.current)
+      ) {
+        const before = bufferRef.current.length;
+        await Promise.all([
+          pullSourceBatch("admin", empresaId, adminUid),
+          pullSourceBatch("empleado", empresaId, adminUid),
+        ]);
+        if (bufferRef.current.length === before) break;
+      }
+    },
+    [pullSourceBatch]
+  );
+
+  const takeFromBuffer = useCallback((count: number): GastoItem[] => {
+    const taken: GastoItem[] = [];
+    const remaining: BufferedGasto[] = [];
+    for (const entry of bufferRef.current) {
+      if (taken.length < count && !gastoKeysRef.current.has(entry.key)) {
+        gastoKeysRef.current.add(entry.key);
+        taken.push(entry.item);
+      } else if (!gastoKeysRef.current.has(entry.key)) {
+        remaining.push(entry);
+      }
+    }
+    bufferRef.current = remaining;
+    return taken;
+  }, []);
+
+  const cargarPaginaGastos = useCallback(
+    async (opts?: { reset?: boolean }) => {
+      if (!db || !user?.uid || !profile?.empresaId) return;
+      const empresaId = profile.empresaId.trim();
+      if (!empresaId) return;
+      if (loadingMoreRef.current) return;
+
+      const reset = opts?.reset === true;
+      loadingMoreRef.current = true;
+      if (reset) {
+        setLoading(true);
+        setError(null);
+        bufferRef.current = [];
+        lastDocAdminRef.current = null;
+        lastDocEmpleadoRef.current = null;
+        exhaustedAdminRef.current = false;
+        exhaustedEmpleadoRef.current = false;
+        gastoKeysRef.current = new Set();
+        setGastos([]);
+        setHayMasGastos(false);
+      } else {
+        setLoadingMore(true);
+      }
+
+      try {
+        await ensureBuffer(LISTA_PAGE_SIZE, empresaId, user.uid);
+        const next = takeFromBuffer(LISTA_PAGE_SIZE);
+        if (reset) {
+          setGastos(next);
+        } else if (next.length > 0) {
+          setGastos((prev) =>
+            [...prev, ...next].sort(
+              (a, b) =>
+                (b.fecha ? new Date(b.fecha).getTime() : 0) -
+                (a.fecha ? new Date(a.fecha).getTime() : 0)
+            )
+          );
+        }
+        syncHayMas();
+      } catch (err) {
+        console.warn("[GastosAdmin] paginación gastos:", err);
+        setError("No se pudieron cargar los gastos");
+        syncHayMas();
+      } finally {
+        loadingMoreRef.current = false;
+        setLoading(false);
+        setLoadingMore(false);
+      }
+    },
+    [user?.uid, profile?.empresaId, ensureBuffer, takeFromBuffer, syncHayMas]
+  );
+
+  const empresaId = profile?.empresaId?.trim() ?? "";
+  const adminUid = user?.uid ?? "";
+
+  useEffect(() => {
+    if (!adminUid || !empresaId) return;
+    void cargarPaginaGastos({ reset: true });
+  }, [adminUid, empresaId, cargarPaginaGastos]);
+
+  const gastosVisibles = useMemo(() => {
     const hoy = fechaDiaColombiaHoy();
     const base = soloHoy
       ? gastos.filter((g) => esGastoDelDiaColombia(g.fecha, hoy))
@@ -185,14 +403,14 @@ export default function GastosAdminPageContent() {
     const searchLower = searchQuery.trim().toLowerCase();
     const filtrados = searchLower
       ? base.filter((g) => {
-          const motivo = (g.descripcion ?? "").toLowerCase();
-          const tipo = (g.tipo ?? "").toLowerCase();
+          const motivoTxt = (g.descripcion ?? "").toLowerCase();
+          const tipoTxt = (g.tipo ?? "").toLowerCase();
           const hechoPor = (g.creadoPorNombre ?? "").toLowerCase();
           const montoStr = (g.monto ?? 0).toFixed(2);
           const fechaStr = formatoFechaGastoColombia(g.fecha ?? null).replace("—", "").trim().toLowerCase();
           return (
-            motivo.includes(searchLower) ||
-            tipo.includes(searchLower) ||
+            motivoTxt.includes(searchLower) ||
+            tipoTxt.includes(searchLower) ||
             hechoPor.includes(searchLower) ||
             montoStr.includes(searchLower) ||
             fechaStr.includes(searchLower)
@@ -206,113 +424,10 @@ export default function GastosAdminPageContent() {
     });
   }, [gastos, searchQuery, soloHoy]);
 
-  const gastosVisibles = useMemo(
-    () => gastosOrdenados.slice(0, listaVisible),
-    [gastosOrdenados, listaVisible]
-  );
-
-  const hayMasGastos = gastosVisibles.length < gastosOrdenados.length;
-
-  useEffect(() => {
-    setListaVisible(LISTA_PAGE_SIZE);
-  }, [searchQuery, soloHoy]);
-
-  useEffect(() => {
-    if (!db || !user || !profile?.empresaId) return;
-    const empresaId = profile.empresaId.trim();
-    if (!empresaId) return;
-
-    setLoading(true);
-
-    const empresaBase = `${EMPRESAS_COLLECTION}/${empresaId}`;
-
-    const qAdmin = query(
-      collection(db, empresaBase, GASTOS_ADMIN_SUBCOLLECTION),
-      where("adminId", "==", user.uid)
-    );
-
-    const qEmpleado = query(
-      collection(db, empresaBase, GASTOS_EMPLEADO_SUBCOLLECTION),
-      where("adminId", "==", user.uid)
-    );
-
-    let gastosAdmin: GastoItem[] = [];
-    let gastosEmpleado: GastoItem[] = [];
-
-    const merge = () => {
-      const byId = new Map<string, GastoItem>();
-      gastosAdmin.forEach((g) => byId.set(`admin-${g.id}`, g));
-      gastosEmpleado.forEach((g) => byId.set(`empleado-${g.id}`, g));
-      const merged = Array.from(byId.values());
-      merged.sort((a, b) =>
-        (b.fecha ? new Date(b.fecha).getTime() : 0) -
-        (a.fecha ? new Date(a.fecha).getTime() : 0)
-      );
-      setGastos(merged);
-      setLoading(false);
-    };
-
-    const mapDoc = (
-      d: { id: string; data: () => Record<string, unknown> },
-      alcanceOverride?: string
-    ): GastoItem => {
-      const data = d.data();
-      return {
-        id: d.id,
-        descripcion: String(data.descripcion ?? ""),
-        monto: typeof data.monto === "number" ? data.monto : 0,
-        fecha:
-          typeof (data.fecha as { toDate?: () => Date })?.toDate === "function"
-            ? (data.fecha as { toDate: () => Date }).toDate().toISOString()
-            : null,
-        tipo: String(data.tipo ?? "otro"),
-        creadoPor: String(data.creadoPor ?? ""),
-        creadoPorNombre: String(data.creadoPorNombre ?? ""),
-        rol: String(data.rol ?? "admin"),
-        rutaId: String(data.rutaId ?? ""),
-        adminId: String(data.adminId ?? ""),
-        empleadoId: String(data.empleadoId ?? ""),
-        evidencia: String(data.evidencia ?? ""),
-        alcance: alcanceOverride ?? String(data.alcance ?? ""),
-      };
-    };
-
-    const unsubAdmin = onSnapshot(
-      qAdmin,
-      (snap) => {
-        gastosAdmin = snap.docs.map((d) =>
-          mapDoc(d as unknown as { id: string; data: () => Record<string, unknown> })
-        );
-        merge();
-      },
-      (err) => {
-        console.warn("[GastosAdmin] onSnapshot gastosAdmin:", err);
-        setLoading(false);
-      }
-    );
-
-    const unsubEmpleado = onSnapshot(
-      qEmpleado,
-      (snap) => {
-        gastosEmpleado = snap.docs.map((d) =>
-          mapDoc(
-            d as unknown as { id: string; data: () => Record<string, unknown> },
-            "empleado"
-          )
-        );
-        merge();
-      },
-      (err) => {
-        console.warn("[GastosAdmin] onSnapshot gastosEmpleado:", err);
-        setLoading(false);
-      }
-    );
-
-    return () => {
-      unsubAdmin();
-      unsubEmpleado();
-    };
-  }, [user?.uid, profile?.empresaId]);
+  const handleMostrarMas = () => {
+    if (loadingMore || !hayMasGastos) return;
+    void cargarPaginaGastos();
+  };
 
   useEffect(() => {
     if (!showCamera) return;
@@ -463,6 +578,9 @@ export default function GastosAdminPageContent() {
       setShowModalGasto(false);
       setConfirmarGastoMarcado(false);
       setShowForm(false);
+      // Lista deja de ser tiempo-real: recargar primera página con el gasto nuevo.
+      loadingMoreRef.current = false;
+      await cargarPaginaGastos({ reset: true });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al registrar gasto");
     } finally {
@@ -729,7 +847,7 @@ export default function GastosAdminPageContent() {
             <h3 className="gastos-admin-hist-title">Historial de gastos</h3>
             {!loading && gastos.length > 0 && (
               <p className="gastos-registros-msg gastos-admin-hist-meta">
-                {gastosOrdenados.length} registro{gastosOrdenados.length !== 1 ? "s" : ""} encontrado{gastosOrdenados.length !== 1 ? "s" : ""}
+                {gastosVisibles.length} registro{gastosVisibles.length !== 1 ? "s" : ""} encontrado{gastosVisibles.length !== 1 ? "s" : ""}
               </p>
             )}
           </div>
@@ -792,12 +910,12 @@ export default function GastosAdminPageContent() {
               </div>
               {searchQuery.trim() || soloHoy ? (
                 <p className="gastos-resultados-msg gastos-admin-search-hint">
-                  {gastosOrdenados.length} resultado{gastosOrdenados.length !== 1 ? "s" : ""}
+                  {gastosVisibles.length} resultado{gastosVisibles.length !== 1 ? "s" : ""}
                   {soloHoy ? " de hoy" : ""}
                 </p>
               ) : null}
             </div>
-            {gastosOrdenados.length === 0 ? (
+            {gastosVisibles.length === 0 ? (
               <p className="gastos-empty-msg">
                 {searchQuery.trim()
                   ? "Ningún gasto coincide con la búsqueda."
@@ -887,9 +1005,10 @@ export default function GastosAdminPageContent() {
                 <button
                   type="button"
                   className="btn btn-secondary"
-                  onClick={() => setListaVisible((n) => n + LISTA_PAGE_SIZE)}
+                  onClick={handleMostrarMas}
+                  disabled={loadingMore}
                 >
-                  Mostrar +{Math.min(LISTA_PAGE_SIZE, gastosOrdenados.length - gastosVisibles.length)}
+                  {loadingMore ? "Cargando…" : `Mostrar +${proximaCantidad}`}
                 </button>
               </div>
             )}
