@@ -5,8 +5,9 @@ import { createPortal } from "react-dom";
 import type { ClienteItem } from "@/lib/empresa-api";
 import {
   filtrarClientesParaExport,
+  filtroPrestamoDesdeVista,
   generarExcelClientes,
-  type FiltroPrestamoActivoCliente,
+  type VistaExportCliente,
 } from "@/lib/export-clientes";
 
 function esperarPintado(): Promise<void> {
@@ -22,11 +23,12 @@ type Props = {
   filtroRutaId: string;
   filtroNombre?: string;
   nombreEmpresa: string;
-  filtroPrestamoInicial?: FiltroPrestamoActivoCliente;
+  vistaInicial?: VistaExportCliente;
 };
 
-const OPCIONES_PRESTAMO: { value: FiltroPrestamoActivoCliente; label: string }[] = [
+const OPCIONES_VISTA: { value: VistaExportCliente; label: string }[] = [
   { value: "todos", label: "Todos" },
+  { value: "az", label: "A-Z" },
   { value: "si", label: "Con préstamo" },
   { value: "no", label: "Sin préstamo" },
 ];
@@ -38,15 +40,15 @@ export function ExportClientesModal({
   filtroRutaId,
   filtroNombre,
   nombreEmpresa,
-  filtroPrestamoInicial = "todos",
+  vistaInicial = "todos",
 }: Props) {
   const [mounted, setMounted] = useState(false);
-  const [filtroPrestamoActivo, setFiltroPrestamoActivo] =
-    useState<FiltroPrestamoActivoCliente>(filtroPrestamoInicial);
+  const [vistaLista, setVistaLista] = useState<VistaExportCliente>(vistaInicial);
   const [generando, setGenerando] = useState(false);
   const [errorExport, setErrorExport] = useState<string | null>(null);
 
   const bloqueadoUi = generando;
+  const filtroPrestamoActivo = filtroPrestamoDesdeVista(vistaLista);
 
   useEffect(() => {
     setMounted(true);
@@ -70,6 +72,7 @@ export function ExportClientesModal({
     const base = filtrarClientesParaExport(clientes, filtroNombre, filtroRutaId, "todos");
     return {
       todos: base.length,
+      az: base.length,
       si: base.filter((c) => c.prestamo_activo).length,
       no: base.filter((c) => !c.prestamo_activo).length,
     };
@@ -97,7 +100,7 @@ export function ExportClientesModal({
       await generarExcelClientes({
         clientes: listaExport,
         rutaPorId,
-        filtroPrestamoActivo,
+        vistaLista,
         filtroRutaId,
         filtroNombre,
         nombreEmpresa,
@@ -157,26 +160,33 @@ export function ExportClientesModal({
 
         <div className="export-prestamos-body">
           <div className="form-group">
-            <span className="export-prestamos-formato-label" id="export-clientes-prestamo-label">
-              Préstamo activo
+            <span className="export-prestamos-formato-label" id="export-clientes-vista-label">
+              Filtro
             </span>
             <div
               className="prestamo-admin-tabs admin-clientes-filtro-tabs export-clientes-prestamo-tabs"
               role="radiogroup"
-              aria-labelledby="export-clientes-prestamo-label"
+              aria-labelledby="export-clientes-vista-label"
             >
-              {OPCIONES_PRESTAMO.map(({ value, label }) => (
+              {OPCIONES_VISTA.map(({ value, label }) => (
                 <button
                   key={value}
                   type="button"
                   role="radio"
-                  aria-checked={filtroPrestamoActivo === value}
-                  className={`prestamo-admin-tab${filtroPrestamoActivo === value ? " prestamo-admin-tab--active" : ""}`}
+                  aria-checked={vistaLista === value}
+                  className={`prestamo-admin-tab${vistaLista === value ? " prestamo-admin-tab--active" : ""}`}
                   disabled={bloqueadoUi}
-                  onClick={() => setFiltroPrestamoActivo(value)}
+                  onClick={() => setVistaLista(value)}
+                  aria-label={
+                    value === "az"
+                      ? "Orden alfabético A-Z"
+                      : `${label}, ${contadores[value]} cliente${contadores[value] !== 1 ? "s" : ""}`
+                  }
                 >
                   {label}
-                  <span className="prestamo-admin-tab-count">({contadores[value]})</span>
+                  {value !== "az" ? (
+                    <span className="prestamo-admin-tab-count">({contadores[value]})</span>
+                  ) : null}
                 </button>
               ))}
             </div>
@@ -193,6 +203,7 @@ export function ExportClientesModal({
           <div className="export-prestamos-preview">
             <p className="export-prestamos-preview-count">
               {listaExport.length} cliente{listaExport.length !== 1 ? "s" : ""} a exportar
+              {vistaLista === "az" ? " · orden A-Z" : ""}
             </p>
           </div>
 

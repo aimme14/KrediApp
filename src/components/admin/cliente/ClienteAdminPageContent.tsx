@@ -56,8 +56,11 @@ export default function ClienteAdminPageContent() {
   const PAGE_SIZE = 15;
   const [pagina, setPagina] = useState(1);
   const [filtroNombre, setFiltroNombre] = useState("");
-  const [filtroPrestamoActivo, setFiltroPrestamoActivo] = useState<"todos" | "si" | "no">("todos");
+  /** todos: todos por fecha (reciente→viejo); az: todos A-Z; si/no: filtro préstamo */
+  const [vistaLista, setVistaLista] = useState<"todos" | "az" | "si" | "no">("todos");
   const [filtroRutaId, setFiltroRutaId] = useState("");
+  const filtroPrestamoActivo: "todos" | "si" | "no" =
+    vistaLista === "si" ? "si" : vistaLista === "no" ? "no" : "todos";
   const [showExportModal, setShowExportModal] = useState(false);
   const [nombreEmpresa, setNombreEmpresa] = useState("KrediApp");
   const [hallazgosServidor, setHallazgosServidor] = useState<ClienteItem[]>([]);
@@ -84,6 +87,7 @@ export default function ClienteAdminPageContent() {
 
     return {
       todos: porRuta.length,
+      az: porRuta.length,
       si: porRuta.filter((c) => c.prestamo_activo).length,
       no: porRuta.filter((c) => !c.prestamo_activo).length,
     };
@@ -91,6 +95,7 @@ export default function ClienteAdminPageContent() {
 
   const FILTROS_CLIENTE = [
     { value: "todos" as const, label: "Todos" },
+    { value: "az" as const, label: "A-Z" },
     { value: "si" as const, label: "Con préstamo" },
     { value: "no" as const, label: "Sin préstamo" },
   ];
@@ -133,11 +138,19 @@ export default function ClienteAdminPageContent() {
   );
 
   const clientesPaginados = useMemo(() => {
-    const sorted = [...clientesFiltrados].sort((a, b) =>
-      (a.nombre ?? "").localeCompare(b.nombre ?? "", "es", { sensitivity: "base" })
-    );
+    const sorted = [...clientesFiltrados].sort((a, b) => {
+      if (vistaLista === "az") {
+        return (a.nombre ?? "").localeCompare(b.nombre ?? "", "es", {
+          sensitivity: "base",
+        });
+      }
+      return (
+        (b.fechaCreacion ? new Date(b.fechaCreacion).getTime() : 0) -
+        (a.fechaCreacion ? new Date(a.fechaCreacion).getTime() : 0)
+      );
+    });
     return sorted.slice(0, pagina * PAGE_SIZE);
-  }, [clientesFiltrados, pagina]);
+  }, [clientesFiltrados, pagina, vistaLista]);
 
   const hayMas = clientesPaginados.length < clientesFiltrados.length;
 
@@ -155,7 +168,7 @@ export default function ClienteAdminPageContent() {
     setHallazgosServidor([]);
     setBusquedaServidorQ(null);
     setErrorBusquedaServidor(null);
-  }, [filtroNombre, filtroPrestamoActivo, filtroRutaId]);
+  }, [filtroNombre, vistaLista, filtroRutaId]);
 
   const handleBuscarEnServidor = useCallback(async () => {
     if (!user || !esBusquedaExactaServidor(filtroNombre)) return;
@@ -456,20 +469,26 @@ export default function ClienteAdminPageContent() {
                 <div
                   className="prestamo-admin-tabs admin-clientes-filtro-tabs"
                   role="tablist"
-                  aria-label="Filtrar por préstamo activo"
+                  aria-label="Filtrar y ordenar clientes"
                 >
                   {FILTROS_CLIENTE.map(({ value, label }) => (
                     <button
                       key={value}
                       type="button"
                       role="tab"
-                      aria-selected={filtroPrestamoActivo === value}
-                      className={`prestamo-admin-tab${filtroPrestamoActivo === value ? " prestamo-admin-tab--active" : ""}`}
-                      onClick={() => setFiltroPrestamoActivo(value)}
-                      aria-label={`${label}, ${contadoresPorFiltro[value]} cliente${contadoresPorFiltro[value] !== 1 ? "s" : ""}`}
+                      aria-selected={vistaLista === value}
+                      className={`prestamo-admin-tab${vistaLista === value ? " prestamo-admin-tab--active" : ""}`}
+                      onClick={() => setVistaLista(value)}
+                      aria-label={
+                        value === "az"
+                          ? "Orden alfabético A-Z"
+                          : `${label}, ${contadoresPorFiltro[value]} cliente${contadoresPorFiltro[value] !== 1 ? "s" : ""}`
+                      }
                     >
                       {label}
-                      <span className="prestamo-admin-tab-count">({contadoresPorFiltro[value]})</span>
+                      {value !== "az" ? (
+                        <span className="prestamo-admin-tab-count">({contadoresPorFiltro[value]})</span>
+                      ) : null}
                     </button>
                   ))}
                 </div>
@@ -749,7 +768,7 @@ export default function ClienteAdminPageContent() {
           filtroRutaId={filtroRutaId}
           filtroNombre={filtroNombre.trim() || undefined}
           nombreEmpresa={nombreEmpresa}
-          filtroPrestamoInicial={filtroPrestamoActivo}
+          vistaInicial={vistaLista}
         />
       )}
     </div>

@@ -3,15 +3,24 @@ import { formatClienteCodigoRutaYNumero } from "@/lib/empresa-api";
 
 export type FiltroPrestamoActivoCliente = "todos" | "si" | "no";
 
+/** Misma lógica de chips que en la lista de clientes (Todos / A-Z / préstamo). */
+export type VistaExportCliente = "todos" | "az" | "si" | "no";
+
 export type ExportClientesParams = {
   clientes: ClienteItem[];
   rutaPorId: Record<string, string>;
-  filtroPrestamoActivo: FiltroPrestamoActivoCliente;
+  vistaLista: VistaExportCliente;
   filtroRutaId: string;
   filtroNombre?: string;
   nombreEmpresa: string;
   nombreRuta?: string;
 };
+
+export function filtroPrestamoDesdeVista(
+  vista: VistaExportCliente
+): FiltroPrestamoActivoCliente {
+  return vista === "si" ? "si" : vista === "no" ? "no" : "todos";
+}
 
 export function filtrarClientesParaExport(
   clientes: ClienteItem[],
@@ -36,26 +45,46 @@ export function filtrarClientesParaExport(
   });
 }
 
+export function ordenarClientesParaExport(
+  clientes: ClienteItem[],
+  vista: VistaExportCliente
+): ClienteItem[] {
+  return [...clientes].sort((a, b) => {
+    if (vista === "az") {
+      return (a.nombre ?? "").localeCompare(b.nombre ?? "", "es", {
+        sensitivity: "base",
+      });
+    }
+    return (
+      (b.fechaCreacion ? new Date(b.fechaCreacion).getTime() : 0) -
+      (a.fechaCreacion ? new Date(a.fechaCreacion).getTime() : 0)
+    );
+  });
+}
+
 export async function generarExcelClientes(params: ExportClientesParams): Promise<void> {
   const ExcelJS = (await import("exceljs")).default;
 
   const {
     clientes,
     rutaPorId,
-    filtroPrestamoActivo,
+    vistaLista,
     filtroRutaId,
     filtroNombre,
     nombreEmpresa,
     nombreRuta,
   } = params;
 
+  const filtroPrestamoActivo = filtroPrestamoDesdeVista(vistaLista);
   const fechaExport = new Date().toLocaleDateString("es-CO", { dateStyle: "long" });
   const filtroLabel =
-    filtroPrestamoActivo === "si"
-      ? "Con préstamo"
-      : filtroPrestamoActivo === "no"
-        ? "Sin préstamo"
-        : "Todos";
+    vistaLista === "az"
+      ? "Todos (A-Z)"
+      : filtroPrestamoActivo === "si"
+        ? "Con préstamo"
+        : filtroPrestamoActivo === "no"
+          ? "Sin préstamo"
+          : "Todos";
   const rutaLabel = filtroRutaId && nombreRuta ? nombreRuta : "Todas las rutas";
 
   const wb = new ExcelJS.Workbook();
@@ -82,7 +111,7 @@ export async function generarExcelClientes(params: ExportClientesParams): Promis
 
   merge(3);
   const s2 = ws.getCell(3, 1);
-  s2.value = `Préstamo activo: ${filtroLabel}  ·  Ruta: ${rutaLabel}${filtroNombre?.trim() ? `  ·  Búsqueda: ${filtroNombre.trim()}` : ""}`;
+  s2.value = `Filtro: ${filtroLabel}  ·  Ruta: ${rutaLabel}${filtroNombre?.trim() ? `  ·  Búsqueda: ${filtroNombre.trim()}` : ""}`;
   s2.font = { size: 10, color: { argb: "FF666666" } };
 
   merge(4);
@@ -115,11 +144,7 @@ export async function generarExcelClientes(params: ExportClientesParams): Promis
 
   ws.autoFilter = { from: { row: 6, column: 1 }, to: { row: 6, column: COLS } };
 
-  const ordenados = [...clientes].sort(
-    (a, b) =>
-      (b.fechaCreacion ? new Date(b.fechaCreacion).getTime() : 0) -
-      (a.fechaCreacion ? new Date(a.fechaCreacion).getTime() : 0)
-  );
+  const ordenados = ordenarClientesParaExport(clientes, vistaLista);
 
   ordenados.forEach((c, idx) => {
     const fila = ws.addRow([

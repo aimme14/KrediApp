@@ -758,8 +758,16 @@ export default function GastosAdminPageContent() {
               >
                 <button
                   type="button"
+                  className={`gastos-periodo-btn ${!soloHoy ? "gastos-periodo-btn-active" : ""}`}
+                  onClick={() => setSoloHoy(false)}
+                  aria-pressed={!soloHoy}
+                >
+                  Todos
+                </button>
+                <button
+                  type="button"
                   className={`gastos-periodo-btn ${soloHoy ? "gastos-periodo-btn-active" : ""}`}
-                  onClick={() => setSoloHoy((v) => !v)}
+                  onClick={() => setSoloHoy(true)}
                   aria-pressed={soloHoy}
                 >
                   Hoy
