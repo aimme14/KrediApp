@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
-import dynamic from "next/dynamic";
 import { useSearchParams } from "next/navigation";
 import { collection, doc, query, where, onSnapshot, limit } from "firebase/firestore";
 import { useAuth } from "@/context/AuthContext";
@@ -27,8 +26,10 @@ import {
   sanitizeMontoDecimalCOP,
   formatMontoDecimalCOPDisplay,
   interiorDecimalCOPToNumber,
+  parseMontoEnteroFormatted,
 } from "@/lib/monto-input-es";
 import SelectConBusqueda from "@/components/SelectConBusqueda";
+import { ModalConfirmar } from "@/components/trabajador/ModalConfirmar";
 import {
   esPrestamoCreadoHoy,
   formatDebeSlashTotalCredito,
@@ -38,11 +39,6 @@ import { sugerirFechaFinalYmd, formatFechaFinalDisplay, DIAS_COBRO_MODO_DEFAULT,
 import { fechaDiaColombiaHoy } from "@/lib/colombia-day-bounds";
 import type { DiasCobroModo } from "@/types/firestore";
 import { OFFLINE_MSG, useOnline } from "@/hooks/useOnline";
-
-const ModalConfirmar = dynamic(
-  () => import("@/components/trabajador/ModalConfirmar").then((m) => ({ default: m.ModalConfirmar })),
-  { ssr: false }
-);
 
 const MODALIDADES = [
   { value: "diario", label: "Diario" },
@@ -107,6 +103,7 @@ export default function PrestamoTrabajadorPageContent() {
   const [creating, setCreating] = useState(false);
   const [showModalPrestamo, setShowModalPrestamo] = useState(false);
   const [confirmarPrestamoMarcado, setConfirmarPrestamoMarcado] = useState(false);
+  const [montoConfirmacionModal, setMontoConfirmacionModal] = useState("");
   const [solicitudPendiente, setSolicitudPendiente] = useState<{
     id: string;
     estado: string;
@@ -314,6 +311,7 @@ export default function PrestamoTrabajadorPageContent() {
     }
     setError(null);
     setConfirmarPrestamoMarcado(false);
+    setMontoConfirmacionModal("");
     setShowModalPrestamo(true);
   };
 
@@ -324,6 +322,12 @@ export default function PrestamoTrabajadorPageContent() {
     }
     if (!user) return;
     const montoNum = interiorDecimalCOPToNumber(monto);
+    if (
+      !confirmarPrestamoMarcado ||
+      parseMontoEnteroFormatted(montoConfirmacionModal) !== montoNum
+    ) {
+      return;
+    }
     const nCuotas = Math.max(1, parseInt(numeroCuotas, 10) || 1);
     const iVal = parseInteresPct(interes);
 
@@ -353,6 +357,7 @@ export default function PrestamoTrabajadorPageContent() {
       setEvaluacionAprobacion(null);
       setShowModalPrestamo(false);
       setConfirmarPrestamoMarcado(false);
+      setMontoConfirmacionModal("");
       setShowCreateForm(false);
       if (resultado.tipo === "prestamo_creado") {
         setExitoCreacion(resultado.mensaje || "Préstamo creado correctamente.");
@@ -1014,6 +1019,10 @@ export default function PrestamoTrabajadorPageContent() {
           confirmarDeshabilitado={!online}
           confirmacionMarcada={confirmarPrestamoMarcado}
           onConfirmacionMarcadaChange={setConfirmarPrestamoMarcado}
+          montoEsperadoConfirmacion={montoNum}
+          montoConfirmacionEscrito={montoConfirmacionModal}
+          onMontoConfirmacionEscritoChange={setMontoConfirmacionModal}
+          labelMontoConfirmacion={`Escribe el monto a desembolsar a ${clienteSeleccionado?.nombre ?? "—"}`}
           labelConfirmacion={
             requiereAprobacionAdmin ? (
               <>
@@ -1031,6 +1040,7 @@ export default function PrestamoTrabajadorPageContent() {
             if (creating) return;
             setShowModalPrestamo(false);
             setConfirmarPrestamoMarcado(false);
+            setMontoConfirmacionModal("");
           }}
           onConfirmar={() => { void handleEjecutarPrestamo(); }}
         >

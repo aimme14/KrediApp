@@ -39,7 +39,7 @@ import {
 } from "@/lib/prestamo-list-filter";
 import { getEmpresa } from "@/lib/empresa";
 import { isPrestamoEnCobro, labelEstadoPrestamo } from "@/lib/prestamo-estado";
-import { interiorDecimalCOPToNumber } from "@/lib/monto-input-es";
+import { interiorDecimalCOPToNumber, parseMontoEnteroFormatted } from "@/lib/monto-input-es";
 import {
   formatMonedaPrestamoAdmin,
   PRESTAMO_ADMIN_CUOTAS_MAX,
@@ -243,6 +243,8 @@ export default function PrestamoAdminPageContent() {
   const prestamoCreateKeyRef = useRef<string | null>(null);
   /** Checkbox de confirmación dentro del modal de creación (separado de confirmarMontoAlto del formulario). */
   const [confirmarModalPrestamo, setConfirmarModalPrestamo] = useState(false);
+  /** Monto escrito en el modal — debe coincidir con el desembolso para habilitar confirmar. */
+  const [montoConfirmacionModal, setMontoConfirmacionModal] = useState("");
 
   useEffect(() => {
     setConfirmarMontoAlto(false);
@@ -279,6 +281,7 @@ export default function PrestamoAdminPageContent() {
     prestamoCreateKeyRef.current = crypto.randomUUID();
     setConfirmarMontoAlto(false);
     setConfirmarModalPrestamo(false);
+    setMontoConfirmacionModal("");
     setShowModalPrestamo(false);
     setError(null);
     setFechaFinalTouched(false);
@@ -415,6 +418,7 @@ export default function PrestamoAdminPageContent() {
       return;
     }
     setConfirmarModalPrestamo(false);
+    setMontoConfirmacionModal("");
     setError(null);
     setShowModalPrestamo(true);
   };
@@ -428,6 +432,12 @@ export default function PrestamoAdminPageContent() {
     }
     if (!user || !confirmarMontoAlto) return;
     const montoNum = interiorDecimalCOPToNumber(monto);
+    if (
+      !confirmarModalPrestamo ||
+      parseMontoEnteroFormatted(montoConfirmacionModal) !== montoNum
+    ) {
+      return;
+    }
     const nCuotas = Math.max(1, parseInt(numeroCuotas, 10) || 1);
 
     // Reutiliza key del intento actual (si red cayó y el usuario reintenta, el backend deduplica)
@@ -461,6 +471,7 @@ export default function PrestamoAdminPageContent() {
       setDiasCobroModo(DIAS_COBRO_MODO_DEFAULT);
       setConfirmarMontoAlto(false);
       setConfirmarModalPrestamo(false);
+      setMontoConfirmacionModal("");
       setShowModalPrestamo(false);
       setShowCreateForm(false);
       await refresh();
@@ -1220,6 +1231,10 @@ export default function PrestamoAdminPageContent() {
           confirmarDeshabilitado={!online}
           confirmacionMarcada={confirmarModalPrestamo}
           onConfirmacionMarcadaChange={setConfirmarModalPrestamo}
+          montoEsperadoConfirmacion={montoNum}
+          montoConfirmacionEscrito={montoConfirmacionModal}
+          onMontoConfirmacionEscritoChange={setMontoConfirmacionModal}
+          labelMontoConfirmacion={`Escribe el monto a desembolsar a ${clienteSeleccionado?.nombre ?? "—"}`}
           labelConfirmacion={
             <>
               Confirmo el desembolso de{" "}
@@ -1230,6 +1245,7 @@ export default function PrestamoAdminPageContent() {
           onCancelar={() => {
             if (creating) return;
             setConfirmarModalPrestamo(false);
+            setMontoConfirmacionModal("");
             setShowModalPrestamo(false);
           }}
           onConfirmar={() => { void handleEjecutarPrestamo(); }}

@@ -1,6 +1,10 @@
 "use client";
 
 import { useEffect, useId, type ReactNode } from "react";
+import {
+  formatMontoEnteroInput,
+  parseMontoEnteroFormatted,
+} from "@/lib/monto-input-es";
 
 type ModalConfirmarProps = {
   titulo: string;
@@ -19,6 +23,14 @@ type ModalConfirmarProps = {
   ocultarCancelar?: boolean;
   /** Si es false, clic fuera del cuadro no cierra el modal. */
   cerrarConBackdrop?: boolean;
+  /**
+   * Capa extra: el usuario debe escribir este monto exacto para habilitar confirmar
+   * (p. ej. desembolso de préstamo).
+   */
+  montoEsperadoConfirmacion?: number;
+  montoConfirmacionEscrito?: string;
+  onMontoConfirmacionEscritoChange?: (valor: string) => void;
+  labelMontoConfirmacion?: string;
 };
 
 export function ModalConfirmar({
@@ -34,11 +46,24 @@ export function ModalConfirmar({
   confirmarDeshabilitado = false,
   ocultarCancelar = false,
   cerrarConBackdrop = true,
+  montoEsperadoConfirmacion,
+  montoConfirmacionEscrito = "",
+  onMontoConfirmacionEscritoChange,
+  labelMontoConfirmacion = "Escribe el monto a desembolsar",
 }: ModalConfirmarProps) {
   const requiereCheckbox = onConfirmacionMarcadaChange !== undefined;
+  const requiereMonto =
+    typeof montoEsperadoConfirmacion === "number" &&
+    Number.isFinite(montoEsperadoConfirmacion);
+  const montoCoincide =
+    !requiereMonto ||
+    parseMontoEnteroFormatted(montoConfirmacionEscrito) === montoEsperadoConfirmacion;
   const puedeConfirmar =
-    (!requiereCheckbox || confirmacionMarcada) && !confirmarDeshabilitado;
+    (!requiereCheckbox || confirmacionMarcada) &&
+    montoCoincide &&
+    !confirmarDeshabilitado;
   const bodyId = useId();
+  const montoInputId = useId();
 
   useEffect(() => {
     if (!cerrarConBackdrop) return;
@@ -75,6 +100,26 @@ export function ModalConfirmar({
         </h3>
         <div className="modal-confirmar-body" id={bodyId}>
           {children}
+          {requiereMonto ? (
+            <div className="modal-confirmar-monto">
+              <label htmlFor={montoInputId} className="modal-confirmar-monto-label">
+                {labelMontoConfirmacion}
+              </label>
+              <input
+                id={montoInputId}
+                type="text"
+                inputMode="numeric"
+                autoComplete="off"
+                className="modal-confirmar-monto-input"
+                value={montoConfirmacionEscrito}
+                onChange={(e) =>
+                  onMontoConfirmacionEscritoChange?.(formatMontoEnteroInput(e.target.value))
+                }
+                disabled={confirmando}
+                aria-invalid={montoConfirmacionEscrito.length > 0 && !montoCoincide}
+              />
+            </div>
+          ) : null}
           {requiereCheckbox ? (
             <label className="modal-confirmar-checkbox-label">
               <input
