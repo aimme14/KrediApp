@@ -21,8 +21,9 @@ import {
   fechaRelevantePrestamo,
   calcularDuracionDias,
 } from "@/lib/prestamo-display";
-import { formatFechaFinalDisplay, sugerirFechaFinalYmd } from "@/lib/prestamo-fecha-final";
+import { formatFechaFinalDisplay, labelDiasCobroModo, sugerirFechaFinalYmd, DIAS_COBRO_MODO_DEFAULT } from "@/lib/prestamo-fecha-final";
 import { fechaDiaColombiaHoy } from "@/lib/colombia-day-bounds";
+import type { DiasCobroModo } from "@/types/firestore";
 import {
   mensajePrestamosVaciosContable,
   numeroPeriodoAdmin,
@@ -225,6 +226,7 @@ export default function PrestamoAdminPageContent() {
   const [monto, setMonto] = useState("");
   const [fechaFinal, setFechaFinal] = useState("");
   const [fechaFinalTouched, setFechaFinalTouched] = useState(false);
+  const [diasCobroModo, setDiasCobroModo] = useState<DiasCobroModo>(DIAS_COBRO_MODO_DEFAULT);
   const [creating, setCreating] = useState(false);
   const [showModalPrestamo, setShowModalPrestamo] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
@@ -247,15 +249,30 @@ export default function PrestamoAdminPageContent() {
   }, [rutaIdForm, clienteId, monto, numeroCuotas, interes, modalidad, fechaFinal]);
 
   useEffect(() => {
+    if (diasCobroModo === "personalizado") return;
     if (fechaFinalTouched) return;
     const nCuotas = parseInt(numeroCuotas, 10);
     if (!nCuotas || nCuotas < 1) {
       setFechaFinal("");
       return;
     }
-    const sugerida = sugerirFechaFinalYmd(modalidad, fechaDiaColombiaHoy(), nCuotas);
+    const sugerida = sugerirFechaFinalYmd(
+      modalidad,
+      fechaDiaColombiaHoy(),
+      nCuotas,
+      diasCobroModo
+    );
     setFechaFinal(sugerida ?? "");
-  }, [modalidad, numeroCuotas, fechaFinalTouched]);
+  }, [modalidad, numeroCuotas, fechaFinalTouched, diasCobroModo]);
+
+  const handleDiasCobroModoChange = useCallback((modo: DiasCobroModo) => {
+    setDiasCobroModo(modo);
+    if (modo === "personalizado") {
+      setFechaFinalTouched(true);
+    } else {
+      setFechaFinalTouched(false);
+    }
+  }, []);
 
   const abrirFormularioCrear = useCallback(() => {
     // Nueva key por cada intento de creación; retiros en la misma sesión reusan la misma key
@@ -265,6 +282,7 @@ export default function PrestamoAdminPageContent() {
     setShowModalPrestamo(false);
     setError(null);
     setFechaFinalTouched(false);
+    setDiasCobroModo(DIAS_COBRO_MODO_DEFAULT);
     setShowCreateForm(true);
   }, []);
 
@@ -428,6 +446,7 @@ export default function PrestamoAdminPageContent() {
         numeroCuotas: nCuotas,
         fechaInicio: fechaDiaColombiaHoy(),
         fechaFinal: fechaFinal.trim(),
+        diasCobroModo,
         idempotencyKey,
       });
       prestamoCreateKeyRef.current = null;
@@ -439,6 +458,7 @@ export default function PrestamoAdminPageContent() {
       setModalidad("mensual");
       setFechaFinal("");
       setFechaFinalTouched(false);
+      setDiasCobroModo(DIAS_COBRO_MODO_DEFAULT);
       setConfirmarMontoAlto(false);
       setConfirmarModalPrestamo(false);
       setShowModalPrestamo(false);
@@ -718,6 +738,8 @@ export default function PrestamoAdminPageContent() {
             setFechaFinalTouched(true);
             setFechaFinal(v);
           }}
+          diasCobroModo={diasCobroModo}
+          onDiasCobroModoChange={handleDiasCobroModoChange}
           montoNum={montoNum}
           nCuotasVal={nCuotasVal}
           iVal={iVal}
@@ -1229,6 +1251,9 @@ export default function PrestamoAdminPageContent() {
           </p>
           <p>
             Cuotas: <strong>{nCuotasVal} ({modalidadLabel})</strong>
+          </p>
+          <p>
+            Días de cobro: <strong>{labelDiasCobroModo(diasCobroModo)}</strong>
           </p>
           <p>
             Fecha final:{" "}

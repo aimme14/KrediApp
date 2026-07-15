@@ -118,6 +118,10 @@ export type PrestamoItem = {
    */
   fechaFinal: string | null;
   /**
+   * Modo de días de cobro al crear (informativo). null en préstamos legacy.
+   */
+  diasCobroModo?: "5" | "6" | "personalizado" | null;
+  /**
    * @deprecated Usar `fechaFinal`. Se mantiene poblado con el valor efectivo por compatibilidad.
    */
   fechaVencimiento: string | null;
@@ -404,6 +408,8 @@ export type SolicitudPrestamoApi = {
   fechaInicio: string;
   /** Fecha final informativa (YYYY-MM-DD), requerida al solicitar. */
   fechaFinal: string;
+  /** Modo de días de cobro al solicitar. */
+  diasCobroModo?: string;
   adminId: string;
   rutaId: string;
   estado: string;
@@ -442,6 +448,8 @@ export async function solicitarPrestamoEmpleado(
     fechaInicio?: string;
     /** Fecha final informativa (YYYY-MM-DD), obligatoria. */
     fechaFinal: string;
+    /** 5 | 6 | personalizado — default servidor "6" si se omite. */
+    diasCobroModo?: "5" | "6" | "personalizado";
   }
 ): Promise<ResultadoPrestamoEmpleadoApi> {
   const res = await fetchWithAuth("/api/empresa/solicitudes-prestamo", token, {
@@ -1219,6 +1227,8 @@ export async function createPrestamo(
     fechaInicio?: string;
     /** Fecha final informativa (YYYY-MM-DD), obligatoria. */
     fechaFinal: string;
+    /** 5 | 6 | personalizado — default servidor "6" si se omite. */
+    diasCobroModo?: "5" | "6" | "personalizado";
     /** Clave de idempotencia — el backend deduplica si la operación ya fue procesada. */
     idempotencyKey?: string;
   }

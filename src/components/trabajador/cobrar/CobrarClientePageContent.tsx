@@ -35,6 +35,7 @@ import {
 import {
   calcularRitmoFechaFinal,
   formatFechaFinalDisplay,
+  labelDiasCobroModo,
 } from "@/lib/prestamo-fecha-final";
 import { isAdminPanelRole } from "@/lib/admin-panel-role";
 import {
@@ -939,6 +940,14 @@ function CobrarClientePageContent() {
               {formatFechaFinalDisplay(ritmoFechaFinal.fechaFinalYmd)}
             </span>
           </div>
+          {prestamo?.diasCobroModo ? (
+            <div className="cobrar-fecha-final-row">
+              <span className="cobrar-fecha-final-label">Días de cobro</span>
+              <span className="cobrar-fecha-final-value">
+                {labelDiasCobroModo(prestamo.diasCobroModo)}
+              </span>
+            </div>
+          ) : null}
           <div className="cobrar-fecha-final-row">
             <span className="cobrar-fecha-final-label">Días restantes</span>
             <span

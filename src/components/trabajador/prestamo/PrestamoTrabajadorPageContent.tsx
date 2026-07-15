@@ -34,8 +34,9 @@ import {
   formatDebeSlashTotalCredito,
   formatFechaCreacionPrestamo,
 } from "@/lib/prestamo-display";
-import { sugerirFechaFinalYmd, formatFechaFinalDisplay } from "@/lib/prestamo-fecha-final";
+import { sugerirFechaFinalYmd, formatFechaFinalDisplay, DIAS_COBRO_MODO_DEFAULT, DIAS_COBRO_MODO_OPTIONS, labelDiasCobroModo } from "@/lib/prestamo-fecha-final";
 import { fechaDiaColombiaHoy } from "@/lib/colombia-day-bounds";
+import type { DiasCobroModo } from "@/types/firestore";
 import { OFFLINE_MSG, useOnline } from "@/hooks/useOnline";
 
 const ModalConfirmar = dynamic(
@@ -101,6 +102,7 @@ export default function PrestamoTrabajadorPageContent() {
   const [interes, setInteres] = useState("");
   const [fechaFinal, setFechaFinal] = useState("");
   const [fechaFinalTouched, setFechaFinalTouched] = useState(false);
+  const [diasCobroModo, setDiasCobroModo] = useState<DiasCobroModo>(DIAS_COBRO_MODO_DEFAULT);
   const [monto, setMonto] = useState("");
   const [creating, setCreating] = useState(false);
   const [showModalPrestamo, setShowModalPrestamo] = useState(false);
@@ -134,15 +136,21 @@ export default function PrestamoTrabajadorPageContent() {
   }, [searchParams, clientes, loading]);
 
   useEffect(() => {
+    if (diasCobroModo === "personalizado") return;
     if (fechaFinalTouched) return;
     const nCuotas = parseInt(numeroCuotas, 10);
     if (!nCuotas || nCuotas < 1) {
       setFechaFinal("");
       return;
     }
-    const sugerida = sugerirFechaFinalYmd(modalidad, fechaDiaColombiaHoy(), nCuotas);
+    const sugerida = sugerirFechaFinalYmd(
+      modalidad,
+      fechaDiaColombiaHoy(),
+      nCuotas,
+      diasCobroModo
+    );
     setFechaFinal(sugerida ?? "");
-  }, [modalidad, numeroCuotas, fechaFinalTouched]);
+  }, [modalidad, numeroCuotas, fechaFinalTouched, diasCobroModo]);
 
   useEffect(() => {
     if (!db || !user || profile?.role !== "trabajador" || !profile?.empresaId) return;
@@ -332,6 +340,7 @@ export default function PrestamoTrabajadorPageContent() {
         numeroCuotas: nCuotas,
         fechaInicio: fechaDiaColombiaHoy(),
         fechaFinal: fechaFinal.trim(),
+        diasCobroModo,
       });
       setClienteId("");
       setMonto("");
@@ -340,6 +349,7 @@ export default function PrestamoTrabajadorPageContent() {
       setModalidad("mensual");
       setFechaFinal("");
       setFechaFinalTouched(false);
+      setDiasCobroModo(DIAS_COBRO_MODO_DEFAULT);
       setEvaluacionAprobacion(null);
       setShowModalPrestamo(false);
       setConfirmarPrestamoMarcado(false);
@@ -687,6 +697,33 @@ export default function PrestamoTrabajadorPageContent() {
           </div>
         </div>
         <div className="form-group" style={{ marginBottom: "1rem" }}>
+          <label htmlFor="prestamo-trab-dias-cobro">Días de cobro</label>
+          <select
+            id="prestamo-trab-dias-cobro"
+            value={diasCobroModo}
+            onChange={(e) => {
+              const modo = e.target.value as DiasCobroModo;
+              setDiasCobroModo(modo);
+              if (modo === "personalizado") {
+                setFechaFinalTouched(true);
+              } else {
+                setFechaFinalTouched(false);
+              }
+            }}
+            aria-label="Días de cobro"
+            style={{ width: "100%", maxWidth: "20rem" }}
+          >
+            {DIAS_COBRO_MODO_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+          <p style={{ margin: "0.25rem 0 0", fontSize: "0.75rem", color: "var(--text-muted)" }}>
+            {DIAS_COBRO_MODO_OPTIONS.find((o) => o.value === diasCobroModo)?.hint}
+          </p>
+        </div>
+        <div className="form-group" style={{ marginBottom: "1rem" }}>
           <label htmlFor="prestamo-trab-fecha-final">Fecha final del préstamo</label>
           <input
             id="prestamo-trab-fecha-final"
@@ -701,7 +738,10 @@ export default function PrestamoTrabajadorPageContent() {
             style={{ width: "100%", maxWidth: "16rem" }}
           />
           <p style={{ margin: "0.25rem 0 0", fontSize: "0.75rem", color: "var(--text-muted)" }}>
-            Solo informativa — no afecta cierres ni cálculos. Se sugiere según cuotas y frecuencia.
+            Solo informativa — no afecta cierres ni cálculos.
+            {diasCobroModo === "personalizado"
+              ? " Elige la fecha manualmente."
+              : " Se sugiere según cuotas, frecuencia y días de cobro."}
           </p>
         </div>
         <div
@@ -771,6 +811,7 @@ export default function PrestamoTrabajadorPageContent() {
               {fechaFinal ? (
                 <li>Fecha final: <strong>{formatFechaFinalDisplay(fechaFinal)}</strong></li>
               ) : null}
+              <li>Días de cobro: <strong>{labelDiasCobroModo(diasCobroModo)}</strong></li>
               <li>Cuota por pago: <strong>{formatMoneda(cuotaPorPago)}</strong></li>
             </ul>
           </div>
@@ -1005,6 +1046,9 @@ export default function PrestamoTrabajadorPageContent() {
           </p>
           <p>
             Cuotas: <strong>{nCuotasVal} ({modalidadLabel})</strong>
+          </p>
+          <p>
+            Días de cobro: <strong>{labelDiasCobroModo(diasCobroModo)}</strong>
           </p>
           <p>
             Fecha final:{" "}

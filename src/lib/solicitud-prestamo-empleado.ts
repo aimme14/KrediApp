@@ -25,6 +25,8 @@ export type SolicitudPrestamoDoc = {
   fechaInicio: string;
   /** Fecha final informativa (YYYY-MM-DD). */
   fechaFinal: string;
+  /** Modo de días de cobro (informativo). */
+  diasCobroModo: string;
   adminId: string;
   rutaId: string;
   estado: EstadoSolicitudPrestamo;
@@ -49,6 +51,7 @@ function mapSolicitud(id: string, data: Record<string, unknown>): SolicitudPrest
     modalidad: typeof data.modalidad === "string" ? data.modalidad : "mensual",
     fechaInicio: typeof data.fechaInicio === "string" ? data.fechaInicio : "",
     fechaFinal: typeof data.fechaFinal === "string" ? data.fechaFinal : "",
+    diasCobroModo: typeof data.diasCobroModo === "string" ? data.diasCobroModo : "",
     adminId: typeof data.adminId === "string" ? data.adminId : "",
     rutaId: typeof data.rutaId === "string" ? data.rutaId : "",
     estado: (data.estado as EstadoSolicitudPrestamo) ?? "pendiente",
@@ -71,6 +74,7 @@ export async function crearSolicitudPrestamo(
     modalidad: string;
     fechaInicio: string;
     fechaFinal: string;
+    diasCobroModo?: string;
   }
 ): Promise<{ solicitudId: string; adminId: string }> {
   const existing = await db
@@ -146,6 +150,7 @@ export async function crearSolicitudPrestamo(
     modalidad: params.modalidad,
     fechaInicio: params.fechaInicio,
     fechaFinal: params.fechaFinal,
+    ...(params.diasCobroModo ? { diasCobroModo: params.diasCobroModo } : {}),
     adminId,
     rutaId,
     estado: "pendiente" as EstadoSolicitudPrestamo,

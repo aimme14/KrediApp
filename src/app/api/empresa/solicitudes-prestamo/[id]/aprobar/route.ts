@@ -13,7 +13,7 @@ import {
 import { recordDebitMovement } from "@/lib/financial-ledger";
 import type { ModalidadPago } from "@/types/firestore";
 import { isAdminPanelApiUser } from "@/lib/admin-panel-role";
-import { validateFechaFinalRequired, sugerirFechaFinalYmd } from "@/lib/prestamo-fecha-final";
+import { validateFechaFinalRequired, sugerirFechaFinalYmd, resolveDiasCobroModoForCreate, parseDiasCobroModo } from "@/lib/prestamo-fecha-final";
 import { fechaDiaColombiaHoy } from "@/lib/colombia-day-bounds";
 
 export async function POST(
@@ -66,9 +66,17 @@ export async function POST(
       ? sol.fechaInicio.trim().slice(0, 10)
       : fechaDiaColombiaHoy();
   let fechaFinalVal = validateFechaFinalRequired(sol.fechaFinal, fechaInicio);
+  const diasCobroResolved = resolveDiasCobroModoForCreate(sol.diasCobroModo);
+  const diasCobroModo =
+    diasCobroResolved.ok ? diasCobroResolved.modo : ("6" as const);
   if (!fechaFinalVal.ok) {
     // Solicitudes pendientes creadas antes de exigir fechaFinal: sugerir por cuotas.
-    const sugerida = sugerirFechaFinalYmd(modalidad, fechaInicio, numeroCuotas);
+    const sugerida = sugerirFechaFinalYmd(
+      modalidad,
+      fechaInicio,
+      numeroCuotas,
+      parseDiasCobroModo(diasCobroModo) ?? "6"
+    );
     fechaFinalVal = validateFechaFinalRequired(sugerida, fechaInicio);
   }
   if (!fechaFinalVal.ok) {
@@ -185,6 +193,7 @@ export async function POST(
         moroso: clienteData.moroso === true,
         fechaInicio: inicio,
         fechaFinal: fechaFinalYmd,
+        diasCobroModo,
         adelantoCuota: 0,
         intentosFallidos: 0,
         desembolsoDesde: "caja_empleado",

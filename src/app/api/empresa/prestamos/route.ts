@@ -28,6 +28,8 @@ import { withRateLimit } from "@/lib/with-rate-limit";
 import { financialWriteLimiterUser } from "@/lib/rate-limit";
 import {
   effectiveFechaFinal,
+  parseDiasCobroModo,
+  resolveDiasCobroModoForCreate,
   validateFechaFinalRequired,
 } from "@/lib/prestamo-fecha-final";
 import { fechaDiaColombiaHoy } from "@/lib/colombia-day-bounds";
@@ -50,6 +52,7 @@ export async function GET(request: NextRequest) {
   const prestamos = snap.docs.map((d) => {
     const data = d.data();
     const fechaFinal = effectiveFechaFinal(data);
+    const diasCobroModo = parseDiasCobroModo(data.diasCobroModo);
     return {
       id: d.id,
       clienteId: data.clienteId ?? "",
@@ -66,6 +69,7 @@ export async function GET(request: NextRequest) {
       moroso: data.moroso === true,
       fechaInicio: data.fechaInicio?.toDate?.()?.toISOString?.() ?? null,
       fechaFinal,
+      diasCobroModo,
       fechaVencimiento: fechaFinal,
       creadoEn: data.creadoEn?.toDate?.()?.toISOString?.() ?? null,
       /** Adelanto aplicado a la(s) siguiente(s) cuota(s). Si > 0, la próxima sugerencia es valorCuota - (adelanto % valorCuota). */
@@ -97,6 +101,7 @@ async function postHandler(request: NextRequest) {
     numeroCuotas,
     fechaInicio,
     fechaFinal,
+    diasCobroModo,
     idempotencyKey,
   } = body as {
     clienteId?: string;
@@ -108,6 +113,7 @@ async function postHandler(request: NextRequest) {
     numeroCuotas?: number;
     fechaInicio?: string;
     fechaFinal?: string;
+    diasCobroModo?: string;
     idempotencyKey?: string;
   };
 
@@ -158,6 +164,11 @@ async function postHandler(request: NextRequest) {
     return finalize(400, { error: fechaFinalVal.error });
   }
   const fechaFinalYmd = fechaFinalVal.ymd;
+  const diasCobroVal = resolveDiasCobroModoForCreate(diasCobroModo);
+  if (!diasCobroVal.ok) {
+    return finalize(400, { error: diasCobroVal.error });
+  }
+  const diasCobroModoResolved = diasCobroVal.modo;
 
   if (apiUser.role === "empleado") {
     const modEmp: ModalidadPago =
@@ -231,6 +242,7 @@ async function postHandler(request: NextRequest) {
         numeroCuotas,
         fechaInicio: fechaInicioYmd,
         fechaFinal: fechaFinalYmd,
+        diasCobroModo: diasCobroModoResolved,
         aprobacionTipo: "automatica",
         aprobadoPorAdmin: null,
         montoUltimoPrestamoReferencia: evaluacion.montoUltimoPrestamo,
@@ -367,6 +379,7 @@ async function postHandler(request: NextRequest) {
         moroso: clienteData.moroso === true,
         fechaInicio: inicio,
         fechaFinal: fechaFinalYmd,
+        diasCobroModo: diasCobroModoResolved,
         adelantoCuota: 0,
         creadoEn: FieldValue.serverTimestamp(),
         ...(rutaIdPrestamo ? { desembolsoDesde: "caja_ruta" as const } : {}),

@@ -1,6 +1,7 @@
 /**
  * Fecha final del préstamo (informativa): campo manual `fechaFinal` (YYYY-MM-DD)
  * con fallback de lectura a `fechaVencimiento` legado.
+ * `diasCobroModo` controla la sugerencia (5 / 6 / personalizado).
  */
 import {
   fechaDiaCalendarioDesdeISO,
@@ -10,15 +11,62 @@ import {
 import {
   addWorkingDays,
   FESTIVOS,
+  getFollowingWorkingDay,
   getNextWorkingDay,
   toDateKey,
+  type DiasLaborablesSemana,
 } from "@/lib/fechas-laborables";
-import type { ModalidadPago } from "@/types/firestore";
+import type { DiasCobroModo, ModalidadPago } from "@/types/firestore";
 
 export type PrestamoFechaFinalFields = {
   fechaFinal?: unknown;
   fechaVencimiento?: unknown;
 };
+
+/** Default productivo: mismo comportamiento histórico (lun–sáb). */
+export const DIAS_COBRO_MODO_DEFAULT: DiasCobroModo = "6";
+
+export const DIAS_COBRO_MODO_OPTIONS: {
+  value: DiasCobroModo;
+  label: string;
+  hint: string;
+}[] = [
+  { value: "6", label: "6 días (lun–sáb)", hint: "Cuenta desde el próximo día hábil (no el del desembolso); salta domingos" },
+  { value: "5", label: "5 días (lun–vie)", hint: "Cuenta desde el próximo día hábil (no el del desembolso); salta sábados y domingos" },
+  {
+    value: "personalizado",
+    label: "Personalizado",
+    hint: "Eliges la fecha final a mano, sin sugerencia automática",
+  },
+];
+
+export function parseDiasCobroModo(value: unknown): DiasCobroModo | null {
+  if (value === "5" || value === "6" || value === "personalizado") return value;
+  return null;
+}
+
+/**
+ * Normaliza modo al crear. Si no viene → default "6" (no rompe clientes que aún no envían el campo).
+ * Si viene inválido → error.
+ */
+export function resolveDiasCobroModoForCreate(
+  value: unknown
+): { ok: true; modo: DiasCobroModo } | { ok: false; error: string } {
+  if (value == null || value === "") {
+    return { ok: true, modo: DIAS_COBRO_MODO_DEFAULT };
+  }
+  const parsed = parseDiasCobroModo(value);
+  if (!parsed) {
+    return { ok: false, error: "Modo de días de cobro inválido (use 5, 6 o personalizado)" };
+  }
+  return { ok: true, modo: parsed };
+}
+
+function diasLaborablesFromModo(modo: DiasCobroModo): DiasLaborablesSemana | null {
+  if (modo === "5") return 5;
+  if (modo === "6") return 6;
+  return null;
+}
 
 function addMonths(date: Date, months: number): Date {
   const d = new Date(date);
@@ -87,7 +135,6 @@ export function validateFechaFinalRequired(
   if (!parseFechaDiaColombia(ymd).ok) {
     return { ok: false, error: "Fecha final inválida (use YYYY-MM-DD)" };
   }
-  // Comprobar que el día existe en el calendario (p.ej. no 2025-02-31)
   const [y, m, d] = ymd.split("-").map(Number);
   const probe = new Date(Date.UTC(y, m - 1, d));
   if (
@@ -105,14 +152,24 @@ export function validateFechaFinalRequired(
 }
 
 /**
- * Sugerencia de fecha final según modalidad + cuotas (días laborables).
- * Solo para prefill en formularios — no es el valor definitivo guardado.
+ * Sugerencia de fecha final según modalidad + cuotas + modo de días de cobro.
+ * - "5" / "6": calcula con días laborables correspondientes
+ * - "personalizado": no sugiere (null) — el usuario elige a mano
+ * Default modo "6" = comportamiento histórico.
+ *
+ * En diario: la 1.ª cuota es el **próximo** día hábil tras la fecha de inicio
+ * (el día del desembolso no cuenta). `addWorkingDays(primer, N)` devuelve el
+ * N-ésimo día hábil contando `primer` como el 1 (incluye el inicio del conteo).
  */
 export function sugerirFechaFinalYmd(
   modalidad: ModalidadPago | string,
   fechaInicioYmd: string,
-  numeroCuotas: number
+  numeroCuotas: number,
+  diasCobroModo: DiasCobroModo = DIAS_COBRO_MODO_DEFAULT
 ): string | null {
+  const laborables = diasLaborablesFromModo(diasCobroModo);
+  if (laborables == null) return null;
+
   const inicioDay = fechaInicioYmd.trim().slice(0, 10);
   if (!parseFechaDiaColombia(inicioDay).ok) return null;
   if (!Number.isFinite(numeroCuotas) || numeroCuotas < 1) return null;
@@ -126,15 +183,16 @@ export function sugerirFechaFinalYmd(
 
   let fin: Date;
   if (mod === "diario") {
-    const primerDiaCobro = getNextWorkingDay(inicio, FESTIVOS);
-    fin = addWorkingDays(primerDiaCobro, numeroCuotas - 1, FESTIVOS);
+    const primerDiaCobro = getFollowingWorkingDay(inicio, FESTIVOS, laborables);
+    // N cuotas = N-ésimo día hábil desde el primero (addWorkingDays cuenta el inicio)
+    fin = addWorkingDays(primerDiaCobro, numeroCuotas, FESTIVOS, laborables);
   } else if (mod === "semanal") {
-    const primerDiaCobro = getNextWorkingDay(inicio, FESTIVOS);
+    const primerDiaCobro = getFollowingWorkingDay(inicio, FESTIVOS, laborables);
     const ultimaCuotaCalendar = addDays(primerDiaCobro, (numeroCuotas - 1) * 7);
-    fin = getNextWorkingDay(ultimaCuotaCalendar, FESTIVOS);
+    fin = getNextWorkingDay(ultimaCuotaCalendar, FESTIVOS, laborables);
   } else {
     const ultimaCuotaCalendar = addMonths(inicio, numeroCuotas - 1);
-    fin = getNextWorkingDay(ultimaCuotaCalendar, FESTIVOS);
+    fin = getNextWorkingDay(ultimaCuotaCalendar, FESTIVOS, laborables);
   }
   return ymdFromDateLocal(fin);
 }
@@ -206,4 +264,11 @@ export function formatFechaFinalDisplay(ymd: string): string {
     month: "short",
     year: "numeric",
   });
+}
+
+export function labelDiasCobroModo(modo: DiasCobroModo | null | undefined): string {
+  if (modo === "5") return "5 días (lun–vie)";
+  if (modo === "6") return "6 días (lun–sáb)";
+  if (modo === "personalizado") return "Personalizado";
+  return "—";
 }

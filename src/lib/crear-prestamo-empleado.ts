@@ -11,7 +11,7 @@ import { applyDesembolsoPrestamoDesdeCajaEmpleadoEnTx } from "@/lib/ruta-financi
 import { upsertCapitalRutaSnapshot } from "@/lib/capital-ruta-snapshot";
 import { recordDebitMovement } from "@/lib/financial-ledger";
 import { validarClienteElegibleParaPrestamo } from "@/lib/prestamo-aprobacion-empleado";
-import { validateFechaFinalRequired } from "@/lib/prestamo-fecha-final";
+import { resolveDiasCobroModoForCreate, validateFechaFinalRequired } from "@/lib/prestamo-fecha-final";
 import { fechaDiaColombiaHoy } from "@/lib/colombia-day-bounds";
 import type { ModalidadPago } from "@/types/firestore";
 
@@ -29,6 +29,8 @@ export type CrearPrestamoEmpleadoParams = {
   fechaInicio?: string;
   /** Fecha final informativa (YYYY-MM-DD), obligatoria. */
   fechaFinal: string;
+  /** 5 | 6 | personalizado — default "6" si se omite. */
+  diasCobroModo?: string;
   aprobacionTipo: "automatica" | "admin";
   aprobadoPorAdmin?: string | null;
   montoUltimoPrestamoReferencia?: number | null;
@@ -56,6 +58,7 @@ export async function crearPrestamoEmpleado(
     numeroCuotas,
     fechaInicio,
     fechaFinal,
+    diasCobroModo,
     aprobacionTipo,
     aprobadoPorAdmin,
     montoUltimoPrestamoReferencia,
@@ -72,6 +75,10 @@ export async function crearPrestamoEmpleado(
   const fechaFinalVal = validateFechaFinalRequired(fechaFinal, fechaInicioYmd);
   if (!fechaFinalVal.ok) {
     throw new Error(fechaFinalVal.error);
+  }
+  const diasCobroVal = resolveDiasCobroModoForCreate(diasCobroModo);
+  if (!diasCobroVal.ok) {
+    throw new Error(diasCobroVal.error);
   }
   const inicio = new Date(fechaInicioYmd);
   inicio.setHours(0, 0, 0, 0);
@@ -152,6 +159,7 @@ export async function crearPrestamoEmpleado(
       moroso: clienteMoroso,
       fechaInicio: inicio,
       fechaFinal: fechaFinalVal.ymd,
+      diasCobroModo: diasCobroVal.modo,
       adelantoCuota: 0,
       intentosFallidos: 0,
       desembolsoDesde: "caja_empleado",
