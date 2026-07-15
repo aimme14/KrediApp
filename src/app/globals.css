@@ -11610,6 +11610,7 @@ a.admin-inicio-link-btn {
 }
 .cobrar-fecha-final-value--vencido { color: var(--danger, #dc2626); }
 .cobrar-fecha-final-value--aldia { color: var(--success-fg, #166534); }
+.cobrar-fecha-final-value--adelantado { color: var(--success-fg, #166534); }
 .cobrar-fecha-final-value--atrasado { color: var(--warning, #ca8a04); }
 .cobrar-form .form-group { margin-bottom: 0.7rem; }
 .cobrar-form .form-group label { font-size: 0.9rem; }

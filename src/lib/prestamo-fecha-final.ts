@@ -206,21 +206,38 @@ function diffDiasCalendario(inicioYmd: string, finYmd: string): number | null {
   return Math.round((b - a) / (24 * 60 * 60 * 1000));
 }
 
+export type RitmoEstadoPago = "atrasado" | "al_dia" | "adelantado";
+
 export type RitmoFechaFinalInfo = {
   fechaFinalYmd: string;
+  /** YYYY-MM-DD de inicio usado en el cálculo (si existe). */
+  fechaInicioYmd: string | null;
   diasRestantes: number;
-  alDia: boolean | null;
+  /** null si no se puede calcular el ritmo */
+  ritmo: RitmoEstadoPago | null;
+  /**
+   * Solo si ritmo === "adelantado": monto cobrado por encima de lo esperado
+   * según el % de tiempo transcurrido.
+   */
+  montoAdelantado: number;
+  /**
+   * Cuotas que debería llevar pagadas según el tiempo del plazo, menos las
+   * ya cubiertas por saldo. 0 si va al día o adelantado.
+   */
+  cuotasAtrasadas: number;
 };
 
 /**
  * Métricas informativas para la UI de cobro.
- * `alDia === null` si no se puede calcular el ritmo (totalDias <= 0 o sin cuotas).
+ * Ritmo / atraso: compara % pagado (por saldo) vs % de tiempo del plazo.
  */
 export function calcularRitmoFechaFinal(params: {
   fechaFinalYmd: string;
   fechaInicioYmd: string | null;
   numeroCuotas: number;
   cuotasPendientes: number;
+  totalAPagar?: number;
+  saldoPendiente?: number;
   hoyYmd?: string;
 }): RitmoFechaFinalInfo | null {
   const fechaFinalYmd = params.fechaFinalYmd.trim().slice(0, 10);
@@ -231,7 +248,10 @@ export function calcularRitmoFechaFinal(params: {
   if (diasRestantes == null) return null;
 
   const inicio = params.fechaInicioYmd?.trim().slice(0, 10) ?? null;
-  let alDia: boolean | null = null;
+  let ritmo: RitmoEstadoPago | null = null;
+  let montoAdelantado = 0;
+  let cuotasAtrasadas = 0;
+
   if (inicio && parseFechaDiaColombia(inicio).ok) {
     const totalDias = diffDiasCalendario(inicio, fechaFinalYmd);
     const diasTranscurridos = diffDiasCalendario(inicio, hoy);
@@ -248,11 +268,48 @@ export function calcularRitmoFechaFinal(params: {
       );
       const progresoPorTiempo = Math.min(1, Math.max(0, diasTranscurridos / totalDias));
       const progresoEnCuotas = cuotasPagadas / numeroCuotas;
-      alDia = progresoEnCuotas >= progresoPorTiempo;
+      const epsilon = 1 / (numeroCuotas * 2); // ~media cuota
+
+      // Cuotas que el calendario “espera” pagadas a esta altura del plazo
+      const cuotasEsperadas = Math.min(
+        numeroCuotas,
+        Math.floor(progresoPorTiempo * numeroCuotas + 1e-9)
+      );
+      cuotasAtrasadas = Math.max(0, cuotasEsperadas - cuotasPagadas);
+
+      if (progresoEnCuotas > progresoPorTiempo + epsilon) {
+        ritmo = "adelantado";
+        cuotasAtrasadas = 0;
+        const total =
+          typeof params.totalAPagar === "number" && params.totalAPagar > 0
+            ? params.totalAPagar
+            : 0;
+        const saldo =
+          typeof params.saldoPendiente === "number" && Number.isFinite(params.saldoPendiente)
+            ? Math.max(0, params.saldoPendiente)
+            : total;
+        if (total > 0) {
+          const cobrado = Math.max(0, total - saldo);
+          const esperado = progresoPorTiempo * total;
+          montoAdelantado = Math.round(Math.max(0, cobrado - esperado) * 100) / 100;
+        }
+      } else if (progresoEnCuotas < progresoPorTiempo - epsilon) {
+        ritmo = "atrasado";
+      } else {
+        ritmo = "al_dia";
+        cuotasAtrasadas = 0;
+      }
     }
   }
 
-  return { fechaFinalYmd, diasRestantes, alDia };
+  return {
+    fechaFinalYmd,
+    fechaInicioYmd: inicio && parseFechaDiaColombia(inicio).ok ? inicio : null,
+    diasRestantes,
+    ritmo,
+    montoAdelantado,
+    cuotasAtrasadas,
+  };
 }
 
 /** Formato corto para mostrar (ej. 31 dic 2025). */
