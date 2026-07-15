@@ -138,10 +138,8 @@ async function buscarClienteExacto(
     for (const snap of snaps) addSnap(snap);
   }
 
-  const list = Array.from(byId.values()).sort(
-    (a, b) =>
-      (b.fechaCreacion ? b.fechaCreacion.getTime() : 0) -
-      (a.fechaCreacion ? a.fechaCreacion.getTime() : 0)
+  const list = Array.from(byId.values()).sort((a, b) =>
+    (a.nombre ?? "").localeCompare(b.nombre ?? "", "es", { sensitivity: "base" })
   );
   const clientes = list.map((c) => ({
     ...c,
@@ -264,7 +262,9 @@ export async function GET(request: NextRequest) {
   if (soloMorosos) {
     list = list.filter((c) => c.moroso);
   }
-  list.sort((a, b) => (b.fechaCreacion ? new Date(b.fechaCreacion).getTime() : 0) - (a.fechaCreacion ? new Date(a.fechaCreacion).getTime() : 0));
+  list.sort((a, b) =>
+    (a.nombre ?? "").localeCompare(b.nombre ?? "", "es", { sensitivity: "base" })
+  );
   const clientes = list.map((c) => ({ ...c, fechaCreacion: c.fechaCreacion?.toISOString?.() ?? null }));
 
   return NextResponse.json({ clientes });

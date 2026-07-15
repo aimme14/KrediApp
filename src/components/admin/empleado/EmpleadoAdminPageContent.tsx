@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { listUsersByCreator, createUser } from "@/lib/users";
-import { listRutas, type RutaItem } from "@/lib/empresa-api";
+import { listRutas, updateEmpleado, type RutaItem } from "@/lib/empresa-api";
 import type { UserProfile } from "@/types/roles";
 import PasswordCreateFields from "@/components/PasswordCreateFields";
 import { guardOfflineWrite, useOnline } from "@/hooks/useOnline";
@@ -13,7 +13,8 @@ export default function EmpleadoAdminPageContent() {
   const { user, profile } = useAuth();
   const online = useOnline();
   const [trabajadores, setTrabajadores] = useState<UserProfile[]>([]);
-  const [rutas, setRutas] = useState<RutaItem[]>([]);
+  const [rutasLibres, setRutasLibres] = useState<RutaItem[]>([]);
+  const [todasRutas, setTodasRutas] = useState<RutaItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
@@ -28,28 +29,77 @@ export default function EmpleadoAdminPageContent() {
   const [passwordConfirm, setPasswordConfirm] = useState("");
   const [creating, setCreating] = useState(false);
 
-  useEffect(() => {
-    if (!profile) return;
-    let cancelled = false;
-    listUsersByCreator(profile.uid, "trabajador")
-      .then((list) => {
-        if (!cancelled) setTrabajadores(list);
-      })
-      .catch((e) => {
-        if (!cancelled) setError(e instanceof Error ? e.message : "Error al cargar");
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => { cancelled = true; };
-  }, [profile]);
+  const [empleadoEditando, setEmpleadoEditando] = useState<UserProfile | null>(null);
+  const [editNombre, setEditNombre] = useState("");
+  const [editUbicacion, setEditUbicacion] = useState("");
+  const [editDireccion, setEditDireccion] = useState("");
+  const [editTelefono, setEditTelefono] = useState("");
+  const [editCedula, setEditCedula] = useState("");
+  const [editError, setEditError] = useState<string | null>(null);
+  const [savingEdit, setSavingEdit] = useState(false);
+
+  const rutaPorId = useMemo(() => {
+    const m: Record<string, string> = {};
+    for (const r of todasRutas) m[r.id] = r.nombre;
+    return m;
+  }, [todasRutas]);
+
+  const refreshLista = useCallback(async () => {
+    if (!profile || !user) return;
+    const [list, token] = await Promise.all([
+      listUsersByCreator(profile.uid, "trabajador"),
+      user.getIdToken(),
+    ]);
+    setTrabajadores(list);
+    const [libres, todas] = await Promise.all([
+      listRutas(token, { sinEmpleado: true }),
+      listRutas(token),
+    ]);
+    setRutasLibres(libres);
+    setTodasRutas(todas);
+  }, [profile, user]);
 
   useEffect(() => {
-    if (!user) return;
-    user.getIdToken().then((token) => {
-      listRutas(token, { sinEmpleado: true }).then(setRutas).catch(() => {});
-    });
-  }, [user]);
+    if (!profile || !user) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        await refreshLista();
+      } catch (e) {
+        if (!cancelled) setError(e instanceof Error ? e.message : "Error al cargar");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [profile, user, refreshLista]);
+
+  const cerrarEdicion = useCallback(() => {
+    setEmpleadoEditando(null);
+    setEditError(null);
+    setSavingEdit(false);
+  }, []);
+
+  const abrirEdicion = useCallback((t: UserProfile) => {
+    setEmpleadoEditando(t);
+    setEditNombre(t.displayName ?? "");
+    setEditUbicacion(t.lugar ?? "");
+    setEditDireccion(t.direccion ?? "");
+    setEditTelefono(t.telefono ?? "");
+    setEditCedula(t.cedula ?? "");
+    setEditError(null);
+  }, []);
+
+  useEffect(() => {
+    if (!empleadoEditando) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !savingEdit) cerrarEdicion();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [empleadoEditando, savingEdit, cerrarEdicion]);
 
   const handleCreateTrabajador = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -89,17 +139,39 @@ export default function EmpleadoAdminPageContent() {
       setPassword("");
       setPasswordConfirm("");
       setShowForm(false);
-      const [list, token] = await Promise.all([
-        listUsersByCreator(profile.uid, "trabajador"),
-        user.getIdToken(),
-      ]);
-      setTrabajadores(list);
-      const rutasLibres = await listRutas(token, { sinEmpleado: true });
-      setRutas(rutasLibres);
+      await refreshLista();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al crear empleado");
     } finally {
       setCreating(false);
+    }
+  };
+
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!guardOfflineWrite(online, setEditError)) return;
+    if (!user || !empleadoEditando) return;
+    if (!editNombre.trim()) {
+      setEditError("El nombre es obligatorio");
+      return;
+    }
+    setEditError(null);
+    setSavingEdit(true);
+    try {
+      const token = await user.getIdToken();
+      await updateEmpleado(token, empleadoEditando.uid, {
+        displayName: editNombre.trim(),
+        lugar: editUbicacion.trim(),
+        direccion: editDireccion.trim(),
+        telefono: editTelefono.trim(),
+        cedula: editCedula.trim(),
+      });
+      cerrarEdicion();
+      await refreshLista();
+    } catch (e) {
+      setEditError(e instanceof Error ? e.message : "Error al actualizar empleado");
+    } finally {
+      setSavingEdit(false);
     }
   };
 
@@ -110,7 +182,6 @@ export default function EmpleadoAdminPageContent() {
       <h2 style={{ marginTop: 0 }}>Empleado</h2>
       <p style={{ color: "var(--text-muted)", fontSize: "0.875rem", marginBottom: "1.25rem" }}>
         Crea empleados con nombre, ubicación, dirección, teléfono, cédula, ruta, correo y contraseña (credenciales de ingreso).
-        
       </p>
 
       <div style={{ marginBottom: "1.25rem" }}>
@@ -185,13 +256,13 @@ export default function EmpleadoAdminPageContent() {
                 style={{ width: "100%", padding: "0.5rem" }}
               >
                 <option value="">Seleccionar ruta</option>
-                {rutas.map((r) => (
+                {rutasLibres.map((r) => (
                   <option key={r.id} value={r.id}>
                     {r.nombre} {r.ubicacion ? `· ${r.ubicacion}` : ""}
                   </option>
                 ))}
               </select>
-              {rutas.length === 0 && (
+              {rutasLibres.length === 0 && (
                 <p style={{ fontSize: "0.8125rem", color: "var(--text-muted)", marginTop: "0.35rem", marginBottom: 0 }}>
                   No hay rutas libres. Crea una ruta nueva o espera a liberar una (un trabajador por ruta).
                 </p>
@@ -242,12 +313,13 @@ export default function EmpleadoAdminPageContent() {
                   <th>Ubicación</th>
                   <th>Teléfono</th>
                   <th>Cédula</th>
+                  <th className="admin-clientes-th-accion">Acción</th>
                 </tr>
               </thead>
               <tbody>
                 {trabajadores.length === 0 ? (
                   <tr>
-                    <td colSpan={5} style={{ color: "var(--text-muted)" }}>
+                    <td colSpan={6} style={{ color: "var(--text-muted)" }}>
                       No hay empleados. Crea uno con el botón &quot;Nuevo empleado&quot;.
                     </td>
                   </tr>
@@ -259,6 +331,20 @@ export default function EmpleadoAdminPageContent() {
                       <td>{t.lugar ?? "—"}</td>
                       <td>{t.telefono ?? "—"}</td>
                       <td>{t.cedula ?? "—"}</td>
+                      <td className="admin-clientes-td-accion">
+                        <button
+                          type="button"
+                          className="admin-clientes-edit-btn"
+                          onClick={() => abrirEdicion(t)}
+                          aria-label={`Actualizar datos de ${t.displayName ?? t.email}`}
+                          title="Actualizar datos"
+                        >
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                            <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+                            <path d="m15 5 4 4" />
+                          </svg>
+                        </button>
+                      </td>
                     </tr>
                   ))
                 )}
@@ -267,6 +353,116 @@ export default function EmpleadoAdminPageContent() {
           </div>
         )}
       </div>
+
+      {empleadoEditando && (
+        <div
+          className="gf-modal-backdrop"
+          onClick={() => !savingEdit && cerrarEdicion()}
+          role="presentation"
+        >
+          <div
+            className="gf-modal gf-modal--cliente-edit"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="empleado-edit-modal-title"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 id="empleado-edit-modal-title" className="gf-modal-title">
+              Actualizar datos
+            </h2>
+            <dl className="admin-clientes-edit-readonly">
+              <div className="admin-clientes-edit-readonly-row">
+                <dt className="admin-clientes-edit-readonly-label">Correo</dt>
+                <dd className="admin-clientes-edit-readonly-value">
+                  {empleadoEditando.email}
+                </dd>
+              </div>
+              <div className="admin-clientes-edit-readonly-row">
+                <dt className="admin-clientes-edit-readonly-label">Ruta</dt>
+                <dd className="admin-clientes-edit-readonly-value">
+                  {empleadoEditando.rutaId
+                    ? (rutaPorId[empleadoEditando.rutaId] ?? empleadoEditando.rutaId)
+                    : "—"}
+                </dd>
+              </div>
+            </dl>
+
+            <form onSubmit={handleEditSubmit}>
+              <div className="form-group">
+                <label htmlFor="empleado-edit-nombre">Nombre</label>
+                <input
+                  id="empleado-edit-nombre"
+                  type="text"
+                  value={editNombre}
+                  onChange={(e) => setEditNombre(e.target.value)}
+                  required
+                  placeholder="Nombre completo"
+                  autoFocus
+                />
+              </div>
+              <div className="form-group">
+                <label htmlFor="empleado-edit-ubicacion">Ubicación</label>
+                <input
+                  id="empleado-edit-ubicacion"
+                  type="text"
+                  value={editUbicacion}
+                  onChange={(e) => setEditUbicacion(e.target.value)}
+                  placeholder="Ciudad o zona"
+                />
+              </div>
+              <div className="form-group">
+                <label htmlFor="empleado-edit-direccion">Dirección</label>
+                <input
+                  id="empleado-edit-direccion"
+                  type="text"
+                  value={editDireccion}
+                  onChange={(e) => setEditDireccion(e.target.value)}
+                  placeholder="Dirección física"
+                />
+              </div>
+              <div className="form-group">
+                <label htmlFor="empleado-edit-telefono">Teléfono</label>
+                <input
+                  id="empleado-edit-telefono"
+                  type="tel"
+                  value={editTelefono}
+                  onChange={(e) => setEditTelefono(e.target.value)}
+                  placeholder="Número de contacto"
+                />
+              </div>
+              <div className="form-group">
+                <label htmlFor="empleado-edit-cedula">Cédula</label>
+                <input
+                  id="empleado-edit-cedula"
+                  type="text"
+                  value={editCedula}
+                  onChange={(e) => setEditCedula(e.target.value)}
+                  placeholder="Número de cédula"
+                />
+              </div>
+              {editError && <p className="error-msg">{editError}</p>}
+              <div className="gf-modal-actions">
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={cerrarEdicion}
+                  disabled={savingEdit}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={savingEdit || !online}
+                  aria-busy={savingEdit}
+                >
+                  {savingEdit ? "Guardando…" : "Guardar cambios"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

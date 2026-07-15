@@ -2229,7 +2229,13 @@ td {
   box-shadow: 0 1px 3px color-mix(in srgb, var(--text) 12%, transparent);
 }
 .gastos-admin-toolbar .gastos-periodo-filter {
+  align-self: flex-start;
+  width: fit-content;
   margin-bottom: 0.15rem;
+}
+.gastos-admin-toolbar .gastos-periodo-btn {
+  min-width: 0;
+  padding: 0.3rem 0.7rem;
 }
 
 /* Filtro periodo contable — gastos admin */
@@ -2603,6 +2609,19 @@ td {
   align-items: stretch;
   gap: 0.28rem;
   margin-bottom: 0.65rem;
+}
+.gastos-admin-mostrar-mas {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 1rem;
+  padding-bottom: 0.25rem;
+}
+.gastos-admin-mostrar-mas-meta {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--text-muted);
 }
 .gastos-admin-search-field {
   display: flex;
@@ -4595,9 +4614,16 @@ td {
 
 .admin-clientes-table th.admin-clientes-th-accion,
 .admin-clientes-table td.admin-clientes-td-accion {
-  width: 3rem;
+  width: 5.5rem;
   text-align: center;
   white-space: nowrap;
+}
+
+.admin-clientes-acciones {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
 }
 
 .admin-clientes-edit-btn {
@@ -4615,7 +4641,7 @@ td {
   transition: color 0.15s, border-color 0.15s, background 0.15s;
 }
 
-.admin-clientes-edit-btn:hover {
+.admin-clientes-edit-btn:hover:not(:disabled) {
   color: var(--text);
   border-color: var(--text-muted);
   background: var(--bg-subtle, rgba(255, 255, 255, 0.04));
@@ -4624,6 +4650,17 @@ td {
 .admin-clientes-edit-btn:focus-visible {
   outline: 2px solid var(--primary, #3b82f6);
   outline-offset: 2px;
+}
+
+.admin-clientes-edit-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.admin-clientes-delete-btn:hover:not(:disabled) {
+  color: #b91c1c;
+  border-color: #b91c1c;
+  background: rgba(185, 28, 28, 0.06);
 }
 
 .gf-modal--cliente-edit {

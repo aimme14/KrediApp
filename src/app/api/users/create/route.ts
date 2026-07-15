@@ -371,8 +371,29 @@ export async function POST(request: NextRequest) {
     await syncCustomClaimsForUid(uid);
 
     return NextResponse.json({ uid });
-  } catch (e) {
-    const message = e instanceof Error ? e.message : "Error al crear usuario";
+  } catch (e: unknown) {
+    const err = e as { code?: string; message?: string };
+    const message = err?.message ?? "Error al crear usuario";
+
+    if (err?.code === "auth/email-already-exists") {
+      return NextResponse.json(
+        { error: "Este correo electrónico ya está registrado. Usa otro." },
+        { status: 400 }
+      );
+    }
+    if (err?.code === "auth/invalid-email") {
+      return NextResponse.json(
+        { error: "El correo no es válido." },
+        { status: 400 }
+      );
+    }
+    if (err?.code === "auth/weak-password") {
+      return NextResponse.json(
+        { error: "La contraseña es demasiado débil. Usa al menos 6 caracteres." },
+        { status: 400 }
+      );
+    }
+
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

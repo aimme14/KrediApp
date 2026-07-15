@@ -7,6 +7,7 @@ import { useTrabajadorLista } from "@/context/TrabajadorListaContext";
 import {
   createCliente,
   updateCliente,
+  deleteCliente,
   searchClientes,
   formatClienteCodigoRutaYNumero,
   type ClienteItem,
@@ -51,6 +52,7 @@ export default function ClienteAdminPageContent() {
   const [editCedula, setEditCedula] = useState("");
   const [editError, setEditError] = useState<string | null>(null);
   const [savingEdit, setSavingEdit] = useState(false);
+  const [eliminandoId, setEliminandoId] = useState<string | null>(null);
   const PAGE_SIZE = 15;
   const [pagina, setPagina] = useState(1);
   const [filtroNombre, setFiltroNombre] = useState("");
@@ -131,9 +133,8 @@ export default function ClienteAdminPageContent() {
   );
 
   const clientesPaginados = useMemo(() => {
-    const sorted = [...clientesFiltrados].sort(
-      (a, b) => (b.fechaCreacion ? new Date(b.fechaCreacion).getTime() : 0) -
-                (a.fechaCreacion ? new Date(a.fechaCreacion).getTime() : 0)
+    const sorted = [...clientesFiltrados].sort((a, b) =>
+      (a.nombre ?? "").localeCompare(b.nombre ?? "", "es", { sensitivity: "base" })
     );
     return sorted.slice(0, pagina * PAGE_SIZE);
   }, [clientesFiltrados, pagina]);
@@ -275,6 +276,31 @@ export default function ClienteAdminPageContent() {
       setEditError(e instanceof Error ? e.message : "Error al actualizar cliente");
     } finally {
       setSavingEdit(false);
+    }
+  };
+
+  const handleEliminarCliente = async (c: ClienteItem) => {
+    if (c.prestamo_activo) {
+      setError("No se puede eliminar un cliente con préstamo activo");
+      return;
+    }
+    if (!guardOfflineWrite(online, setError)) return;
+    if (!user) return;
+    const ok = window.confirm(
+      `¿Eliminar a «${c.nombre}»?\nEsta acción no se puede deshacer.`
+    );
+    if (!ok) return;
+    setError(null);
+    setEliminandoId(c.id);
+    try {
+      const token = await user.getIdToken();
+      await deleteCliente(token, c.id);
+      if (clienteEditando?.id === c.id) cerrarEdicion();
+      await refreshLista();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Error al eliminar cliente");
+    } finally {
+      setEliminandoId(null);
     }
   };
 
@@ -540,18 +566,44 @@ export default function ClienteAdminPageContent() {
                     <td>{c.prestamo_activo ? "Sí" : "No"}</td>
                     <td>{c.moroso ? "Sí (excluido)" : "No"}</td>
                     <td className="admin-clientes-td-accion">
-                      <button
-                        type="button"
-                        className="admin-clientes-edit-btn"
-                        onClick={() => abrirEdicion(c)}
-                        aria-label={`Actualizar datos de ${c.nombre}`}
-                        title="Actualizar datos"
-                      >
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                          <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
-                          <path d="m15 5 4 4" />
-                        </svg>
-                      </button>
+                      <div className="admin-clientes-acciones">
+                        <button
+                          type="button"
+                          className="admin-clientes-edit-btn"
+                          onClick={() => abrirEdicion(c)}
+                          aria-label={`Actualizar datos de ${c.nombre}`}
+                          title="Actualizar datos"
+                        >
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                            <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+                            <path d="m15 5 4 4" />
+                          </svg>
+                        </button>
+                        <button
+                          type="button"
+                          className="admin-clientes-edit-btn admin-clientes-delete-btn"
+                          onClick={() => handleEliminarCliente(c)}
+                          disabled={c.prestamo_activo || eliminandoId === c.id || !online}
+                          aria-label={
+                            c.prestamo_activo
+                              ? `No se puede eliminar a ${c.nombre}: tiene préstamo activo`
+                              : `Eliminar a ${c.nombre}`
+                          }
+                          title={
+                            c.prestamo_activo
+                              ? "No se puede eliminar: tiene préstamo activo"
+                              : "Eliminar cliente"
+                          }
+                        >
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                            <path d="M3 6h18" />
+                            <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
+                            <path d="M10 11v6" />
+                            <path d="M14 11v6" />
+                          </svg>
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}

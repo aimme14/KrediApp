@@ -118,3 +118,58 @@ export async function PATCH(
 
   return NextResponse.json({ ok: true });
 }
+
+/** DELETE: elimina el cliente solo si no tiene préstamo activo. Decrementa totalClientes. */
+export async function DELETE(
+  _request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const apiUser = await getApiUser(_request);
+  if (!apiUser) {
+    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  }
+  if (!isAdminPanelApiUser(apiUser)) {
+    return NextResponse.json(
+      { error: "Solo el administrador puede eliminar clientes" },
+      { status: 403 }
+    );
+  }
+
+  const { id: clienteId } = await params;
+  const cliente = await getClienteAutorizado(apiUser, clienteId);
+  if (cliente instanceof NextResponse) return cliente;
+  const { ref, snap } = cliente;
+  const data = snap.data()!;
+
+  if (data.prestamo_activo === true) {
+    return NextResponse.json(
+      { error: "No se puede eliminar un cliente con préstamo activo" },
+      { status: 400 }
+    );
+  }
+
+  const db = getAdminFirestore();
+  const adminId =
+    typeof data.adminId === "string" && data.adminId.trim()
+      ? data.adminId.trim()
+      : apiUser.uid;
+  const eraMoroso = data.moroso === true;
+
+  await ref.delete();
+
+  const usuarioRef = db
+    .collection(EMPRESAS_COLLECTION)
+    .doc(apiUser.empresaId)
+    .collection(USUARIOS_SUBCOLLECTION)
+    .doc(adminId);
+
+  const updates: Record<string, ReturnType<typeof FieldValue.increment>> = {
+    totalClientes: FieldValue.increment(-1),
+  };
+  if (eraMoroso) {
+    updates.totalMorosos = FieldValue.increment(-1);
+  }
+  await usuarioRef.set(updates, { merge: true });
+
+  return NextResponse.json({ ok: true });
+}

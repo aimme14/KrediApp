@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useMemo, useCallback, type ReactNode } from "react";
+import { useState, useEffect, useRef, useMemo, type ReactNode } from "react";
 import Link from "next/link";
 import { collection, query, where, onSnapshot } from "firebase/firestore";
 import { useAuth } from "@/context/AuthContext";
@@ -8,9 +8,7 @@ import { useAdminDashboard } from "@/context/AdminDashboardContext";
 import { db } from "@/lib/firebase";
 import {
   createGasto,
-  listPeriodosAdmin,
   type GastoItem,
-  type PeriodoAdminListaItem,
 } from "@/lib/empresa-api";
 import {
   sanitizeMontoDecimalCOP,
@@ -23,16 +21,7 @@ import {
   fechaDiaColombiaHoy,
   formatoFechaGastoColombia,
 } from "@/lib/colombia-day-bounds";
-import {
-  calcularTotalesGastosPorAlcance,
-  filtrarGastosPorFiltroContable,
-  mensajeGastosVaciosContable,
-  numeroPeriodoAdmin,
-  periodoAbiertoAdmin,
-  resolverRangoFiltroContable,
-  type GastosFiltroContable,
-} from "@/lib/gastos-periodo-filter";
-import { GastosPeriodoContableFilter } from "@/components/GastosPeriodoContableFilter";
+import { esGastoDelDiaColombia } from "@/lib/gastos-periodo-filter";
 import { OFFLINE_MSG, useOnline } from "@/hooks/useOnline";
 import dynamic from "next/dynamic";
 import { isAdminPanelRole } from "@/lib/admin-panel-role";
@@ -51,6 +40,8 @@ const TIPOS = [
   { value: "alimentacion", label: "Alimentación", icon: "alimentacion" },
   { value: "otro", label: "Otro", icon: "otro" },
 ] as const;
+
+const LISTA_PAGE_SIZE = 10;
 
 type TipoGasto = (typeof TIPOS)[number]["value"];
 
@@ -172,10 +163,9 @@ export default function GastosAdminPageContent() {
   const [creating, setCreating] = useState(false);
   const [motivoOverlay, setMotivoOverlay] = useState<string | null>(null);
   const [gastoDetalle, setGastoDetalle] = useState<GastoItem | null>(null);
-  const [periodos, setPeriodos] = useState<PeriodoAdminListaItem[]>([]);
-  const [periodosLoading, setPeriodosLoading] = useState(true);
-  const [filtroContable, setFiltroContable] = useState<GastosFiltroContable>({ modo: "actual" });
+  const [soloHoy, setSoloHoy] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [listaVisible, setListaVisible] = useState(LISTA_PAGE_SIZE);
   const [alcanceGasto, setAlcanceGasto] = useState<"admin" | "ruta">("admin");
   const [rutaIdGasto, setRutaIdGasto] = useState("");
   const [showModalGasto, setShowModalGasto] = useState(false);
@@ -187,61 +177,45 @@ export default function GastosAdminPageContent() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
-  const loadPeriodos = useCallback(() => {
-    if (!user) return;
-    setPeriodosLoading(true);
-    user.getIdToken().then((token) => {
-      listPeriodosAdmin(token)
-        .then(setPeriodos)
-        .catch(() => setPeriodos([]))
-        .finally(() => setPeriodosLoading(false));
+  const gastosOrdenados = useMemo(() => {
+    const hoy = fechaDiaColombiaHoy();
+    const base = soloHoy
+      ? gastos.filter((g) => esGastoDelDiaColombia(g.fecha, hoy))
+      : gastos;
+    const searchLower = searchQuery.trim().toLowerCase();
+    const filtrados = searchLower
+      ? base.filter((g) => {
+          const motivo = (g.descripcion ?? "").toLowerCase();
+          const tipo = (g.tipo ?? "").toLowerCase();
+          const hechoPor = (g.creadoPorNombre ?? "").toLowerCase();
+          const montoStr = (g.monto ?? 0).toFixed(2);
+          const fechaStr = formatoFechaGastoColombia(g.fecha ?? null).replace("—", "").trim().toLowerCase();
+          return (
+            motivo.includes(searchLower) ||
+            tipo.includes(searchLower) ||
+            hechoPor.includes(searchLower) ||
+            montoStr.includes(searchLower) ||
+            fechaStr.includes(searchLower)
+          );
+        })
+      : base;
+    return [...filtrados].sort((a, b) => {
+      const timeA = new Date(a.fecha ?? 0).getTime();
+      const timeB = new Date(b.fecha ?? 0).getTime();
+      return timeB - timeA;
     });
-  }, [user]);
+  }, [gastos, searchQuery, soloHoy]);
+
+  const gastosVisibles = useMemo(
+    () => gastosOrdenados.slice(0, listaVisible),
+    [gastosOrdenados, listaVisible]
+  );
+
+  const hayMasGastos = gastosVisibles.length < gastosOrdenados.length;
 
   useEffect(() => {
-    loadPeriodos();
-  }, [loadPeriodos]);
-
-  const rangoContable = useMemo(
-    () => resolverRangoFiltroContable(filtroContable, periodos),
-    [filtroContable, periodos]
-  );
-
-  const periodoAbierto = useMemo(() => periodoAbiertoAdmin(periodos), [periodos]);
-
-  const gastosPorPeriodo = useMemo(
-    () => filtrarGastosPorFiltroContable(gastos, filtroContable, periodos),
-    [gastos, filtroContable, periodos]
-  );
-
-  const totalesPeriodo = useMemo(
-    () => calcularTotalesGastosPorAlcance(gastosPorPeriodo),
-    [gastosPorPeriodo]
-  );
-
-  const searchLower = searchQuery.trim().toLowerCase();
-  const gastosFiltrados = searchLower
-    ? gastosPorPeriodo.filter((g) => {
-        const motivo = (g.descripcion ?? "").toLowerCase();
-        const tipo = (g.tipo ?? "").toLowerCase();
-        const hechoPor = (g.creadoPorNombre ?? "").toLowerCase();
-        const montoStr = (g.monto ?? 0).toFixed(2);
-        const fechaStr = formatoFechaGastoColombia(g.fecha ?? null).replace("—", "").trim().toLowerCase();
-        return (
-          motivo.includes(searchLower) ||
-          tipo.includes(searchLower) ||
-          hechoPor.includes(searchLower) ||
-          montoStr.includes(searchLower) ||
-          fechaStr.includes(searchLower)
-        );
-      })
-    : gastosPorPeriodo;
-
-  const gastosOrdenados = [...gastosFiltrados].sort((a, b) => {
-    const timeA = new Date(a.fecha ?? 0).getTime();
-    const timeB = new Date(b.fecha ?? 0).getTime();
-    return timeB - timeA;
-  });
+    setListaVisible(LISTA_PAGE_SIZE);
+  }, [searchQuery, soloHoy]);
 
   useEffect(() => {
     if (!db || !user || !profile?.empresaId) return;
@@ -500,50 +474,6 @@ export default function GastosAdminPageContent() {
     alcance === "ruta" ? "Ruta" : "Administrador";
 
   if (!profile || !isAdminPanelRole(profile.role)) return null;
-
-  const bannerPeriodo = (() => {
-    if (filtroContable.modo === "hoy") {
-      return {
-        tone: "neutral" as const,
-        titulo: "Gastos de hoy",
-        detalle: "",
-      };
-    }
-    if (filtroContable.modo === "todo") {
-      return {
-        tone: "neutral" as const,
-        titulo: "Todo el historial",
-        detalle: "",
-      };
-    }
-    if (filtroContable.modo === "actual" && !periodoAbierto) {
-      return {
-        tone: "warn" as const,
-        titulo: "Sin periodo abierto",
-        detalle: "",
-      };
-    }
-    if (!rangoContable?.periodo) {
-      return {
-        tone: "warn" as const,
-        titulo: "Periodo no disponible",
-        detalle: "",
-      };
-    }
-    const num = rangoContable.numeroPeriodo ?? numeroPeriodoAdmin(rangoContable.periodo.id, periodos);
-    if (rangoContable.periodo.estado === "abierto") {
-      return {
-        tone: "active" as const,
-        titulo: `Periodo #${num ?? "—"} · Abierto`,
-        detalle: "",
-      };
-    }
-    return {
-      tone: "neutral" as const,
-      titulo: `Periodo #${num ?? "—"} · Cerrado`,
-      detalle: "",
-    };
-  })();
 
   function renderAlcance(g: GastoItem): ReactNode {
     const a = (g.alcance ?? "").trim();
@@ -820,41 +750,21 @@ export default function GastosAdminPageContent() {
           <p className="gastos-empty-msg">No hay gastos registrados.</p>
         ) : (
           <>
-            <div
-              className={`gastos-admin-periodo-banner gastos-admin-periodo-banner--${bannerPeriodo.tone}`}
-              role="status"
-            >
-              <div className="gastos-admin-periodo-banner-text">
-                <strong>{bannerPeriodo.titulo}</strong>
-                {bannerPeriodo.detalle ? <span>{bannerPeriodo.detalle}</span> : null}
-              </div>
-            </div>
-
-            {filtroContable.modo !== "todo" && gastosPorPeriodo.length > 0 && (
-              <div className="gastos-admin-totales-grid" aria-label="Totales del periodo">
-                {[
-                  { label: "Gastos admin", value: totalesPeriodo.admin, tone: "admin" },
-                  { label: "Gastos ruta", value: totalesPeriodo.ruta, tone: "ruta" },
-                  { label: "Gastos trabajador", value: totalesPeriodo.empleado, tone: "empleado" },
-                  { label: "Total periodo", value: totalesPeriodo.total, tone: "total" },
-                ].map((item) => (
-                  <div
-                    key={item.label}
-                    className={`gastos-admin-total-stat gastos-admin-total-stat--${item.tone}`}
-                  >
-                    <p className="gastos-admin-total-label">{item.label}</p>
-                    <p className="gastos-admin-total-value">{formatMoneda(item.value)}</p>
-                  </div>
-                ))}
-              </div>
-            )}
-
             <div className="gastos-admin-toolbar">
-              <GastosPeriodoContableFilter
-                filtro={filtroContable}
-                onChange={setFiltroContable}
-                periodos={periodos}
-              />
+              <div
+                className="gastos-periodo-filter"
+                role="group"
+                aria-label="Filtrar gastos por día"
+              >
+                <button
+                  type="button"
+                  className={`gastos-periodo-btn ${soloHoy ? "gastos-periodo-btn-active" : ""}`}
+                  onClick={() => setSoloHoy((v) => !v)}
+                  aria-pressed={soloHoy}
+                >
+                  Hoy
+                </button>
+              </div>
               <div className="gastos-admin-search-field">
                 <span className="gastos-admin-search-icon" aria-hidden>
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -872,22 +782,25 @@ export default function GastosAdminPageContent() {
                   aria-label="Buscar en historial de gastos"
                 />
               </div>
-              {searchQuery.trim() ? (
+              {searchQuery.trim() || soloHoy ? (
                 <p className="gastos-resultados-msg gastos-admin-search-hint">
                   {gastosOrdenados.length} resultado{gastosOrdenados.length !== 1 ? "s" : ""}
+                  {soloHoy ? " de hoy" : ""}
                 </p>
               ) : null}
             </div>
-            {periodosLoading ? (
-              <p className="gastos-loading-msg">Cargando periodos...</p>
-            ) : gastosOrdenados.length === 0 ? (
+            {gastosOrdenados.length === 0 ? (
               <p className="gastos-empty-msg">
-                {mensajeGastosVaciosContable(filtroContable, periodos, !!searchQuery.trim())}
+                {searchQuery.trim()
+                  ? "Ningún gasto coincide con la búsqueda."
+                  : soloHoy
+                    ? "No hay gastos registrados hoy."
+                    : "No hay gastos registrados."}
               </p>
             ) : (
             <>
             <div className="gastos-admin-mobile-list" role="list" aria-label="Lista de gastos">
-              {gastosOrdenados.map((g) => (
+              {gastosVisibles.map((g) => (
                 <div key={`${g.rol}-${g.id}-mobile`} className="gastos-admin-mobile-row" role="listitem">
                   <span className="gastos-admin-mobile-nombre" title={g.creadoPorNombre ?? undefined}>
                     {g.creadoPorNombre ?? <span className="gastos-admin-dash">—</span>}
@@ -920,7 +833,7 @@ export default function GastosAdminPageContent() {
                   </tr>
                 </thead>
                 <tbody>
-                  {gastosOrdenados.map((g) => (
+                  {gastosVisibles.map((g) => (
                   <tr key={`${g.rol}-${g.id}`}>
                     <td className="gastos-col-nombre" title={g.creadoPorNombre ?? undefined}>{g.creadoPorNombre ?? <span className="gastos-admin-dash" title="Sin nombre">—</span>}</td>
                     <td className="gastos-col-fecha">{formatoFechaGastoColombia(g.fecha ?? null)}</td>
@@ -961,6 +874,17 @@ export default function GastosAdminPageContent() {
                 </tbody>
               </table>
             </div>
+            {hayMasGastos && (
+              <div className="gastos-admin-mostrar-mas">
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => setListaVisible((n) => n + LISTA_PAGE_SIZE)}
+                >
+                  Mostrar +{Math.min(LISTA_PAGE_SIZE, gastosOrdenados.length - gastosVisibles.length)}
+                </button>
+              </div>
+            )}
             </>
             )}
           </>

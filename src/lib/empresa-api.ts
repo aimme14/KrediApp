@@ -1028,6 +1028,15 @@ export async function updateCliente(
   if (!res.ok) throw new Error(data.error ?? "Error al actualizar cliente");
 }
 
+/** Elimina un cliente sin préstamo activo (solo admin). Decrementa totalClientes. */
+export async function deleteCliente(token: string, clienteId: string): Promise<void> {
+  const res = await fetchWithAuth(`/api/empresa/clientes/${encodeURIComponent(clienteId)}`, token, {
+    method: "DELETE",
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error ?? "Error al eliminar cliente");
+}
+
 export async function listPrestamos(token: string): Promise<PrestamoItem[]> {
   const res = await fetchWithAuth("/api/empresa/prestamos", token);
   const data = await res.json();
@@ -1416,6 +1425,26 @@ export async function setEmpleadoEnabled(
   const res = await fetchWithAuth(`/api/empresa/empleados/${encodeURIComponent(empleadoUid)}/enabled`, token, {
     method: "PATCH",
     body: JSON.stringify({ enabled }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error ?? "Error al actualizar empleado");
+}
+
+/** Actualiza datos de contacto del empleado (solo admin creador; no modifica correo, contraseña ni ruta). */
+export async function updateEmpleado(
+  token: string,
+  empleadoUid: string,
+  params: {
+    displayName: string;
+    lugar?: string;
+    direccion?: string;
+    telefono?: string;
+    cedula?: string;
+  }
+): Promise<void> {
+  const res = await fetchWithAuth(`/api/empresa/empleados/${encodeURIComponent(empleadoUid)}`, token, {
+    method: "PATCH",
+    body: JSON.stringify(params),
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error ?? "Error al actualizar empleado");
