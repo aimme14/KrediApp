@@ -42,6 +42,8 @@ export type PrestamoAdminCreateFormProps = {
   onNumeroCuotasChange: (value: string) => void;
   interes: string;
   onInteresChange: (value: string) => void;
+  fechaFinal: string;
+  onFechaFinalChange: (value: string) => void;
   montoNum: number;
   nCuotasVal: number;
   iVal: number;
@@ -81,6 +83,8 @@ export default function PrestamoAdminCreateForm({
   onNumeroCuotasChange,
   interes,
   onInteresChange,
+  fechaFinal,
+  onFechaFinalChange,
   montoNum,
   nCuotasVal,
   iVal,
@@ -346,6 +350,21 @@ export default function PrestamoAdminCreateForm({
           />
         </div>
       </div>
+      <div className="form-group" style={{ marginBottom: "1rem" }}>
+        <label htmlFor="prestamo-admin-fecha-final">Fecha final del préstamo</label>
+        <input
+          id="prestamo-admin-fecha-final"
+          type="date"
+          value={fechaFinal}
+          onChange={(e) => onFechaFinalChange(e.target.value)}
+          required
+          aria-label="Fecha final del préstamo"
+          style={{ width: "100%", maxWidth: "16rem", padding: "0.5rem" }}
+        />
+        <p style={{ margin: "0.25rem 0 0", fontSize: "0.75rem", color: "var(--text-muted)" }}>
+          Solo informativa — no afecta cierres ni cálculos. Se sugiere según cuotas y frecuencia.
+        </p>
+      </div>
       {totalAPagar > 0 && (
         <div
           className="form-group"
@@ -370,6 +389,11 @@ export default function PrestamoAdminCreateForm({
             <li>
               Número de cuotas: <strong>{nCuotasVal}</strong> ({modalidad})
             </li>
+            {fechaFinal ? (
+              <li>
+                Fecha final: <strong>{fechaFinal}</strong>
+              </li>
+            ) : null}
             <li>
               Cuota por pago: <strong>{formatMonedaPrestamoAdmin(cuotaPorPago)}</strong>
             </li>

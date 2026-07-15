@@ -102,7 +102,16 @@ export interface PrestamoDoc {
   saldoPendiente: number;
   estado: EstadoPrestamo;
   fechaInicio: Date;
-  fechaVencimiento: Date;
+  /**
+   * Fecha final informativa (YYYY-MM-DD). Manual al crear.
+   * No afecta cierres ni cálculos financieros.
+   */
+  fechaFinal?: string;
+  /**
+   * @deprecated Legado — fin previsto calculado. Leer con `effectiveFechaFinal`.
+   * Nuevos préstamos no lo escriben.
+   */
+  fechaVencimiento?: Date;
   /** Copia de cliente.moroso — sincronizado al marcar/desmarcar moroso. */
   moroso?: boolean;
   /** Suma acumulada de pérdidas/castigos parciales reconocidos sobre este préstamo. */

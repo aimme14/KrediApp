@@ -113,6 +113,13 @@ export type PrestamoItem = {
   saldoPendiente: number;
   estado: string;
   fechaInicio: string | null;
+  /**
+   * Fecha final efectiva (YYYY-MM-DD): `fechaFinal` manual o fallback de `fechaVencimiento` legado.
+   */
+  fechaFinal: string | null;
+  /**
+   * @deprecated Usar `fechaFinal`. Se mantiene poblado con el valor efectivo por compatibilidad.
+   */
   fechaVencimiento: string | null;
   /** Timestamp de creación del documento (ISO). Fallback visual: fechaInicio. */
   creadoEn?: string | null;
@@ -395,6 +402,8 @@ export type SolicitudPrestamoApi = {
   numeroCuotas: number;
   modalidad: string;
   fechaInicio: string;
+  /** Fecha final informativa (YYYY-MM-DD), requerida al solicitar. */
+  fechaFinal: string;
   adminId: string;
   rutaId: string;
   estado: string;
@@ -431,6 +440,8 @@ export async function solicitarPrestamoEmpleado(
     modalidad?: "diario" | "semanal" | "mensual";
     numeroCuotas: number;
     fechaInicio?: string;
+    /** Fecha final informativa (YYYY-MM-DD), obligatoria. */
+    fechaFinal: string;
   }
 ): Promise<ResultadoPrestamoEmpleadoApi> {
   const res = await fetchWithAuth("/api/empresa/solicitudes-prestamo", token, {
@@ -1206,6 +1217,8 @@ export async function createPrestamo(
     modalidad?: "diario" | "semanal" | "mensual";
     numeroCuotas: number;
     fechaInicio?: string;
+    /** Fecha final informativa (YYYY-MM-DD), obligatoria. */
+    fechaFinal: string;
     /** Clave de idempotencia — el backend deduplica si la operación ya fue procesada. */
     idempotencyKey?: string;
   }

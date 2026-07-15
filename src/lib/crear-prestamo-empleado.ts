@@ -10,43 +10,10 @@ import {
 import { applyDesembolsoPrestamoDesdeCajaEmpleadoEnTx } from "@/lib/ruta-financiera-admin";
 import { upsertCapitalRutaSnapshot } from "@/lib/capital-ruta-snapshot";
 import { recordDebitMovement } from "@/lib/financial-ledger";
-import {
-  getNextWorkingDay,
-  addWorkingDays,
-  FESTIVOS,
-} from "@/lib/fechas-laborables";
 import { validarClienteElegibleParaPrestamo } from "@/lib/prestamo-aprobacion-empleado";
+import { validateFechaFinalRequired } from "@/lib/prestamo-fecha-final";
+import { fechaDiaColombiaHoy } from "@/lib/colombia-day-bounds";
 import type { ModalidadPago } from "@/types/firestore";
-
-function addMonths(date: Date, months: number): Date {
-  const d = new Date(date);
-  d.setMonth(d.getMonth() + months);
-  return d;
-}
-
-function addDays(date: Date, days: number): Date {
-  const d = new Date(date);
-  d.setDate(d.getDate() + days);
-  return d;
-}
-
-function calcularFechaVencimiento(
-  mod: ModalidadPago,
-  inicio: Date,
-  numeroCuotas: number
-): Date {
-  if (mod === "diario") {
-    const primerDiaCobro = getNextWorkingDay(inicio, FESTIVOS);
-    return addWorkingDays(primerDiaCobro, numeroCuotas - 1, FESTIVOS);
-  }
-  if (mod === "semanal") {
-    const primerDiaCobro = getNextWorkingDay(inicio, FESTIVOS);
-    const ultimaCuotaCalendar = addDays(primerDiaCobro, (numeroCuotas - 1) * 7);
-    return getNextWorkingDay(ultimaCuotaCalendar, FESTIVOS);
-  }
-  const ultimaCuotaCalendar = addMonths(inicio, numeroCuotas - 1);
-  return getNextWorkingDay(ultimaCuotaCalendar, FESTIVOS);
-}
 
 export type CrearPrestamoEmpleadoParams = {
   empresaId: string;
@@ -60,6 +27,8 @@ export type CrearPrestamoEmpleadoParams = {
   modalidad: ModalidadPago;
   numeroCuotas: number;
   fechaInicio?: string;
+  /** Fecha final informativa (YYYY-MM-DD), obligatoria. */
+  fechaFinal: string;
   aprobacionTipo: "automatica" | "admin";
   aprobadoPorAdmin?: string | null;
   montoUltimoPrestamoReferencia?: number | null;
@@ -86,6 +55,7 @@ export async function crearPrestamoEmpleado(
     modalidad,
     numeroCuotas,
     fechaInicio,
+    fechaFinal,
     aprobacionTipo,
     aprobadoPorAdmin,
     montoUltimoPrestamoReferencia,
@@ -95,9 +65,16 @@ export async function crearPrestamoEmpleado(
     modalidad === "diario" || modalidad === "semanal" ? modalidad : "mensual";
   const interesPct = typeof interes === "number" ? interes : 0;
   const totalAPagar = monto * (1 + interesPct / 100);
-  const inicio = fechaInicio ? new Date(fechaInicio) : new Date();
+  const fechaInicioYmd =
+    typeof fechaInicio === "string" && fechaInicio.trim()
+      ? fechaInicio.trim().slice(0, 10)
+      : fechaDiaColombiaHoy();
+  const fechaFinalVal = validateFechaFinalRequired(fechaFinal, fechaInicioYmd);
+  if (!fechaFinalVal.ok) {
+    throw new Error(fechaFinalVal.error);
+  }
+  const inicio = new Date(fechaInicioYmd);
   inicio.setHours(0, 0, 0, 0);
-  const fechaVencimiento = calcularFechaVencimiento(mod, inicio, numeroCuotas);
 
   const prestamoRef = db
     .collection(EMPRESAS_COLLECTION)
@@ -174,7 +151,7 @@ export async function crearPrestamoEmpleado(
       estado: "activo",
       moroso: clienteMoroso,
       fechaInicio: inicio,
-      fechaVencimiento,
+      fechaFinal: fechaFinalVal.ymd,
       adelantoCuota: 0,
       intentosFallidos: 0,
       desembolsoDesde: "caja_empleado",

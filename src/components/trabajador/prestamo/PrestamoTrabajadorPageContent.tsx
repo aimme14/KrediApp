@@ -34,6 +34,8 @@ import {
   formatDebeSlashTotalCredito,
   formatFechaCreacionPrestamo,
 } from "@/lib/prestamo-display";
+import { sugerirFechaFinalYmd, formatFechaFinalDisplay } from "@/lib/prestamo-fecha-final";
+import { fechaDiaColombiaHoy } from "@/lib/colombia-day-bounds";
 import { OFFLINE_MSG, useOnline } from "@/hooks/useOnline";
 
 const ModalConfirmar = dynamic(
@@ -97,6 +99,8 @@ export default function PrestamoTrabajadorPageContent() {
   const [modalidad, setModalidad] = useState<"diario" | "semanal" | "mensual">("mensual");
   const [numeroCuotas, setNumeroCuotas] = useState("");
   const [interes, setInteres] = useState("");
+  const [fechaFinal, setFechaFinal] = useState("");
+  const [fechaFinalTouched, setFechaFinalTouched] = useState(false);
   const [monto, setMonto] = useState("");
   const [creating, setCreating] = useState(false);
   const [showModalPrestamo, setShowModalPrestamo] = useState(false);
@@ -128,6 +132,17 @@ export default function PrestamoTrabajadorPageContent() {
     setClienteId(id);
     setShowCreateForm(true);
   }, [searchParams, clientes, loading]);
+
+  useEffect(() => {
+    if (fechaFinalTouched) return;
+    const nCuotas = parseInt(numeroCuotas, 10);
+    if (!nCuotas || nCuotas < 1) {
+      setFechaFinal("");
+      return;
+    }
+    const sugerida = sugerirFechaFinalYmd(modalidad, fechaDiaColombiaHoy(), nCuotas);
+    setFechaFinal(sugerida ?? "");
+  }, [modalidad, numeroCuotas, fechaFinalTouched]);
 
   useEffect(() => {
     if (!db || !user || profile?.role !== "trabajador" || !profile?.empresaId) return;
@@ -281,6 +296,10 @@ export default function PrestamoTrabajadorPageContent() {
       setError("Selecciona un cliente");
       return;
     }
+    if (!fechaFinal.trim()) {
+      setError("Selecciona la fecha final del préstamo");
+      return;
+    }
     if (solicitudPendiente) {
       setError("Ya tienes una solicitud pendiente. Espera la respuesta del administrador.");
       return;
@@ -311,13 +330,16 @@ export default function PrestamoTrabajadorPageContent() {
         interes: iVal,
         modalidad,
         numeroCuotas: nCuotas,
-        fechaInicio: new Date().toISOString().slice(0, 10),
+        fechaInicio: fechaDiaColombiaHoy(),
+        fechaFinal: fechaFinal.trim(),
       });
       setClienteId("");
       setMonto("");
       setNumeroCuotas("");
       setInteres("");
       setModalidad("mensual");
+      setFechaFinal("");
+      setFechaFinalTouched(false);
       setEvaluacionAprobacion(null);
       setShowModalPrestamo(false);
       setConfirmarPrestamoMarcado(false);
@@ -661,9 +683,26 @@ export default function PrestamoTrabajadorPageContent() {
               style={{ width: "100%" }}
             />
             <p style={{ color: "var(--text-muted)", fontSize: "0.75rem", marginTop: "0.25rem", marginBottom: 0 }}>
-
             </p>
           </div>
+        </div>
+        <div className="form-group" style={{ marginBottom: "1rem" }}>
+          <label htmlFor="prestamo-trab-fecha-final">Fecha final del préstamo</label>
+          <input
+            id="prestamo-trab-fecha-final"
+            type="date"
+            value={fechaFinal}
+            onChange={(e) => {
+              setFechaFinalTouched(true);
+              setFechaFinal(e.target.value);
+            }}
+            required
+            aria-label="Fecha final del préstamo"
+            style={{ width: "100%", maxWidth: "16rem" }}
+          />
+          <p style={{ margin: "0.25rem 0 0", fontSize: "0.75rem", color: "var(--text-muted)" }}>
+            Solo informativa — no afecta cierres ni cálculos. Se sugiere según cuotas y frecuencia.
+          </p>
         </div>
         <div
           style={{
@@ -729,6 +768,9 @@ export default function PrestamoTrabajadorPageContent() {
               <li>Interés: <strong>{formatInteresResumenPct(iVal)}%</strong></li>
               <li>Total a pagar: <strong>{formatMoneda(totalAPagar)}</strong></li>
               <li>Número de cuotas: <strong>{nCuotasVal}</strong> ({modalidad})</li>
+              {fechaFinal ? (
+                <li>Fecha final: <strong>{formatFechaFinalDisplay(fechaFinal)}</strong></li>
+              ) : null}
               <li>Cuota por pago: <strong>{formatMoneda(cuotaPorPago)}</strong></li>
             </ul>
           </div>
@@ -963,6 +1005,10 @@ export default function PrestamoTrabajadorPageContent() {
           </p>
           <p>
             Cuotas: <strong>{nCuotasVal} ({modalidadLabel})</strong>
+          </p>
+          <p>
+            Fecha final:{" "}
+            <strong>{fechaFinal ? formatFechaFinalDisplay(fechaFinal) : "—"}</strong>
           </p>
           <p>
             Total a pagar: <strong>$ {formatMoneda(totalAPagar)}</strong>

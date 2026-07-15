@@ -21,6 +21,8 @@ import {
   fechaRelevantePrestamo,
   calcularDuracionDias,
 } from "@/lib/prestamo-display";
+import { formatFechaFinalDisplay, sugerirFechaFinalYmd } from "@/lib/prestamo-fecha-final";
+import { fechaDiaColombiaHoy } from "@/lib/colombia-day-bounds";
 import {
   mensajePrestamosVaciosContable,
   numeroPeriodoAdmin,
@@ -221,6 +223,8 @@ export default function PrestamoAdminPageContent() {
   const [numeroCuotas, setNumeroCuotas] = useState("");
   const [interes, setInteres] = useState("");
   const [monto, setMonto] = useState("");
+  const [fechaFinal, setFechaFinal] = useState("");
+  const [fechaFinalTouched, setFechaFinalTouched] = useState(false);
   const [creating, setCreating] = useState(false);
   const [showModalPrestamo, setShowModalPrestamo] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
@@ -240,7 +244,18 @@ export default function PrestamoAdminPageContent() {
 
   useEffect(() => {
     setConfirmarMontoAlto(false);
-  }, [rutaIdForm, clienteId, monto, numeroCuotas, interes, modalidad]);
+  }, [rutaIdForm, clienteId, monto, numeroCuotas, interes, modalidad, fechaFinal]);
+
+  useEffect(() => {
+    if (fechaFinalTouched) return;
+    const nCuotas = parseInt(numeroCuotas, 10);
+    if (!nCuotas || nCuotas < 1) {
+      setFechaFinal("");
+      return;
+    }
+    const sugerida = sugerirFechaFinalYmd(modalidad, fechaDiaColombiaHoy(), nCuotas);
+    setFechaFinal(sugerida ?? "");
+  }, [modalidad, numeroCuotas, fechaFinalTouched]);
 
   const abrirFormularioCrear = useCallback(() => {
     // Nueva key por cada intento de creación; retiros en la misma sesión reusan la misma key
@@ -249,6 +264,7 @@ export default function PrestamoAdminPageContent() {
     setConfirmarModalPrestamo(false);
     setShowModalPrestamo(false);
     setError(null);
+    setFechaFinalTouched(false);
     setShowCreateForm(true);
   }, []);
 
@@ -376,6 +392,10 @@ export default function PrestamoAdminPageContent() {
       setError("Selecciona un cliente");
       return;
     }
+    if (!fechaFinal.trim()) {
+      setError("Selecciona la fecha final del préstamo");
+      return;
+    }
     setConfirmarModalPrestamo(false);
     setError(null);
     setShowModalPrestamo(true);
@@ -406,7 +426,8 @@ export default function PrestamoAdminPageContent() {
         interes: parseInteresPct(interes),
         modalidad,
         numeroCuotas: nCuotas,
-        fechaInicio: new Date().toISOString().slice(0, 10),
+        fechaInicio: fechaDiaColombiaHoy(),
+        fechaFinal: fechaFinal.trim(),
         idempotencyKey,
       });
       prestamoCreateKeyRef.current = null;
@@ -416,6 +437,8 @@ export default function PrestamoAdminPageContent() {
       setNumeroCuotas("");
       setInteres("");
       setModalidad("mensual");
+      setFechaFinal("");
+      setFechaFinalTouched(false);
       setConfirmarMontoAlto(false);
       setConfirmarModalPrestamo(false);
       setShowModalPrestamo(false);
@@ -690,6 +713,11 @@ export default function PrestamoAdminPageContent() {
           onNumeroCuotasChange={setNumeroCuotas}
           interes={interes}
           onInteresChange={setInteres}
+          fechaFinal={fechaFinal}
+          onFechaFinalChange={(v) => {
+            setFechaFinalTouched(true);
+            setFechaFinal(v);
+          }}
           montoNum={montoNum}
           nCuotasVal={nCuotasVal}
           iVal={iVal}
@@ -1201,6 +1229,10 @@ export default function PrestamoAdminPageContent() {
           </p>
           <p>
             Cuotas: <strong>{nCuotasVal} ({modalidadLabel})</strong>
+          </p>
+          <p>
+            Fecha final:{" "}
+            <strong>{fechaFinal ? formatFechaFinalDisplay(fechaFinal) : "—"}</strong>
           </p>
           <p>
             Total a pagar: <strong>$ {formatMonedaPrestamoAdmin(totalAPagar)}</strong>

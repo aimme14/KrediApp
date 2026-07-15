@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { FieldValue } from "firebase-admin/firestore";
+import { FieldValue, type DocumentSnapshot } from "firebase-admin/firestore";
 import { getAdminFirestore } from "@/lib/firebase-admin";
 import { getApiUser } from "@/lib/api-auth";
 import {
@@ -18,11 +18,6 @@ import {
 } from "@/lib/crear-prestamo-empleado";
 import { recordDebitMovement } from "@/lib/financial-ledger";
 import {
-  getNextWorkingDay,
-  addWorkingDays,
-  FESTIVOS,
-} from "@/lib/fechas-laborables";
-import {
   startIdempotentOperation,
   finishIdempotentOperation,
 } from "@/lib/financial-idempotency";
@@ -31,6 +26,11 @@ import { evaluarAprobacionPrestamoEmpleado } from "@/lib/prestamo-aprobacion-emp
 import { normalizeEstadoPrestamo } from "@/lib/prestamo-estado";
 import { withRateLimit } from "@/lib/with-rate-limit";
 import { financialWriteLimiterUser } from "@/lib/rate-limit";
+import {
+  effectiveFechaFinal,
+  validateFechaFinalRequired,
+} from "@/lib/prestamo-fecha-final";
+import { fechaDiaColombiaHoy } from "@/lib/colombia-day-bounds";
 
 
 /** GET: lista préstamos. Empleado: los de su ruta. Admin/Jefe: los suyos */
@@ -49,6 +49,7 @@ export async function GET(request: NextRequest) {
 
   const prestamos = snap.docs.map((d) => {
     const data = d.data();
+    const fechaFinal = effectiveFechaFinal(data);
     return {
       id: d.id,
       clienteId: data.clienteId ?? "",
@@ -64,7 +65,8 @@ export async function GET(request: NextRequest) {
       estado: normalizeEstadoPrestamo(data.estado),
       moroso: data.moroso === true,
       fechaInicio: data.fechaInicio?.toDate?.()?.toISOString?.() ?? null,
-      fechaVencimiento: data.fechaVencimiento?.toDate?.()?.toISOString?.() ?? null,
+      fechaFinal,
+      fechaVencimiento: fechaFinal,
       creadoEn: data.creadoEn?.toDate?.()?.toISOString?.() ?? null,
       /** Adelanto aplicado a la(s) siguiente(s) cuota(s). Si > 0, la próxima sugerencia es valorCuota - (adelanto % valorCuota). */
       adelantoCuota: data.adelantoCuota ?? 0,
@@ -75,18 +77,6 @@ export async function GET(request: NextRequest) {
   });
 
   return NextResponse.json({ prestamos });
-}
-
-function addMonths(date: Date, months: number): Date {
-  const d = new Date(date);
-  d.setMonth(d.getMonth() + months);
-  return d;
-}
-
-function addDays(date: Date, days: number): Date {
-  const d = new Date(date);
-  d.setDate(d.getDate() + days);
-  return d;
 }
 
 /** POST: crea un préstamo */
@@ -106,6 +96,7 @@ async function postHandler(request: NextRequest) {
     modalidad,
     numeroCuotas,
     fechaInicio,
+    fechaFinal,
     idempotencyKey,
   } = body as {
     clienteId?: string;
@@ -116,6 +107,7 @@ async function postHandler(request: NextRequest) {
     modalidad?: ModalidadPago;
     numeroCuotas?: number;
     fechaInicio?: string;
+    fechaFinal?: string;
     idempotencyKey?: string;
   };
 
@@ -156,6 +148,16 @@ async function postHandler(request: NextRequest) {
   if (typeof numeroCuotas !== "number" || numeroCuotas < 1) {
     return finalize(400, { error: "Número de cuotas debe ser al menos 1" });
   }
+
+  const fechaInicioYmd =
+    typeof fechaInicio === "string" && fechaInicio.trim()
+      ? fechaInicio.trim().slice(0, 10)
+      : fechaDiaColombiaHoy();
+  const fechaFinalVal = validateFechaFinalRequired(fechaFinal, fechaInicioYmd);
+  if (!fechaFinalVal.ok) {
+    return finalize(400, { error: fechaFinalVal.error });
+  }
+  const fechaFinalYmd = fechaFinalVal.ymd;
 
   if (apiUser.role === "empleado") {
     const modEmp: ModalidadPago =
@@ -227,10 +229,8 @@ async function postHandler(request: NextRequest) {
         interes: interesPctEmp,
         modalidad: modEmp,
         numeroCuotas,
-        fechaInicio:
-          typeof fechaInicio === "string" && fechaInicio.trim()
-            ? fechaInicio.trim()
-            : new Date().toISOString().slice(0, 10),
+        fechaInicio: fechaInicioYmd,
+        fechaFinal: fechaFinalYmd,
         aprobacionTipo: "automatica",
         aprobadoPorAdmin: null,
         montoUltimoPrestamoReferencia: evaluacion.montoUltimoPrestamo,
@@ -285,22 +285,8 @@ async function postHandler(request: NextRequest) {
   const mod: ModalidadPago = modalidad === "diario" || modalidad === "semanal" ? modalidad : "mensual";
   const interesPct = typeof interes === "number" ? interes : 0;
   const totalAPagar = monto * (1 + interesPct / 100);
-  const inicio = fechaInicio ? new Date(fechaInicio) : new Date();
+  const inicio = new Date(fechaInicioYmd);
   inicio.setHours(0, 0, 0, 0);
-
-  // Fin previsto (referencia, no forzado): solo días laborables (lun-sáb, sin festivos)
-  let fechaVencimiento: Date;
-  if (mod === "diario") {
-    const primerDiaCobro = getNextWorkingDay(inicio, FESTIVOS);
-    fechaVencimiento = addWorkingDays(primerDiaCobro, numeroCuotas - 1, FESTIVOS);
-  } else if (mod === "semanal") {
-    const primerDiaCobro = getNextWorkingDay(inicio, FESTIVOS);
-    const ultimaCuotaCalendar = addDays(primerDiaCobro, (numeroCuotas - 1) * 7);
-    fechaVencimiento = getNextWorkingDay(ultimaCuotaCalendar, FESTIVOS);
-  } else {
-    const ultimaCuotaCalendar = addMonths(inicio, numeroCuotas - 1);
-    fechaVencimiento = getNextWorkingDay(ultimaCuotaCalendar, FESTIVOS);
-  }
 
   const ref = db
     .collection(EMPRESAS_COLLECTION)
@@ -339,7 +325,7 @@ async function postHandler(request: NextRequest) {
       const clienteSnapTx = await tx.get(clienteRef);
       if (!clienteSnapTx.exists) throw new Error("CLIENTE_NOT_FOUND");
 
-      let rutaSnapTx: FirebaseFirestore.DocumentSnapshot | null = null;
+      let rutaSnapTx: DocumentSnapshot | null = null;
       if (rutaRefPrestamo) {
         rutaSnapTx = await tx.get(rutaRefPrestamo);
       }
@@ -380,7 +366,7 @@ async function postHandler(request: NextRequest) {
         estado: "activo",
         moroso: clienteData.moroso === true,
         fechaInicio: inicio,
-        fechaVencimiento,
+        fechaFinal: fechaFinalYmd,
         adelantoCuota: 0,
         creadoEn: FieldValue.serverTimestamp(),
         ...(rutaIdPrestamo ? { desembolsoDesde: "caja_ruta" as const } : {}),

@@ -32,6 +32,10 @@ import {
   fechaDiaCalendarioDesdeISO,
   fechaDiaColombiaHoy,
 } from "@/lib/colombia-day-bounds";
+import {
+  calcularRitmoFechaFinal,
+  formatFechaFinalDisplay,
+} from "@/lib/prestamo-fecha-final";
 import { isAdminPanelRole } from "@/lib/admin-panel-role";
 import {
   clearCobroSnapshot,
@@ -345,6 +349,8 @@ function CobrarClientePageContent() {
   }, [montoInput]);
 
   const saldoPendiente = prestamo?.saldoPendiente ?? 0;
+  const montoPrestado = prestamo?.monto ?? 0;
+  const pagosAtrasados = ultimosPagos.filter((p) => p.tipo === "no_pago").length;
   const montoAplicar = Math.min(montoNum, saldoPendiente);
 
   const totalAPagar = prestamo?.totalAPagar ?? 0;
@@ -354,6 +360,20 @@ function CobrarClientePageContent() {
       ? Math.min(numeroCuotas, Math.ceil((saldoPendiente / totalAPagar) * numeroCuotas))
       : numeroCuotas;
   const valorCuotaFija = numeroCuotas > 0 ? totalAPagar / numeroCuotas : 0;
+
+  const ritmoFechaFinal = useMemo(() => {
+    const fechaFinalYmd = prestamo?.fechaFinal ?? null;
+    if (!fechaFinalYmd) return null;
+    const fechaInicioYmd =
+      fechaDiaCalendarioDesdeISO(prestamo?.fechaInicio ?? null) ??
+      fechaDiaCalendarioDesdeISO(prestamo?.creadoEn ?? null);
+    return calcularRitmoFechaFinal({
+      fechaFinalYmd,
+      fechaInicioYmd,
+      numeroCuotas,
+      cuotasPendientes,
+    });
+  }, [prestamo, numeroCuotas, cuotasPendientes]);
 
   const desglosePerdida = useMemo(() => {
     if (!prestamo) return null;
@@ -888,12 +908,12 @@ function CobrarClientePageContent() {
           <span className="cobrar-metrica-value">{formatCurrencyCobro(saldoPendiente)}</span>
         </div>
         <div className="cobrar-metrica">
-          <span className="cobrar-metrica-label">Número de cuotas</span>
-          <span className="cobrar-metrica-value">{numeroCuotas}</span>
+          <span className="cobrar-metrica-label">Monto prestado</span>
+          <span className="cobrar-metrica-value">{formatCurrencyCobro(montoPrestado)}</span>
         </div>
         <div className="cobrar-metrica">
-          <span className="cobrar-metrica-label">Cuotas pendientes</span>
-          <span className="cobrar-metrica-value">{cuotasPendientes}</span>
+          <span className="cobrar-metrica-label">Número de cuotas</span>
+          <span className="cobrar-metrica-value">{numeroCuotas}</span>
         </div>
         <div className="cobrar-metrica">
           <span className="cobrar-metrica-label">Valor de la cuota</span>
@@ -901,7 +921,60 @@ function CobrarClientePageContent() {
             {valorCuotaFija > 0 ? formatCurrencyCobro(Math.round(valorCuotaFija)) : "—"}
           </span>
         </div>
+        <div className="cobrar-metrica">
+          <span className="cobrar-metrica-label">Cuotas pendientes</span>
+          <span className="cobrar-metrica-value">{cuotasPendientes}</span>
+        </div>
+        <div className="cobrar-metrica">
+          <span className="cobrar-metrica-label">Pagos atrasados</span>
+          <span className="cobrar-metrica-value">{pagosAtrasados}</span>
+        </div>
       </div>
+
+      {ritmoFechaFinal && (
+        <div className="cobrar-fecha-final" aria-label="Fecha final del préstamo">
+          <div className="cobrar-fecha-final-row">
+            <span className="cobrar-fecha-final-label">Fecha final</span>
+            <span className="cobrar-fecha-final-value">
+              {formatFechaFinalDisplay(ritmoFechaFinal.fechaFinalYmd)}
+            </span>
+          </div>
+          <div className="cobrar-fecha-final-row">
+            <span className="cobrar-fecha-final-label">Días restantes</span>
+            <span
+              className={
+                ritmoFechaFinal.diasRestantes < 0
+                  ? "cobrar-fecha-final-value cobrar-fecha-final-value--vencido"
+                  : "cobrar-fecha-final-value"
+              }
+            >
+              {ritmoFechaFinal.diasRestantes < 0
+                ? `Venció hace ${Math.abs(ritmoFechaFinal.diasRestantes)} día${
+                    Math.abs(ritmoFechaFinal.diasRestantes) === 1 ? "" : "s"
+                  }`
+                : ritmoFechaFinal.diasRestantes === 0
+                  ? "Vence hoy"
+                  : `${ritmoFechaFinal.diasRestantes} día${
+                      ritmoFechaFinal.diasRestantes === 1 ? "" : "s"
+                    }`}
+            </span>
+          </div>
+          {ritmoFechaFinal.alDia != null && (
+            <div className="cobrar-fecha-final-row">
+              <span className="cobrar-fecha-final-label">Ritmo de pago</span>
+              <span
+                className={
+                  ritmoFechaFinal.alDia
+                    ? "cobrar-fecha-final-value cobrar-fecha-final-value--aldia"
+                    : "cobrar-fecha-final-value cobrar-fecha-final-value--atrasado"
+                }
+              >
+                {ritmoFechaFinal.alDia ? "Al día" : "Atrasado"}
+              </span>
+            </div>
+          )}
+        </div>
+      )}
 
       <form onSubmit={handleRevisarCobro} className="cobrar-form">
         <div className="form-group">

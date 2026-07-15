@@ -33,6 +33,7 @@ import {
 } from "@/lib/empresa-api";
 import { ESTADO_PRESTAMO_ABIERTO, normalizeEstadoPrestamo } from "@/lib/prestamo-estado";
 import { useDeferredMount } from "@/hooks/useDeferredMount";
+import { effectiveFechaFinal } from "@/lib/prestamo-fecha-final";
 
 const EMPRESAS_COLLECTION = "empresas";
 const PRESTAMOS_SUBCOLLECTION = "prestamos";
@@ -86,6 +87,7 @@ function enriquecerMorosoPrestamo(
 
 function mapPrestamo(d: QueryDocumentSnapshot): PrestamoItem {
   const data = d.data();
+  const fechaFinal = effectiveFechaFinal(data);
   return {
     id: d.id,
     clienteId: data.clienteId ?? "",
@@ -100,7 +102,8 @@ function mapPrestamo(d: QueryDocumentSnapshot): PrestamoItem {
     saldoPendiente: data.saldoPendiente ?? 0,
     estado: normalizeEstadoPrestamo(data.estado),
     fechaInicio: data.fechaInicio?.toDate?.()?.toISOString?.() ?? null,
-    fechaVencimiento: data.fechaVencimiento?.toDate?.()?.toISOString?.() ?? null,
+    fechaFinal,
+    fechaVencimiento: fechaFinal,
     creadoEn: data.creadoEn?.toDate?.()?.toISOString?.() ?? null,
     adelantoCuota: data.adelantoCuota ?? 0,
     ultimoPagoFecha: data.ultimoPagoFecha?.toDate?.()?.toISOString?.() ?? null,

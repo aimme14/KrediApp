@@ -11,25 +11,10 @@ import {
   RUTAS_SUBCOLLECTION,
 } from "@/lib/empresas-db";
 import { recordDebitMovement } from "@/lib/financial-ledger";
-import {
-  getNextWorkingDay,
-  addWorkingDays,
-  FESTIVOS,
-} from "@/lib/fechas-laborables";
 import type { ModalidadPago } from "@/types/firestore";
 import { isAdminPanelApiUser } from "@/lib/admin-panel-role";
-
-function addMonths(date: Date, months: number): Date {
-  const d = new Date(date);
-  d.setMonth(d.getMonth() + months);
-  return d;
-}
-
-function addDays(date: Date, days: number): Date {
-  const d = new Date(date);
-  d.setDate(d.getDate() + days);
-  return d;
-}
+import { validateFechaFinalRequired, sugerirFechaFinalYmd } from "@/lib/prestamo-fecha-final";
+import { fechaDiaColombiaHoy } from "@/lib/colombia-day-bounds";
 
 export async function POST(
   request: NextRequest,
@@ -77,25 +62,29 @@ export async function POST(
   const numeroCuotas = typeof sol.numeroCuotas === "number" ? sol.numeroCuotas : 1;
   const modalidad = (sol.modalidad as ModalidadPago) ?? "mensual";
   const fechaInicio =
-    typeof sol.fechaInicio === "string"
-      ? sol.fechaInicio
-      : new Date().toISOString().slice(0, 10);
+    typeof sol.fechaInicio === "string" && sol.fechaInicio.trim()
+      ? sol.fechaInicio.trim().slice(0, 10)
+      : fechaDiaColombiaHoy();
+  let fechaFinalVal = validateFechaFinalRequired(sol.fechaFinal, fechaInicio);
+  if (!fechaFinalVal.ok) {
+    // Solicitudes pendientes creadas antes de exigir fechaFinal: sugerir por cuotas.
+    const sugerida = sugerirFechaFinalYmd(modalidad, fechaInicio, numeroCuotas);
+    fechaFinalVal = validateFechaFinalRequired(sugerida, fechaInicio);
+  }
+  if (!fechaFinalVal.ok) {
+    return NextResponse.json(
+      {
+        error:
+          "La solicitud no tiene fecha final válida. Pide al trabajador que vuelva a solicitar el préstamo.",
+      },
+      { status: 400 }
+    );
+  }
+  const fechaFinalYmd = fechaFinalVal.ymd;
   const totalAPagar = Math.round(monto * (1 + interes / 100) * 100) / 100;
 
   const inicio = new Date(fechaInicio);
   inicio.setHours(0, 0, 0, 0);
-  let fechaVencimiento: Date;
-  if (modalidad === "diario") {
-    const primerDiaCobro = getNextWorkingDay(inicio, FESTIVOS);
-    fechaVencimiento = addWorkingDays(primerDiaCobro, numeroCuotas - 1, FESTIVOS);
-  } else if (modalidad === "semanal") {
-    const primerDiaCobro = getNextWorkingDay(inicio, FESTIVOS);
-    const ultimaCuotaCalendar = addDays(primerDiaCobro, (numeroCuotas - 1) * 7);
-    fechaVencimiento = getNextWorkingDay(ultimaCuotaCalendar, FESTIVOS);
-  } else {
-    const ultimaCuotaCalendar = addMonths(inicio, numeroCuotas - 1);
-    fechaVencimiento = getNextWorkingDay(ultimaCuotaCalendar, FESTIVOS);
-  }
 
   let ledgerBalanceAfter: number | undefined;
 
@@ -195,7 +184,7 @@ export async function POST(
         estado: "activo",
         moroso: clienteData.moroso === true,
         fechaInicio: inicio,
-        fechaVencimiento,
+        fechaFinal: fechaFinalYmd,
         adelantoCuota: 0,
         intentosFallidos: 0,
         desembolsoDesde: "caja_empleado",

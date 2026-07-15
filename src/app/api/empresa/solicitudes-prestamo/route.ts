@@ -23,6 +23,8 @@ import {
   crearPrestamoEmpleado,
   mapCrearPrestamoEmpleadoError,
 } from "@/lib/crear-prestamo-empleado";
+import { validateFechaFinalRequired } from "@/lib/prestamo-fecha-final";
+import { fechaDiaColombiaHoy } from "@/lib/colombia-day-bounds";
 
 function serializeSolicitud(s: SolicitudPrestamoDoc) {
   return {
@@ -36,6 +38,7 @@ function serializeSolicitud(s: SolicitudPrestamoDoc) {
     numeroCuotas: s.numeroCuotas,
     modalidad: s.modalidad,
     fechaInicio: s.fechaInicio,
+    fechaFinal: s.fechaFinal,
     adminId: s.adminId,
     rutaId: s.rutaId,
     estado: s.estado,
@@ -95,6 +98,7 @@ export async function POST(request: NextRequest) {
     numeroCuotas?: number;
     modalidad?: string;
     fechaInicio?: string;
+    fechaFinal?: string;
   };
 
   const clienteId = body.clienteId?.trim();
@@ -115,8 +119,13 @@ export async function POST(request: NextRequest) {
   const interes = typeof body.interes === "number" ? body.interes : 0;
   const fechaInicio =
     typeof body.fechaInicio === "string" && body.fechaInicio.trim()
-      ? body.fechaInicio.trim()
-      : new Date().toISOString().slice(0, 10);
+      ? body.fechaInicio.trim().slice(0, 10)
+      : fechaDiaColombiaHoy();
+  const fechaFinalVal = validateFechaFinalRequired(body.fechaFinal, fechaInicio);
+  if (!fechaFinalVal.ok) {
+    return NextResponse.json({ error: fechaFinalVal.error }, { status: 400 });
+  }
+  const fechaFinal = fechaFinalVal.ymd;
 
   const db = getAdminFirestore();
   const montoSolicitud = body.monto;
@@ -213,6 +222,7 @@ export async function POST(request: NextRequest) {
         modalidad,
         numeroCuotas: body.numeroCuotas,
         fechaInicio,
+        fechaFinal,
         aprobacionTipo: "automatica",
         aprobadoPorAdmin: null,
         montoUltimoPrestamoReferencia: evaluacion.montoUltimoPrestamo,
@@ -257,6 +267,7 @@ export async function POST(request: NextRequest) {
       numeroCuotas: body.numeroCuotas,
       modalidad,
       fechaInicio,
+      fechaFinal,
     });
 
     void (async () => {

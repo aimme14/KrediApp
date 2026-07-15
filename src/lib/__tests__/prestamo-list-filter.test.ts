@@ -21,6 +21,7 @@ function prestamo(
     totalAPagar: 110_000,
     saldoPendiente: 50_000,
     fechaInicio: "2026-06-01",
+    fechaFinal: null,
     fechaVencimiento: null,
     ...partial,
   };

@@ -114,9 +114,14 @@ function isMismoDia(isoDate: string | null | undefined): boolean {
   return isHoy(d);
 }
 
-/** Convierte fecha de API (ISO string o null) a Date | null */
+/** Convierte fecha de API (ISO / YYYY-MM-DD) a Date | null */
 function toDate(value: string | null | undefined): Date | null {
   if (!value) return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    const [y, m, d] = value.split("-").map(Number);
+    const local = new Date(y, m - 1, d);
+    return Number.isNaN(local.getTime()) ? null : local;
+  }
   const d = new Date(value);
   return Number.isNaN(d.getTime()) ? null : d;
 }
@@ -134,7 +139,7 @@ function buildClientesRuta(
   const map: ClienteRuta[] = [];
   for (const p of prestamosPendientes) {
     const c = mapClientesById.get(p.clienteId);
-    const fechaV = toDate(p.fechaVencimiento ?? null);
+    const fechaV = toDate(p.fechaFinal ?? p.fechaVencimiento ?? null);
     const intentosFallidos = p.intentosFallidos ?? 0;
     const diasVencidos = calcularDiasVencidos(fechaV);
     const prioridad = calcularPrioridadCobro(fechaV, intentosFallidos);

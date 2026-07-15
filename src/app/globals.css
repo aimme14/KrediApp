@@ -11583,6 +11583,34 @@ a.admin-inicio-link-btn {
 .cobrar-metrica-total { grid-column: 1 / -1; font-weight: 600; }
 .cobrar-metrica-label { display: block; font-size: 0.7rem; color: var(--text-muted); margin-bottom: 0.15rem; line-height: 1.25; }
 .cobrar-metrica-value { font-size: 0.99rem; line-height: 1.2; }
+.cobrar-fecha-final {
+  padding: 0.65rem 0.75rem;
+  margin-bottom: 0.8rem;
+  background: var(--input-bg);
+  border-radius: 7px;
+  border: 1px solid var(--card-border);
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.cobrar-fecha-final-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.75rem;
+}
+.cobrar-fecha-final-label {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+.cobrar-fecha-final-value {
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-align: right;
+}
+.cobrar-fecha-final-value--vencido { color: var(--danger, #dc2626); }
+.cobrar-fecha-final-value--aldia { color: var(--success-fg, #166534); }
+.cobrar-fecha-final-value--atrasado { color: var(--warning, #ca8a04); }
 .cobrar-form .form-group { margin-bottom: 0.7rem; }
 .cobrar-form .form-group label { font-size: 0.9rem; }
 .cobrar-input, .cobrar-select { width: 100%; padding: 0.4rem 0.65rem; border-radius: 6px; border: 1px solid var(--input-border); background: var(--input-bg); color: var(--text); }

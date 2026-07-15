@@ -68,6 +68,7 @@ export default function SolicitudesPrestamoPageContent() {
             numeroCuotas: typeof x.numeroCuotas === "number" ? x.numeroCuotas : 0,
             modalidad: x.modalidad ?? "mensual",
             fechaInicio: typeof x.fechaInicio === "string" ? x.fechaInicio : "",
+            fechaFinal: typeof x.fechaFinal === "string" ? x.fechaFinal : "",
             adminId: x.adminId ?? "",
             rutaId: x.rutaId ?? "",
             estado: x.estado ?? "pendiente",
@@ -215,6 +216,12 @@ export default function SolicitudesPrestamoPageContent() {
                         {s.numeroCuotas} {s.modalidad}s
                       </strong>
                     </span>
+                    {s.fechaFinal ? (
+                      <span>
+                        <span style={{ color: "var(--text-muted)" }}>Fecha final: </span>
+                        <strong>{s.fechaFinal}</strong>
+                      </span>
+                    ) : null}
                     <span>
                       <span style={{ color: "var(--text-muted)" }}>Cuota: </span>
                       <strong>
