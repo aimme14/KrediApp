@@ -743,10 +743,10 @@ export default function PrestamoTrabajadorPageContent() {
             style={{ width: "100%", maxWidth: "16rem" }}
           />
           <p style={{ margin: "0.25rem 0 0", fontSize: "0.75rem", color: "var(--text-muted)" }}>
-            Solo informativa — no afecta cierres ni cálculos.
+            
             {diasCobroModo === "personalizado"
               ? " Elige la fecha manualmente."
-              : " Se sugiere según cuotas, frecuencia y días de cobro."}
+              : ""}
           </p>
         </div>
         <div

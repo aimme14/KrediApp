@@ -31,8 +31,8 @@ export const DIAS_COBRO_MODO_OPTIONS: {
   label: string;
   hint: string;
 }[] = [
-  { value: "6", label: "6 días (lun–sáb)", hint: "Cuenta desde el próximo día hábil (no el del desembolso); salta domingos" },
-  { value: "5", label: "5 días (lun–vie)", hint: "Cuenta desde el próximo día hábil (no el del desembolso); salta sábados y domingos" },
+  { value: "6", label: "6 días (lun–sáb)", hint: "" },
+  { value: "5", label: "5 días (lun–vie)", hint: "" },
   {
     value: "personalizado",
     label: "Personalizado",
