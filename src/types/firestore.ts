@@ -88,6 +88,12 @@ export type CierrePrestamoTipo = "cobro" | "castigo";
 /** Modalidad de pago */
 export type ModalidadPago = "diario" | "semanal" | "mensual";
 
+/**
+ * Días de cobro para sugerir fecha final (informativo).
+ * "5" = lun–vie · "6" = lun–sáb · "personalizado" = elección libre
+ */
+export type DiasCobroModo = "5" | "6" | "personalizado";
+
 /** Préstamo */
 export interface PrestamoDoc {
   clienteId: string;
@@ -107,6 +113,14 @@ export interface PrestamoDoc {
    * No afecta cierres ni cálculos financieros.
    */
   fechaFinal?: string;
+  /**
+   * Modo de días de cobro usado al sugerir/definir la fecha final.
+   * Informativo / UX. Opcional en docs legacy.
+   * - "5": lun–vie
+   * - "6": lun–sáb
+   * - "personalizado": fecha elegida sin sugerencia automática
+   */
+  diasCobroModo?: DiasCobroModo;
   /**
    * @deprecated Legado — fin previsto calculado. Leer con `effectiveFechaFinal`.
    * Nuevos préstamos no lo escriben.

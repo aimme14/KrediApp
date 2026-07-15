@@ -23,7 +23,7 @@ import {
   crearPrestamoEmpleado,
   mapCrearPrestamoEmpleadoError,
 } from "@/lib/crear-prestamo-empleado";
-import { validateFechaFinalRequired } from "@/lib/prestamo-fecha-final";
+import { validateFechaFinalRequired, resolveDiasCobroModoForCreate } from "@/lib/prestamo-fecha-final";
 import { fechaDiaColombiaHoy } from "@/lib/colombia-day-bounds";
 
 function serializeSolicitud(s: SolicitudPrestamoDoc) {
@@ -39,6 +39,7 @@ function serializeSolicitud(s: SolicitudPrestamoDoc) {
     modalidad: s.modalidad,
     fechaInicio: s.fechaInicio,
     fechaFinal: s.fechaFinal,
+    diasCobroModo: s.diasCobroModo || null,
     adminId: s.adminId,
     rutaId: s.rutaId,
     estado: s.estado,
@@ -99,6 +100,7 @@ export async function POST(request: NextRequest) {
     modalidad?: string;
     fechaInicio?: string;
     fechaFinal?: string;
+    diasCobroModo?: string;
   };
 
   const clienteId = body.clienteId?.trim();
@@ -126,6 +128,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: fechaFinalVal.error }, { status: 400 });
   }
   const fechaFinal = fechaFinalVal.ymd;
+  const diasCobroVal = resolveDiasCobroModoForCreate(body.diasCobroModo);
+  if (!diasCobroVal.ok) {
+    return NextResponse.json({ error: diasCobroVal.error }, { status: 400 });
+  }
+  const diasCobroModoResolved = diasCobroVal.modo;
 
   const db = getAdminFirestore();
   const montoSolicitud = body.monto;
@@ -223,6 +230,7 @@ export async function POST(request: NextRequest) {
         numeroCuotas: body.numeroCuotas,
         fechaInicio,
         fechaFinal,
+        diasCobroModo: diasCobroModoResolved,
         aprobacionTipo: "automatica",
         aprobadoPorAdmin: null,
         montoUltimoPrestamoReferencia: evaluacion.montoUltimoPrestamo,
@@ -268,6 +276,7 @@ export async function POST(request: NextRequest) {
       modalidad,
       fechaInicio,
       fechaFinal,
+      diasCobroModo: diasCobroModoResolved,
     });
 
     void (async () => {

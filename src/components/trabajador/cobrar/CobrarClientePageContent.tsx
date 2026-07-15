@@ -35,6 +35,7 @@ import {
 import {
   calcularRitmoFechaFinal,
   formatFechaFinalDisplay,
+  labelDiasCobroModo,
 } from "@/lib/prestamo-fecha-final";
 import { isAdminPanelRole } from "@/lib/admin-panel-role";
 import {
@@ -350,7 +351,6 @@ function CobrarClientePageContent() {
 
   const saldoPendiente = prestamo?.saldoPendiente ?? 0;
   const montoPrestado = prestamo?.monto ?? 0;
-  const pagosAtrasados = ultimosPagos.filter((p) => p.tipo === "no_pago").length;
   const montoAplicar = Math.min(montoNum, saldoPendiente);
 
   const totalAPagar = prestamo?.totalAPagar ?? 0;
@@ -372,8 +372,14 @@ function CobrarClientePageContent() {
       fechaInicioYmd,
       numeroCuotas,
       cuotasPendientes,
+      totalAPagar,
+      saldoPendiente,
     });
-  }, [prestamo, numeroCuotas, cuotasPendientes]);
+  }, [prestamo, numeroCuotas, cuotasPendientes, totalAPagar, saldoPendiente]);
+
+  /** Atraso por plan de fechas (no por historial de «no pagó»). */
+  const cuotasAtrasadas =
+    ritmoFechaFinal != null ? ritmoFechaFinal.cuotasAtrasadas : null;
 
   const desglosePerdida = useMemo(() => {
     if (!prestamo) return null;
@@ -926,19 +932,37 @@ function CobrarClientePageContent() {
           <span className="cobrar-metrica-value">{cuotasPendientes}</span>
         </div>
         <div className="cobrar-metrica">
-          <span className="cobrar-metrica-label">Pagos atrasados</span>
-          <span className="cobrar-metrica-value">{pagosAtrasados}</span>
+          <span className="cobrar-metrica-label">Cuotas atrasadas</span>
+          <span className="cobrar-metrica-value">
+            {cuotasAtrasadas == null ? "—" : cuotasAtrasadas}
+          </span>
         </div>
       </div>
 
       {ritmoFechaFinal && (
-        <div className="cobrar-fecha-final" aria-label="Fecha final del préstamo">
+        <div className="cobrar-fecha-final" aria-label="Plazo del préstamo">
+          {ritmoFechaFinal.fechaInicioYmd ? (
+            <div className="cobrar-fecha-final-row">
+              <span className="cobrar-fecha-final-label">Fecha de inicio</span>
+              <span className="cobrar-fecha-final-value">
+                {formatFechaFinalDisplay(ritmoFechaFinal.fechaInicioYmd)}
+              </span>
+            </div>
+          ) : null}
           <div className="cobrar-fecha-final-row">
             <span className="cobrar-fecha-final-label">Fecha final</span>
             <span className="cobrar-fecha-final-value">
               {formatFechaFinalDisplay(ritmoFechaFinal.fechaFinalYmd)}
             </span>
           </div>
+          {prestamo?.diasCobroModo ? (
+            <div className="cobrar-fecha-final-row">
+              <span className="cobrar-fecha-final-label">Días de cobro</span>
+              <span className="cobrar-fecha-final-value">
+                {labelDiasCobroModo(prestamo.diasCobroModo)}
+              </span>
+            </div>
+          ) : null}
           <div className="cobrar-fecha-final-row">
             <span className="cobrar-fecha-final-label">Días restantes</span>
             <span
@@ -959,17 +983,23 @@ function CobrarClientePageContent() {
                     }`}
             </span>
           </div>
-          {ritmoFechaFinal.alDia != null && (
+          {ritmoFechaFinal.ritmo != null && (
             <div className="cobrar-fecha-final-row">
               <span className="cobrar-fecha-final-label">Ritmo de pago</span>
               <span
                 className={
-                  ritmoFechaFinal.alDia
-                    ? "cobrar-fecha-final-value cobrar-fecha-final-value--aldia"
-                    : "cobrar-fecha-final-value cobrar-fecha-final-value--atrasado"
+                  ritmoFechaFinal.ritmo === "adelantado"
+                    ? "cobrar-fecha-final-value cobrar-fecha-final-value--adelantado"
+                    : ritmoFechaFinal.ritmo === "al_dia"
+                      ? "cobrar-fecha-final-value cobrar-fecha-final-value--aldia"
+                      : "cobrar-fecha-final-value cobrar-fecha-final-value--atrasado"
                 }
               >
-                {ritmoFechaFinal.alDia ? "Al día" : "Atrasado"}
+                {ritmoFechaFinal.ritmo === "adelantado"
+                  ? "Adelantado"
+                  : ritmoFechaFinal.ritmo === "al_dia"
+                    ? "Al día"
+                    : "Atrasado"}
               </span>
             </div>
           )}

@@ -19,6 +19,8 @@ import {
   PRESTAMO_ADMIN_CUOTAS_MAX,
   PRESTAMO_ADMIN_MODALIDADES,
 } from "@/lib/prestamo-admin-format";
+import { DIAS_COBRO_MODO_OPTIONS } from "@/lib/prestamo-fecha-final";
+import type { DiasCobroModo } from "@/types/firestore";
 
 export type PrestamoAdminCreateFormProps = {
   rutas: RutaItem[];
@@ -44,6 +46,8 @@ export type PrestamoAdminCreateFormProps = {
   onInteresChange: (value: string) => void;
   fechaFinal: string;
   onFechaFinalChange: (value: string) => void;
+  diasCobroModo: DiasCobroModo;
+  onDiasCobroModoChange: (value: DiasCobroModo) => void;
   montoNum: number;
   nCuotasVal: number;
   iVal: number;
@@ -85,6 +89,8 @@ export default function PrestamoAdminCreateForm({
   onInteresChange,
   fechaFinal,
   onFechaFinalChange,
+  diasCobroModo,
+  onDiasCobroModoChange,
   montoNum,
   nCuotasVal,
   iVal,
@@ -351,6 +357,25 @@ export default function PrestamoAdminCreateForm({
         </div>
       </div>
       <div className="form-group" style={{ marginBottom: "1rem" }}>
+        <label htmlFor="prestamo-admin-dias-cobro">Días de cobro</label>
+        <select
+          id="prestamo-admin-dias-cobro"
+          value={diasCobroModo}
+          onChange={(e) => onDiasCobroModoChange(e.target.value as DiasCobroModo)}
+          aria-label="Días de cobro"
+          style={{ width: "100%", maxWidth: "20rem", padding: "0.5rem" }}
+        >
+          {DIAS_COBRO_MODO_OPTIONS.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </select>
+        <p style={{ margin: "0.25rem 0 0", fontSize: "0.75rem", color: "var(--text-muted)" }}>
+          {DIAS_COBRO_MODO_OPTIONS.find((o) => o.value === diasCobroModo)?.hint}
+        </p>
+      </div>
+      <div className="form-group" style={{ marginBottom: "1rem" }}>
         <label htmlFor="prestamo-admin-fecha-final">Fecha final del préstamo</label>
         <input
           id="prestamo-admin-fecha-final"
@@ -362,7 +387,10 @@ export default function PrestamoAdminCreateForm({
           style={{ width: "100%", maxWidth: "16rem", padding: "0.5rem" }}
         />
         <p style={{ margin: "0.25rem 0 0", fontSize: "0.75rem", color: "var(--text-muted)" }}>
-          Solo informativa — no afecta cierres ni cálculos. Se sugiere según cuotas y frecuencia.
+          Solo informativa — no afecta cierres ni cálculos.
+          {diasCobroModo === "personalizado"
+            ? " Elige la fecha manualmente."
+            : " Se sugiere según cuotas, frecuencia y días de cobro."}
         </p>
       </div>
       {totalAPagar > 0 && (

@@ -69,6 +69,7 @@ export default function SolicitudesPrestamoPageContent() {
             modalidad: x.modalidad ?? "mensual",
             fechaInicio: typeof x.fechaInicio === "string" ? x.fechaInicio : "",
             fechaFinal: typeof x.fechaFinal === "string" ? x.fechaFinal : "",
+            diasCobroModo: typeof x.diasCobroModo === "string" ? x.diasCobroModo : "",
             adminId: x.adminId ?? "",
             rutaId: x.rutaId ?? "",
             estado: x.estado ?? "pendiente",
