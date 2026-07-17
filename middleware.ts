@@ -22,6 +22,7 @@ import {
   anularLimiterIP,
   pdfLimiterIP,
   readLimiterIP,
+  rateLimitEnabled,
 } from "@/lib/rate-limit";
 import type { Ratelimit } from "@upstash/ratelimit";
 
@@ -146,6 +147,9 @@ export async function middleware(req: NextRequest) {
 
   // Solo actúa sobre rutas /api/
   if (!pathname.startsWith("/api/")) return NextResponse.next();
+
+  // Sin Redis configurado no hay rate limiting que aplicar (p. ej. dev local).
+  if (!rateLimitEnabled) return NextResponse.next();
 
   const tier = classifyPath(pathname, method);
   if (tier === "skip") return NextResponse.next();

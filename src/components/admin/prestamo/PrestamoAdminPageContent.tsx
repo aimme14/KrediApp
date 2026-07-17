@@ -9,6 +9,7 @@ import { useAdminDashboard } from "@/context/AdminDashboardContext";
 import { useTrabajadorLista } from "@/context/TrabajadorListaContext";
 import {
   createPrestamo,
+  deletePrestamo,
   formatClienteCodigoRutaYNumero,
   listPeriodosAdmin,
   type ClienteItem,
@@ -74,6 +75,19 @@ function cuotasPagadas(totalAPagar: number, numeroCuotas: number, saldoPendiente
   const cuotaUnit = totalAPagar / numeroCuotas;
   const pagado = totalAPagar - saldoPendiente;
   return Math.min(numeroCuotas, Math.round(pagado / cuotaUnit));
+}
+
+/**
+ * Un préstamo es eliminable solo si está activo y no tiene ningún movimiento de cobro:
+ * saldo intacto (== total a pagar) y sin intentos de no pago. El backend es la
+ * autoridad final (verifica la subcolección `pagos`); esto solo controla la UI.
+ */
+function prestamoEsEliminable(p: PrestamoItem): boolean {
+  return (
+    p.estado === "activo" &&
+    Math.abs((p.saldoPendiente ?? 0) - (p.totalAPagar ?? 0)) < 0.01 &&
+    (p.intentosFallidos ?? 0) === 0
+  );
 }
 
 /** Orden de prioridad para mostrar préstamo principal: activo > pagado/castigado; luego más reciente primero. */
@@ -245,6 +259,12 @@ export default function PrestamoAdminPageContent() {
   const [confirmarModalPrestamo, setConfirmarModalPrestamo] = useState(false);
   /** Monto escrito en el modal — debe coincidir con el desembolso para habilitar confirmar. */
   const [montoConfirmacionModal, setMontoConfirmacionModal] = useState("");
+  /** Préstamo pendiente de eliminación (abre modal de confirmación). */
+  const [prestamoAEliminar, setPrestamoAEliminar] = useState<PrestamoItem | null>(null);
+  const [eliminando, setEliminando] = useState(false);
+  const [confirmarEliminar, setConfirmarEliminar] = useState(false);
+  /** Clave de idempotencia del intento de eliminación actual. */
+  const prestamoEliminarKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
     setConfirmarMontoAlto(false);
@@ -479,6 +499,47 @@ export default function PrestamoAdminPageContent() {
       setError(e instanceof Error ? e.message : "Error al crear préstamo");
     } finally {
       setCreating(false);
+    }
+  };
+
+  const abrirEliminarPrestamo = useCallback((p: PrestamoItem) => {
+    prestamoEliminarKeyRef.current = crypto.randomUUID();
+    setConfirmarEliminar(false);
+    setError(null);
+    setPrestamoAEliminar(p);
+  }, []);
+
+  const cerrarEliminarPrestamo = useCallback(() => {
+    if (eliminando) return;
+    prestamoEliminarKeyRef.current = null;
+    setPrestamoAEliminar(null);
+    setConfirmarEliminar(false);
+  }, [eliminando]);
+
+  const handleEliminarPrestamo = async () => {
+    if (eliminando || !prestamoAEliminar) return;
+    if (!online) {
+      setError(OFFLINE_MSG);
+      return;
+    }
+    if (!user || !confirmarEliminar) return;
+
+    const idempotencyKey = prestamoEliminarKeyRef.current ?? crypto.randomUUID();
+    prestamoEliminarKeyRef.current = idempotencyKey;
+
+    setError(null);
+    setEliminando(true);
+    try {
+      const token = await user.getIdToken();
+      await deletePrestamo(token, prestamoAEliminar.id, idempotencyKey);
+      prestamoEliminarKeyRef.current = null;
+      setPrestamoAEliminar(null);
+      setConfirmarEliminar(false);
+      await refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Error al eliminar préstamo");
+    } finally {
+      setEliminando(false);
     }
   };
 
@@ -1072,6 +1133,17 @@ export default function PrestamoAdminPageContent() {
                               <span className="prestamo-admin-cobro-label-mobile">Cobrar</span>
                             </Link>
                           )}
+                          {prestamoEsEliminable(principal) && (
+                            <button
+                              type="button"
+                              className="btn btn-secondary prestamo-admin-eliminar-btn"
+                              onClick={() => abrirEliminarPrestamo(principal)}
+                              title="Eliminar préstamo (sin cobros)"
+                              aria-label="Eliminar préstamo"
+                            >
+                              Eliminar
+                            </button>
+                          )}
                         </td>
                       </tr>
                       {tieneMas && expandido && (
@@ -1128,6 +1200,17 @@ export default function PrestamoAdminPageContent() {
                                     >
                                       Cobrar
                                     </Link>
+                                  )}
+                                  {prestamoEsEliminable(p) && (
+                                    <button
+                                      type="button"
+                                      className="btn btn-secondary prestamo-admin-eliminar-btn prestamo-admin-eliminar-btn--sm"
+                                      onClick={() => abrirEliminarPrestamo(p)}
+                                      title="Eliminar préstamo (sin cobros)"
+                                      aria-label="Eliminar préstamo"
+                                    >
+                                      Eliminar
+                                    </button>
                                   )}
                                 </td>
                               </tr>
@@ -1286,6 +1369,52 @@ export default function PrestamoAdminPageContent() {
               Se descontará de la caja de la ruta: <strong>$ {formatMonedaPrestamoAdmin(cajaRuta - montoNum)}</strong> restantes.
             </p>
           )}
+        </ModalConfirmar>
+      )}
+
+      {prestamoAEliminar && (
+        <ModalConfirmar
+          titulo="Eliminar préstamo"
+          labelConfirmar="Sí, eliminar préstamo"
+          confirmando={eliminando}
+          confirmarDeshabilitado={!online}
+          confirmacionMarcada={confirmarEliminar}
+          onConfirmacionMarcadaChange={setConfirmarEliminar}
+          labelConfirmacion={
+            <>
+              Confirmo que deseo eliminar este préstamo y devolver{" "}
+              <strong>$ {formatMonedaPrestamoAdmin(prestamoAEliminar.monto)}</strong> a la
+              base de la ruta
+            </>
+          }
+          onCancelar={cerrarEliminarPrestamo}
+          onConfirmar={() => {
+            void handleEliminarPrestamo();
+          }}
+        >
+          <p>Esta acción no se puede deshacer.</p>
+          <p>
+            Cliente:{" "}
+            <strong>
+              {clientePorId[prestamoAEliminar.clienteId]?.nombre ?? prestamoAEliminar.clienteId}
+            </strong>
+          </p>
+          <p>
+            Monto: <strong>$ {formatMonedaPrestamoAdmin(prestamoAEliminar.monto)}</strong>
+          </p>
+          <p>
+            Total a pagar:{" "}
+            <strong>$ {formatMonedaPrestamoAdmin(prestamoAEliminar.totalAPagar)}</strong>
+          </p>
+          <p>
+            El dinero volverá a la <strong>base de la ruta</strong> y el cliente quedará
+            habilitado para un nuevo préstamo.
+          </p>
+          {error ? (
+            <p style={{ color: "var(--danger, #dc2626)" }} role="alert">
+              {error}
+            </p>
+          ) : null}
         </ModalConfirmar>
       )}
 

@@ -17,6 +17,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { Ratelimit } from "@upstash/ratelimit";
 import { getApiUser } from "@/lib/api-auth";
+import { rateLimitEnabled } from "@/lib/rate-limit";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type RouteHandler = (req: NextRequest, ctx: any) => Promise<NextResponse> | NextResponse;
@@ -33,6 +34,9 @@ export function withRateLimit(
   failClosed = true
 ): RouteHandler {
   return async (req, ctx) => {
+    // Sin Redis configurado no hay rate limiting que aplicar (p. ej. dev local).
+    if (!rateLimitEnabled) return handler(req, ctx);
+
     // Extraer uid del token Firebase verificado
     const apiUser = await getApiUser(req);
 

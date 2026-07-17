@@ -20,6 +20,14 @@ const AdminFcmRegistration = dynamic(
   { ssr: false }
 );
 
+const AdminNovedadPrestamosDelete = dynamic(
+  () =>
+    import("@/components/admin/AdminNovedadPrestamosDelete").then((m) => ({
+      default: m.AdminNovedadPrestamosDelete,
+    })),
+  { ssr: false }
+);
+
 function adminNavItemActive(pathname: string, href: string): boolean {
   if (href === "/dashboard/admin") return pathname === "/dashboard/admin";
   return pathname === href || pathname.startsWith(`${href}/`);
@@ -106,6 +114,7 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
   return (
     <div className="admin-shell">
       <AdminFcmRegistration />
+      <AdminNovedadPrestamosDelete />
       <aside
         className={`admin-sidebar ${menuOpen ? "admin-sidebar-open" : ""}`}
         aria-label="Navegación del administrador"

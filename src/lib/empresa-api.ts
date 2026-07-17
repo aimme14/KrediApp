@@ -1242,6 +1242,27 @@ export async function createPrestamo(
   return data.id;
 }
 
+/**
+ * Elimina un préstamo sin movimientos de cobro. El backend revierte el desembolso
+ * a la base de la ruta y libera al cliente. Solo admin/adminEmpresa.
+ */
+export async function deletePrestamo(
+  token: string,
+  prestamoId: string,
+  idempotencyKey?: string
+): Promise<void> {
+  const res = await fetchWithAuth(
+    `/api/empresa/prestamos/${encodeURIComponent(prestamoId)}`,
+    token,
+    {
+      method: "DELETE",
+      body: JSON.stringify(idempotencyKey ? { idempotencyKey } : {}),
+    }
+  );
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error ?? "Error al eliminar préstamo");
+}
+
 export async function listGastos(token: string): Promise<GastoItem[]> {
   const res = await fetchWithAuth("/api/empresa/gastos", token);
   const data = await res.json();

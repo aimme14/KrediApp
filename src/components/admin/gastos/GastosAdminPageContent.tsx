@@ -210,7 +210,7 @@ function EyeIcon() {
 
 export default function GastosAdminPageContent() {
   const { user, profile } = useAuth();
-  const { rutas } = useAdminDashboard();
+  const { rutas, rutasConEmpleados } = useAdminDashboard();
   const online = useOnline();
   const [gastos, setGastos] = useState<GastoItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -423,6 +423,40 @@ export default function GastosAdminPageContent() {
       return timeB - timeA;
     });
   }, [gastos, searchQuery, soloHoy]);
+
+  /** Mapa uid → nombre real (admin actual + empleados de sus rutas). */
+  const nombrePorUid = useMemo(() => {
+    const m = new Map<string, string>();
+    if (user?.uid) {
+      const propio = user.displayName?.trim() || profile?.displayName?.trim();
+      if (propio) m.set(user.uid, propio);
+    }
+    rutasConEmpleados.forEach((r) =>
+      r.empleados.forEach((e) => {
+        if (e.nombre?.trim()) m.set(e.uid, e.nombre.trim());
+      })
+    );
+    return m;
+  }, [user?.uid, user?.displayName, profile?.displayName, rutasConEmpleados]);
+
+  /**
+   * Nombre a mostrar para un gasto: usa el nombre guardado si es real;
+   * si se guardó el UID (datos sin displayName), lo resuelve por el mapa;
+   * como último recurso muestra "Tú".
+   */
+  const nombreMostrado = useCallback(
+    (g: GastoItem): string => {
+      const raw = (g.creadoPorNombre ?? "").trim();
+      if (raw && raw !== g.creadoPor) return raw;
+      const real = nombrePorUid.get(g.creadoPor);
+      if (real) return real;
+      if (g.creadoPor && g.creadoPor === user?.uid) {
+        return user.displayName?.trim() || "Tú";
+      }
+      return "Tú";
+    },
+    [nombrePorUid, user?.uid, user?.displayName]
+  );
 
   const handleMostrarMas = () => {
     if (loadingMore || !hayMasGastos) return;
@@ -928,8 +962,8 @@ export default function GastosAdminPageContent() {
             <div className="gastos-admin-mobile-list" role="list" aria-label="Lista de gastos">
               {gastosVisibles.map((g) => (
                 <div key={`${g.rol}-${g.id}-mobile`} className="gastos-admin-mobile-row" role="listitem">
-                  <span className="gastos-admin-mobile-nombre" title={g.creadoPorNombre ?? undefined}>
-                    {g.creadoPorNombre ?? <span className="gastos-admin-dash">—</span>}
+                  <span className="gastos-admin-mobile-nombre" title={nombreMostrado(g)}>
+                    {nombreMostrado(g)}
                   </span>
                   <span className="gastos-admin-mobile-fecha">
                     {formatoFechaGastoColombia(g.fecha ?? null)}
@@ -938,7 +972,7 @@ export default function GastosAdminPageContent() {
                     type="button"
                     className="gastos-admin-mobile-ver-btn"
                     onClick={() => setGastoDetalle(g)}
-                    aria-label={`Ver detalle del gasto de ${g.creadoPorNombre || "sin nombre"}`}
+                    aria-label={`Ver detalle del gasto de ${nombreMostrado(g)}`}
                   >
                     <EyeIcon />
                   </button>
@@ -961,7 +995,7 @@ export default function GastosAdminPageContent() {
                 <tbody>
                   {gastosVisibles.map((g) => (
                   <tr key={`${g.rol}-${g.id}`}>
-                    <td className="gastos-col-nombre" title={g.creadoPorNombre ?? undefined}>{g.creadoPorNombre ?? <span className="gastos-admin-dash" title="Sin nombre">—</span>}</td>
+                    <td className="gastos-col-nombre" title={nombreMostrado(g)}>{nombreMostrado(g)}</td>
                     <td className="gastos-col-fecha">{formatoFechaGastoColombia(g.fecha ?? null)}</td>
                     <td className="gastos-col-tipo">{tipoLabel(g.tipo ?? "")}</td>
                     <td className="gastos-col-alcance">{renderAlcance(g)}</td>
@@ -1050,7 +1084,7 @@ export default function GastosAdminPageContent() {
             <dl className="gastos-admin-detalle-dl">
               <div className="gastos-admin-detalle-row">
                 <dt>Nombre</dt>
-                <dd>{gastoDetalle.creadoPorNombre || "—"}</dd>
+                <dd>{nombreMostrado(gastoDetalle)}</dd>
               </div>
               <div className="gastos-admin-detalle-row">
                 <dt>Fecha</dt>

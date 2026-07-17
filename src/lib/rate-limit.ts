@@ -15,11 +15,28 @@
 import { Ratelimit } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
 
+/**
+ * El rate limiting solo está activo si Upstash Redis está configurado.
+ * Sin credenciales (p. ej. desarrollo local) se desactiva por completo
+ * — no hay backend que lo aplique. En producción las variables sí están
+ * presentes, así que el comportamiento estricto (fail-closed) se mantiene.
+ */
+export const rateLimitEnabled = Boolean(
+  process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN
+);
+
+if (!rateLimitEnabled) {
+  console.warn(
+    "[rate-limit] Upstash Redis no configurado (UPSTASH_REDIS_REST_URL/TOKEN). " +
+      "Rate limiting DESACTIVADO en este entorno."
+  );
+}
+
 // ─── Cliente Redis ──────────────────────────────────────────────────────────
 
 const redis = new Redis({
-  url: process.env.UPSTASH_REDIS_REST_URL!,
-  token: process.env.UPSTASH_REDIS_REST_TOKEN!,
+  url: process.env.UPSTASH_REDIS_REST_URL ?? "http://localhost:0",
+  token: process.env.UPSTASH_REDIS_REST_TOKEN ?? "disabled",
 });
 
 // ─── Helper ─────────────────────────────────────────────────────────────────

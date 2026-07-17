@@ -10,10 +10,9 @@ export type AdminRutaStatsData = {
 };
 
 function formatMoneda(value: number): string {
-  const hasDecimals = Math.round(value * 100) % 100 !== 0;
-  return `$ ${value.toLocaleString("es-CO", {
-    minimumFractionDigits: hasDecimals ? 2 : 0,
-    maximumFractionDigits: 2,
+  return `$ ${Math.trunc(value).toLocaleString("es-CO", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
   })}`;
 }
 

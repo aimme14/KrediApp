@@ -877,6 +877,45 @@ button {
   justify-content: flex-end;
 }
 
+/* Modal novedades admin */
+.admin-novedad-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.admin-novedad-lead {
+  color: var(--text);
+  font-weight: 500;
+}
+
+.admin-novedad-link {
+  color: var(--link);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.admin-novedad-link:hover {
+  text-decoration: underline;
+}
+
+.admin-novedad-callout {
+  padding: 0.75rem 0.85rem;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, #d97706 35%, var(--card-border));
+  background: color-mix(in srgb, #d97706 9%, var(--card-bg));
+}
+
+.admin-novedad-callout p {
+  margin: 0;
+  color: var(--text);
+  line-height: 1.5;
+}
+
+.admin-novedad-callout strong {
+  color: var(--text);
+}
+
 /* Página cuenta deshabilitada */
 .deshabilitado-wrap {
   min-height: 100dvh;
@@ -4209,6 +4248,17 @@ td {
     white-space: nowrap;
   }
 
+  .prestamo-admin-hist-card .table-historial .prestamo-admin-eliminar-btn {
+    width: auto;
+    max-width: 100%;
+    min-width: 2.35rem;
+    padding: 0.24rem 0.28rem !important;
+    font-size: 0.575rem !important;
+    line-height: 1.1 !important;
+    border-radius: 6px !important;
+    margin-top: 0.26rem;
+  }
+
   .prestamo-admin-hist-card .table-historial th:nth-child(2),
   .prestamo-admin-hist-card .table-historial th:nth-child(3),
   .prestamo-admin-hist-card .table-historial th:nth-child(4),
@@ -4331,6 +4381,32 @@ td {
 .prestamo-admin-cobro-btn--sm {
   padding: 0.22rem 0.45rem !important;
   font-size: 0.72rem !important;
+}
+
+.prestamo-admin-eliminar-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.28rem 0.55rem !important;
+  font-size: 0.72rem !important;
+  font-weight: 600 !important;
+  min-width: 0 !important;
+  border-radius: 8px !important;
+  line-height: 1.25 !important;
+  margin-top: 0.3rem;
+  color: var(--danger, #dc2626) !important;
+  border: 1px solid color-mix(in srgb, var(--danger, #dc2626) 45%, transparent) !important;
+  background: color-mix(in srgb, var(--danger, #dc2626) 10%, transparent) !important;
+  white-space: nowrap;
+}
+
+.prestamo-admin-eliminar-btn:hover {
+  background: color-mix(in srgb, var(--danger, #dc2626) 18%, transparent) !important;
+}
+
+.prestamo-admin-eliminar-btn--sm {
+  padding: 0.2rem 0.42rem !important;
+  font-size: 0.7rem !important;
 }
 
 .prestamo-admin-filtro-vacio {
