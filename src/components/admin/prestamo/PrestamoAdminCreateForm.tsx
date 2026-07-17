@@ -4,7 +4,7 @@ import SelectConBusqueda, { type SelectConBusquedaOption } from "@/components/Se
 import {
   formatClienteCodigoRutaYNumero,
   type ClienteItem,
-  type PrestamoItem,
+  type PrestamoHistorialClienteItem,
   type RutaItem,
 } from "@/lib/empresa-api";
 import { formatInteresResumenPct, parseInteresPct } from "@/lib/interes-pct";
@@ -37,7 +37,8 @@ export type PrestamoAdminCreateFormProps = {
   historialEconomicoColapsado: boolean;
   onHistorialEconomicoColapsadoToggle: () => void;
   loading: boolean;
-  prestamosDelCliente: PrestamoItem[];
+  /** Últimos 3 préstamos del cliente (consulta puntual). */
+  prestamosDelCliente: PrestamoHistorialClienteItem[];
   modalidad: "diario" | "semanal" | "mensual";
   onModalidadChange: (value: "diario" | "semanal" | "mensual") => void;
   numeroCuotas: string;
@@ -278,7 +279,7 @@ export default function PrestamoAdminCreateForm({
             <p style={{ padding: "0 0.75rem 0.75rem", margin: 0, fontSize: "0.875rem", color: "var(--text-muted)" }}>
               {prestamosDelCliente.length === 0
                 ? "Sin préstamos anteriores"
-                : `${prestamosDelCliente.length} préstamo${prestamosDelCliente.length !== 1 ? "s" : ""} registrado${prestamosDelCliente.length !== 1 ? "s" : ""}. Haz clic en «Expandir» para ver el detalle.`}
+                : `Últimos ${prestamosDelCliente.length} préstamo${prestamosDelCliente.length !== 1 ? "s" : ""}. Haz clic en «Expandir» para ver el detalle.`}
             </p>
           )}
         </div>

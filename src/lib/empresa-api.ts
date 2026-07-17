@@ -1063,6 +1063,37 @@ export async function listPrestamos(token: string): Promise<PrestamoItem[]> {
   return data.prestamos ?? [];
 }
 
+/** Fila del historial de préstamos anteriores de un cliente (máx. 3). */
+export type PrestamoHistorialClienteItem = {
+  id: string;
+  monto: number;
+  interes: number;
+  modalidad: string;
+  numeroCuotas: number;
+  totalAPagar: number;
+  saldoPendiente: number;
+  estado: string;
+  totalCastigado: number;
+  fechaInicio: string | null;
+  fechaCierre: string | null;
+  creadoEn: string | null;
+};
+
+/** Últimos 3 préstamos de un cliente (para historial al crear préstamo). */
+export async function listUltimosPrestamosCliente(
+  token: string,
+  clienteId: string
+): Promise<PrestamoHistorialClienteItem[]> {
+  const qs = new URLSearchParams({ clienteId: clienteId.trim() });
+  const res = await fetchWithAuth(
+    `/api/empresa/prestamos/ultimos-cliente?${qs.toString()}`,
+    token
+  );
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error ?? "Error al cargar historial del cliente");
+  return Array.isArray(data.prestamos) ? data.prestamos : [];
+}
+
 /** Sincroniza moroso de clientes hacia sus préstamos en Firestore. */
 export async function syncMorosoPrestamos(token: string): Promise<void> {
   const res = await fetchWithAuth("/api/empresa/prestamos/sync-moroso", token, {

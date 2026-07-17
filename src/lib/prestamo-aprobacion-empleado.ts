@@ -66,6 +66,59 @@ export async function listPrestamosHistoricosCliente(
     .sort(ordenarPorMasReciente);
 }
 
+export type PrestamoHistorialUiRow = {
+  id: string;
+  monto: number;
+  interes: number;
+  modalidad: string;
+  numeroCuotas: number;
+  totalAPagar: number;
+  saldoPendiente: number;
+  estado: string;
+  totalCastigado: number;
+  fechaInicio: string | null;
+  fechaCierre: string | null;
+  creadoEn: string | null;
+};
+
+/**
+ * Últimos préstamos del cliente para mostrar en UI (máx. `max` lecturas).
+ * Ordena por creadoEn desc; requiere índice compuesto clienteId + creadoEn.
+ */
+export async function listUltimosPrestamosClienteUi(
+  db: Firestore,
+  empresaId: string,
+  clienteId: string,
+  max = 3
+): Promise<PrestamoHistorialUiRow[]> {
+  const snap = await db
+    .collection(EMPRESAS_COLLECTION)
+    .doc(empresaId)
+    .collection(PRESTAMOS_SUBCOLLECTION)
+    .where("clienteId", "==", clienteId.trim())
+    .orderBy("creadoEn", "desc")
+    .limit(max)
+    .get();
+
+  return snap.docs.map((doc) => {
+    const d = doc.data() as Record<string, unknown>;
+    return {
+      id: doc.id,
+      monto: typeof d.monto === "number" ? d.monto : 0,
+      interes: typeof d.interes === "number" ? d.interes : 0,
+      modalidad: typeof d.modalidad === "string" ? d.modalidad : "mensual",
+      numeroCuotas: typeof d.numeroCuotas === "number" ? d.numeroCuotas : 0,
+      totalAPagar: typeof d.totalAPagar === "number" ? d.totalAPagar : 0,
+      saldoPendiente: typeof d.saldoPendiente === "number" ? d.saldoPendiente : 0,
+      estado: typeof d.estado === "string" ? d.estado : "activo",
+      totalCastigado: typeof d.totalCastigado === "number" ? d.totalCastigado : 0,
+      fechaInicio: timestampToDate(d.fechaInicio)?.toISOString() ?? null,
+      fechaCierre: timestampToDate(d.fechaCierre)?.toISOString() ?? null,
+      creadoEn: timestampToDate(d.creadoEn)?.toISOString() ?? null,
+    };
+  });
+}
+
 /** Monto del último préstamo histórico del cliente (referencia para auto-aprobación). */
 export async function getMontoUltimoPrestamoCliente(
   db: Firestore,
