@@ -139,7 +139,6 @@ export default function PrestamoTrabajadorPageContent() {
   }, [searchParams, clientes, loading]);
 
   useEffect(() => {
-    if (diasCobroModo === "personalizado") return;
     if (fechaFinalTouched) return;
     const nCuotas = parseInt(numeroCuotas, 10);
     if (!nCuotas || nCuotas < 1) {
@@ -780,11 +779,7 @@ export default function PrestamoTrabajadorPageContent() {
             onChange={(e) => {
               const modo = e.target.value as DiasCobroModo;
               setDiasCobroModo(modo);
-              if (modo === "personalizado") {
-                setFechaFinalTouched(true);
-              } else {
-                setFechaFinalTouched(false);
-              }
+              setFechaFinalTouched(false);
             }}
             aria-label="Días de cobro"
             style={{ width: "100%", maxWidth: "20rem" }}
@@ -814,10 +809,7 @@ export default function PrestamoTrabajadorPageContent() {
             style={{ width: "100%", maxWidth: "16rem" }}
           />
           <p style={{ margin: "0.25rem 0 0", fontSize: "0.75rem", color: "var(--text-muted)" }}>
-            
-            {diasCobroModo === "personalizado"
-              ? " Elige la fecha manualmente."
-              : ""}
+            Se sugiere según cuotas, frecuencia y días de cobro. Puedes ajustarla.
           </p>
         </div>
         <div

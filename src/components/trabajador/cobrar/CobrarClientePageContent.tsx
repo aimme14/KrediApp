@@ -374,6 +374,7 @@ function CobrarClientePageContent() {
       cuotasPendientes,
       totalAPagar,
       saldoPendiente,
+      diasCobroModo: prestamo?.diasCobroModo ?? undefined,
     });
   }, [prestamo, numeroCuotas, cuotasPendientes, totalAPagar, saldoPendiente]);
 

@@ -273,7 +273,6 @@ export default function PrestamoAdminPageContent() {
   }, [rutaIdForm, clienteId, monto, numeroCuotas, interes, modalidad, fechaFinal]);
 
   useEffect(() => {
-    if (diasCobroModo === "personalizado") return;
     if (fechaFinalTouched) return;
     const nCuotas = parseInt(numeroCuotas, 10);
     if (!nCuotas || nCuotas < 1) {
@@ -291,11 +290,7 @@ export default function PrestamoAdminPageContent() {
 
   const handleDiasCobroModoChange = useCallback((modo: DiasCobroModo) => {
     setDiasCobroModo(modo);
-    if (modo === "personalizado") {
-      setFechaFinalTouched(true);
-    } else {
-      setFechaFinalTouched(false);
-    }
+    setFechaFinalTouched(false);
   }, []);
 
   const abrirFormularioCrear = useCallback(() => {

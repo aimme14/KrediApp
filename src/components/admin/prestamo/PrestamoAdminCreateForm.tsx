@@ -388,10 +388,7 @@ export default function PrestamoAdminCreateForm({
           style={{ width: "100%", maxWidth: "16rem", padding: "0.5rem" }}
         />
         <p style={{ margin: "0.25rem 0 0", fontSize: "0.75rem", color: "var(--text-muted)" }}>
-          .
-          {diasCobroModo === "personalizado"
-            ? " Elige la fecha manualmente."
-            : " Se sugiere según cuotas, frecuencia y días de cobro."}
+          Se sugiere según cuotas, frecuencia y días de cobro. Puedes ajustarla.
         </p>
       </div>
       {totalAPagar > 0 && (

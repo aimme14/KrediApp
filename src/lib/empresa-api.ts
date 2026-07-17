@@ -118,9 +118,9 @@ export type PrestamoItem = {
    */
   fechaFinal: string | null;
   /**
-   * Modo de días de cobro al crear (informativo). null en préstamos legacy.
+   * Modo de días de cobro (lun–vie / lun–sáb). null en préstamos legacy.
    */
-  diasCobroModo?: "5" | "6" | "personalizado" | null;
+  diasCobroModo?: "5" | "6" | null;
   /**
    * @deprecated Usar `fechaFinal`. Se mantiene poblado con el valor efectivo por compatibilidad.
    */
@@ -448,8 +448,8 @@ export async function solicitarPrestamoEmpleado(
     fechaInicio?: string;
     /** Fecha final informativa (YYYY-MM-DD), obligatoria. */
     fechaFinal: string;
-    /** 5 | 6 | personalizado — default servidor "6" si se omite. */
-    diasCobroModo?: "5" | "6" | "personalizado";
+    /** 5 = lun–vie · 6 = lun–sáb — default servidor "6" si se omite. */
+    diasCobroModo?: "5" | "6";
   }
 ): Promise<ResultadoPrestamoEmpleadoApi> {
   const res = await fetchWithAuth("/api/empresa/solicitudes-prestamo", token, {
@@ -1258,8 +1258,8 @@ export async function createPrestamo(
     fechaInicio?: string;
     /** Fecha final informativa (YYYY-MM-DD), obligatoria. */
     fechaFinal: string;
-    /** 5 | 6 | personalizado — default servidor "6" si se omite. */
-    diasCobroModo?: "5" | "6" | "personalizado";
+    /** 5 = lun–vie · 6 = lun–sáb — default servidor "6" si se omite. */
+    diasCobroModo?: "5" | "6";
     /** Clave de idempotencia — el backend deduplica si la operación ya fue procesada. */
     idempotencyKey?: string;
   }

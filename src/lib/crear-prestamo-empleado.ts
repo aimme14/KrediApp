@@ -29,7 +29,7 @@ export type CrearPrestamoEmpleadoParams = {
   fechaInicio?: string;
   /** Fecha final informativa (YYYY-MM-DD), obligatoria. */
   fechaFinal: string;
-  /** 5 | 6 | personalizado — default "6" si se omite. */
+  /** 5 = lun–vie · 6 = lun–sáb — default "6" si se omite. */
   diasCobroModo?: string;
   aprobacionTipo: "automatica" | "admin";
   aprobadoPorAdmin?: string | null;
