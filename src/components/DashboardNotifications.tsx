@@ -12,6 +12,7 @@ import { db } from "@/lib/firebase";
 import { type SolicitudEntregaPendienteAdmin } from "@/lib/empresa-api";
 import { fechaDiaColombiaHoy } from "@/lib/colombia-day-bounds";
 import { EMPRESAS_COLLECTION, SOLICITUDES_ENTREGA_REPORTE_SUBCOLLECTION } from "@/lib/empresas-db";
+import { isAdminPanelRole } from "@/lib/admin-panel-role";
 
 function BellIcon() {
   return (
@@ -164,6 +165,7 @@ export default function DashboardNotifications() {
   const containerRef = useRef<HTMLDivElement>(null);
 
   const role = profile?.role;
+  const isAdminPanel = isAdminPanelRole(role);
 
   const measurePanelMaxWidth = useCallback(() => {
     const root = containerRef.current;
@@ -242,7 +244,7 @@ export default function DashboardNotifications() {
   }, [storageKey, dismissedKeys]);
 
   useEffect(() => {
-    if (!db || !user || role !== "admin" || !profile?.empresaId) return;
+    if (!db || !user || !isAdminPanel || !profile?.empresaId) return;
 
     const empresaId = profile.empresaId.trim();
     if (!empresaId) return;
@@ -278,7 +280,7 @@ export default function DashboardNotifications() {
     );
 
     return unsub;
-  }, [user?.uid, role, profile?.empresaId]);
+  }, [user?.uid, isAdminPanel, profile?.empresaId]);
 
   useEffect(() => {
     if (!open) return;
@@ -300,22 +302,22 @@ export default function DashboardNotifications() {
 
   const campanitaWasOpen = useRef(false);
   useEffect(() => {
-    if (role !== "admin") return;
+    if (!isAdminPanel) return;
     if (open && !campanitaWasOpen.current) {
       markAllAsRead();
     }
     campanitaWasOpen.current = open;
-  }, [open, role, markAllAsRead]);
+  }, [open, isAdminPanel, markAllAsRead]);
 
   const badgeCount = useMemo(() => {
-    if (role === "admin") {
+    if (isAdminPanel) {
       const operativoUnread = sessionOperativoLines.filter((l) => !l.read).length;
       const pendingCount = dismissedSet.has(adminPendingKey) ? 0 : adminPendientes.length;
       return pendingCount + operativoUnread;
     }
     return 0;
   }, [
-    role,
+    isAdminPanel,
     dismissedSet,
     adminPendingKey,
     adminPendientes.length,
@@ -365,7 +367,7 @@ export default function DashboardNotifications() {
         >
           <div className="dashboard-notifications-panel-title">Avisos</div>
 
-          {role === "admin" && (
+          {isAdminPanel && (
             <>
               <NotifAdminPendientes
                 pendientes={adminPendientes}
