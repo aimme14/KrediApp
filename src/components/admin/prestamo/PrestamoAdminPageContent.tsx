@@ -12,9 +12,11 @@ import {
   deletePrestamo,
   formatClienteCodigoRutaYNumero,
   listPeriodosAdmin,
+  listUltimosPrestamosCliente,
   type ClienteItem,
   type PeriodoAdminListaItem,
   type PrestamoItem,
+  type PrestamoHistorialClienteItem,
 } from "@/lib/empresa-api";
 import { formatInteresResumenPct, parseInteresPct } from "@/lib/interes-pct";
 import {
@@ -720,17 +722,33 @@ export default function PrestamoAdminPageContent() {
     });
   }, []);
 
-  const prestamosDelCliente = useMemo(() => {
-    if (!clienteId) return [];
-    const ids = new Set<string>();
-    const merged: PrestamoItem[] = [];
-    for (const p of [...prestamos, ...prestamosPagados, ...prestamosCastigados]) {
-      if (p.clienteId !== clienteId || ids.has(p.id)) continue;
-      ids.add(p.id);
-      merged.push(p);
+  /** Últimos 3 préstamos del cliente seleccionado — consulta puntual (3 lecturas). */
+  const [historialCliente, setHistorialCliente] = useState<PrestamoHistorialClienteItem[]>([]);
+  const [historialClienteLoading, setHistorialClienteLoading] = useState(false);
+
+  useEffect(() => {
+    if (!user || !clienteId.trim()) {
+      setHistorialCliente([]);
+      setHistorialClienteLoading(false);
+      return;
     }
-    return ordenarPrestamosParaPrincipal(merged);
-  }, [prestamos, prestamosPagados, prestamosCastigados, clienteId]);
+    let cancelled = false;
+    setHistorialClienteLoading(true);
+    void (async () => {
+      try {
+        const token = await user.getIdToken();
+        const rows = await listUltimosPrestamosCliente(token, clienteId.trim());
+        if (!cancelled) setHistorialCliente(rows);
+      } catch {
+        if (!cancelled) setHistorialCliente([]);
+      } finally {
+        if (!cancelled) setHistorialClienteLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user, clienteId]);
 
   if (!profile || !isAdminPanelRole(profile.role)) return null;
 
@@ -797,8 +815,8 @@ export default function PrestamoAdminPageContent() {
           cajaRuta={cajaRuta}
           historialEconomicoColapsado={historialEconomicoColapsado}
           onHistorialEconomicoColapsadoToggle={() => setHistorialEconomicoColapsado((v) => !v)}
-          loading={loading}
-          prestamosDelCliente={prestamosDelCliente}
+          loading={historialClienteLoading}
+          prestamosDelCliente={historialCliente}
           modalidad={modalidad}
           onModalidadChange={setModalidad}
           numeroCuotas={numeroCuotas}

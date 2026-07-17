@@ -14,11 +14,13 @@ import {
 import {
   solicitarPrestamoEmpleado,
   evaluarAprobacionPrestamoEmpleado,
+  listUltimosPrestamosCliente,
   clienteNumFromCodigo,
   esPrestamoMorosoPendiente,
   formatClienteCodigoCorto,
   type ClienteItem,
   type PrestamoItem,
+  type PrestamoHistorialClienteItem,
   type EvaluacionAprobacionPrestamoApi,
 } from "@/lib/empresa-api";
 import { formatInteresResumenPct, parseInteresPct } from "@/lib/interes-pct";
@@ -35,6 +37,7 @@ import {
   formatDebeSlashTotalCredito,
   formatFechaCreacionPrestamo,
 } from "@/lib/prestamo-display";
+import { labelEstadoPrestamo } from "@/lib/prestamo-estado";
 import { sugerirFechaFinalYmd, formatFechaFinalDisplay, DIAS_COBRO_MODO_DEFAULT, DIAS_COBRO_MODO_OPTIONS, labelDiasCobroModo } from "@/lib/prestamo-fecha-final";
 import { fechaDiaColombiaHoy } from "@/lib/colombia-day-bounds";
 import type { DiasCobroModo } from "@/types/firestore";
@@ -120,6 +123,9 @@ export default function PrestamoTrabajadorPageContent() {
   const [evaluacionAprobacion, setEvaluacionAprobacion] =
     useState<EvaluacionAprobacionPrestamoApi | null>(null);
   const [evaluandoAprobacion, setEvaluandoAprobacion] = useState(false);
+  /** Últimos 3 préstamos del cliente seleccionado — consulta puntual (3 lecturas). */
+  const [historialCliente, setHistorialCliente] = useState<PrestamoHistorialClienteItem[]>([]);
+  const [historialClienteLoading, setHistorialClienteLoading] = useState(false);
   const [exitoCreacion, setExitoCreacion] = useState<string | null>(null);
   const [filtroEstado, setFiltroEstado] = useState<"hoy" | "activos" | "noActivos" | "morosos">("hoy");
   const [busquedaNombre, setBusquedaNombre] = useState("");
@@ -229,6 +235,30 @@ export default function PrestamoTrabajadorPageContent() {
     prestamosPagados.length,
     cargarMasPagados,
   ]);
+
+  useEffect(() => {
+    if (!user || !clienteId.trim()) {
+      setHistorialCliente([]);
+      setHistorialClienteLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setHistorialClienteLoading(true);
+    void (async () => {
+      try {
+        const token = await user.getIdToken();
+        const rows = await listUltimosPrestamosCliente(token, clienteId.trim());
+        if (!cancelled) setHistorialCliente(rows);
+      } catch {
+        if (!cancelled) setHistorialCliente([]);
+      } finally {
+        if (!cancelled) setHistorialClienteLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user, clienteId]);
 
   const montoNumPreview = interiorDecimalCOPToNumber(monto);
 
@@ -643,6 +673,47 @@ export default function PrestamoTrabajadorPageContent() {
               {clienteSeleccionado.nombre}
             </strong>
           </p>
+        )}
+
+        {clienteSeleccionado && (
+          <div
+            className="form-group"
+            style={{
+              marginBottom: "1rem",
+              border: "1px solid var(--card-border)",
+              borderRadius: "var(--radius)",
+              padding: "0.6rem 0.75rem",
+            }}
+          >
+            <p style={{ margin: "0 0 0.35rem", fontWeight: 600, fontSize: "0.875rem" }}>
+              Préstamos anteriores
+            </p>
+            {historialClienteLoading ? (
+              <p style={{ color: "var(--text-muted)", fontSize: "0.875rem", margin: 0 }}>
+                Cargando...
+              </p>
+            ) : historialCliente.length === 0 ? (
+              <p style={{ color: "var(--text-muted)", fontSize: "0.875rem", margin: 0 }}>
+                Este cliente no tiene préstamos anteriores.
+              </p>
+            ) : (
+              <ul style={{ margin: 0, paddingLeft: "1.1rem", fontSize: "0.875rem", lineHeight: 1.7 }}>
+                {historialCliente.map((p) => (
+                  <li key={p.id}>
+                    <strong>$ {formatMoneda(p.monto)}</strong>
+                    {" · "}
+                    {formatInteresResumenPct(p.interes)}%
+                    {" · "}
+                    {p.numeroCuotas} {p.modalidad}
+                    {" · "}
+                    {labelEstadoPrestamo(p)}
+                    {" · "}
+                    {formatFechaCreacionPrestamo(p)}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         )}
 
         <div

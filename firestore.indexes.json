@@ -255,6 +255,14 @@
       ]
     },
     {
+      "collectionGroup": "prestamos",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "clienteId", "order": "ASCENDING" },
+        { "fieldPath": "creadoEn", "order": "DESCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "empresas",
       "queryScope": "COLLECTION",
       "fields": [
