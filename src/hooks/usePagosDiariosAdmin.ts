@@ -16,6 +16,7 @@ import {
   finDiaColombiaUtc,
   fechaDiaColombiaHoy,
 } from "@/lib/colombia-day-bounds";
+import { calcularTotalesPagosDiariosAdmin } from "@/lib/pagos-diarios-filter";
 
 export type PagoDiarioAdminItem = {
   id: string;
@@ -128,30 +129,10 @@ export function usePagosDiariosAdmin(fechaDia: string) {
     return unsub;
   }, [user?.uid, profile?.role, profile?.empresaId, fechaDia]);
 
-  const totales = useMemo((): PagosDiariosAdminTotales => {
-    const cobrosActivos = pagos.filter((p) => p.tipo === "pago" && p.estado === "activo");
-    const noPagos = pagos.filter((p) => p.tipo === "no_pago" && p.estado === "activo");
-    const perdidas = pagos.filter((p) => p.tipo === "perdida" && p.estado === "activo");
-
-    let totalEfectivo = 0;
-    let totalTransferencia = 0;
-    for (const c of cobrosActivos) {
-      const m = c.monto;
-      if (m <= 0) continue;
-      const metodo = (c.metodoPago ?? "").toLowerCase();
-      if (metodo === "transferencia") totalTransferencia += m;
-      else totalEfectivo += m;
-    }
-
-    return {
-      totalCobros: Math.round((totalEfectivo + totalTransferencia) * 100) / 100,
-      totalEfectivo: Math.round(totalEfectivo * 100) / 100,
-      totalTransferencia: Math.round(totalTransferencia * 100) / 100,
-      countCobros: cobrosActivos.length,
-      countNoPagos: noPagos.length,
-      countPerdidas: perdidas.length,
-    };
-  }, [pagos]);
+  const totales = useMemo(
+    (): PagosDiariosAdminTotales => calcularTotalesPagosDiariosAdmin(pagos),
+    [pagos]
+  );
 
   const fechaHoy = fechaDiaColombiaHoy();
 
