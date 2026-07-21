@@ -74,8 +74,10 @@ export default function DeshabilitadoPage() {
             </div>
             <h1 className="deshabilitado-titulo">Cuenta deshabilitada</h1>
             <p className="deshabilitado-body">
-              Tu cuenta está temporalmente deshabilitada. Comunícate con el administrador para
-              reactivarla.
+              Tu cuenta está temporalmente deshabilitada, puede relacionarse a temas de mantenimiento del sistema o falta de pago. 
+            </p>
+            <p className="deshabilitado-body">
+              Comunícate con el administrador para mas información.
             </p>
             <a
               href={WHATSAPP_URL}
