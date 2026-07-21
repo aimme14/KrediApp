@@ -8,6 +8,7 @@ import { useAuth } from "@/context/AuthContext";
 import { roleLabel } from "@/types/roles";
 import DashboardNotifications from "@/components/DashboardNotifications";
 import InactivityLock from "@/components/InactivityLock";
+import AvisoAccesoVencimiento from "@/components/AvisoAccesoVencimiento";
 import { DashboardHeaderProvider } from "@/context/DashboardHeaderContext";
 import { GastoFcmCampanitaProvider } from "@/context/GastoFcmCampanitaContext";
 import { OfflineRootEffect } from "@/components/OfflineRootEffect";
@@ -15,6 +16,7 @@ import { getEmpresa } from "@/lib/empresa";
 import type { ReactNode } from "react";
 import type { EmpresaProfile } from "@/types/empresa";
 import { isAdminPanelRole } from "@/lib/admin-panel-role";
+import { resolverEmpresaIdParaAcceso } from "@/lib/aviso-acceso-vencimiento";
 
 const DashboardHelp = dynamic(() => import("@/components/help/DashboardHelp"), { ssr: false });
 const DashboardSettings = dynamic(() => import("@/components/DashboardSettings"), { ssr: false });
@@ -51,7 +53,9 @@ export default function DashboardLayout({
     }
   }, [user, profile, loading, isEnabled, router]);
 
-  const empresaDocId = isJefe ? profile?.uid : profile?.empresaId;
+  const empresaDocId = profile
+    ? resolverEmpresaIdParaAcceso(profile) ?? profile.empresaId ?? null
+    : null;
   useEffect(() => {
     if (!empresaDocId) return;
     let cancelled = false;
@@ -106,6 +110,7 @@ export default function DashboardLayout({
   return (
     <InactivityLock>
       <OfflineRootEffect />
+      <AvisoAccesoVencimiento />
       <GastoFcmCampanitaProvider>
         <DashboardHeaderProvider value={setHeaderLeftSlot}>
           <div

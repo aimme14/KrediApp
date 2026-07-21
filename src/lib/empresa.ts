@@ -10,12 +10,19 @@ export async function getEmpresa(jefeUid: string): Promise<EmpresaProfile | null
   const snap = await getDoc(docRef);
   if (!snap.exists()) return null;
   const d = snap.data();
+  const accesoRaw = d.accesoHasta;
+  const accesoHasta =
+    typeof accesoRaw === "string" && /^\d{4}-\d{2}-\d{2}/.test(accesoRaw.trim())
+      ? accesoRaw.trim().slice(0, 10)
+      : null;
+
   return {
     nombre: d.nombre ?? "",
     logo: d.logo ?? "",
     dueño: d.dueño ?? "",
     sedePrincipal: d.sedePrincipal ?? "",
     activa: d.activa !== false,
+    accesoHasta,
   };
 }
 

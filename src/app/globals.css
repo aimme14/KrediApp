@@ -1035,6 +1035,126 @@ button {
   border-top: 1px solid var(--card-border);
 }
 
+/* Aviso de acceso próximo a vencer (1–2 días antes del corte) */
+.aviso-acceso-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+}
+
+.aviso-acceso-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+}
+
+.aviso-acceso-card {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 420px;
+  margin: 0;
+  padding: 2rem 1.75rem 1.5rem;
+  text-align: center;
+  overflow: hidden;
+  border-color: color-mix(in srgb, #38bdf8 28%, var(--card-border));
+  background:
+    radial-gradient(ellipse 120% 80% at 50% -20%, color-mix(in srgb, #38bdf8 12%, transparent), transparent 55%),
+    var(--card-bg);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.22);
+}
+
+[data-theme="light"] .aviso-acceso-card {
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.1);
+}
+
+.aviso-acceso-deco {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.aviso-acceso-deco-item {
+  position: absolute;
+  display: inline-flex;
+  opacity: 0.55;
+}
+
+.aviso-acceso-deco-star {
+  top: 1rem;
+  left: 1.15rem;
+  color: #fbbf24;
+}
+
+.aviso-acceso-deco-rocket {
+  top: 1.1rem;
+  right: 1.2rem;
+  color: #38bdf8;
+}
+
+.aviso-acceso-deco-dollar {
+  bottom: 4.75rem;
+  left: 1.1rem;
+  color: #34d399;
+}
+
+.aviso-acceso-deco-bell {
+  bottom: 4.75rem;
+  right: 1.15rem;
+  color: #f59e0b;
+}
+
+[data-theme="light"] .aviso-acceso-deco-item {
+  opacity: 0.7;
+}
+
+.aviso-acceso-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 3.25rem;
+  height: 3.25rem;
+  margin-bottom: 0.85rem;
+  border-radius: 50%;
+  background: color-mix(in srgb, #38bdf8 16%, var(--card-bg));
+  border: 1px solid color-mix(in srgb, #38bdf8 38%, transparent);
+  color: #38bdf8;
+}
+
+[data-theme="light"] .aviso-acceso-icon {
+  color: #0284c7;
+}
+
+.aviso-acceso-titulo {
+  margin: 0 0 0.85rem;
+  font-size: 1.3rem;
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--text);
+}
+
+.aviso-acceso-body {
+  margin: 0 0 0.25rem;
+  font-size: 0.95rem;
+  line-height: 1.65;
+  color: var(--text-muted);
+}
+
+.aviso-acceso-actions {
+  margin-top: 1.35rem;
+  padding-top: 1.15rem;
+  border-top: 1px solid var(--card-border);
+}
+
+.aviso-acceso-actions .btn {
+  width: 100%;
+  max-width: 280px;
+}
+
 /* Modal anular cobro — admin pagos diarios (tema claro/oscuro) */
 .pagos-diarios-anular-resumen {
   background: var(--btn-secondary-bg);
