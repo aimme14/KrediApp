@@ -27,14 +27,14 @@ export function isPrestamoCastigado(p: { estado: string }): boolean {
   return p.estado === "castigado";
 }
 
-/** Etiqueta legible para UI. */
+/** Etiqueta legible para UI. La pérdida siempre cierra el préstamo (castigado); no hay pérdida parcial. */
 export function labelEstadoPrestamo(p: {
   estado: string;
+  /** Ignorado: se conserva por compatibilidad de llamadas; la pérdida no deja el préstamo activo. */
   totalCastigado?: number;
 }): string {
   if (p.estado === "castigado") return "Pérdida";
   if (p.estado === "pagado") return "Pagado";
-  if ((p.totalCastigado ?? 0) > 0) return "Activo (con pérdida parcial)";
   return "Activo";
 }
 

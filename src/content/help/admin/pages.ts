@@ -23,7 +23,7 @@ export const ADMIN_HELP_PAGES: Record<AdminHelpPageKey, HelpPageContent> = {
     summary:
       "Vista general de la operación del día: rutas, clientes, préstamos activos, morosos y capital. Úsala como punto de partida cada mañana.",
     steps: [
-      "Revisa rigurosamente la informacion del estado de cada ruta (capital, base, inversiones, ganancias, perdidas, clientes, prestamos, morosos, etc).",
+      "Revisa rigurosamente la informacion del estado de cada ruta (capital = caja + bases + inversiones; ganancias y perdidas son informativos; clientes, prestamos, morosos, etc).",
       "Accede rápido a las secciones clave desde el menú lateral o la barra inferior en móvil.",
     ],
     cautions: [
@@ -237,6 +237,7 @@ export const ADMIN_HELP_PAGES: Record<AdminHelpPageKey, HelpPageContent> = {
     ],
     cautions: [
       "Los cobros en campo los registra normalmente el trabajador; usa esta vista solo cuando sea necesario.",
+      "Registrar pérdida castiga todo el saldo pendiente y cierra el préstamo; no existe pérdida parcial.",
     ],
     relatedLinks: [{ label: "Préstamos", href: "/dashboard/admin/prestamo" }],
   },

@@ -63,12 +63,14 @@ export default function CobrarPerdidaPanel({
         <p className="cobrar-subtitle">{cliente.nombre}</p>
       </div>
       <p className="cobrar-text">
-        Indica el motivo para castigar el saldo pendiente del préstamo. Esta acción no se puede deshacer.
+        Se castiga todo el saldo pendiente del préstamo (no hay pérdida parcial) y el préstamo queda
+        cerrado como pérdida. Indica el motivo. Esta acción no se puede deshacer.
       </p>
       {desglosePerdida ? (
         <>
           <p style={{ fontSize: "0.9375rem", marginTop: "0.25rem" }}>
-            Saldo pendiente: <strong>{formatCurrencyCobro(desglosePerdida.saldoPendiente)}</strong>
+            Monto a castigar (saldo completo):{" "}
+            <strong>{formatCurrencyCobro(desglosePerdida.saldoPendiente)}</strong>
           </p>
           <div
             style={{
@@ -162,7 +164,14 @@ export default function CobrarPerdidaPanel({
           onConfirmar={onConfirmar}
         >
           <p>
-            ¿Confirmas registrar la pérdida del préstamo de <strong>{cliente.nombre}</strong>?
+            ¿Confirmas castigar todo el saldo pendiente del préstamo de{" "}
+            <strong>{cliente.nombre}</strong>?
+            {desglosePerdida ? (
+              <>
+                {" "}
+                Monto: <strong>{formatCurrencyCobro(desglosePerdida.saldoPendiente)}</strong>.
+              </>
+            ) : null}
           </p>
           {desglosePerdida ? (
             desglosePerdida.capitalNoRecuperado > 0 ? (

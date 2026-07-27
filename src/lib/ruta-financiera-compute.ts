@@ -63,10 +63,15 @@ export type RutaUpdateCobro = {
   inversiones: number;
   ganancias: number;
   capitalTotal: number;
+  /** Capital realmente restado de `inversiones` (≤ split teórico). */
+  inversionesDescontadas: number;
+  /** Interés + capital no registrado que se sumó a `ganancias`. */
+  gananciaAplicada: number;
 };
 
 /**
  * Cobro que ingresa a caja de ruta: el efectivo sube cajaRuta; solo la parte capital recupera inversión.
+ * Si el capital teórico supera `inversiones`, el remanente se contabiliza en ganancias.
  */
 export function computeRutaCamposTrasCobroPrestamo(
   rutaData: Record<string, unknown>,
@@ -113,6 +118,8 @@ export function computeRutaCamposTrasCobroPrestamo(
     inversiones,
     ganancias,
     capitalTotal: nuevoCapitalTotal,
+    inversionesDescontadas: capitalDescontar,
+    gananciaAplicada: gananciaTotal,
   };
 }
 
@@ -124,11 +131,16 @@ export type RutaUpdateCobroEnEmpleado = {
   capitalTotal: number;
   /** Efectivo total del cobro que ingresa a la caja del trabajador (capital recuperado + interés / ganancia). */
   montoAcreditarCajaEmpleado: number;
+  /** Capital realmente restado de `inversiones` (≤ split teórico). */
+  inversionesDescontadas: number;
+  /** Interés + capital no registrado que se sumó a `ganancias`. */
+  gananciaAplicada: number;
 };
 
 /**
  * Cobro del trabajador: todo el efectivo cobrado entra en su caja; solo la parte capital reduce `inversiones`
  * (hasta agotar el colocado). El interés no sale de inversiones: queda como ganancia en la caja del trabajador.
+ * Si el capital teórico supera `inversiones`, el remanente se contabiliza en ganancias.
  */
 export function computeRutaCamposTrasCobroPrestamoCobroEnEmpleado(
   rutaData: Record<string, unknown>,
@@ -177,6 +189,8 @@ export function computeRutaCamposTrasCobroPrestamoCobroEnEmpleado(
     ganancias,
     capitalTotal: nuevoCapitalTotal,
     montoAcreditarCajaEmpleado: montoAplicar,
+    inversionesDescontadas: capitalDescontar,
+    gananciaAplicada: gananciaTotal,
   };
 }
 

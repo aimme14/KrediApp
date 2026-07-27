@@ -3,10 +3,16 @@ import {
   validarCoherenciaPrestamoConPago,
   determinarModoReversion,
   calcularReversion,
+  resolverImpactoReversionPago,
   type DatosPago,
   type DatosPrestamo,
   type DatosRuta,
 } from "../anular-pago-prestamo";
+import {
+  computeRutaCamposTrasCobroPrestamo,
+  computeRutaCamposTrasCobroPrestamoCobroEnEmpleado,
+  round2,
+} from "../ruta-financiera-compute";
 
 const pagoBase: DatosPago = {
   estado: "activo",
@@ -219,6 +225,145 @@ describe("calcularReversion — acreditaCajaRuta: true", () => {
     expect(rev.nuevaCajaRuta).toBe(450_000);
     expect(rev.nuevosCajasEmpleados).toBe(200_000);
     expect(rev.nuevaCajaEmpleado).toBeNull();
+  });
+});
+
+describe("resolverImpactoReversionPago", () => {
+  it("usa campos nuevos cuando existen", () => {
+    expect(
+      resolverImpactoReversionPago({
+        ...pagoBase,
+        cuotaCapital: 40_000,
+        cuotaGanancia: 10_000,
+        inversionesDescontadas: 10_000,
+        gananciaAplicada: 40_000,
+      })
+    ).toEqual({ inversionesDescontadas: 10_000, gananciaAplicada: 40_000 });
+  });
+
+  it("fallback legacy a cuotaCapital/cuotaGanancia", () => {
+    expect(resolverImpactoReversionPago(pagoBase)).toEqual({
+      inversionesDescontadas: 40_000,
+      gananciaAplicada: 10_000,
+    });
+  });
+});
+
+describe("calcularReversion — capital no registrado (ida y vuelta)", () => {
+  const rutaPobre: DatosRuta = {
+    cajaRuta: 1_000_000,
+    cajasEmpleados: 500_000,
+    inversiones: 10_000,
+    ganancias: 50_000,
+    perdidas: 0,
+  };
+
+  it("cobro admin + anulación restaura saldos de ruta", () => {
+    const monto = 100_000;
+    const montoPrestamo = 500_000;
+    const totalAPagar = 600_000;
+    const cobro = computeRutaCamposTrasCobroPrestamo(
+      rutaPobre,
+      monto,
+      montoPrestamo,
+      totalAPagar
+    );
+    const { capital, ganancia } = (() => {
+      const ratio = montoPrestamo / totalAPagar;
+      const c = round2(monto * ratio);
+      return { capital: c, ganancia: round2(monto - c) };
+    })();
+
+    const rutaTrasCobro: DatosRuta = {
+      ...rutaPobre,
+      cajaRuta: cobro.cajaRuta,
+      inversiones: cobro.inversiones,
+      ganancias: cobro.ganancias,
+    };
+
+    const pago: DatosPago = {
+      ...pagoBase,
+      monto,
+      cuotaCapital: capital,
+      cuotaGanancia: ganancia,
+      inversionesDescontadas: cobro.inversionesDescontadas,
+      gananciaAplicada: cobro.gananciaAplicada,
+      acreditaCajaRuta: true,
+      saldoPendienteAntes: 200_000,
+      saldoPendienteDespues: 100_000,
+    };
+
+    const rev = calcularReversion({
+      pago,
+      prestamo: { ...prestamoBase, saldoPendiente: 100_000 },
+      ruta: rutaTrasCobro,
+      empleado: null,
+      modo: "snapshots",
+    });
+
+    expect(rev.nuevaCajaRuta).toBe(rutaPobre.cajaRuta);
+    expect(rev.nuevasInversiones).toBe(rutaPobre.inversiones);
+    expect(rev.nuevasGanancias).toBe(rutaPobre.ganancias);
+  });
+
+  it("cobro empleado + anulación restaura saldos de ruta", () => {
+    const monto = 100_000;
+    const montoPrestamo = 500_000;
+    const totalAPagar = 600_000;
+    const cobro = computeRutaCamposTrasCobroPrestamoCobroEnEmpleado(
+      rutaPobre,
+      monto,
+      montoPrestamo,
+      totalAPagar
+    );
+    const ratio = montoPrestamo / totalAPagar;
+    const capital = round2(monto * ratio);
+    const ganancia = round2(monto - capital);
+
+    const rutaTrasCobro: DatosRuta = {
+      ...rutaPobre,
+      cajasEmpleados: cobro.cajasEmpleados,
+      inversiones: cobro.inversiones,
+      ganancias: cobro.ganancias,
+    };
+
+    const pago: DatosPago = {
+      ...pagoBase,
+      monto,
+      cuotaCapital: capital,
+      cuotaGanancia: ganancia,
+      inversionesDescontadas: cobro.inversionesDescontadas,
+      gananciaAplicada: cobro.gananciaAplicada,
+      acreditaCajaRuta: false,
+      saldoPendienteAntes: 200_000,
+      saldoPendienteDespues: 100_000,
+    };
+
+    const rev = calcularReversion({
+      pago,
+      prestamo: { ...prestamoBase, saldoPendiente: 100_000 },
+      ruta: rutaTrasCobro,
+      empleado: { cajaEmpleado: 300_000 + monto },
+      modo: "snapshots",
+    });
+
+    expect(rev.nuevosCajasEmpleados).toBe(rutaPobre.cajasEmpleados);
+    expect(rev.nuevasInversiones).toBe(rutaPobre.inversiones);
+    expect(rev.nuevasGanancias).toBe(rutaPobre.ganancias);
+    expect(rev.nuevaCajaEmpleado).toBe(300_000);
+  });
+
+  it("pago legacy sin impacto: sigue usando cuotaCapital/cuotaGanancia", () => {
+    const rev = calcularReversion({
+      pago: { ...pagoBase, acreditaCajaRuta: true },
+      prestamo: prestamoBase,
+      ruta: rutaBase,
+      empleado: null,
+      modo: "snapshots",
+    });
+    expect(rev.nuevaCajaRuta).toBe(450_000);
+    expect(rev.nuevasInversiones).toBe(840_000);
+    expect(rev.nuevasGanancias).toBe(40_000);
   });
 });
 

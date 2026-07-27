@@ -16,7 +16,13 @@ import {
   startIdempotentOperation,
   finishIdempotentOperation,
 } from "@/lib/financial-idempotency";
-import { recordDebitMovement } from "@/lib/financial-ledger";
+import {
+  buildAnulacionLedgerDebits,
+  drainLedgerOutbox,
+  enqueueLedgerOutboxInTx,
+  isFinancialLedgerEnabled,
+  markPagoLedgerStatus,
+} from "@/lib/financial-ledger";
 import { upsertCapitalRutaSnapshot } from "@/lib/capital-ruta-snapshot";
 import {
   fechaDiaColombiaHoy,
@@ -37,6 +43,7 @@ import {
   type DatosEmpleado,
   type AnulacionElegibilidadError,
 } from "@/lib/anular-pago-prestamo";
+import { deltaTotalPrestamosActivosPorCambioEstado } from "@/lib/total-prestamos-activos";
 import { withRateLimit } from "@/lib/with-rate-limit";
 import { anularLimiterUser } from "@/lib/rate-limit";
 
@@ -63,6 +70,12 @@ function mapDatosPago(pd: Record<string, unknown>): DatosPago {
     monto: typeof pd.monto === "number" ? pd.monto : 0,
     cuotaCapital: typeof pd.cuotaCapital === "number" ? pd.cuotaCapital : 0,
     cuotaGanancia: typeof pd.cuotaGanancia === "number" ? pd.cuotaGanancia : 0,
+    inversionesDescontadas:
+      typeof pd.inversionesDescontadas === "number"
+        ? pd.inversionesDescontadas
+        : undefined,
+    gananciaAplicada:
+      typeof pd.gananciaAplicada === "number" ? pd.gananciaAplicada : undefined,
     acreditaCajaRuta: inferirAcreditaCajaRuta(pd),
     tieneSnapshotsCompletos: pd.tieneSnapshotsCompletos === true,
     saldoPendienteAntes:
@@ -454,13 +467,61 @@ async function postHandler(
         }
       }
 
+      const adminIdPrestamo =
+        typeof pr.adminId === "string" && pr.adminId.trim()
+          ? pr.adminId.trim()
+          : apiUser.uid;
+      const deltaContador = deltaTotalPrestamosActivosPorCambioEstado({
+        estadoAntes: prestamo.estado,
+        estadoDespues: rev.nuevoEstadoPrestamo,
+      });
+      if (deltaContador !== 0) {
+        tx.set(
+          db
+            .collection(EMPRESAS_COLLECTION)
+            .doc(empresaId)
+            .collection(USUARIOS_SUBCOLLECTION)
+            .doc(adminIdPrestamo),
+          { totalPrestamosActivos: FieldValue.increment(deltaContador) },
+          { merge: true }
+        );
+      }
+
+      const walletBalanceAfterAnul = pago.acreditaCajaRuta
+        ? rev.nuevaCajaRuta
+        : rev.nuevaCajaEmpleado;
+      const ledgerSpecs = buildAnulacionLedgerDebits({
+        acreditaCajaRuta: pago.acreditaCajaRuta,
+        rutaId,
+        empleadoId: empleadoCobrador,
+        pagoId,
+        cuotaCapital: pago.cuotaCapital,
+        cuotaGanancia: pago.cuotaGanancia,
+        walletBalanceAfter: walletBalanceAfterAnul,
+        createdBy: apiUser.uid,
+        prestamoId,
+        modo,
+      });
+      const ledgerOperationIds = enqueueLedgerOutboxInTx(
+        tx,
+        db,
+        empresaId,
+        ledgerSpecs
+      );
+      if (isFinancialLedgerEnabled()) {
+        tx.set(
+          pagoRef,
+          {
+            ledgerStatus: ledgerOperationIds.length > 0 ? "pending" : "skipped",
+          },
+          { merge: true }
+        );
+      }
+
       return {
         rutaId,
         reabrePrestamo: rev.reabrePrestamo,
-        adminId:
-          typeof pr.adminId === "string" && pr.adminId.trim()
-            ? pr.adminId.trim()
-            : apiUser.uid,
+        adminId: adminIdPrestamo,
         modo,
         nuevoSaldoPendiente: rev.nuevoSaldoPendiente,
         cuotaCapital: pago.cuotaCapital,
@@ -468,6 +529,7 @@ async function postHandler(
         acreditaCajaRuta: pago.acreditaCajaRuta,
         empleadoId: empleadoCobrador,
         nuevaCajaEmpleado: rev.nuevaCajaEmpleado,
+        ledgerOperationIds,
       };
     });
 
@@ -483,62 +545,15 @@ async function postHandler(
       }
     }
 
-    if (result.reabrePrestamo && result.adminId) {
-      void db
-        .collection(EMPRESAS_COLLECTION)
-        .doc(empresaId)
-        .collection(USUARIOS_SUBCOLLECTION)
-        .doc(result.adminId)
-        .set({ totalPrestamosActivos: FieldValue.increment(1) }, { merge: true });
-    }
-
-    try {
-      if (result.cuotaCapital > 0) {
-        await recordDebitMovement({
-          db,
-          empresaId,
-          walletType: result.acreditaCajaRuta ? "ruta_caja" : "empleado_caja",
-          walletId: result.acreditaCajaRuta
-            ? (result.rutaId ?? "")
-            : (result.empleadoId ?? ""),
-          amount: result.cuotaCapital,
-          balanceAfter:
-            !result.acreditaCajaRuta && result.nuevaCajaEmpleado !== null
-              ? result.nuevaCajaEmpleado
-              : undefined,
-          eventType: "anulacion_pago_capital",
-          scope: result.acreditaCajaRuta ? "ruta" : "empleado",
-          createdBy: apiUser.uid,
-          relatedEntityType: "pago",
-          relatedEntityId: pagoId,
-          metadata: { prestamoId, rutaId: result.rutaId, modo: result.modo },
-          operationId: `anulacion_capital:${pagoId}`,
-        });
-      }
-      if (result.cuotaGanancia > 0) {
-        await recordDebitMovement({
-          db,
-          empresaId,
-          walletType: result.acreditaCajaRuta ? "ruta_caja" : "empleado_caja",
-          walletId: result.acreditaCajaRuta
-            ? (result.rutaId ?? "")
-            : (result.empleadoId ?? ""),
-          amount: result.cuotaGanancia,
-          balanceAfter:
-            !result.acreditaCajaRuta && result.nuevaCajaEmpleado !== null
-              ? result.nuevaCajaEmpleado
-              : undefined,
-          eventType: "anulacion_pago_ganancia",
-          scope: result.acreditaCajaRuta ? "ruta" : "empleado",
-          createdBy: apiUser.uid,
-          relatedEntityType: "pago",
-          relatedEntityId: pagoId,
-          metadata: { prestamoId, rutaId: result.rutaId, modo: result.modo },
-          operationId: `anulacion_ganancia:${pagoId}`,
-        });
-      }
-    } catch (e) {
-      console.warn("[ledger] No se pudo registrar movimiento de anulación", e);
+    if (result.ledgerOperationIds.length > 0) {
+      const drain = await drainLedgerOutbox(db, empresaId, result.ledgerOperationIds);
+      await markPagoLedgerStatus({
+        db,
+        empresaId,
+        prestamoId,
+        pagoId,
+        status: drain.failed > 0 ? "pending" : "committed",
+      });
     }
 
     return finalize(200, {

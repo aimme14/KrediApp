@@ -44,7 +44,10 @@ export type RutaItem = {
   gastos?: number;
   /** Pérdidas acumuladas del período. */
   perdidas?: number;
-  /** Patrimonio total de la ruta (caja ruta + bases empleados + inversiones − pérdidas). */
+  /**
+   * Patrimonio total de la ruta: cajaRuta + cajasEmpleados + inversiones.
+   * `ganancias` y `perdidas` son informativos; las pérdidas ya se reflejan al bajar inversiones.
+   */
   capitalTotal?: number;
 };
 
@@ -1213,7 +1216,11 @@ export async function registrarNoPago(
   if (!res.ok) throw new Error(data.error ?? "Error al registrar no pago");
 }
 
-/** Registra pérdida reconocida (monto que no se cobrará): ajusta saldo del préstamo y ruta (inversiones → pérdidas). */
+/**
+ * Registra pérdida/castigo del préstamo: el servidor castiga todo el saldo pendiente
+ * (el `monto` se valida como positivo; el valor efectivo es el saldo completo).
+ * Cierra el préstamo como castigado y ajusta inversiones/ganancias/pérdidas de la ruta.
+ */
 export async function registrarPerdida(
   token: string,
   prestamoId: string,

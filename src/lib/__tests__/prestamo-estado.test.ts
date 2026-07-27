@@ -42,11 +42,9 @@ describe("isPrestamoCerrado / isPrestamoCastigado", () => {
 });
 
 describe("labelEstadoPrestamo", () => {
-  it("etiqueta según estado y pérdida parcial", () => {
+  it("etiqueta según estado (sin pérdida parcial en activo)", () => {
     expect(labelEstadoPrestamo({ estado: "activo" })).toBe("Activo");
-    expect(labelEstadoPrestamo({ estado: "activo", totalCastigado: 50_000 })).toBe(
-      "Activo (con pérdida parcial)"
-    );
+    expect(labelEstadoPrestamo({ estado: "activo", totalCastigado: 50_000 })).toBe("Activo");
     expect(labelEstadoPrestamo({ estado: "pagado" })).toBe("Pagado");
     expect(labelEstadoPrestamo({ estado: "castigado" })).toBe("Pérdida");
   });

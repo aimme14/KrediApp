@@ -877,45 +877,6 @@ button {
   justify-content: flex-end;
 }
 
-/* Modal novedades admin */
-.admin-novedad-content {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
-.admin-novedad-lead {
-  color: var(--text);
-  font-weight: 500;
-}
-
-.admin-novedad-link {
-  color: var(--link);
-  font-weight: 600;
-  text-decoration: none;
-}
-
-.admin-novedad-link:hover {
-  text-decoration: underline;
-}
-
-.admin-novedad-callout {
-  padding: 0.75rem 0.85rem;
-  border-radius: 10px;
-  border: 1px solid color-mix(in srgb, #d97706 35%, var(--card-border));
-  background: color-mix(in srgb, #d97706 9%, var(--card-bg));
-}
-
-.admin-novedad-callout p {
-  margin: 0;
-  color: var(--text);
-  line-height: 1.5;
-}
-
-.admin-novedad-callout strong {
-  color: var(--text);
-}
-
 /* Página cuenta deshabilitada */
 .deshabilitado-wrap {
   min-height: 100dvh;

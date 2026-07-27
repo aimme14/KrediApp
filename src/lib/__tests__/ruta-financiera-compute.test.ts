@@ -125,6 +125,57 @@ describe("computeRutaCamposTrasCobroPrestamo — cobro en caja ruta (admin)", ()
       computeRutaCamposTrasCobroPrestamo({} as never, 100_000, 500_000, 600_000)
     ).not.toThrow();
   });
+
+  it("inversiones bajas: remanente de capital va a ganancias y se reporta en impacto", () => {
+    const rutaPobre = { ...rutaBase, inversiones: 10_000 };
+    const { capital, ganancia } = splitMontoPagoEnCapitalYGanancia(
+      100_000,
+      500_000,
+      600_000
+    );
+    const result = computeRutaCamposTrasCobroPrestamo(
+      rutaPobre,
+      100_000,
+      500_000,
+      600_000
+    );
+    expect(result.inversionesDescontadas).toBe(10_000);
+    expect(result.inversiones).toBe(0);
+    const capitalNoRegistrado = round2(capital - 10_000);
+    expect(result.gananciaAplicada).toBe(round2(ganancia + capitalNoRegistrado));
+    expect(result.ganancias).toBe(
+      snapPesoCOP(round2(rutaPobre.ganancias + result.gananciaAplicada))
+    );
+  });
+});
+
+describe("impacto contable admin vs empleado — inversiones bajas", () => {
+  const rutaPobre = {
+    cajaRuta: 1_000_000,
+    cajasEmpleados: 500_000,
+    inversiones: 10_000,
+    ganancias: 50_000,
+    perdidas: 0,
+  };
+
+  it("misma gananciaAplicada e inversionesDescontadas en ambos caminos", () => {
+    const admin = computeRutaCamposTrasCobroPrestamo(
+      rutaPobre,
+      100_000,
+      500_000,
+      600_000
+    );
+    const emp = computeRutaCamposTrasCobroPrestamoCobroEnEmpleado(
+      rutaPobre,
+      100_000,
+      500_000,
+      600_000
+    );
+    expect(admin.inversionesDescontadas).toBe(emp.inversionesDescontadas);
+    expect(admin.gananciaAplicada).toBe(emp.gananciaAplicada);
+    expect(admin.inversiones).toBe(emp.inversiones);
+    expect(admin.ganancias).toBe(emp.ganancias);
+  });
 });
 
 describe("computeRutaCamposTrasCobroPrestamoCobroEnEmpleado", () => {

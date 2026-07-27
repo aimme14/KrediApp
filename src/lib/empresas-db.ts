@@ -80,6 +80,9 @@ export const USERS_COLLECTION = "users"; // Índice de auth
 /** Ledger financiero append-only por empresa. */
 export const FINANCIAL_MOVEMENTS_SUBCOLLECTION = "financialMovements";
 
+/** Outbox del ledger (pending → committed). empresas/{id}/financialLedgerOutbox/{operationId} */
+export const FINANCIAL_LEDGER_OUTBOX_SUBCOLLECTION = "financialLedgerOutbox";
+
 /** Saldos proyectados por wallet dentro de la empresa. */
 export const WALLET_BALANCES_SUBCOLLECTION = "walletBalances";
 

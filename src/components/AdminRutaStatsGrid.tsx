@@ -66,7 +66,7 @@ export function AdminRutaStatsGrid({
         <div className="admin-inicio-ruta-stat-body">
           <span className="admin-inicio-ruta-stat-label">Capital</span>
           <span className="admin-inicio-ruta-stat-value">{formatMoneda(ruta.capitalRuta ?? 0)}</span>
-          <span className="admin-inicio-ruta-stat-hint">total ruta</span>
+          <span className="admin-inicio-ruta-stat-hint">caja + bases + inversiones</span>
         </div>
       </div>
       <div className="admin-inicio-ruta-stat">

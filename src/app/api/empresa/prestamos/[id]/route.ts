@@ -19,6 +19,7 @@ import { recordCreditMovement } from "@/lib/financial-ledger";
 import { upsertCapitalRutaSnapshot } from "@/lib/capital-ruta-snapshot";
 import { computeCapitalTotalRutaDesdeSaldos } from "@/lib/capital-formulas";
 import { round2 } from "@/lib/ruta-financiera-compute";
+import { deltaTotalPrestamosActivosAlEliminar } from "@/lib/total-prestamos-activos";
 import { withRateLimit } from "@/lib/with-rate-limit";
 import { financialWriteLimiterUser } from "@/lib/rate-limit";
 
@@ -185,16 +186,19 @@ async function deleteHandler(
         tx.update(clienteRef, { prestamo_activo: false });
       }
 
-      // ── Decrementar contador de préstamos activos del admin ──
-      tx.set(
-        db
-          .collection(EMPRESAS_COLLECTION)
-          .doc(empresaId)
-          .collection(USUARIOS_SUBCOLLECTION)
-          .doc(adminId),
-        { totalPrestamosActivos: FieldValue.increment(-1) },
-        { merge: true }
-      );
+      // ── Decrementar contador solo si el préstamo aún contaba como activo ──
+      const deltaContador = deltaTotalPrestamosActivosAlEliminar(pr.estado);
+      if (deltaContador !== 0) {
+        tx.set(
+          db
+            .collection(EMPRESAS_COLLECTION)
+            .doc(empresaId)
+            .collection(USUARIOS_SUBCOLLECTION)
+            .doc(adminId),
+          { totalPrestamosActivos: FieldValue.increment(deltaContador) },
+          { merge: true }
+        );
+      }
 
       // ── Eliminar el préstamo ──
       tx.delete(prestamoRef);

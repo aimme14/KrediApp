@@ -187,6 +187,16 @@ export interface PagoDoc {
   /** Desglose contable del cobro (solo si tipo === "pago") */
   cuotaCapital?: number;
   cuotaGanancia?: number;
+  /**
+   * Capital realmente restado de inversiones al cobrar (≤ cuotaCapital).
+   * Usado en anulación simétrica; pagos legacy sin este campo usan cuotaCapital.
+   */
+  inversionesDescontadas?: number;
+  /**
+   * Monto realmente sumado a ganancias (interés + capital no registrado en inversiones).
+   * Usado en anulación simétrica; pagos legacy sin este campo usan cuotaGanancia.
+   */
+  gananciaAplicada?: number;
   /** Denormalización para collectionGroup admin */
   adminId?: string;
   empresaId?: string;
@@ -205,6 +215,8 @@ export interface PagoDoc {
   estadoPrestamoDespues?: EstadoPrestamo;
   acreditaCajaRuta?: boolean;
   tieneSnapshotsCompletos?: boolean;
+  /** Estado del ledger paralelo: pending | committed | skipped (solo si FINANCIAL_LEDGER_ENABLED). */
+  ledgerStatus?: "pending" | "committed" | "skipped";
 }
 
 /** Tipo de gasto */

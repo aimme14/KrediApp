@@ -13,14 +13,22 @@ import {
   USUARIOS_SUBCOLLECTION,
 } from "@/lib/empresas-db";
 import {
+  computeRutaCamposTrasCobroPrestamo,
   computeRutaCamposTrasCobroPrestamoCobroEnEmpleado,
   computeRutaCamposTrasPerdidaPrestamo,
   splitMontoPagoEnCapitalYGanancia,
   round2,
-  snapPesoCOP,
+  type RutaUpdateCobro,
+  type RutaUpdateCobroEnEmpleado,
 } from "@/lib/ruta-financiera-admin";
 import { upsertCapitalRutaSnapshot } from "@/lib/capital-ruta-snapshot";
-import { recordCreditMovement } from "@/lib/financial-ledger";
+import {
+  buildPagoLedgerCredits,
+  drainLedgerOutbox,
+  enqueueLedgerOutboxInTx,
+  isFinancialLedgerEnabled,
+  markPagoLedgerStatus,
+} from "@/lib/financial-ledger";
 import {
   startIdempotentOperation,
   finishIdempotentOperation,
@@ -30,6 +38,7 @@ import {
   normalizeEstadoPrestamo,
   resolverEstadoTrasMovimiento,
 } from "@/lib/prestamo-estado";
+import { deltaTotalPrestamosActivosPorCambioEstado } from "@/lib/total-prestamos-activos";
 import type { EstadoPrestamo } from "@/types/firestore";
 import { isAdminPanelApiUser } from "@/lib/admin-panel-role";
 import { withRateLimit } from "@/lib/with-rate-limit";
@@ -538,6 +547,27 @@ async function postHandler(
           tx.update(clienteRef, { prestamo_activo: false });
         }
 
+        const estadoAntesPerdida = normalizeEstadoPrestamo(d.estado);
+        const deltaContador = deltaTotalPrestamosActivosPorCambioEstado({
+          estadoAntes: estadoAntesPerdida,
+          estadoDespues: resolucionPerdida.estado,
+        });
+        if (deltaContador !== 0) {
+          const adminUid =
+            typeof d.adminId === "string" && d.adminId.trim()
+              ? d.adminId.trim()
+              : adminIdPrestamo;
+          tx.set(
+            db
+              .collection(EMPRESAS_COLLECTION)
+              .doc(apiUser.empresaId)
+              .collection(USUARIOS_SUBCOLLECTION)
+              .doc(adminUid),
+            { totalPrestamosActivos: FieldValue.increment(deltaContador) },
+            { merge: true }
+          );
+        }
+
         return {
           saldoPendiente: nuevoSaldo,
           adelantoCuota: adelantoParaGuardar,
@@ -562,22 +592,6 @@ async function postHandler(
             result.rutaId,
             rutaAfter.data()!
           );
-        }
-      }
-
-      if (result.saldoPendiente <= 0) {
-        const adminUidPrestamo =
-          typeof data.adminId === "string" ? data.adminId.trim() : "";
-        if (adminUidPrestamo) {
-          void db
-            .collection(EMPRESAS_COLLECTION)
-            .doc(apiUser.empresaId)
-            .collection(USUARIOS_SUBCOLLECTION)
-            .doc(adminUidPrestamo)
-            .set(
-              { totalPrestamosActivos: FieldValue.increment(-1) },
-              { merge: true }
-            );
         }
       }
 
@@ -719,6 +733,37 @@ async function postHandler(
         nuevoSaldo,
       });
 
+      /** Impacto real en ruta (mismo helper admin/empleado). Sin ruta: split teórico. */
+      let rutaUpdAdmin: RutaUpdateCobro | null = null;
+      let rutaUpdEmp: RutaUpdateCobroEnEmpleado | null = null;
+      let inversionesDescontadas = parteCapital;
+      let gananciaAplicada = parteGanancia;
+
+      if (rutaRef && rutaSnap?.exists && montoAplicar > 0) {
+        const rutaData = rutaSnap.data() as Record<string, unknown>;
+        if (acreditaCajaRuta) {
+          rutaUpdAdmin = computeRutaCamposTrasCobroPrestamo(
+            rutaData,
+            montoAplicar,
+            montoPrestamo,
+            totalAPagar,
+            cobradoAcumuladoAntes
+          );
+          inversionesDescontadas = rutaUpdAdmin.inversionesDescontadas;
+          gananciaAplicada = rutaUpdAdmin.gananciaAplicada;
+        } else {
+          rutaUpdEmp = computeRutaCamposTrasCobroPrestamoCobroEnEmpleado(
+            rutaData,
+            montoAplicar,
+            montoPrestamo,
+            totalAPagar,
+            cobradoAcumuladoAntes
+          );
+          inversionesDescontadas = rutaUpdEmp.inversionesDescontadas;
+          gananciaAplicada = rutaUpdEmp.gananciaAplicada;
+        }
+      }
+
       const pagoRef = prestamoRef.collection(PAGOS_SUBCOLLECTION).doc();
       const pagoData: Record<string, unknown> = {
         monto: montoAplicar,
@@ -731,6 +776,8 @@ async function postHandler(
         registradoPorNombre: nombreRegistro,
         cuotaCapital: parteCapital,
         cuotaGanancia: parteGanancia,
+        inversionesDescontadas,
+        gananciaAplicada,
         saldoPendienteAntes: saldoPendiente,
         saldoPendienteDespues: nuevoSaldo,
         adelantoCuotaAntes: adelantoActual,
@@ -772,39 +819,24 @@ async function postHandler(
       });
 
       if (rutaRef && rutaSnap?.exists) {
-        if (acreditaCajaRuta) {
-          const rutaData = rutaSnap.data() as Record<string, unknown>;
-          const cajaRuta = typeof rutaData.cajaRuta === "number" ? rutaData.cajaRuta : 0;
-          const cajasEmpleados =
-            typeof rutaData.cajasEmpleados === "number" ? rutaData.cajasEmpleados : 0;
-          let inversiones = typeof rutaData.inversiones === "number" ? rutaData.inversiones : 0;
-          let ganancias = typeof rutaData.ganancias === "number" ? rutaData.ganancias : 0;
-
-          const capitalDescontar = Math.min(parteCapital, inversiones);
-          inversiones = Math.round((inversiones - capitalDescontar) * 100) / 100;
-          ganancias = snapPesoCOP(Math.round((ganancias + parteGanancia) * 100) / 100);
-          const nuevaCajaRuta = Math.round((cajaRuta + montoAplicar) * 100) / 100;
-          const nuevoCapital = Math.round((nuevaCajaRuta + cajasEmpleados + inversiones) * 100) / 100;
-
+        if (acreditaCajaRuta && rutaUpdAdmin) {
           tx.update(rutaRef, {
-            cajaRuta: nuevaCajaRuta,
-            inversiones,
-            ganancias,
-            capitalTotal: nuevoCapital,
+            cajaRuta: rutaUpdAdmin.cajaRuta,
+            inversiones: rutaUpdAdmin.inversiones,
+            ganancias: rutaUpdAdmin.ganancias,
+            capitalTotal: rutaUpdAdmin.capitalTotal,
             cobradoAcumulado: FieldValue.increment(montoAplicar),
             ultimaActualizacion: nowTx,
           });
-        } else {
-          const rutaUpd = computeRutaCamposTrasCobroPrestamoCobroEnEmpleado(
-            rutaSnap.data() as Record<string, unknown>,
-            montoAplicar,
-            montoPrestamo,
-            totalAPagar,
-            cobradoAcumuladoAntes
-          );
-          const { montoAcreditarCajaEmpleado, ...rutaCampos } = rutaUpd;
+          walletBalanceAfter = rutaUpdAdmin.cajaRuta;
+        } else if (!acreditaCajaRuta && rutaUpdEmp) {
+          const { montoAcreditarCajaEmpleado, ...rutaCampos } = rutaUpdEmp;
           tx.update(rutaRef, {
-            ...rutaCampos,
+            cajaRuta: rutaCampos.cajaRuta,
+            cajasEmpleados: rutaCampos.cajasEmpleados,
+            inversiones: rutaCampos.inversiones,
+            ganancias: rutaCampos.ganancias,
+            capitalTotal: rutaCampos.capitalTotal,
             cobradoAcumulado: FieldValue.increment(montoAplicar),
             ultimaActualizacion: nowTx,
           });
@@ -833,6 +865,54 @@ async function postHandler(
         }
       }
 
+      const deltaContador = deltaTotalPrestamosActivosPorCambioEstado({
+        estadoAntes: estadoPrestamoAntes,
+        estadoDespues: resolucionPago.estado,
+      });
+      if (deltaContador !== 0) {
+        const adminUid =
+          typeof d.adminId === "string" && d.adminId.trim()
+            ? d.adminId.trim()
+            : adminIdPrestamo;
+        tx.set(
+          db
+            .collection(EMPRESAS_COLLECTION)
+            .doc(apiUser.empresaId)
+            .collection(USUARIOS_SUBCOLLECTION)
+            .doc(adminUid),
+          { totalPrestamosActivos: FieldValue.increment(deltaContador) },
+          { merge: true }
+        );
+      }
+
+      const ledgerSpecs = buildPagoLedgerCredits({
+        acreditaCajaRuta,
+        rutaId: rutaIdPrestamo || null,
+        empleadoId: cobradorEmpleadoUid,
+        pagoId: pagoRef.id,
+        cuotaCapital: parteCapital,
+        cuotaGanancia: parteGanancia,
+        walletBalanceAfter,
+        createdBy: apiUser.uid,
+        prestamoId,
+        metodoPago: metodo,
+      });
+      const ledgerOperationIds = enqueueLedgerOutboxInTx(
+        tx,
+        db,
+        apiUser.empresaId,
+        ledgerSpecs
+      );
+      if (isFinancialLedgerEnabled()) {
+        tx.set(
+          pagoRef,
+          {
+            ledgerStatus: ledgerOperationIds.length > 0 ? "pending" : "skipped",
+          },
+          { merge: true }
+        );
+      }
+
       return {
         pagoId: pagoRef.id,
         saldoPendiente: nuevoSaldo,
@@ -845,6 +925,7 @@ async function postHandler(
         walletBalanceAfter,
         montoAplicado: montoAplicar,
         estado: resolucionPago.estado as EstadoPrestamo,
+        ledgerOperationIds,
       };
     });
 
@@ -865,108 +946,27 @@ async function postHandler(
       }
     }
 
-    try {
-      if (result.cuotaCapital > 0) {
-        if (result.acreditaCajaRuta) {
-          await recordCreditMovement({
-            db,
-            empresaId: apiUser.empresaId,
-            walletType: "ruta_caja",
-            walletId: result.rutaId ?? "",
-            amount: result.cuotaCapital,
-            eventType: "pago_prestamo_admin",
-            scope: "ruta",
-            createdBy: apiUser.uid,
-            relatedEntityType: "pago",
-            relatedEntityId: result.pagoId,
-            metadata: {
-              prestamoId,
-              rutaId: result.rutaId,
-              metodoPago: metodo,
-            },
-            operationId: `pago_capital:${result.pagoId}`,
-          });
-        } else if (result.empleadoId) {
-          await recordCreditMovement({
-            db,
-            empresaId: apiUser.empresaId,
-            walletType: "empleado_caja",
-            walletId: result.empleadoId,
-            amount: result.cuotaCapital,
-            eventType: "pago_prestamo_capital",
-            scope: "empleado",
-            createdBy: apiUser.uid,
-            relatedEntityType: "pago",
-            relatedEntityId: result.pagoId,
-            metadata: {
-              prestamoId,
-              rutaId: result.rutaId,
-              metodoPago: metodo,
-            },
-            operationId: `pago_capital:${result.pagoId}`,
-          });
-        }
-      }
-      if (result.cuotaGanancia > 0) {
-        if (result.acreditaCajaRuta) {
-          await recordCreditMovement({
-            db,
-            empresaId: apiUser.empresaId,
-            walletType: "ruta_caja",
-            walletId: result.rutaId ?? "",
-            amount: result.cuotaGanancia,
-            eventType: "pago_prestamo_admin",
-            scope: "ruta",
-            createdBy: apiUser.uid,
-            relatedEntityType: "pago",
-            relatedEntityId: result.pagoId,
-            metadata: {
-              prestamoId,
-              rutaId: result.rutaId,
-              metodoPago: metodo,
-            },
-            operationId: `pago_interes:${result.pagoId}`,
-          });
-        } else if (result.empleadoId) {
-          await recordCreditMovement({
-            db,
-            empresaId: apiUser.empresaId,
-            walletType: "empleado_caja",
-            walletId: result.empleadoId,
-            amount: result.cuotaGanancia,
-            balanceAfter: result.walletBalanceAfter,
-            eventType: "pago_prestamo_interes",
-            scope: "empleado",
-            createdBy: apiUser.uid,
-            relatedEntityType: "pago",
-            relatedEntityId: result.pagoId,
-            metadata: {
-              prestamoId,
-              rutaId: result.rutaId,
-              metodoPago: metodo,
-            },
-            operationId: `pago_interes:${result.pagoId}`,
-          });
-        }
-      }
-    } catch (e) {
-      console.warn("[ledger] No se pudo registrar movimiento de pago", e);
-    }
-
-    if (result.saldoPendiente <= 0) {
-      const adminUidPrestamo =
-        typeof data.adminId === "string" ? data.adminId.trim() : "";
-      if (adminUidPrestamo) {
-        void db
-          .collection(EMPRESAS_COLLECTION)
-          .doc(apiUser.empresaId)
-          .collection(USUARIOS_SUBCOLLECTION)
-          .doc(adminUidPrestamo)
-          .set(
-            { totalPrestamosActivos: FieldValue.increment(-1) },
-            { merge: true }
-          );
-      }
+    if (result.ledgerOperationIds.length > 0) {
+      const drain = await drainLedgerOutbox(
+        db,
+        apiUser.empresaId,
+        result.ledgerOperationIds
+      );
+      await markPagoLedgerStatus({
+        db,
+        empresaId: apiUser.empresaId,
+        prestamoId,
+        pagoId: result.pagoId,
+        status: drain.failed > 0 ? "pending" : "committed",
+      });
+    } else if (isFinancialLedgerEnabled()) {
+      await markPagoLedgerStatus({
+        db,
+        empresaId: apiUser.empresaId,
+        prestamoId,
+        pagoId: result.pagoId,
+        status: "skipped",
+      });
     }
 
     scheduleFcmCuotaToAdminIfEmpleado({

@@ -41,6 +41,16 @@ export type DatosPago = {
   monto: number;
   cuotaCapital: number;
   cuotaGanancia: number;
+  /**
+   * Capital realmente descontado de inversiones al cobrar.
+   * Si falta (pagos legacy), la anulación usa `cuotaCapital`.
+   */
+  inversionesDescontadas?: number;
+  /**
+   * Monto realmente sumado a ganancias al cobrar (interés + capital no registrado).
+   * Si falta (pagos legacy), la anulación usa `cuotaGanancia`.
+   */
+  gananciaAplicada?: number;
   acreditaCajaRuta: boolean;
   tieneSnapshotsCompletos?: boolean;
   saldoPendienteAntes?: number;
@@ -56,6 +66,25 @@ export type DatosPago = {
   /** Snapshot: ultimoPagoId del préstamo justo antes de este pago (para restaurar en anulación). */
   ultimoPagoIdAnterior?: string | null;
 };
+
+/** Impacto contable a revertir: campos nuevos si existen; si no, split teórico legacy. */
+export function resolverImpactoReversionPago(pago: DatosPago): {
+  inversionesDescontadas: number;
+  gananciaAplicada: number;
+} {
+  const inversionesDescontadas =
+    typeof pago.inversionesDescontadas === "number"
+      ? pago.inversionesDescontadas
+      : pago.cuotaCapital;
+  const gananciaAplicada =
+    typeof pago.gananciaAplicada === "number"
+      ? pago.gananciaAplicada
+      : pago.cuotaGanancia;
+  return {
+    inversionesDescontadas: round2(inversionesDescontadas),
+    gananciaAplicada: round2(gananciaAplicada),
+  };
+}
 
 export type DatosPrestamo = {
   saldoPendiente: number;
@@ -157,6 +186,9 @@ export function calcularReversion(params: {
   const reabrePrestamo =
     prestamo.estado === "pagado" && nuevoEstadoPrestamo === "activo";
 
+  const { inversionesDescontadas, gananciaAplicada } =
+    resolverImpactoReversionPago(pago);
+
   let nuevaCajaRuta = ruta.cajaRuta;
   let nuevosCajasEmpleados = ruta.cajasEmpleados;
   let nuevasInversiones = ruta.inversiones;
@@ -164,12 +196,12 @@ export function calcularReversion(params: {
 
   if (pago.acreditaCajaRuta) {
     nuevaCajaRuta = round2(ruta.cajaRuta - pago.monto);
-    nuevasInversiones = round2(ruta.inversiones + pago.cuotaCapital);
-    nuevasGanancias = snapPesoCOP(round2(ruta.ganancias - pago.cuotaGanancia));
+    nuevasInversiones = round2(ruta.inversiones + inversionesDescontadas);
+    nuevasGanancias = snapPesoCOP(round2(ruta.ganancias - gananciaAplicada));
   } else {
     nuevosCajasEmpleados = round2(ruta.cajasEmpleados - pago.monto);
-    nuevasInversiones = round2(ruta.inversiones + pago.cuotaCapital);
-    nuevasGanancias = snapPesoCOP(round2(ruta.ganancias - pago.cuotaGanancia));
+    nuevasInversiones = round2(ruta.inversiones + inversionesDescontadas);
+    nuevasGanancias = snapPesoCOP(round2(ruta.ganancias - gananciaAplicada));
   }
 
   if (nuevasInversiones < 0) nuevasInversiones = 0;
