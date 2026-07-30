@@ -332,6 +332,7 @@ export async function solicitarEntregaReporteDia(
 export async function getMiSolicitudEntregaReporte(token: string): Promise<{
   pendiente: SolicitudEntregaReporteApi | null;
   ultimaRechazada: SolicitudEntregaReporteApi | null;
+  masReciente: SolicitudEntregaReporteApi | null;
 }> {
   const res = await fetchWithAuth("/api/empresa/empleado/mi-solicitud-reporte", token);
   const data = await res.json();
@@ -339,6 +340,7 @@ export async function getMiSolicitudEntregaReporte(token: string): Promise<{
   return {
     pendiente: data.pendiente ?? null,
     ultimaRechazada: data.ultimaRechazada ?? null,
+    masReciente: data.masReciente ?? null,
   };
 }
 

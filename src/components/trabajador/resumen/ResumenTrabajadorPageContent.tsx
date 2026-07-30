@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { collection, query, where, onSnapshot } from "firebase/firestore";
+import { collection, query, where, onSnapshot, type DocumentData } from "firebase/firestore";
 import { useAuth } from "@/context/AuthContext";
 import { db } from "@/lib/firebase";
 import { useTrabajadorCajaDia } from "@/context/TrabajadorCajaDiaContext";
@@ -10,6 +10,7 @@ import {
   solicitarEntregaReporteDia,
   type SolicitudEntregaReporteApi,
 } from "@/lib/empresa-api";
+import { resolverEstadoSolicitudesEmpleado } from "@/lib/resolver-estado-solicitudes-empleado";
 import { guardOfflineWrite, useOnline } from "@/hooks/useOnline";
 
 const MAX_COMENTARIO_REPORTE = 2000;
@@ -22,6 +23,27 @@ function formatMonto(value: number): string {
   })}`;
 }
 
+function mapDocToSolicitud(id: string, d: DocumentData): SolicitudEntregaReporteApi {
+  return {
+    id,
+    empleadoUid: d.empleadoUid ?? "",
+    empleadoNombre: d.empleadoNombre ?? "",
+    rutaId: d.rutaId ?? "",
+    rutaNombre: d.rutaNombre ?? "",
+    adminId: d.adminId ?? "",
+    estado: d.estado ?? "",
+    comentarioTrabajador: d.comentarioTrabajador ?? null,
+    montoAlSolicitar: typeof d.montoAlSolicitar === "number" ? d.montoAlSolicitar : 0,
+    creadaEn: d.creadaEn?.toDate?.()?.toISOString?.() ?? null,
+    resueltaEn: d.resueltaEn?.toDate?.()?.toISOString?.() ?? null,
+    resueltaPorUid: d.resueltaPorUid ?? null,
+    motivoRechazo: d.motivoRechazo ?? null,
+    montoEntregadoEfectivo: d.montoEntregadoEfectivo ?? null,
+  };
+}
+
+type EstadoUiSolicitud = "en_curso" | "rechazada" | "aprobada" | "sin_solicitud";
+
 export default function ResumenTrabajadorPageContent() {
   const { user, profile } = useAuth();
   const online = useOnline();
@@ -31,85 +53,49 @@ export default function ResumenTrabajadorPageContent() {
   const [comentarioEntrega, setComentarioEntrega] = useState("");
   const [msgReporte, setMsgReporte] = useState<string | null>(null);
   const [errReporte, setErrReporte] = useState<string | null>(null);
-  const [solicitudPendiente, setSolicitudPendiente] = useState<SolicitudEntregaReporteApi | null>(null);
-  const [solicitudRechazada, setSolicitudRechazada] = useState<SolicitudEntregaReporteApi | null>(null);
+  const [solicitudes, setSolicitudes] = useState<SolicitudEntregaReporteApi[]>([]);
 
   useEffect(() => {
     if (!db || !user || !profile?.empresaId) return;
     const empresaId = profile.empresaId.trim();
 
-    const qPendiente = query(
+    const q = query(
       collection(db, "empresas", empresaId, "solicitudesEntregaReporte"),
-      where("empleadoUid", "==", user.uid),
-      where("estado", "==", "pendiente")
-    );
-    const qRechazada = query(
-      collection(db, "empresas", empresaId, "solicitudesEntregaReporte"),
-      where("empleadoUid", "==", user.uid),
-      where("estado", "==", "rechazada")
+      where("empleadoUid", "==", user.uid)
     );
 
-    const unsubPendiente = onSnapshot(qPendiente, (snap) => {
-      if (snap.empty) {
-        setSolicitudPendiente(null);
-      } else {
-        const d = snap.docs[0].data();
-        setSolicitudPendiente({
-          id: snap.docs[0].id,
-          empleadoUid: d.empleadoUid ?? "",
-          empleadoNombre: d.empleadoNombre ?? "",
-          rutaId: d.rutaId ?? "",
-          rutaNombre: d.rutaNombre ?? "",
-          adminId: d.adminId ?? "",
-          estado: d.estado ?? "",
-          comentarioTrabajador: d.comentarioTrabajador ?? null,
-          montoAlSolicitar: typeof d.montoAlSolicitar === "number" ? d.montoAlSolicitar : 0,
-          creadaEn: d.creadaEn?.toDate?.()?.toISOString?.() ?? null,
-          resueltaEn: d.resueltaEn?.toDate?.()?.toISOString?.() ?? null,
-          resueltaPorUid: d.resueltaPorUid ?? null,
-          motivoRechazo: d.motivoRechazo ?? null,
-          montoEntregadoEfectivo: d.montoEntregadoEfectivo ?? null,
-        });
-        setSolicitudRechazada(null);
-      }
-    });
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        setSolicitudes(snap.docs.map((docSnap) => mapDocToSolicitud(docSnap.id, docSnap.data())));
+      },
+      (err) => console.warn("[ResumenTrabajador] onSnapshot solicitudes:", err)
+    );
 
-    const unsubRechazada = onSnapshot(qRechazada, (snap) => {
-      setSolicitudPendiente((pendiente) => {
-        if (pendiente) return pendiente;
-        if (snap.empty) {
-          setSolicitudRechazada(null);
-        } else {
-          const docs = snap.docs.sort((a, b) =>
-            (b.data().creadaEn?.toMillis?.() ?? 0) - (a.data().creadaEn?.toMillis?.() ?? 0)
-          );
-          const d = docs[0].data();
-          setSolicitudRechazada({
-            id: docs[0].id,
-            empleadoUid: d.empleadoUid ?? "",
-            empleadoNombre: d.empleadoNombre ?? "",
-            rutaId: d.rutaId ?? "",
-            rutaNombre: d.rutaNombre ?? "",
-            adminId: d.adminId ?? "",
-            estado: d.estado ?? "",
-            comentarioTrabajador: d.comentarioTrabajador ?? null,
-            montoAlSolicitar: typeof d.montoAlSolicitar === "number" ? d.montoAlSolicitar : 0,
-            creadaEn: d.creadaEn?.toDate?.()?.toISOString?.() ?? null,
-            resueltaEn: d.resueltaEn?.toDate?.()?.toISOString?.() ?? null,
-            resueltaPorUid: d.resueltaPorUid ?? null,
-            motivoRechazo: d.motivoRechazo ?? null,
-            montoEntregadoEfectivo: d.montoEntregadoEfectivo ?? null,
-          });
-        }
-        return pendiente;
-      });
-    });
-
-    return () => {
-      unsubPendiente();
-      unsubRechazada();
-    };
+    return unsub;
   }, [user?.uid, profile?.empresaId]);
+
+  const paraResolver = solicitudes.map((s) => ({
+    ...s,
+    estado: (s.estado === "aprobada" || s.estado === "rechazada" || s.estado === "pendiente"
+      ? s.estado
+      : "pendiente") as "pendiente" | "aprobada" | "rechazada",
+    creadaEn: s.creadaEn ? new Date(s.creadaEn) : null,
+  }));
+  const { pendiente, ultimaRechazada, masReciente } =
+    resolverEstadoSolicitudesEmpleado(paraResolver);
+
+  let estadoSolicitud: EstadoUiSolicitud = "sin_solicitud";
+  if (pendiente) estadoSolicitud = "en_curso";
+  else if (ultimaRechazada) estadoSolicitud = "rechazada";
+  else if (masReciente?.estado === "aprobada") estadoSolicitud = "aprobada";
+
+  const solicitudRechazada = ultimaRechazada
+    ? solicitudes.find((s) => s.id === ultimaRechazada.id) ?? null
+    : null;
+  const solicitudMasReciente = masReciente
+    ? solicitudes.find((s) => s.id === masReciente.id) ?? null
+    : null;
 
   useEffect(() => {
     if (!modalEntregaAbierto) return;
@@ -154,12 +140,6 @@ export default function ResumenTrabajadorPageContent() {
 
   if (!profile || profile.role !== "trabajador") return null;
 
-  const estadoSolicitud = solicitudPendiente
-    ? "en_curso"
-    : solicitudRechazada
-      ? "rechazada"
-      : "sin_solicitud";
-
   const btnTitle =
     estadoSolicitud === "en_curso"
       ? "Ya tenés una solicitud de entrega pendiente de confirmación."
@@ -189,6 +169,18 @@ export default function ResumenTrabajadorPageContent() {
               </p>
               <p style={{ margin: "0.35rem 0 0", fontSize: "0.875rem", color: "var(--text-muted)" }}>
                 Tu solicitud está pendiente de validación por el administrador.
+              </p>
+            </>
+          ) : estadoSolicitud === "aprobada" ? (
+            <>
+              <p style={{ margin: "0.35rem 0 0", fontWeight: 700, color: "var(--success, #6bbf6b)" }}>
+                Aprobada
+              </p>
+              <p style={{ margin: "0.35rem 0 0", fontSize: "0.875rem", color: "var(--text-muted)" }}>
+                Tu última solicitud fue aprobada
+                {solicitudMasReciente && typeof solicitudMasReciente.montoEntregadoEfectivo === "number"
+                  ? ` (${formatMonto(solicitudMasReciente.montoEntregadoEfectivo)}).`
+                  : "."}
               </p>
             </>
           ) : (

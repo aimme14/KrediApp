@@ -38,7 +38,7 @@ export async function GET(_request: NextRequest) {
 
   const db = getAdminFirestore();
   try {
-    const { pendiente, ultimaRechazada } = await getMiEstadoSolicitudesEmpleado(
+    const { pendiente, ultimaRechazada, masReciente } = await getMiEstadoSolicitudesEmpleado(
       db,
       apiUser.empresaId,
       apiUser.uid
@@ -46,6 +46,7 @@ export async function GET(_request: NextRequest) {
     return NextResponse.json({
       pendiente: serializeSolicitud(pendiente),
       ultimaRechazada: serializeSolicitud(ultimaRechazada),
+      masReciente: serializeSolicitud(masReciente),
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Error al cargar solicitud";

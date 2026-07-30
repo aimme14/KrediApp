@@ -21,8 +21,10 @@ import {
   getPreviewEntregaReporteTrabajador,
 } from "@/lib/entregar-reporte-empleado-admin";
 import { purgeTransferenciaEvidenciasDelCierre } from "@/lib/cierre-dia-evidencia-purge";
+import { resolverEstadoSolicitudesEmpleado } from "@/lib/resolver-estado-solicitudes-empleado";
 
 export type EstadoSolicitudEntrega = "pendiente" | "aprobada" | "rechazada";
+export { resolverEstadoSolicitudesEmpleado };
 
 export type SolicitudEntregaReporteDoc = {
   id: string;
@@ -103,11 +105,13 @@ export async function getMiSolicitudEntregaPendiente(
 export type MiEstadoSolicitudesEmpleado = {
   pendiente: SolicitudEntregaReporteDoc | null;
   ultimaRechazada: SolicitudEntregaReporteDoc | null;
+  /** Solicitud más reciente por `creadaEn` (cualquier estado). */
+  masReciente: SolicitudEntregaReporteDoc | null;
 };
 
 /**
- * Estado actual para el trabajador: pendiente (si hay) y último rechazo solo si
- * no hubo una aprobación posterior (`resueltaEn`). Sin historial en UI.
+ * Estado actual para el trabajador según la solicitud más reciente (`creadaEn`).
+ * Sin historial en UI: un rechazo viejo no se muestra si luego hubo otra solicitud.
  */
 export async function getMiEstadoSolicitudesEmpleado(
   db: Firestore,
@@ -122,26 +126,7 @@ export async function getMiEstadoSolicitudesEmpleado(
     .get();
 
   const mapped = snap.docs.map((d) => mapSolicitud(d.id, d.data() as Record<string, unknown>));
-  const pendiente = mapped.find((s) => s.estado === "pendiente") ?? null;
-
-  const rechazadas = mapped
-    .filter((s) => s.estado === "rechazada" && s.resueltaEn)
-    .sort((a, b) => (b.resueltaEn?.getTime() ?? 0) - (a.resueltaEn?.getTime() ?? 0));
-  let ultimaRechazada: SolicitudEntregaReporteDoc | null = rechazadas[0] ?? null;
-
-  if (ultimaRechazada?.resueltaEn) {
-    const rechazoMs = ultimaRechazada.resueltaEn.getTime();
-    const maxAprobadaMs = mapped.reduce((acc, s) => {
-      if (s.estado !== "aprobada" || !s.resueltaEn) return acc;
-      const t = s.resueltaEn.getTime();
-      return t > acc ? t : acc;
-    }, 0);
-    if (maxAprobadaMs > rechazoMs) {
-      ultimaRechazada = null;
-    }
-  }
-
-  return { pendiente, ultimaRechazada };
+  return resolverEstadoSolicitudesEmpleado(mapped);
 }
 
 export async function listSolicitudesEntregaPendientesAdmin(

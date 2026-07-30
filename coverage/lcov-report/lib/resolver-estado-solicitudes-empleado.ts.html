@@ -3,7 +3,7 @@
 <html lang="en">
 
 <head>
-    <title>Code coverage report for types/superAdmin.ts</title>
+    <title>Code coverage report for lib/resolver-estado-solicitudes-empleado.ts</title>
     <meta charset="utf-8" />
     <link rel="stylesheet" href="../prettify.css" />
     <link rel="stylesheet" href="../base.css" />
@@ -19,34 +19,34 @@
 <body>
 <div class='wrapper'>
     <div class='pad1'>
-        <h1><a href="../index.html">All files</a> / <a href="index.html">types</a> superAdmin.ts</h1>
+        <h1><a href="../index.html">All files</a> / <a href="index.html">lib</a> resolver-estado-solicitudes-empleado.ts</h1>
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>1/1</span>
+                <span class='fraction'>10/10</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">100% </span>
+                <span class="strong">81.81% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>0/0</span>
+                <span class='fraction'>18/22</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>0/0</span>
+                <span class='fraction'>2/2</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>1/1</span>
+                <span class='fraction'>10/10</span>
             </div>
         
             
@@ -93,7 +93,16 @@
 <a name='L28'></a><a href='#L28'>28</a>
 <a name='L29'></a><a href='#L29'>29</a>
 <a name='L30'></a><a href='#L30'>30</a>
-<a name='L31'></a><a href='#L31'>31</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L31'></a><a href='#L31'>31</a>
+<a name='L32'></a><a href='#L32'>32</a>
+<a name='L33'></a><a href='#L33'>33</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -102,56 +111,53 @@
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">4x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">/**
- * Colección Firestore: /superAdmin/{adminID}
- *
- * Almacena los datos del Super Administrador.
- * La contraseña NUNCA se guarda aquí; Firebase Auth la gestiona de forma segura.
- */
-export const SUPER_ADMIN_COLLECTION = "superAdmin";
+<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">export type EstadoSolicitudEntregaUi = "pendiente" | "aprobada" | "rechazada";
 &nbsp;
-export interface SuperAdminProfile {
-  /** UID de Firebase Auth (mismo que el ID del documento) */
-  uid: string;
-  /** Correo electrónico */
-  email: string;
-  /** Nombre para mostrar (opcional) */
-  displayName?: string;
-  /** Siempre "superAdmin" */
-  role: "superAdmin";
-  /** Si la cuenta está activa */
-  enabled: boolean;
-  /** UID de quien creó este super admin (vacío para el primero) */
-  createdBy: string;
-  /** Fecha de creación */
-  createdAt: Date;
-  /** Última actualización */
-  updatedAt: Date;
-  /** Si el correo está verificado en Auth */
-  emailVerified: boolean;
-  /** Último inicio de sesión (auditoría) */
-  lastLoginAt?: Date;
+type SolicitudConCreadaEn = {
+  estado: EstadoSolicitudEntregaUi;
+  creadaEn: Date | null;
+};
+&nbsp;
+/**
+ * Toma la solicitud más reciente (`creadaEn`) y deriva el estado visible:
+ * - pendiente → en curso
+ * - rechazada → mostrar ese rechazo
+ * - aprobada → no mostrar rechazo viejo
+ */
+export function resolverEstadoSolicitudesEmpleado&lt;T extends SolicitudConCreadaEn&gt;(
+  solicitudes: T[]
+): { pendiente: T | null; ultimaRechazada: T | null; masReciente: T | null } {
+  if (solicitudes.length === 0) {
+    return { pendiente: null, ultimaRechazada: null, masReciente: null };
+  }
+&nbsp;
+  const masReciente = [...solicitudes].sort(
+    (a, b) =&gt; (b.creadaEn<span class="branch-0 cbranch-no" title="branch not covered" >?.g</span>etTime() ?? <span class="branch-1 cbranch-no" title="branch not covered" >0)</span> - (a.creadaEn<span class="branch-0 cbranch-no" title="branch not covered" >?.g</span>etTime() ?? <span class="branch-1 cbranch-no" title="branch not covered" >0)</span>
+  )[0];
+&nbsp;
+  if (masReciente.estado === "pendiente") {
+    return { pendiente: masReciente, ultimaRechazada: null, masReciente };
+  }
+  if (masReciente.estado === "rechazada") {
+    return { pendiente: null, ultimaRechazada: masReciente, masReciente };
+  }
+  return { pendiente: null, ultimaRechazada: null, masReciente };
 }
 &nbsp;</pre></td></tr></table></pre>
 
