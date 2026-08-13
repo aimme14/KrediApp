@@ -128,8 +128,13 @@ function mostrarColumnaMetrica(filtroEstado: PrestamoFiltroEstado): boolean {
   return filtroEstado !== "pagado";
 }
 
+/** La columna "Código" se oculta en la vista de pagados. */
+function mostrarColumnaCodigo(filtroEstado: PrestamoFiltroEstado): boolean {
+  return filtroEstado !== "pagado";
+}
+
 function numColumnasTablaPrestamo(filtroEstado: PrestamoFiltroEstado): number {
-  if (filtroEstado === "pagado") return 9;
+  if (filtroEstado === "pagado") return 8; // sin columna Código
   if (filtroEstado === "castigado") return 10;
   return 11;
 }
@@ -1048,7 +1053,7 @@ export default function PrestamoAdminPageContent() {
               <thead>
                 <tr>
                   <th aria-label="Expandir historial" />
-                  <th>Código</th>
+                  {mostrarColumnaCodigo(filtroEstado) && <th>Código</th>}
                   <th>Cliente</th>
                   <th>
                     {filtroEstado === "pagado"
@@ -1108,7 +1113,9 @@ export default function PrestamoAdminPageContent() {
                             <span aria-hidden style={{ display: "inline-block", width: "1.5rem", minHeight: "1.25rem" }} />
                           )}
                         </td>
-                        <td className="prestamo-admin-col-codigo">{codigoDisplay}</td>
+                        {mostrarColumnaCodigo(filtroEstado) && (
+                          <td className="prestamo-admin-col-codigo">{codigoDisplay}</td>
+                        )}
                         <td className="prestamo-admin-col-cliente" title={nombre}>
                           {nombre}
                         </td>
@@ -1193,11 +1200,18 @@ export default function PrestamoAdminPageContent() {
                             aria-labelledby={`btn-expand-${grupo.clienteId}`}
                           >
                             <td aria-hidden />
-                            <td colSpan={2} className="prestamo-admin-expand-title-cell">
+                            <td
+                              colSpan={mostrarColumnaCodigo(filtroEstado) ? 2 : 1}
+                              className="prestamo-admin-expand-title-cell"
+                            >
                               <span className="prestamo-admin-expand-title">Otros préstamos</span>
                             </td>
                             <td
-                              colSpan={numColumnasTablaPrestamo(filtroEstado) - 3}
+                              colSpan={
+                                numColumnasTablaPrestamo(filtroEstado) -
+                                1 -
+                                (mostrarColumnaCodigo(filtroEstado) ? 2 : 1)
+                              }
                               aria-hidden
                               className="prestamo-admin-expand-empty"
                             />
@@ -1211,7 +1225,9 @@ export default function PrestamoAdminPageContent() {
                             return (
                               <tr key={p.id} className="prestamo-admin-expand-row">
                                 <td aria-hidden className="prestamo-admin-expand-empty" />
-                                <td aria-hidden className="prestamo-admin-expand-empty" />
+                                {mostrarColumnaCodigo(filtroEstado) && (
+                                  <td aria-hidden className="prestamo-admin-expand-empty" />
+                                )}
                                 <td aria-hidden className="prestamo-admin-expand-empty" />
                                 <td className="prestamo-histo-col-fecha">
                                   {fechaRelevantePrestamo(p)}
