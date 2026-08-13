@@ -9,14 +9,46 @@ import {
   updateCliente,
   deleteCliente,
   searchClientes,
+  listHistorialPagosCliente,
   formatClienteCodigoRutaYNumero,
   type ClienteItem,
+  type PagoHistorialClienteItem,
 } from "@/lib/empresa-api";
+import {
+  getHistorialPagosCache,
+  setHistorialPagosCache,
+  clearHistorialPagosCache,
+} from "@/lib/historial-pagos-cache";
+import { MOTIVOS_NO_PAGO, formatCurrencyCobro } from "@/lib/cobrar-utils";
 import { filtrarClientesParaExport } from "@/lib/export-clientes";
 import { getEmpresa } from "@/lib/empresa";
 import { ExportClientesModal } from "@/components/ExportClientesModal";
 import { guardOfflineWrite, OFFLINE_MSG, useOnline } from "@/hooks/useOnline";
 import { isAdminPanelRole } from "@/lib/admin-panel-role";
+
+/** Fecha legible para el historial de pagos (o "—" si no hay fecha). */
+function formatFechaHistorial(iso: string | null): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleDateString("es-CO", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+/** Etiqueta del tipo de movimiento de un pago. */
+function labelTipoPago(p: PagoHistorialClienteItem): string {
+  if (p.tipo === "perdida") return "Pérdida";
+  if (p.tipo === "no_pago") {
+    const motivo = p.motivoNoPago
+      ? MOTIVOS_NO_PAGO.find((m) => m.value === p.motivoNoPago)?.label ?? p.motivoNoPago
+      : null;
+    return motivo ? `No pagó — ${motivo}` : "No pagó";
+  }
+  return p.metodoPago === "transferencia" ? "Transferencia" : "Efectivo";
+}
 
 /** true si el texto parece cédula o código (búsqueda server-side viable). */
 function esBusquedaExactaServidor(q: string): boolean {
@@ -53,6 +85,11 @@ export default function ClienteAdminPageContent() {
   const [editError, setEditError] = useState<string | null>(null);
   const [savingEdit, setSavingEdit] = useState(false);
   const [eliminandoId, setEliminandoId] = useState<string | null>(null);
+  const [clienteHistorial, setClienteHistorial] = useState<ClienteItem | null>(null);
+  const [historialPagos, setHistorialPagos] = useState<PagoHistorialClienteItem[]>([]);
+  const [historialLoading, setHistorialLoading] = useState(false);
+  const [historialError, setHistorialError] = useState<string | null>(null);
+  const [historialDesdeCache, setHistorialDesdeCache] = useState(false);
   const PAGE_SIZE = 15;
   const [pagina, setPagina] = useState(1);
   const [filtroNombre, setFiltroNombre] = useState("");
@@ -316,6 +353,78 @@ export default function ClienteAdminPageContent() {
       setEliminandoId(null);
     }
   };
+
+  const cargarHistorial = useCallback(
+    async (cliente: ClienteItem, forzar: boolean) => {
+      if (!user) return;
+      if (!forzar) {
+        const cache = getHistorialPagosCache(cliente.id);
+        if (cache) {
+          setHistorialPagos(cache);
+          setHistorialDesdeCache(true);
+          setHistorialError(null);
+          setHistorialLoading(false);
+          return;
+        }
+      }
+      if (!online) {
+        setHistorialError(OFFLINE_MSG);
+        setHistorialLoading(false);
+        return;
+      }
+      setHistorialLoading(true);
+      setHistorialError(null);
+      setHistorialDesdeCache(false);
+      try {
+        const token = await user.getIdToken();
+        const pagos = await listHistorialPagosCliente(token, cliente.id);
+        setHistorialPagos(pagos);
+        setHistorialPagosCache(cliente.id, pagos);
+      } catch (e) {
+        setHistorialError(
+          e instanceof Error ? e.message : "No se pudo cargar el historial"
+        );
+        setHistorialPagos([]);
+      } finally {
+        setHistorialLoading(false);
+      }
+    },
+    [user, online]
+  );
+
+  const abrirHistorial = useCallback(
+    (c: ClienteItem) => {
+      setClienteHistorial(c);
+      setHistorialPagos([]);
+      setHistorialError(null);
+      setHistorialDesdeCache(false);
+      void cargarHistorial(c, false);
+    },
+    [cargarHistorial]
+  );
+
+  const cerrarHistorial = useCallback(() => {
+    setClienteHistorial(null);
+    setHistorialPagos([]);
+    setHistorialError(null);
+    setHistorialLoading(false);
+    setHistorialDesdeCache(false);
+  }, []);
+
+  const recargarHistorial = useCallback(() => {
+    if (!clienteHistorial) return;
+    clearHistorialPagosCache(clienteHistorial.id);
+    void cargarHistorial(clienteHistorial, true);
+  }, [clienteHistorial, cargarHistorial]);
+
+  useEffect(() => {
+    if (!clienteHistorial) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") cerrarHistorial();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [clienteHistorial, cerrarHistorial]);
 
   if (!profile || !isAdminPanelRole(profile.role)) return null;
 
@@ -600,6 +709,19 @@ export default function ClienteAdminPageContent() {
                         </button>
                         <button
                           type="button"
+                          className="admin-clientes-edit-btn"
+                          onClick={() => abrirHistorial(c)}
+                          aria-label={`Ver historial de pagos de ${c.nombre}`}
+                          title="Historial de pagos"
+                        >
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                            <path d="M3 3v5h5" />
+                            <path d="M3.05 13A9 9 0 1 0 6 5.3L3 8" />
+                            <path d="M12 7v5l4 2" />
+                          </svg>
+                        </button>
+                        <button
+                          type="button"
                           className="admin-clientes-edit-btn admin-clientes-delete-btn"
                           onClick={() => handleEliminarCliente(c)}
                           disabled={c.prestamo_activo || eliminandoId === c.id || !online}
@@ -756,6 +878,88 @@ export default function ClienteAdminPageContent() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {clienteHistorial && (
+        <div
+          className="gf-modal-backdrop"
+          onClick={cerrarHistorial}
+          role="presentation"
+        >
+          <div
+            className="gf-modal gf-modal--cliente-historial"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="cliente-historial-modal-title"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="admin-hist-header">
+              <div>
+                <h2 id="cliente-historial-modal-title" className="gf-modal-title" style={{ marginBottom: "0.15rem" }}>
+                  Historial de pagos
+                </h2>
+                <p className="admin-hist-cliente">
+                  {clienteHistorial.nombre}
+                  {clienteHistorial.codigo
+                    ? ` · ${formatClienteCodigoRutaYNumero(clienteHistorial.codigo)}`
+                    : ""}
+                </p>
+              </div>
+              <button
+                type="button"
+                className="btn btn-secondary admin-hist-refresh"
+                onClick={recargarHistorial}
+                disabled={historialLoading || !online}
+                title="Volver a consultar en el servidor"
+              >
+                {historialLoading ? "Actualizando…" : "Actualizar"}
+              </button>
+            </div>
+
+            {historialDesdeCache && !historialLoading && !historialError ? (
+              <p className="admin-hist-cache-hint">Mostrando datos guardados. Pulsa «Actualizar» para refrescar.</p>
+            ) : null}
+
+            {historialLoading ? (
+              <p className="admin-hist-estado">Cargando historial…</p>
+            ) : historialError ? (
+              <p className="error-msg">{historialError}</p>
+            ) : historialPagos.length === 0 ? (
+              <p className="admin-hist-estado">Este cliente no tiene pagos registrados.</p>
+            ) : (
+              <ul className="admin-hist-ul">
+                {historialPagos.map((p, idx) => (
+                  <li key={p.id || `${p.prestamoId}-${idx}`} className="admin-hist-li">
+                    <span className="admin-hist-fecha">{formatFechaHistorial(p.fecha)}</span>
+                    <span className="admin-hist-monto">{formatCurrencyCobro(p.monto)}</span>
+                    <span
+                      className="admin-hist-tipo"
+                      style={{
+                        color:
+                          p.tipo === "perdida"
+                            ? "var(--danger, #f87171)"
+                            : p.tipo === "no_pago"
+                              ? "var(--warning, #eab308)"
+                              : "inherit",
+                      }}
+                    >
+                      {labelTipoPago(p)}
+                    </span>
+                    <span className="admin-hist-registrado" title="Registrado por">
+                      {p.registradoPorNombre || p.registradoPorUid || "—"}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            <div className="gf-modal-actions">
+              <button type="button" className="btn btn-secondary" onClick={cerrarHistorial}>
+                Cerrar
+              </button>
+            </div>
           </div>
         </div>
       )}

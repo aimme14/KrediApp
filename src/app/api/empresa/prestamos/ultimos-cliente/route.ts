@@ -23,6 +23,12 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "clienteId es obligatorio" }, { status: 400 });
   }
 
+  // max opcional: por defecto 3 (historial al crear préstamo). Para el historial
+  // completo del cliente se pide un tope mayor. Se acota entre 1 y 100.
+  const maxParam = Number(request.nextUrl.searchParams.get("max"));
+  const max =
+    Number.isFinite(maxParam) && maxParam > 0 ? Math.min(Math.floor(maxParam), 100) : 3;
+
   const db = getAdminFirestore();
   const clienteSnap = await db
     .collection(EMPRESAS_COLLECTION)
@@ -66,7 +72,7 @@ export async function GET(request: NextRequest) {
     db,
     apiUser.empresaId,
     clienteId,
-    3
+    max
   );
 
   return NextResponse.json({ prestamos });

@@ -4890,7 +4890,7 @@ td {
 
 .admin-clientes-table th.admin-clientes-th-accion,
 .admin-clientes-table td.admin-clientes-td-accion {
-  width: 5.5rem;
+  width: 8rem;
   text-align: center;
   white-space: nowrap;
 }
@@ -4941,6 +4941,87 @@ td {
 
 .gf-modal--cliente-edit {
   max-width: 440px;
+}
+
+/* ── Modal historial de pagos del cliente ─────────────────────────── */
+.gf-modal--cliente-historial {
+  max-width: 560px;
+}
+
+.admin-hist-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.admin-hist-cliente {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--text-muted);
+}
+
+.admin-hist-refresh {
+  flex-shrink: 0;
+  font-size: 0.8125rem;
+  white-space: nowrap;
+}
+
+.admin-hist-cache-hint {
+  margin: 0 0 0.5rem 0;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.admin-hist-estado {
+  margin: 1rem 0;
+  color: var(--text-muted);
+}
+
+.admin-hist-ul {
+  list-style: none;
+  margin: 0.25rem 0 0;
+  padding: 0;
+  max-height: 55vh;
+  overflow-y: auto;
+}
+
+.admin-hist-li {
+  display: grid;
+  grid-template-columns: auto auto 1fr auto;
+  gap: 0.65rem;
+  align-items: center;
+  padding: 0.5rem 0;
+  font-size: 0.8125rem;
+  border-bottom: 1px solid var(--card-border);
+}
+
+.admin-hist-li:last-child {
+  border-bottom: none;
+}
+
+.admin-hist-fecha {
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.admin-hist-monto {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.admin-hist-tipo {
+  color: var(--text-muted);
+}
+
+.admin-hist-registrado {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: right;
 }
 
 .admin-clientes-edit-readonly {

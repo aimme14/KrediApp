@@ -1084,12 +1084,15 @@ export type PrestamoHistorialClienteItem = {
   creadoEn: string | null;
 };
 
-/** Últimos 3 préstamos de un cliente (para historial al crear préstamo). */
+/** Préstamos de un cliente (por defecto los últimos 3, para historial al crear préstamo).
+ *  Pasa un `max` mayor para traer el historial completo. */
 export async function listUltimosPrestamosCliente(
   token: string,
-  clienteId: string
+  clienteId: string,
+  max?: number
 ): Promise<PrestamoHistorialClienteItem[]> {
   const qs = new URLSearchParams({ clienteId: clienteId.trim() });
+  if (typeof max === "number" && max > 0) qs.set("max", String(Math.floor(max)));
   const res = await fetchWithAuth(
     `/api/empresa/prestamos/ultimos-cliente?${qs.toString()}`,
     token
@@ -1097,6 +1100,53 @@ export async function listUltimosPrestamosCliente(
   const data = await res.json();
   if (!res.ok) throw new Error(data.error ?? "Error al cargar historial del cliente");
   return Array.isArray(data.prestamos) ? data.prestamos : [];
+}
+
+/** Un pago del historial del cliente, enriquecido con el préstamo al que pertenece. */
+export type PagoHistorialClienteItem = PagoItem & {
+  prestamoId: string;
+  prestamoMonto: number;
+  prestamoEstado: string;
+  prestamoFechaInicio: string | null;
+};
+
+/** Tope de préstamos a inspeccionar por cliente al construir su historial de pagos. */
+const MAX_PRESTAMOS_HISTORIAL_CLIENTE = 50;
+
+/**
+ * Historial de pagos COMPLETO de un cliente: recorre sus préstamos y junta los
+ * pagos de cada uno, ordenados por fecha (más reciente primero). Una sola llamada
+ * de préstamos + una por préstamo (en paralelo). Pensado para cachearse en el cliente.
+ */
+export async function listHistorialPagosCliente(
+  token: string,
+  clienteId: string
+): Promise<PagoHistorialClienteItem[]> {
+  const prestamos = await listUltimosPrestamosCliente(
+    token,
+    clienteId,
+    MAX_PRESTAMOS_HISTORIAL_CLIENTE
+  );
+  if (prestamos.length === 0) return [];
+
+  const porPrestamo = await Promise.all(
+    prestamos.map(async (pr) => {
+      const pagos = await listPagos(token, pr.id);
+      return pagos.map<PagoHistorialClienteItem>((p) => ({
+        ...p,
+        prestamoId: pr.id,
+        prestamoMonto: pr.monto,
+        prestamoEstado: pr.estado,
+        prestamoFechaInicio: pr.fechaInicio,
+      }));
+    })
+  );
+
+  return porPrestamo.flat().sort((a, b) => {
+    const ta = a.fecha ? new Date(a.fecha).getTime() : 0;
+    const tb = b.fecha ? new Date(b.fecha).getTime() : 0;
+    return tb - ta;
+  });
 }
 
 /** Sincroniza moroso de clientes hacia sus préstamos en Firestore. */
