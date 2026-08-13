@@ -1075,7 +1075,7 @@ export default function PrestamoAdminPageContent() {
                   )}
                   <th>Estado</th>
                   <th>Frecuencia</th>
-                  <th>
+                  <th className="prestamo-admin-cobro-th">
                     <span className="prestamo-admin-cobro-th-desktop">Acción</span>
                     <span className="prestamo-admin-cobro-th-mobile" aria-hidden>
                       Cobrar
