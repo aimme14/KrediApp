@@ -50,6 +50,10 @@ import {
 } from "@/lib/prestamo-admin-format";
 import { OFFLINE_MSG, useOnline } from "@/hooks/useOnline";
 import { isAdminPanelRole } from "@/lib/admin-panel-role";
+import {
+  HistorialPagosClienteModal,
+  type ClienteHistorialRef,
+} from "@/components/admin/HistorialPagosClienteModal";
 
 const ExportPrestamosModal = dynamic(
   () => import("@/components/ExportPrestamosModal").then((m) => ({ default: m.ExportPrestamosModal })),
@@ -717,6 +721,20 @@ export default function PrestamoAdminPageContent() {
     });
   }, []);
 
+  const [clienteHistorial, setClienteHistorial] = useState<ClienteHistorialRef | null>(null);
+  const abrirHistorial = useCallback(
+    (clienteIdHist: string) => {
+      const cl = clientePorId[clienteIdHist];
+      setClienteHistorial({
+        id: clienteIdHist,
+        nombre: cl?.nombre ?? clienteIdHist,
+        codigo: cl?.codigo ?? null,
+      });
+    },
+    [clientePorId]
+  );
+  const cerrarHistorial = useCallback(() => setClienteHistorial(null), []);
+
   /** Últimos 3 préstamos del cliente seleccionado — consulta puntual (3 lecturas). */
   const [historialCliente, setHistorialCliente] = useState<PrestamoHistorialClienteItem[]>([]);
   const [historialClienteLoading, setHistorialClienteLoading] = useState(false);
@@ -1146,6 +1164,15 @@ export default function PrestamoAdminPageContent() {
                               <span className="prestamo-admin-cobro-label-mobile">Cobrar</span>
                             </Link>
                           )}
+                          <button
+                            type="button"
+                            className="btn btn-secondary prestamo-admin-historial-btn"
+                            onClick={() => abrirHistorial(grupo.clienteId)}
+                            title={`Ver historial de pagos de ${nombre}`}
+                            aria-label={`Ver historial de pagos de ${nombre}`}
+                          >
+                            Historial
+                          </button>
                           {prestamoEsEliminable(principal) && (
                             <button
                               type="button"
@@ -1445,6 +1472,13 @@ export default function PrestamoAdminPageContent() {
           loadingPagados={loadingPagados}
           filtrosIniciales={{ filtroContable, filtroEstado, filtroRutaId, filtroNombre }}
           onCerrar={() => setShowExportModal(false)}
+        />
+      )}
+
+      {clienteHistorial && (
+        <HistorialPagosClienteModal
+          cliente={clienteHistorial}
+          onCerrar={cerrarHistorial}
         />
       )}
 

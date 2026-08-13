@@ -4406,7 +4406,8 @@ td {
     white-space: nowrap;
   }
 
-  .prestamo-admin-hist-card .table-historial .prestamo-admin-eliminar-btn {
+  .prestamo-admin-hist-card .table-historial .prestamo-admin-eliminar-btn,
+  .prestamo-admin-hist-card .table-historial .prestamo-admin-historial-btn {
     width: auto;
     max-width: 100%;
     min-width: 2.35rem;
@@ -4565,6 +4566,29 @@ td {
 .prestamo-admin-eliminar-btn--sm {
   padding: 0.2rem 0.42rem !important;
   font-size: 0.7rem !important;
+}
+
+.prestamo-admin-historial-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.28rem 0.55rem !important;
+  font-size: 0.72rem !important;
+  font-weight: 600 !important;
+  min-width: 0 !important;
+  border-radius: 8px !important;
+  line-height: 1.25 !important;
+  margin-top: 0.3rem;
+  color: var(--text-muted) !important;
+  border: 1px solid var(--card-border) !important;
+  background: transparent !important;
+  white-space: nowrap;
+}
+
+.prestamo-admin-historial-btn:hover {
+  color: var(--text) !important;
+  border-color: var(--text-muted) !important;
+  background: var(--bg-subtle, rgba(255, 255, 255, 0.05)) !important;
 }
 
 .prestamo-admin-filtro-vacio {
