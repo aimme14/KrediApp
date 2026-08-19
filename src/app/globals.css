@@ -5129,6 +5129,266 @@ td {
   }
 }
 
+/* Teléfono: Nombre, Préstamo activo y Acción (menú ⋮); detalle en modal al tocar el nombre */
+@media (max-width: 640px) {
+  .admin-clientes-table-wrap {
+    overflow-x: hidden;
+    margin-left: -0.1rem;
+    margin-right: -0.1rem;
+  }
+
+  .admin-clientes-table {
+    width: 100%;
+    min-width: 0;
+    table-layout: fixed;
+    border-collapse: collapse;
+  }
+
+  .admin-clientes-table .admin-clientes-col-oculta-movil {
+    display: none !important;
+  }
+
+  .admin-clientes-th-prestamo-desktop {
+    display: none !important;
+  }
+
+  .admin-clientes-th-prestamo-mobile {
+    display: inline !important;
+  }
+
+  .admin-clientes-table th.admin-clientes-col-nombre,
+  .admin-clientes-table td.admin-clientes-col-nombre {
+    width: 58%;
+    max-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .admin-clientes-table th.admin-clientes-col-prestamo,
+  .admin-clientes-table td.admin-clientes-col-prestamo {
+    width: 18%;
+    text-align: center;
+    font-size: 0.6875rem;
+    white-space: nowrap;
+  }
+
+  .admin-clientes-table th.admin-clientes-th-accion,
+  .admin-clientes-table td.admin-clientes-td-accion {
+    width: 24%;
+    min-width: 0;
+    padding-left: 0.15rem;
+    padding-right: 0.15rem;
+    overflow: visible;
+    position: relative;
+    text-align: center;
+    vertical-align: middle;
+  }
+
+  .admin-clientes-nombre-btn {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    padding: 0;
+    margin: 0;
+    border: none;
+    background: none;
+    font: inherit;
+    font-weight: 600;
+    color: var(--link);
+    text-align: left;
+    cursor: pointer;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .admin-clientes-nombre-btn:hover,
+  .admin-clientes-nombre-btn:focus-visible {
+    text-decoration: underline;
+    outline: none;
+  }
+
+  .admin-clientes-acciones-menu-wrap {
+    position: relative;
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+  }
+
+  .admin-clientes-menu-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    padding: 0;
+    border: 1px solid var(--card-border);
+    border-radius: 8px;
+    background: var(--input-bg);
+    color: var(--text-muted);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .admin-clientes-menu-btn[aria-expanded="true"] {
+    color: var(--link);
+    border-color: color-mix(in srgb, var(--link) 45%, var(--card-border));
+    background: color-mix(in srgb, var(--link) 8%, var(--input-bg));
+  }
+
+  .admin-clientes-menu-btn:focus-visible {
+    outline: 2px solid var(--primary, #3b82f6);
+    outline-offset: 2px;
+  }
+
+  .admin-clientes-menu-dropdown {
+    position: absolute;
+    top: calc(100% + 0.25rem);
+    right: 0;
+    min-width: 9.5rem;
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 10px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
+    z-index: 80;
+    padding: 0.3rem 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .admin-clientes-menu-opcion {
+    display: block;
+    width: 100%;
+    padding: 0.55rem 0.85rem;
+    border: none;
+    background: none;
+    color: var(--text);
+    font-size: 0.875rem;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .admin-clientes-menu-opcion:hover:not(:disabled),
+  .admin-clientes-menu-opcion:focus-visible {
+    background: var(--btn-secondary-hover, rgba(255, 255, 255, 0.06));
+    outline: none;
+  }
+
+  .admin-clientes-menu-opcion:not(:last-child) {
+    border-bottom: 1px solid var(--card-border);
+  }
+
+  .admin-clientes-menu-opcion--danger {
+    color: #b91c1c;
+  }
+
+  .admin-clientes-menu-opcion--danger:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+}
+
+.admin-clientes-th-prestamo-mobile {
+  display: none;
+}
+
+.gf-modal-backdrop--cliente-detalle {
+  z-index: 1100;
+  align-items: flex-end;
+  padding: 0;
+}
+
+.gf-modal--cliente-detalle {
+  max-width: none;
+  width: 100%;
+  border-radius: 16px 16px 0 0;
+  max-height: min(88vh, 640px);
+  overflow-y: auto;
+  padding: 0.65rem 1rem calc(1rem + env(safe-area-inset-bottom, 0px));
+  animation: prestamo-detalle-slide-up 0.22s ease-out;
+}
+
+.gf-modal-backdrop--empleado-detalle {
+  z-index: 1100;
+  align-items: flex-end;
+  padding: 0;
+}
+
+.gf-modal--empleado-detalle {
+  max-width: none;
+  width: 100%;
+  border-radius: 16px 16px 0 0;
+  max-height: min(88vh, 640px);
+  overflow-y: auto;
+  padding: 0.65rem 1rem calc(1rem + env(safe-area-inset-bottom, 0px));
+  animation: prestamo-detalle-slide-up 0.22s ease-out;
+}
+
+/* Teléfono: Nombre + Acción; detalle en modal al tocar el nombre */
+@media (max-width: 640px) {
+  .admin-empleados-table-wrap {
+    overflow-x: hidden;
+    margin-left: -0.1rem;
+    margin-right: -0.1rem;
+  }
+
+  .admin-empleados-table {
+    width: 100%;
+    min-width: 0;
+    table-layout: fixed;
+    border-collapse: collapse;
+  }
+
+  .admin-empleados-table .admin-empleados-col-oculta-movil {
+    display: none !important;
+  }
+
+  .admin-empleados-table th.admin-empleados-col-nombre,
+  .admin-empleados-table td.admin-empleados-col-nombre {
+    width: 78%;
+    max-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .admin-empleados-table th.admin-empleados-col-accion,
+  .admin-empleados-table td.admin-empleados-col-accion {
+    width: 22%;
+    text-align: center;
+    vertical-align: middle;
+    padding-left: 0.15rem;
+    padding-right: 0.15rem;
+  }
+
+  .admin-empleados-nombre-btn {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    padding: 0;
+    margin: 0;
+    border: none;
+    background: none;
+    font: inherit;
+    font-weight: 600;
+    color: var(--link);
+    text-align: left;
+    cursor: pointer;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .admin-empleados-nombre-btn:hover,
+  .admin-empleados-nombre-btn:focus-visible {
+    text-decoration: underline;
+    outline: none;
+  }
+}
+
 .admin-clientes-table th.admin-clientes-th-accion,
 .admin-clientes-table td.admin-clientes-td-accion {
   width: 8rem;

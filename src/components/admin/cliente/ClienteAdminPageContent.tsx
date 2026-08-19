@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect, useCallback } from "react";
+import dynamic from "next/dynamic";
 import { useAuth } from "@/context/AuthContext";
 import { useAdminDashboard } from "@/context/AdminDashboardContext";
 import { useTrabajadorLista } from "@/context/TrabajadorListaContext";
@@ -24,7 +25,18 @@ import { filtrarClientesParaExport } from "@/lib/export-clientes";
 import { getEmpresa } from "@/lib/empresa";
 import { ExportClientesModal } from "@/components/ExportClientesModal";
 import { guardOfflineWrite, OFFLINE_MSG, useOnline } from "@/hooks/useOnline";
+import { useIsPhoneViewport } from "@/hooks/useIsPhoneViewport";
 import { isAdminPanelRole } from "@/lib/admin-panel-role";
+
+const ClienteDetalleMobileModal = dynamic(
+  () => import("@/components/admin/cliente/ClienteDetalleMobileModal"),
+  { ssr: false }
+);
+
+const ClienteAccionesMenuMobile = dynamic(
+  () => import("@/components/admin/cliente/ClienteAccionesMenuMobile"),
+  { ssr: false }
+);
 
 /** Fecha legible para el historial de pagos (o "—" si no hay fecha). */
 function formatFechaHistorial(iso: string | null): string {
@@ -64,6 +76,7 @@ function esBusquedaExactaServidor(q: string): boolean {
 export default function ClienteAdminPageContent() {
   const { user, profile } = useAuth();
   const online = useOnline();
+  const isPhone = useIsPhoneViewport();
   const { rutas } = useAdminDashboard();
   const { clientes, refresh: refreshLista } = useTrabajadorLista();
   const [loading] = useState(false);
@@ -104,6 +117,12 @@ export default function ClienteAdminPageContent() {
   const [busquedaServidorQ, setBusquedaServidorQ] = useState<string | null>(null);
   const [buscandoServidor, setBuscandoServidor] = useState(false);
   const [errorBusquedaServidor, setErrorBusquedaServidor] = useState<string | null>(null);
+  const [clienteDetalleMobile, setClienteDetalleMobile] = useState<ClienteItem | null>(null);
+  const [menuAccionesClienteId, setMenuAccionesClienteId] = useState<string | null>(null);
+
+  useEffect(() => {
+    setMenuAccionesClienteId(null);
+  }, [pagina, vistaLista, filtroRutaId, filtroNombre]);
 
   const rutaPorId = useMemo(() => {
     const m: Record<string, string> = {};
@@ -246,6 +265,11 @@ export default function ClienteAdminPageContent() {
     setEditError(null);
     setSavingEdit(false);
   }, []);
+
+  const abrirDetalleMobile = useCallback((c: ClienteItem) => {
+    setClienteDetalleMobile(c);
+  }, []);
+  const cerrarDetalleMobile = useCallback(() => setClienteDetalleMobile(null), []);
 
   const abrirEdicion = useCallback((c: ClienteItem) => {
     setClienteEditando(c);
@@ -671,29 +695,73 @@ export default function ClienteAdminPageContent() {
               <table className="admin-clientes-table">
               <thead>
                 <tr>
-                  <th>Código</th>
-                  <th>Nombre</th>
-                  <th>Ubicación</th>
-                  <th>Teléfono</th>
-                  <th>Cédula</th>
-                  <th>Préstamo activo</th>
-                  <th>Moroso</th>
+                  <th className="admin-clientes-col-codigo admin-clientes-col-oculta-movil">Código</th>
+                  <th className="admin-clientes-col-nombre">Nombre</th>
+                  <th className="admin-clientes-col-oculta-movil">Ubicación</th>
+                  <th className="admin-clientes-col-oculta-movil">Teléfono</th>
+                  <th className="admin-clientes-col-oculta-movil">Cédula</th>
+                  <th className="admin-clientes-col-prestamo">
+                    <span className="admin-clientes-th-prestamo-desktop">Préstamo activo</span>
+                    <span className="admin-clientes-th-prestamo-mobile" aria-hidden>
+                      Prést.
+                    </span>
+                  </th>
+                  <th className="admin-clientes-col-oculta-movil">Moroso</th>
                   <th className="admin-clientes-th-accion">Acción</th>
                 </tr>
               </thead>
               <tbody>
                 {clientesPaginados.map((c) => (
                   <tr key={c.id}>
-                    <td title={c.codigo ?? undefined}>
+                    <td
+                      className="admin-clientes-col-codigo admin-clientes-col-oculta-movil"
+                      title={c.codigo ?? undefined}
+                    >
                       {formatClienteCodigoRutaYNumero(c.codigo)}
                     </td>
-                    <td>{c.nombre}</td>
-                    <td>{c.ubicacion || "—"}</td>
-                    <td>{c.telefono || "—"}</td>
-                    <td>{c.cedula || "—"}</td>
-                    <td>{c.prestamo_activo ? "Sí" : "No"}</td>
-                    <td>{c.moroso ? "Sí (excluido)" : "No"}</td>
+                    <td className="admin-clientes-col-nombre">
+                      {isPhone ? (
+                        <button
+                          type="button"
+                          className="admin-clientes-nombre-btn"
+                          onClick={() => abrirDetalleMobile(c)}
+                          aria-label={`Ver detalle de ${c.nombre}`}
+                        >
+                          {c.nombre}
+                        </button>
+                      ) : (
+                        c.nombre
+                      )}
+                    </td>
+                    <td className="admin-clientes-col-oculta-movil">{c.ubicacion || "—"}</td>
+                    <td className="admin-clientes-col-oculta-movil">{c.telefono || "—"}</td>
+                    <td className="admin-clientes-col-oculta-movil">{c.cedula || "—"}</td>
+                    <td className="admin-clientes-col-prestamo">{c.prestamo_activo ? "Sí" : "No"}</td>
+                    <td className="admin-clientes-col-oculta-movil">{c.moroso ? "Sí (excluido)" : "No"}</td>
                     <td className="admin-clientes-td-accion">
+                      {isPhone ? (
+                        <ClienteAccionesMenuMobile
+                          cliente={c}
+                          abierto={menuAccionesClienteId === c.id}
+                          onToggle={() =>
+                            setMenuAccionesClienteId((prev) =>
+                              prev === c.id ? null : c.id
+                            )
+                          }
+                          onCerrar={() => setMenuAccionesClienteId(null)}
+                          onEditar={() => abrirEdicion(c)}
+                          onHistorial={() => abrirHistorial(c)}
+                          onEliminar={() => handleEliminarCliente(c)}
+                          eliminarDisabled={
+                            c.prestamo_activo || eliminandoId === c.id || !online
+                          }
+                          eliminarTitle={
+                            c.prestamo_activo
+                              ? "No se puede eliminar: tiene préstamo activo"
+                              : "Eliminar cliente"
+                          }
+                        />
+                      ) : (
                       <div className="admin-clientes-acciones">
                         <button
                           type="button"
@@ -745,6 +813,7 @@ export default function ClienteAdminPageContent() {
                           </svg>
                         </button>
                       </div>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -973,6 +1042,14 @@ export default function ClienteAdminPageContent() {
           filtroNombre={filtroNombre.trim() || undefined}
           nombreEmpresa={nombreEmpresa}
           vistaInicial={vistaLista}
+        />
+      )}
+
+      {clienteDetalleMobile && (
+        <ClienteDetalleMobileModal
+          cliente={clienteDetalleMobile}
+          rutaNombre={rutaPorId[clienteDetalleMobile.rutaId] ?? "—"}
+          onCerrar={cerrarDetalleMobile}
         />
       )}
     </div>

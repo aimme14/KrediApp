@@ -1,17 +1,25 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
+import dynamic from "next/dynamic";
 import { useAuth } from "@/context/AuthContext";
 import { listUsersByCreator, createUser } from "@/lib/users";
 import { listRutas, updateEmpleado, type RutaItem } from "@/lib/empresa-api";
 import type { UserProfile } from "@/types/roles";
 import PasswordCreateFields from "@/components/PasswordCreateFields";
 import { guardOfflineWrite, useOnline } from "@/hooks/useOnline";
+import { useIsPhoneViewport } from "@/hooks/useIsPhoneViewport";
 import { isAdminPanelRole } from "@/lib/admin-panel-role";
+
+const EmpleadoDetalleMobileModal = dynamic(
+  () => import("@/components/admin/empleado/EmpleadoDetalleMobileModal"),
+  { ssr: false }
+);
 
 export default function EmpleadoAdminPageContent() {
   const { user, profile } = useAuth();
   const online = useOnline();
+  const isPhone = useIsPhoneViewport();
   const [trabajadores, setTrabajadores] = useState<UserProfile[]>([]);
   const [rutasLibres, setRutasLibres] = useState<RutaItem[]>([]);
   const [todasRutas, setTodasRutas] = useState<RutaItem[]>([]);
@@ -29,6 +37,7 @@ export default function EmpleadoAdminPageContent() {
   const [passwordConfirm, setPasswordConfirm] = useState("");
   const [creating, setCreating] = useState(false);
 
+  const [empleadoDetalleMobile, setEmpleadoDetalleMobile] = useState<UserProfile | null>(null);
   const [empleadoEditando, setEmpleadoEditando] = useState<UserProfile | null>(null);
   const [editNombre, setEditNombre] = useState("");
   const [editUbicacion, setEditUbicacion] = useState("");
@@ -81,6 +90,11 @@ export default function EmpleadoAdminPageContent() {
     setEditError(null);
     setSavingEdit(false);
   }, []);
+
+  const abrirDetalleMobile = useCallback((t: UserProfile) => {
+    setEmpleadoDetalleMobile(t);
+  }, []);
+  const cerrarDetalleMobile = useCallback(() => setEmpleadoDetalleMobile(null), []);
 
   const abrirEdicion = useCallback((t: UserProfile) => {
     setEmpleadoEditando(t);
@@ -304,16 +318,16 @@ export default function EmpleadoAdminPageContent() {
         {loading ? (
           <p>Cargando...</p>
         ) : (
-          <div className="table-wrap">
-            <table>
+          <div className="table-wrap admin-empleados-table-wrap">
+            <table className="admin-empleados-table">
               <thead>
                 <tr>
-                  <th>Nombre</th>
-                  <th>Correo</th>
-                  <th>Ubicación</th>
-                  <th>Teléfono</th>
-                  <th>Cédula</th>
-                  <th className="admin-clientes-th-accion">Acción</th>
+                  <th className="admin-empleados-col-nombre">Nombre</th>
+                  <th className="admin-empleados-col-oculta-movil">Correo</th>
+                  <th className="admin-empleados-col-oculta-movil">Ubicación</th>
+                  <th className="admin-empleados-col-oculta-movil">Teléfono</th>
+                  <th className="admin-empleados-col-oculta-movil">Cédula</th>
+                  <th className="admin-clientes-th-accion admin-empleados-col-accion">Acción</th>
                 </tr>
               </thead>
               <tbody>
@@ -326,12 +340,25 @@ export default function EmpleadoAdminPageContent() {
                 ) : (
                   trabajadores.map((t) => (
                     <tr key={t.uid}>
-                      <td>{t.displayName ?? "—"}</td>
-                      <td>{t.email}</td>
-                      <td>{t.lugar ?? "—"}</td>
-                      <td>{t.telefono ?? "—"}</td>
-                      <td>{t.cedula ?? "—"}</td>
-                      <td className="admin-clientes-td-accion">
+                      <td className="admin-empleados-col-nombre">
+                        {isPhone ? (
+                          <button
+                            type="button"
+                            className="admin-empleados-nombre-btn"
+                            onClick={() => abrirDetalleMobile(t)}
+                            aria-label={`Ver detalle de ${t.displayName ?? t.email}`}
+                          >
+                            {t.displayName ?? "—"}
+                          </button>
+                        ) : (
+                          t.displayName ?? "—"
+                        )}
+                      </td>
+                      <td className="admin-empleados-col-oculta-movil">{t.email}</td>
+                      <td className="admin-empleados-col-oculta-movil">{t.lugar ?? "—"}</td>
+                      <td className="admin-empleados-col-oculta-movil">{t.telefono ?? "—"}</td>
+                      <td className="admin-empleados-col-oculta-movil">{t.cedula ?? "—"}</td>
+                      <td className="admin-clientes-td-accion admin-empleados-col-accion">
                         <button
                           type="button"
                           className="admin-clientes-edit-btn"
@@ -353,6 +380,18 @@ export default function EmpleadoAdminPageContent() {
           </div>
         )}
       </div>
+
+      {empleadoDetalleMobile && (
+        <EmpleadoDetalleMobileModal
+          empleado={empleadoDetalleMobile}
+          rutaNombre={
+            empleadoDetalleMobile.rutaId
+              ? (rutaPorId[empleadoDetalleMobile.rutaId] ?? empleadoDetalleMobile.rutaId)
+              : "—"
+          }
+          onCerrar={cerrarDetalleMobile}
+        />
+      )}
 
       {empleadoEditando && (
         <div
