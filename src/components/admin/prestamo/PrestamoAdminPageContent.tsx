@@ -49,6 +49,7 @@ import {
   PRESTAMO_ADMIN_MODALIDADES,
 } from "@/lib/prestamo-admin-format";
 import { OFFLINE_MSG, useOnline } from "@/hooks/useOnline";
+import { useIsPhoneViewport } from "@/hooks/useIsPhoneViewport";
 import { isAdminPanelRole } from "@/lib/admin-panel-role";
 import {
   HistorialPagosClienteModal,
@@ -67,6 +68,11 @@ const ModalConfirmar = dynamic(
 
 const PrestamoAdminCreateForm = dynamic(
   () => import("@/components/admin/prestamo/PrestamoAdminCreateForm"),
+  { ssr: false }
+);
+
+const PrestamoDetalleMobileModal = dynamic(
+  () => import("@/components/admin/prestamo/PrestamoDetalleMobileModal"),
   { ssr: false }
 );
 
@@ -119,6 +125,14 @@ function ordenarPrestamosParaPrincipal(prestamos: PrestamoItem[]): PrestamoItem[
 
 type GrupoClientePrestamos = { clienteId: string; prestamos: PrestamoItem[] };
 
+type DetalleMobileState = {
+  prestamo: PrestamoItem;
+  clienteId: string;
+  nombre: string;
+  codigo: string | null;
+  otrosPrestamos: PrestamoItem[];
+};
+
 function tituloColumnaMetrica(filtroEstado: PrestamoFiltroEstado): string {
   if (filtroEstado === "castigado") return "Capital perdido";
   return "Cuotas";
@@ -128,13 +142,12 @@ function mostrarColumnaMetrica(filtroEstado: PrestamoFiltroEstado): boolean {
   return filtroEstado !== "pagado";
 }
 
-/** La columna "Código" se oculta en la vista de pagados. */
-function mostrarColumnaCodigo(filtroEstado: PrestamoFiltroEstado): boolean {
-  return filtroEstado !== "pagado";
+function mostrarColumnaCodigo(_filtroEstado: PrestamoFiltroEstado): boolean {
+  return true;
 }
 
 function numColumnasTablaPrestamo(filtroEstado: PrestamoFiltroEstado): number {
-  if (filtroEstado === "pagado") return 8; // sin columna Código
+  if (filtroEstado === "pagado") return 9;
   if (filtroEstado === "castigado") return 10;
   return 11;
 }
@@ -237,6 +250,7 @@ export default function PrestamoAdminPageContent() {
     refresh,
   } = useTrabajadorLista();
   const online = useOnline();
+  const isPhone = useIsPhoneViewport();
   const [error, setError] = useState<string | null>(null);
   const [rutaIdForm, setRutaIdForm] = useState("");
   const rutaSeleccionada = rutas.find((r) => r.id === rutaIdForm);
@@ -740,6 +754,22 @@ export default function PrestamoAdminPageContent() {
   );
   const cerrarHistorial = useCallback(() => setClienteHistorial(null), []);
 
+  const [detalleMobile, setDetalleMobile] = useState<DetalleMobileState | null>(null);
+  const abrirDetalleMobile = useCallback(
+    (grupo: GrupoClientePrestamos, nombreCliente: string, codigoCliente: string | null) => {
+      const [principal, ...otros] = grupo.prestamos;
+      setDetalleMobile({
+        prestamo: principal,
+        clienteId: grupo.clienteId,
+        nombre: nombreCliente,
+        codigo: codigoCliente,
+        otrosPrestamos: otros,
+      });
+    },
+    []
+  );
+  const cerrarDetalleMobile = useCallback(() => setDetalleMobile(null), []);
+
   /** Últimos 3 préstamos del cliente seleccionado — consulta puntual (3 lecturas). */
   const [historialCliente, setHistorialCliente] = useState<PrestamoHistorialClienteItem[]>([]);
   const [historialClienteLoading, setHistorialClienteLoading] = useState(false);
@@ -1049,36 +1079,43 @@ export default function PrestamoAdminPageContent() {
               </div>
             </div>
             <div className="table-wrap table-historial-wrap prestamo-admin-hist-table-wrap">
-            <table className="table-historial">
+            <table
+              className={`table-historial table-historial--filtro-${filtroEstado}`}
+            >
               <thead>
                 <tr>
-                  <th aria-label="Expandir historial" />
-                  {mostrarColumnaCodigo(filtroEstado) && <th>Código</th>}
-                  <th>Cliente</th>
-                  <th>
+                  <th className="prestamo-admin-col-oculta-movil" aria-label="Expandir historial" />
+                  {mostrarColumnaCodigo(filtroEstado) && <th className="prestamo-admin-col-codigo">Código</th>}
+                  <th className="prestamo-admin-col-cliente">Cliente</th>
+                  <th
+                    className="prestamo-histo-col-fecha prestamo-admin-col-oculta-movil"
+                  >
                     {filtroEstado === "pagado"
                       ? "Fecha pago"
                       : filtroEstado === "castigado"
                         ? "Fecha pérdida"
                         : "Fecha"}
                   </th>
-                  <th className="col-num">
+                  <th className="col-num prestamo-admin-col-oculta-movil">
                     <span className="prestamo-admin-monto-th-desktop">Monto</span>
                     <span className="prestamo-admin-monto-th-mobile">Debe</span>
                   </th>
                   {filtroEstado !== "pagado" && filtroEstado !== "castigado" && (
-                    <th className="col-num">Total a pagar</th>
+                    <th className="col-num prestamo-admin-col-oculta-movil">Total a pagar</th>
                   )}
-                  <th className="col-num">{tituloColumnaSaldo(filtroEstado)}</th>
+                  <th className="col-num prestamo-admin-col-oculta-movil">{tituloColumnaSaldo(filtroEstado)}</th>
                   {mostrarColumnaMetrica(filtroEstado) && (
-                    <th className="col-num">{tituloColumnaMetrica(filtroEstado)}</th>
+                    <th className="col-num prestamo-admin-col-oculta-movil">{tituloColumnaMetrica(filtroEstado)}</th>
                   )}
-                  <th>Estado</th>
-                  <th>Frecuencia</th>
+                  <th className="prestamo-admin-col-oculta-movil">Estado</th>
+                  <th className="prestamo-admin-col-oculta-movil">Frecuencia</th>
                   <th className="prestamo-admin-cobro-th">
                     <span className="prestamo-admin-cobro-th-desktop">Acción</span>
-                    <span className="prestamo-admin-cobro-th-mobile" aria-hidden>
+                    <span className="prestamo-admin-cobro-th-mobile prestamo-admin-cobro-th-mobile--cobrar" aria-hidden>
                       Cobrar
+                    </span>
+                    <span className="prestamo-admin-cobro-th-mobile prestamo-admin-cobro-th-mobile--historial" aria-hidden>
+                      Historial
                     </span>
                   </th>
                 </tr>
@@ -1096,7 +1133,7 @@ export default function PrestamoAdminPageContent() {
                   return (
                     <Fragment key={grupo.clienteId}>
                       <tr>
-                        <td>
+                        <td className="prestamo-admin-col-oculta-movil">
                           {tieneMas ? (
                             <button
                               type="button"
@@ -1117,10 +1154,31 @@ export default function PrestamoAdminPageContent() {
                           <td className="prestamo-admin-col-codigo">{codigoDisplay}</td>
                         )}
                         <td className="prestamo-admin-col-cliente" title={nombre}>
-                          {nombre}
+                          {isPhone ? (
+                            <button
+                              type="button"
+                              className="prestamo-admin-nombre-btn"
+                              onClick={() =>
+                                abrirDetalleMobile(grupo, nombre, cl?.codigo ?? null)
+                              }
+                              aria-label={`Ver detalle del préstamo de ${nombre}${
+                                tieneMas ? ` y ${otros.length} más` : ""
+                              }`}
+                            >
+                              {nombre}
+                              {tieneMas ? (
+                                <span className="prestamo-admin-nombre-mas" aria-hidden>
+                                  {" "}
+                                  (+{otros.length})
+                                </span>
+                              ) : null}
+                            </button>
+                          ) : (
+                            nombre
+                          )}
                         </td>
                         <td
-                          className="prestamo-histo-col-fecha"
+                          className="prestamo-histo-col-fecha prestamo-admin-col-oculta-movil"
                           title={
                             principal.estado === "pagado" || principal.estado === "castigado"
                               ? "Fecha de cierre"
@@ -1129,19 +1187,19 @@ export default function PrestamoAdminPageContent() {
                         >
                           {fechaRelevantePrestamo(principal)}
                         </td>
-                        <td className="col-num">
+                        <td className="col-num prestamo-admin-col-oculta-movil">
                           <span className="prestamo-admin-monto-desktop">{formatMonedaPrestamoAdmin(principal.monto)}</span>
                           <span className="prestamo-admin-monto-mobile">
                             {formatDebeSlashTotalCredito(principal.saldoPendiente, principal)}
                           </span>
                         </td>
                         {filtroEstado !== "pagado" && filtroEstado !== "castigado" && (
-                          <td className="col-num">{formatMonedaPrestamoAdmin(principal.totalAPagar)}</td>
+                          <td className="col-num prestamo-admin-col-oculta-movil">{formatMonedaPrestamoAdmin(principal.totalAPagar)}</td>
                         )}
-                        <td className="col-num">{celdaSaldoOCobrado(principal, filtroEstado)}</td>
+                        <td className="col-num prestamo-admin-col-oculta-movil">{celdaSaldoOCobrado(principal, filtroEstado)}</td>
                         {mostrarColumnaMetrica(filtroEstado) && (
                           <td
-                            className="col-num"
+                            className="col-num prestamo-admin-col-oculta-movil"
                             title={
                               filtroEstado === "castigado" || principal.estado === "castigado"
                                 ? "Capital no recuperado"
@@ -1153,14 +1211,14 @@ export default function PrestamoAdminPageContent() {
                             {celdaMetrica(principal, filtroEstado, pagadas)}
                           </td>
                         )}
-                        <td>
+                        <td className="prestamo-admin-col-oculta-movil">
                           <span
                             className={`prestamo-admin-estado${prestamoEstadoBadgeClass(principal.estado)}`}
                           >
                             {labelEstadoPrestamo(principal)}
                           </span>
                         </td>
-                        <td>{principal.modalidad}</td>
+                        <td className="prestamo-admin-col-oculta-movil">{principal.modalidad}</td>
                         <td className="prestamo-admin-cobro-cell">
                           {isPrestamoEnCobro(principal) && (
                             <Link
@@ -1173,7 +1231,11 @@ export default function PrestamoAdminPageContent() {
                           )}
                           <button
                             type="button"
-                            className="btn btn-secondary prestamo-admin-historial-btn"
+                            className={`btn btn-secondary prestamo-admin-historial-btn${
+                              filtroEstado === "pagado"
+                                ? " prestamo-admin-historial-btn--accion-movil"
+                                : ""
+                            }`}
                             onClick={() => abrirHistorial(grupo.clienteId)}
                             title={`Ver historial de pagos de ${nombre}`}
                             aria-label={`Ver historial de pagos de ${nombre}`}
@@ -1495,6 +1557,22 @@ export default function PrestamoAdminPageContent() {
         <HistorialPagosClienteModal
           cliente={clienteHistorial}
           onCerrar={cerrarHistorial}
+        />
+      )}
+
+      {detalleMobile && (
+        <PrestamoDetalleMobileModal
+          prestamo={detalleMobile.prestamo}
+          clienteId={detalleMobile.clienteId}
+          nombre={detalleMobile.nombre}
+          codigo={detalleMobile.codigo}
+          filtroEstado={filtroEstado}
+          otrosPrestamos={detalleMobile.otrosPrestamos}
+          onHistorial={() => {
+            cerrarDetalleMobile();
+            abrirHistorial(detalleMobile.clienteId);
+          }}
+          onCerrar={cerrarDetalleMobile}
         />
       )}
 

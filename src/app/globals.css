@@ -4461,6 +4461,223 @@ td {
   }
 }
 
+/* Teléfono: solo Código, Nombre y Acción; detalle en modal al tocar el nombre */
+@media (max-width: 640px) {
+  .prestamo-admin-hist-card .table-historial .prestamo-admin-col-oculta-movil {
+    display: none !important;
+  }
+
+  .prestamo-admin-hist-card .table-historial th.prestamo-admin-col-codigo,
+  .prestamo-admin-hist-card .table-historial td.prestamo-admin-col-codigo {
+    width: 22%;
+    font-size: 0.6875rem;
+  }
+
+  .prestamo-admin-hist-card .table-historial th.prestamo-admin-col-cliente,
+  .prestamo-admin-hist-card .table-historial td.prestamo-admin-col-cliente {
+    width: 46%;
+    max-width: none;
+    margin-left: 0;
+  }
+
+  .prestamo-admin-hist-card .table-historial th.prestamo-admin-cobro-th,
+  .prestamo-admin-hist-card .table-historial td.prestamo-admin-cobro-cell {
+    width: 32%;
+    min-width: 0;
+  }
+
+  .prestamo-admin-cobro-th-mobile--historial {
+    display: none !important;
+  }
+
+  .table-historial--filtro-pagado .prestamo-admin-cobro-th-mobile--cobrar {
+    display: none !important;
+  }
+
+  .table-historial--filtro-pagado .prestamo-admin-cobro-th-mobile--historial {
+    display: inline !important;
+  }
+
+  .prestamo-admin-nombre-btn {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    padding: 0;
+    margin: 0;
+    border: none;
+    background: none;
+    font: inherit;
+    font-weight: 600;
+    color: var(--link);
+    text-align: left;
+    cursor: pointer;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .prestamo-admin-nombre-btn:hover,
+  .prestamo-admin-nombre-btn:focus-visible {
+    text-decoration: underline;
+    outline: none;
+  }
+
+  .prestamo-admin-nombre-mas {
+    font-weight: 500;
+    color: var(--text-muted);
+    font-size: 0.8125em;
+  }
+
+  .prestamo-admin-hist-card .table-historial .prestamo-admin-historial-btn:not(.prestamo-admin-historial-btn--accion-movil),
+  .prestamo-admin-hist-card .table-historial .prestamo-admin-eliminar-btn {
+    display: none !important;
+  }
+
+  .prestamo-admin-hist-card .table-historial .prestamo-admin-historial-btn--accion-movil {
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    width: auto;
+    max-width: 100%;
+    min-width: 2.35rem;
+    padding: 0.24rem 0.28rem !important;
+    font-size: 0.575rem !important;
+    line-height: 1.1 !important;
+    border-radius: 6px !important;
+    white-space: nowrap;
+    margin-top: 0;
+    background: var(--link) !important;
+    border-color: var(--link) !important;
+    color: #fff !important;
+  }
+
+  .prestamo-admin-hist-card .table-historial .prestamo-admin-cobro-btn {
+    margin-top: 0;
+  }
+
+  .prestamo-admin-hist-card .table-historial .prestamo-admin-expand-header-row,
+  .prestamo-admin-hist-card .table-historial .prestamo-admin-expand-row {
+    display: none !important;
+  }
+}
+
+.gf-modal-backdrop--prestamo-detalle {
+  z-index: 1100;
+  align-items: flex-end;
+  padding: 0;
+}
+
+.gf-modal--prestamo-detalle {
+  max-width: none;
+  width: 100%;
+  border-radius: 16px 16px 0 0;
+  max-height: min(88vh, 640px);
+  overflow-y: auto;
+  padding: 0.65rem 1rem calc(1rem + env(safe-area-inset-bottom, 0px));
+  animation: prestamo-detalle-slide-up 0.22s ease-out;
+}
+
+@keyframes prestamo-detalle-slide-up {
+  from {
+    transform: translateY(100%);
+    opacity: 0.6;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.prestamo-detalle-handle {
+  width: 2.5rem;
+  height: 0.25rem;
+  border-radius: 999px;
+  background: var(--card-border);
+  margin: 0.15rem auto 0.85rem;
+}
+
+.prestamo-detalle-codigo {
+  margin: 0 0 0.85rem;
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+}
+
+.prestamo-detalle-grid {
+  margin: 0;
+  display: grid;
+  gap: 0.55rem;
+}
+
+.prestamo-detalle-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.75rem;
+  padding: 0.45rem 0;
+  border-bottom: 1px solid var(--card-border);
+}
+
+.prestamo-detalle-row:last-child {
+  border-bottom: none;
+}
+
+.prestamo-detalle-row dt {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.prestamo-detalle-row dd {
+  margin: 0;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.prestamo-detalle-otros {
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px dashed var(--card-border);
+}
+
+.prestamo-detalle-otros-title {
+  margin: 0 0 0.65rem;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.prestamo-detalle-otros-item {
+  padding: 0.65rem 0;
+  border-bottom: 1px solid var(--card-border);
+}
+
+.prestamo-detalle-otros-item:last-child {
+  border-bottom: none;
+}
+
+.prestamo-detalle-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.prestamo-detalle-actions .btn {
+  flex: 1 1 calc(50% - 0.25rem);
+  min-width: 0;
+  justify-content: center;
+}
+
+.prestamo-detalle-cobrar-btn {
+  flex: 1 1 100% !important;
+}
+
 .prestamo-admin-estado {
   display: inline-block;
   padding: 0.18rem 0.45rem;
