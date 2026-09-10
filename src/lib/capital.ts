@@ -182,6 +182,8 @@ export async function registrarSalidaCapital(
 /** Entrada de liquidez a la base empresa (no transfiere a administradores). */
 export type InvertirEmpresaBody = {
   monto: number;
+  /** Deduplica reintentos del mismo intento (ver runIdempotent en el servidor). */
+  idempotencyKey?: string;
 };
 
 export async function invertirCajaJefe(
@@ -191,7 +193,7 @@ export async function invertirCajaJefe(
   const res = await fetch("/api/jefe/invertir", {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ monto: body.monto }),
+    body: JSON.stringify({ monto: body.monto, idempotencyKey: body.idempotencyKey }),
   });
   const json = await parseJsonResponse<Record<string, unknown>>(res);
   if (!res.ok) {
@@ -206,6 +208,8 @@ export async function invertirCajaJefe(
 export type TransferirBaseAdminBody = {
   adminUid: string;
   monto: number;
+  /** Deduplica reintentos del mismo intento (ver runIdempotent en el servidor). */
+  idempotencyKey?: string;
 };
 
 export async function transferirBaseEmpresaAAdmin(
@@ -215,7 +219,11 @@ export async function transferirBaseEmpresaAAdmin(
   const res = await fetch("/api/jefe/transferir-base-admin", {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ adminUid: body.adminUid, monto: body.monto }),
+    body: JSON.stringify({
+      adminUid: body.adminUid,
+      monto: body.monto,
+      idempotencyKey: body.idempotencyKey,
+    }),
   });
   const json = await parseJsonResponse<Record<string, unknown>>(res);
   if (!res.ok) {
