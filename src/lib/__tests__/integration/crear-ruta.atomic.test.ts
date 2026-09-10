@@ -22,7 +22,7 @@ import {
 const empresaId = nuevaEmpresaId("crear-ruta");
 const adminUid = "admin-1";
 
-const usuarioActual: ApiUser = { uid: adminUid, empresaId, role: "admin" };
+let usuarioActual: ApiUser = { uid: adminUid, empresaId, role: "admin" };
 
 jest.mock("@/lib/api-auth", () => ({
   getApiUser: jest.fn(async () => usuarioActual),
@@ -47,6 +47,7 @@ function crearRuta(body: Record<string, unknown>) {
 
 describe("Creación de ruta — atomicidad", () => {
   beforeEach(async () => {
+    usuarioActual = { uid: adminUid, empresaId, role: "admin" };
     await seedAdmin({ empresaId, adminUid, cajaAdmin: 300_000 });
     await db.collection("users").doc(adminUid).set({ adminNum: 1, codigo: "AD-001" });
 
@@ -121,6 +122,20 @@ describe("Creación de ruta — atomicidad", () => {
     const rutas = await empresaRef(empresaId).collection(RUTAS).get();
     expect(rutas.size).toBe(1);
     expect(num(rutas.docs[0].data().cajaRuta)).toBe(0);
+  });
+
+  it("el rol adminEmpresa crea rutas con la misma atomicidad", async () => {
+    usuarioActual = { uid: adminUid, empresaId, role: "adminEmpresa" };
+
+    const respuesta = await crearRuta({ nombre: "Ruta AE", capitalInicial: 120_000 });
+    expect(respuesta.status).toBe(200);
+
+    const admin = await leerUsuario(empresaId, adminUid);
+    expect(num(admin.cajaAdmin)).toBe(180_000);
+
+    const rutas = await empresaRef(empresaId).collection(RUTAS).get();
+    expect(rutas.size).toBe(1);
+    expect(num(rutas.docs[0].data().cajaRuta)).toBe(120_000);
   });
 
   it("el total de capital en rutas más la caja del admin se conserva", async () => {

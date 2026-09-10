@@ -175,6 +175,42 @@ describe("Gastos — atomicidad y concurrencia", () => {
       expect(num(admin.cajaAdmin)).toBeGreaterThanOrEqual(0);
     });
 
+    it("el rol adminEmpresa opera contra su propia caja igual que un admin", async () => {
+      usuarioActual = { uid: adminUid, empresaId, role: "adminEmpresa" };
+
+      const respuesta = await crearGasto({
+        descripcion: "Gasto de admin empresa",
+        monto: 60_000,
+        tipo: "otro",
+        alcance: "admin",
+      });
+
+      expect(respuesta.status).toBe(200);
+
+      const admin = await leerUsuario(empresaId, adminUid);
+      expect(num(admin.cajaAdmin)).toBe(140_000);
+
+      const gastos = await empresaRef(empresaId).collection(GASTOS_ADMIN).get();
+      expect(gastos.size).toBe(1);
+      expect(gastos.docs[0].data().adminId).toBe(adminUid);
+    });
+
+    it("adminEmpresa sin saldo tampoco descuenta ni registra", async () => {
+      usuarioActual = { uid: adminUid, empresaId, role: "adminEmpresa" };
+
+      const respuesta = await crearGasto({
+        descripcion: "Gasto imposible",
+        monto: 900_000,
+        tipo: "otro",
+        alcance: "admin",
+      });
+
+      expect(respuesta.status).toBe(400);
+      const admin = await leerUsuario(empresaId, adminUid);
+      expect(num(admin.cajaAdmin)).toBe(200_000);
+      expect((await empresaRef(empresaId).collection(GASTOS_ADMIN).get()).size).toBe(0);
+    });
+
     it("deduplica por clave de idempotencia", async () => {
       const idempotencyKey = "gasto-dedup-1";
       const respuestas = await Promise.all(
