@@ -91,7 +91,8 @@ export interface CapitalEmpresaDoc {
 /** Cuántas entradas de flujo se cargan al leer capital (API/UI). */
 export const CAPITAL_EMPRESA_FLUJO_QUERY_LIMIT = 100;
 
-function cajaEmpresaRef(db: Firestore, jefeUid: string) {
+/** Documento donde vive `cajaEmpresa`; se lee con tx.get para componer movimientos. */
+export function cajaEmpresaRef(db: Firestore, jefeUid: string) {
   return db
     .collection(EMPRESAS_COLLECTION)
     .doc(jefeUid)

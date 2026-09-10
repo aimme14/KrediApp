@@ -6,7 +6,7 @@ import {
   empleadoAsignadoEnDocumentoRuta,
   rutaIdsConEmpleadoEnUsuarios,
 } from "@/lib/ruta-empleado-ocupada";
-import { descontarCajaAdmin } from "@/lib/admin-capital";
+import { applyDescontarCajaAdminEnTx, cajaAdminRef } from "@/lib/admin-capital";
 import { computeCapitalTotalRutaDesdeSaldos } from "@/lib/capital-formulas";
 import { upsertCapitalRutaSnapshot } from "@/lib/capital-ruta-snapshot";
 import { isAdminPanelApiUser } from "@/lib/admin-panel-role";
@@ -129,31 +129,13 @@ export async function POST(request: NextRequest) {
   const db = getAdminFirestore();
   const now = new Date();
 
-  if (capitalInicial > 0) {
-    try {
-      await descontarCajaAdmin(db, apiUser.empresaId, apiUser.uid, capitalInicial, "Creación de ruta");
-    } catch (e) {
-      return NextResponse.json(
-        { error: e instanceof Error ? e.message : "Saldo insuficiente en base del administrador" },
-        { status: 400 }
-      );
-    }
-  }
-
+  // `adminNum` es un dato estático del perfil: leerlo fuera de la transacción
+  // no introduce carreras y evita bloquear un documento de otra colección.
   const adminSnap = await db.collection(USERS_COLLECTION).doc(apiUser.uid).get();
   const adminNum = getAdminNumForRuta(adminSnap.data());
 
   const counterRef = db.collection(COUNTERS_COLLECTION).doc(`rutas_${apiUser.uid}`);
-  const routeNum = await db.runTransaction(async (tx) => {
-    const snap = await tx.get(counterRef);
-    const lastNum = snap.exists ? (snap.data()?.lastNum ?? 0) : 0;
-    const next = lastNum + 1;
-    tx.set(counterRef, { lastNum: next }, { merge: true });
-    return next;
-  });
-
-  const codigo = `RT-${String(adminNum).padStart(3, "0")}-${String(routeNum).padStart(3, "0")}`;
-
+  const adminRef = cajaAdminRef(db, apiUser.empresaId, apiUser.uid);
   const ref = db
     .collection(EMPRESAS_COLLECTION)
     .doc(apiUser.empresaId)
@@ -161,25 +143,58 @@ export async function POST(request: NextRequest) {
     .doc();
 
   const zonaId = (ubicacion ?? "").trim() || "";
-  await ref.set({
-    nombre: nombre.trim(),
-    ubicacion: zonaId || null,
-    base: null,
-    descripcion: null,
-    adminId: apiUser.uid,
-    fechaCreacion: now,
-    codigo,
-    zonaId,
-    empleadosIds: [],
-    cajaRuta: capitalInicial,
-    cajasEmpleados: 0,
-    inversiones: 0,
-    capitalTotal: capitalInicial,
-    ganancias: 0,
-    gastos: 0,
-    perdidas: 0,
-    ultimaActualizacion: now,
-  });
+
+  let codigo = "";
+  try {
+    // Débito de caja, contador y documento de ruta en una sola transacción:
+    // antes eran tres operaciones sueltas y un fallo intermedio dejaba la caja
+    // descontada sin ruta creada.
+    await db.runTransaction(async (tx) => {
+      const counterSnap = await tx.get(counterRef);
+      const adminCajaSnap =
+        capitalInicial > 0 ? await tx.get(adminRef) : null;
+
+      if (capitalInicial > 0 && adminCajaSnap) {
+        applyDescontarCajaAdminEnTx(tx, {
+          adminRef,
+          adminSnap: adminCajaSnap,
+          monto: capitalInicial,
+          now,
+        });
+      }
+
+      const lastNum = counterSnap.exists ? (counterSnap.data()?.lastNum ?? 0) : 0;
+      const routeNum = lastNum + 1;
+      tx.set(counterRef, { lastNum: routeNum }, { merge: true });
+
+      codigo = `RT-${String(adminNum).padStart(3, "0")}-${String(routeNum).padStart(3, "0")}`;
+
+      tx.set(ref, {
+        nombre: nombre.trim(),
+        ubicacion: zonaId || null,
+        base: null,
+        descripcion: null,
+        adminId: apiUser.uid,
+        fechaCreacion: now,
+        codigo,
+        zonaId,
+        empleadosIds: [],
+        cajaRuta: capitalInicial,
+        cajasEmpleados: 0,
+        inversiones: 0,
+        capitalTotal: capitalInicial,
+        ganancias: 0,
+        gastos: 0,
+        perdidas: 0,
+        ultimaActualizacion: now,
+      });
+    });
+  } catch (e) {
+    return NextResponse.json(
+      { error: e instanceof Error ? e.message : "Saldo insuficiente en base del administrador" },
+      { status: 400 }
+    );
+  }
 
   await upsertCapitalRutaSnapshot(db, apiUser.empresaId, ref.id, {
     nombre: nombre.trim(),
