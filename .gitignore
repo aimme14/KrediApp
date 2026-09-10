@@ -38,3 +38,7 @@ Thumbs.db
 # Vercel
 .vercel
 serviceAccountKey.json.json
+
+firestore-debug.log
+firebase-debug.log
+audit-*.json
