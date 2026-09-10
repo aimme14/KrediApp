@@ -54,47 +54,75 @@ export async function registrarPrestamoEnRuta(
     .collection(RUTAS_SUBCOLLECTION)
     .doc(rutaId);
 
-  const snap = await rutaRef.get();
-  if (!snap.exists) throw new Error("Ruta no encontrada");
-
-  const data = snap.data()!;
-  let cajaRuta = typeof data.cajaRuta === "number" ? data.cajaRuta : 0;
-  const cajasEmpleados = typeof data.cajasEmpleados === "number" ? data.cajasEmpleados : 0;
-  let inversiones = typeof data.inversiones === "number" ? data.inversiones : 0;
-  const perdidas = typeof data.perdidas === "number" ? data.perdidas : 0;
-  const capitalTotal = computeCapitalTotalRutaDesdeSaldos({
-    cajaRuta,
-    cajasEmpleados,
-    inversiones,
-    perdidas,
-  });
-
-  if (cajaRuta < monto) throw new Error("Saldo insuficiente en base de la ruta");
-
-  cajaRuta -= monto;
-  inversiones += monto;
-
-  const suma = computeCapitalTotalRutaDesdeSaldos({
-    cajaRuta,
-    cajasEmpleados,
-    inversiones,
-    perdidas,
-  });
-  if (Math.abs(suma - capitalTotal) > 0.02) {
-    throw new Error("Capital descuadrado — revisar operación");
-  }
-
-  await rutaRef.update({
-    cajaRuta,
-    inversiones,
-    totalPrestado: FieldValue.increment(monto),
-    ultimaActualizacion: new Date(),
+  await db.runTransaction(async (tx) => {
+    const rutaSnap = await tx.get(rutaRef);
+    applyRegistrarPrestamoEnRutaEnTx(tx, {
+      rutaSnap,
+      rutaRef,
+      monto,
+      now: new Date(),
+    });
   });
 
   const after = await rutaRef.get();
   if (after.exists) {
     await upsertCapitalRutaSnapshot(db, empresaId, rutaId, after.data()!);
   }
+}
+
+/**
+ * Descuenta un gasto de la caja de una ruta dentro de una transacción existente.
+ * `rutaSnap` debe venir de tx.get(rutaRef) para bloquear el saldo.
+ *
+ * @throws "Ruta no encontrada" | "Esta ruta no pertenece a tu administración"
+ *   | "Saldo insuficiente en caja de la ruta"
+ */
+export function applyDescontarCajaRutaEnTx(
+  tx: Transaction,
+  ctx: {
+    rutaSnap: DocumentSnapshot;
+    rutaRef: DocumentReference;
+    adminUid: string;
+    monto: number;
+    now: Date;
+  }
+): { cajaRuta: number; capitalTotal: number } {
+  const { rutaSnap, rutaRef, adminUid, monto, now } = ctx;
+
+  if (!rutaSnap.exists) throw new Error("Ruta no encontrada");
+
+  const rd = rutaSnap.data() as Record<string, unknown>;
+  if ((rd.adminId as string) !== adminUid) {
+    throw new Error("Esta ruta no pertenece a tu administración");
+  }
+
+  const cajaRuta = typeof rd.cajaRuta === "number" ? rd.cajaRuta : 0;
+  const cajasEmpleados =
+    typeof rd.cajasEmpleados === "number" ? rd.cajasEmpleados : 0;
+  const inversiones = typeof rd.inversiones === "number" ? rd.inversiones : 0;
+  const perdidas = typeof rd.perdidas === "number" ? rd.perdidas : 0;
+  const gastos = typeof rd.gastos === "number" ? rd.gastos : 0;
+
+  if (cajaRuta < monto) {
+    throw new Error("Saldo insuficiente en caja de la ruta");
+  }
+
+  const nuevaCajaRuta = round2(cajaRuta - monto);
+  const nuevoCapitalTotal = computeCapitalTotalRutaDesdeSaldos({
+    cajaRuta: nuevaCajaRuta,
+    cajasEmpleados,
+    inversiones,
+    perdidas,
+  });
+
+  tx.update(rutaRef, {
+    cajaRuta: nuevaCajaRuta,
+    gastos: round2(gastos + monto),
+    capitalTotal: nuevoCapitalTotal,
+    ultimaActualizacion: now,
+  });
+
+  return { cajaRuta: nuevaCajaRuta, capitalTotal: nuevoCapitalTotal };
 }
 
 /**
@@ -121,40 +149,13 @@ export async function descontarCajaRutaAdmin(
 
   const result = await db.runTransaction(async (tx) => {
     const rutaSnap = await tx.get(rutaRef);
-    if (!rutaSnap.exists) throw new Error("Ruta no encontrada");
-
-    const rd = rutaSnap.data() as Record<string, unknown>;
-    if ((rd.adminId as string) !== adminUid) {
-      throw new Error("Esta ruta no pertenece a tu administración");
-    }
-
-    const cajaRuta = typeof rd.cajaRuta === "number" ? rd.cajaRuta : 0;
-    const cajasEmpleados =
-      typeof rd.cajasEmpleados === "number" ? rd.cajasEmpleados : 0;
-    const inversiones = typeof rd.inversiones === "number" ? rd.inversiones : 0;
-    const perdidas = typeof rd.perdidas === "number" ? rd.perdidas : 0;
-    const gastos = typeof rd.gastos === "number" ? rd.gastos : 0;
-
-    if (cajaRuta < monto) {
-      throw new Error("Saldo insuficiente en caja de la ruta");
-    }
-
-    const nuevaCajaRuta = round2(cajaRuta - monto);
-    const nuevoCapitalTotal = computeCapitalTotalRutaDesdeSaldos({
-      cajaRuta: nuevaCajaRuta,
-      cajasEmpleados,
-      inversiones,
-      perdidas,
+    return applyDescontarCajaRutaEnTx(tx, {
+      rutaSnap,
+      rutaRef,
+      adminUid,
+      monto,
+      now: new Date(),
     });
-
-    tx.update(rutaRef, {
-      cajaRuta: nuevaCajaRuta,
-      gastos: round2(gastos + monto),
-      capitalTotal: nuevoCapitalTotal,
-      ultimaActualizacion: new Date(),
-    });
-
-    return { cajaRuta: nuevaCajaRuta, capitalTotal: nuevoCapitalTotal };
   });
 
   const after = await rutaRef.get();
