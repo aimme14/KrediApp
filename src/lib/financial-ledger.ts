@@ -35,6 +35,13 @@ export type WalletType =
 
 export type LedgerDirection = "debit" | "credit";
 
+export type LedgerRelatedEntityType =
+  | "gasto"
+  | "prestamo"
+  | "pago"
+  /** Ingreso de liquidez externa a la base del adminEmpresa. */
+  | "ingreso_base";
+
 export type LedgerMovementSpec = {
   walletType: WalletType;
   walletId: string;
@@ -44,7 +51,7 @@ export type LedgerMovementSpec = {
   eventType: string;
   scope: "empresa" | "admin" | "ruta" | "empleado";
   createdBy: string;
-  relatedEntityType: "gasto" | "prestamo" | "pago";
+  relatedEntityType: LedgerRelatedEntityType;
   relatedEntityId: string;
   metadata?: Record<string, unknown>;
   /** Clave de idempotencia; también id del doc de movimiento y del outbox. */
@@ -61,7 +68,7 @@ type RecordDebitMovementParams = {
   eventType: string;
   scope: "empresa" | "admin" | "ruta" | "empleado";
   createdBy: string;
-  relatedEntityType: "gasto" | "prestamo" | "pago";
+  relatedEntityType: LedgerRelatedEntityType;
   relatedEntityId: string;
   metadata?: Record<string, unknown>;
   operationId: string;

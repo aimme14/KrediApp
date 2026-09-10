@@ -2,7 +2,7 @@
  * Flujo: trabajador crea solicitud → administrador aprueba (ejecuta traspaso) o rechaza.
  */
 
-import type { Firestore } from "firebase-admin/firestore";
+import type { DocumentReference, Firestore } from "firebase-admin/firestore";
 import { Timestamp } from "firebase-admin/firestore";
 import { fechaDiaColombiaHoy } from "@/lib/colombia-day-bounds";
 import { buildCierreDiaSnapshot } from "@/lib/cierre-dia-snapshot";
@@ -16,7 +16,7 @@ import {
   SOLICITUDES_ENTREGA_REPORTE_SUBCOLLECTION,
 } from "@/lib/empresas-db";
 import {
-  assertSolicitudEntregaPendienteEnTransaccion,
+  cerrarSolicitudEntregaLegacyEnTransaccion,
   entregarReporteTrabajadorARutaConValidacion,
   getPreviewEntregaReporteTrabajador,
 } from "@/lib/entregar-reporte-empleado-admin";
@@ -206,6 +206,7 @@ export async function crearSolicitudEntregaReporte(
 async function appendReporteDia(
   db: Firestore,
   empresaId: string,
+  docRef: DocumentReference,
   params: {
     solicitudId: string;
     rutaId: string;
@@ -220,11 +221,6 @@ async function appendReporteDia(
 ): Promise<{ id: string; fechaDia: string }> {
   const fechaDia = fechaDiaColombiaHoy();
 
-  const col = db
-    .collection(EMPRESAS_COLLECTION)
-    .doc(empresaId)
-    .collection(REPORTES_DIA_SUBCOLLECTION);
-  const docRef = col.doc();
   await docRef.set({
     fecha: Timestamp.now(),
     fechaDia,
@@ -280,6 +276,16 @@ export async function aprobarSolicitudEntregaReporte(
     throw new Error("La ruta ya no está bajo tu administración");
   }
 
+  // El id del reporte se reserva antes de mover dinero y se guarda dentro de la
+  // misma transacción: así la solicitud aprobada nunca queda sin referencia,
+  // aunque la generación del reporte o del PDF falle después.
+  const reporteRef = db
+    .collection(EMPRESAS_COLLECTION)
+    .doc(empresaId)
+    .collection(REPORTES_DIA_SUBCOLLECTION)
+    .doc();
+  const cierre = { reporteDiaId: reporteRef.id };
+
   // Compatibilidad: solicitudes pendientes creadas con traspaso anticipado (campo legacy en Firestore).
   const legacyTraspasoAnticipado =
     sol.traspasoEjecutadoEn != null &&
@@ -288,15 +294,23 @@ export async function aprobarSolicitudEntregaReporte(
 
   let result: { monto: number; rutaId: string };
   if (legacyTraspasoAnticipado) {
-    await assertSolicitudEntregaPendienteEnTransaccion(db, solRef, adminUid);
-    result = { monto: sol.montoEntregadoEfectivo as number, rutaId: rutaIdSol };
+    const montoLegacy = sol.montoEntregadoEfectivo as number;
+    await cerrarSolicitudEntregaLegacyEnTransaccion(
+      db,
+      solRef,
+      adminUid,
+      montoLegacy,
+      cierre
+    );
+    result = { monto: montoLegacy, rutaId: rutaIdSol };
   } else {
     result = await entregarReporteTrabajadorARutaConValidacion(
       db,
       empresaId,
       empleadoUid,
       solRef,
-      adminUid
+      adminUid,
+      cierre
     );
   }
 
@@ -317,23 +331,22 @@ export async function aprobarSolicitudEntregaReporte(
     adminId: adminUid,
   });
 
-  const { id: reporteDiaId, fechaDia } = await appendReporteDia(db, empresaId, {
-    solicitudId,
-    rutaId: result.rutaId,
-    empleadoId: empleadoUid,
-    empleadoNombre,
-    montoEntregado: result.monto,
-    adminId: adminUid,
-    comentario: comentarioTrabajador,
-    fechaDesde,
-    fechaHasta,
-  });
-
-  const reporteRef = db
-    .collection(EMPRESAS_COLLECTION)
-    .doc(empresaId)
-    .collection(REPORTES_DIA_SUBCOLLECTION)
-    .doc(reporteDiaId);
+  const { id: reporteDiaId, fechaDia } = await appendReporteDia(
+    db,
+    empresaId,
+    reporteRef,
+    {
+      solicitudId,
+      rutaId: result.rutaId,
+      empleadoId: empleadoUid,
+      empleadoNombre,
+      montoEntregado: result.monto,
+      adminId: adminUid,
+      comentario: comentarioTrabajador,
+      fechaDesde,
+      fechaHasta,
+    }
+  );
 
   const snapshot = await buildCierreDiaSnapshot(db, {
     empresaId,
@@ -378,14 +391,7 @@ export async function aprobarSolicitudEntregaReporte(
     });
   }
 
-  const now = Timestamp.now();
-  await solRef.update({
-    estado: "aprobada",
-    resueltaEn: now,
-    resueltaPorUid: adminUid,
-    montoEntregadoEfectivo: result.monto,
-    reporteDiaId,
-  });
+  // La solicitud ya quedó aprobada dentro de la transacción del traspaso.
 
   try {
     await purgeTransferenciaEvidenciasDelCierre(db, empresaId, snapshot);

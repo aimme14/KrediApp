@@ -4,6 +4,7 @@
  */
 
 import type { DocumentReference, Firestore, Transaction } from "firebase-admin/firestore";
+import { Timestamp } from "firebase-admin/firestore";
 import {
   EMPRESAS_COLLECTION,
   RUTAS_SUBCOLLECTION,
@@ -164,24 +165,58 @@ async function assertSolicitudPendienteEnTx(
   }
 }
 
-/** Valida estado pendiente dentro de una transacción (p. ej. solicitudes legacy). */
-export async function assertSolicitudEntregaPendienteEnTransaccion(
-  db: Firestore,
+/** Datos del cierre que se escriben en la solicitud al aprobarla. */
+export type CierreSolicitudEntrega = {
+  /** Id del reporte del día, pre-generado para que la solicitud nunca quede sin referencia. */
+  reporteDiaId: string;
+};
+
+function marcarSolicitudAprobadaEnTx(
+  tx: Transaction,
   solRef: DocumentReference,
-  adminUid: string
-): Promise<void> {
-  await db.runTransaction(async (tx) => {
-    await assertSolicitudPendienteEnTx(tx, solRef, adminUid);
+  adminUid: string,
+  monto: number,
+  cierre: CierreSolicitudEntrega
+): void {
+  tx.update(solRef, {
+    estado: "aprobada",
+    resueltaEn: Timestamp.now(),
+    resueltaPorUid: adminUid,
+    montoEntregadoEfectivo: monto,
+    reporteDiaId: cierre.reporteDiaId,
   });
 }
 
-/** Traspasa cajaEmpleado → cajaRuta validando la solicitud pendiente en la misma transacción. */
+/**
+ * Cierra una solicitud legacy (el traspaso de efectivo ya se ejecutó al crearla)
+ * validando y marcando aprobada en la misma transacción.
+ */
+export async function cerrarSolicitudEntregaLegacyEnTransaccion(
+  db: Firestore,
+  solRef: DocumentReference,
+  adminUid: string,
+  monto: number,
+  cierre: CierreSolicitudEntrega
+): Promise<void> {
+  await db.runTransaction(async (tx) => {
+    await assertSolicitudPendienteEnTx(tx, solRef, adminUid);
+    marcarSolicitudAprobadaEnTx(tx, solRef, adminUid, monto, cierre);
+  });
+}
+
+/**
+ * Traspasa cajaEmpleado → cajaRuta y cierra la solicitud en la misma transacción.
+ *
+ * Marcar la solicitud como aprobada dentro de la transacción del dinero es lo
+ * que impide que dos aprobaciones simultáneas generen dos cierres del día.
+ */
 export async function entregarReporteTrabajadorARutaConValidacion(
   db: Firestore,
   empresaId: string,
   empleadoUid: string,
   solRef: DocumentReference,
-  adminUid: string
+  adminUid: string,
+  cierre: CierreSolicitudEntrega
 ): Promise<EntregarReporteResult> {
   const usuarioRef = db
     .collection(EMPRESAS_COLLECTION)
@@ -212,7 +247,8 @@ export async function entregarReporteTrabajadorARutaConValidacion(
     const rd = rutaSnap.data() as Record<string, unknown>;
 
     let cajaRuta = typeof rd.cajaRuta === "number" ? rd.cajaRuta : 0;
-    let cajasEmpleados = typeof rd.cajasEmpleados === "number" ? rd.cajasEmpleados : 0;
+    const cajasEmpleadosAntes =
+      typeof rd.cajasEmpleados === "number" ? rd.cajasEmpleados : 0;
     const inversiones = typeof rd.inversiones === "number" ? rd.inversiones : 0;
     const perdidas = typeof rd.perdidas === "number" ? rd.perdidas : 0;
 
@@ -223,7 +259,14 @@ export async function entregarReporteTrabajadorARutaConValidacion(
     const monto = round2(cEmp);
 
     cajaRuta = round2(cajaRuta + monto);
-    cajasEmpleados = round2(Math.max(0, cajasEmpleados - monto));
+
+    // El trabajador entrega más de lo que la ruta tenía contabilizado en
+    // `cajasEmpleados`. Truncar a cero mantiene la operación viva, pero el
+    // faltante se deja registrado para que la auditoría lo vea.
+    const cajasEmpleadosExacto = round2(cajasEmpleadosAntes - monto);
+    const faltante = cajasEmpleadosExacto < -0.02 ? round2(-cajasEmpleadosExacto) : 0;
+    const cajasEmpleados = round2(Math.max(0, cajasEmpleadosExacto));
+
     const nuevoCapital = computeCapitalTotalRutaDesdeSaldos({
       cajaRuta,
       cajasEmpleados,
@@ -237,12 +280,28 @@ export async function entregarReporteTrabajadorARutaConValidacion(
       cajaEmpleado: 0,
       ultimaActualizacionCapital: now,
     });
-    tx.update(rutaRef, {
+
+    const rutaUpdate: Record<string, unknown> = {
       cajaRuta,
       cajasEmpleados,
       capitalTotal: nuevoCapital,
       ultimaActualizacion: now,
-    });
+    };
+    if (faltante > 0) {
+      console.warn(
+        `[entrega-reporte] Descuadre en ruta ${rutaId}: el trabajador ${empleadoUid} entregó ${monto} y cajasEmpleados era ${cajasEmpleadosAntes} (faltante ${faltante}).`
+      );
+      rutaUpdate.descuadreCajasEmpleados = {
+        detectadoEn: now,
+        faltante,
+        empleadoUid,
+        montoEntregado: monto,
+        cajasEmpleadosAntes,
+      };
+    }
+    tx.update(rutaRef, rutaUpdate);
+
+    marcarSolicitudAprobadaEnTx(tx, solRef, adminUid, monto, cierre);
   });
 
   const after = await rutaRef.get();

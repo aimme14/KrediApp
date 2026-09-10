@@ -16,7 +16,7 @@ import {
   crearPrestamoEmpleado,
   mapCrearPrestamoEmpleadoError,
 } from "@/lib/crear-prestamo-empleado";
-import { recordDebitMovement } from "@/lib/financial-ledger";
+import { drainLedgerOutbox, enqueueLedgerOutboxInTx } from "@/lib/financial-ledger";
 import {
   startIdempotentOperation,
   finishIdempotentOperation,
@@ -313,10 +313,7 @@ async function postHandler(request: NextRequest) {
     rutaIdPrestamo = (clienteSnap.data()?.rutaId as string) ?? "";
   }
 
-  let ledgerWalletType: "ruta_caja" | "empleado_caja" | null = null;
-  let ledgerWalletId = "";
-  let ledgerBalanceAfter: number | undefined;
-  let ledgerEventType = "";
+  let ledgerOperationIds: string[] = [];
 
   const rutaRefPrestamo = rutaIdPrestamo
     ? db
@@ -351,15 +348,37 @@ async function postHandler(request: NextRequest) {
 
       // ── Desembolso desde caja ruta (dentro de la tx: atómico con la creación del préstamo) ──
       if (rutaRefPrestamo && rutaSnapTx) {
-        applyRegistrarPrestamoEnRutaEnTx(tx, {
+        const saldos = applyRegistrarPrestamoEnRutaEnTx(tx, {
           rutaSnap: rutaSnapTx,
           rutaRef: rutaRefPrestamo,
           monto,
           now,
         });
-        ledgerWalletType = "ruta_caja";
-        ledgerWalletId = rutaIdPrestamo;
-        ledgerEventType = "prestamo_desembolso_ruta";
+
+        // El asiento se encola en la misma transacción que el desembolso.
+        ledgerOperationIds = enqueueLedgerOutboxInTx(tx, db, apiUser.empresaId, [
+          {
+            direction: "debit",
+            walletType: "ruta_caja",
+            walletId: rutaIdPrestamo,
+            amount: monto,
+            balanceAfter: saldos.cajaRuta,
+            eventType: "prestamo_desembolso_ruta",
+            scope: "ruta",
+            createdBy: apiUser.uid,
+            relatedEntityType: "prestamo",
+            relatedEntityId: ref.id,
+            metadata: {
+              prestamoId: ref.id,
+              clienteId: clienteId.trim(),
+              rutaId: rutaIdPrestamo,
+              empleadoId: empleadoIdPrestamo,
+              totalAPagar,
+              interesPct,
+            },
+            operationId: `prestamo:${ref.id}`,
+          },
+        ]);
       }
 
       // ── Escrituras ──
@@ -414,7 +433,7 @@ async function postHandler(request: NextRequest) {
     throw e;
   }
 
-  // Snapshot de capital de ruta y saldo para ledger — después de la tx, no dentro
+  // Snapshot de capital de ruta — proyección, después de la tx
   if (rutaRefPrestamo && rutaIdPrestamo) {
     try {
       const rutaAfter = await rutaRefPrestamo.get();
@@ -425,42 +444,17 @@ async function postHandler(request: NextRequest) {
           rutaIdPrestamo,
           rutaAfter.data()!
         );
-        const cajaRuta = rutaAfter.data()?.cajaRuta;
-        if (typeof cajaRuta === "number") {
-          ledgerBalanceAfter = cajaRuta;
-        }
       }
     } catch (e) {
       console.warn("[prestamos] upsertCapitalRutaSnapshot post-tx:", e);
     }
   }
 
-  if (rutaIdPrestamo && ledgerWalletType && ledgerWalletId) {
+  if (ledgerOperationIds.length > 0) {
     try {
-      await recordDebitMovement({
-        db,
-        empresaId: apiUser.empresaId,
-        walletType: ledgerWalletType,
-        walletId: ledgerWalletId,
-        amount: monto,
-        balanceAfter: ledgerBalanceAfter,
-        eventType: ledgerEventType,
-        scope: ledgerWalletType === "ruta_caja" ? "ruta" : "empleado",
-        createdBy: apiUser.uid,
-        relatedEntityType: "prestamo",
-        relatedEntityId: ref.id,
-        metadata: {
-          prestamoId: ref.id,
-          clienteId: clienteId.trim(),
-          rutaId: rutaIdPrestamo,
-          empleadoId: empleadoIdPrestamo,
-          totalAPagar,
-          interesPct,
-        },
-        operationId: `prestamo:${ref.id}`,
-      });
+      await drainLedgerOutbox(db, apiUser.empresaId, ledgerOperationIds);
     } catch (e) {
-      console.warn("[ledger] No se pudo registrar movimiento de desembolso", e);
+      console.warn("[ledger] Desembolso queda pending en el outbox", e);
     }
   }
 

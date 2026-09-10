@@ -9,8 +9,9 @@ import {
   USUARIOS_SUBCOLLECTION,
   INGRESOS_BASE_ADMIN_EMPRESA_SUBCOLLECTION,
 } from "@/lib/empresas-db";
-import { sumarCajaAdmin } from "@/lib/admin-capital";
+import { applySumarCajaAdminEnTx, cajaAdminRef } from "@/lib/admin-capital";
 import { persistAggregatedCapitalDocs } from "@/lib/capital-aggregates";
+import { drainLedgerOutbox, enqueueLedgerOutboxInTx } from "@/lib/financial-ledger";
 
 export interface IngresoBaseAdminEmpresaEntry {
   id: string;
@@ -21,6 +22,13 @@ export interface IngresoBaseAdminEmpresaEntry {
   adminUid: string;
 }
 
+/**
+ * Acredita liquidez externa en la base del adminEmpresa.
+ *
+ * El crédito de caja y el documento que lo justifica se escriben en la misma
+ * transacción: antes eran dos pasos sueltos, y un fallo entre ellos dejaba
+ * dinero ingresado sin registro de su origen.
+ */
 export async function ingresarBaseAdminEmpresa(
   db: Firestore,
   empresaId: string,
@@ -29,36 +37,65 @@ export async function ingresarBaseAdminEmpresa(
 ): Promise<{ cajaAdmin: number }> {
   if (monto <= 0) throw new Error("El monto debe ser mayor a 0");
 
-  const adminRef = db
-    .collection(EMPRESAS_COLLECTION)
-    .doc(empresaId)
-    .collection(USUARIOS_SUBCOLLECTION)
-    .doc(adminUid);
-
-  const adminSnap = await adminRef.get();
-  if (!adminSnap.exists) {
-    throw new Error("Administrador de empresa no encontrado");
-  }
-  const adminData = adminSnap.data()!;
-  if ((adminData.rol as string) !== "adminEmpresa") {
-    throw new Error("Solo un administrador de empresa puede registrar este ingreso");
-  }
-
-  const cajaAnterior =
-    typeof adminData.cajaAdmin === "number" ? adminData.cajaAdmin : 0;
-  const cajaNueva = await sumarCajaAdmin(db, empresaId, adminUid, monto);
-  const now = new Date();
-
-  await adminRef
+  const adminRef = cajaAdminRef(db, empresaId, adminUid);
+  const ingresoRef = adminRef
     .collection(INGRESOS_BASE_ADMIN_EMPRESA_SUBCOLLECTION)
-    .doc()
-    .set({
+    .doc();
+
+  const now = new Date();
+  let cajaNueva = 0;
+  let ledgerOperationIds: string[] = [];
+
+  await db.runTransaction(async (tx) => {
+    ledgerOperationIds = [];
+
+    const adminSnap = await tx.get(adminRef);
+    if (!adminSnap.exists) {
+      throw new Error("Administrador de empresa no encontrado");
+    }
+    const adminData = adminSnap.data()!;
+    if ((adminData.rol as string) !== "adminEmpresa") {
+      throw new Error("Solo un administrador de empresa puede registrar este ingreso");
+    }
+
+    const cajaAnterior =
+      typeof adminData.cajaAdmin === "number" ? adminData.cajaAdmin : 0;
+
+    cajaNueva = applySumarCajaAdminEnTx(tx, { adminRef, adminSnap, monto, now });
+
+    tx.set(ingresoRef, {
       monto,
       cajaAnterior,
       cajaNueva,
       at: Timestamp.fromDate(now),
       adminUid,
     });
+
+    ledgerOperationIds = enqueueLedgerOutboxInTx(tx, db, empresaId, [
+      {
+        direction: "credit",
+        walletType: "admin_caja",
+        walletId: adminUid,
+        amount: monto,
+        balanceAfter: cajaNueva,
+        eventType: "ingreso_base_admin_empresa",
+        scope: "admin",
+        createdBy: adminUid,
+        relatedEntityType: "ingreso_base",
+        relatedEntityId: ingresoRef.id,
+        metadata: { ingresoId: ingresoRef.id, cajaAnterior },
+        operationId: `ingreso-base:${ingresoRef.id}`,
+      },
+    ]);
+  });
+
+  if (ledgerOperationIds.length > 0) {
+    try {
+      await drainLedgerOutbox(db, empresaId, ledgerOperationIds);
+    } catch (e) {
+      console.warn("[ledger] Ingreso a base queda pending en el outbox", e);
+    }
+  }
 
   await persistAggregatedCapitalDocs(db, empresaId);
 

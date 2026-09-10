@@ -8,17 +8,30 @@ import {
   GASTOS_EMPRESA_SUBCOLLECTION,
   GASTOS_ADMIN_SUBCOLLECTION,
   GASTOS_EMPLEADO_SUBCOLLECTION,
-  RUTAS_SUBCOLLECTION,
   USERS_COLLECTION,
 } from "@/lib/empresas-db";
-import { descontarCajaAdmin } from "@/lib/admin-capital";
-import { descontarCajaEmpresa } from "@/lib/jefe-capital";
-import { registrarGastoOperativoEmpleadoDesdeApi } from "@/lib/empleado-gasto-operativo-admin";
-import { descontarCajaRutaAdmin } from "@/lib/ruta-financiera-admin";
-import { recordDebitMovement, type WalletType } from "@/lib/financial-ledger";
+import { applyDescontarCajaAdminEnTx, cajaAdminRef } from "@/lib/admin-capital";
 import {
-  startIdempotentOperation,
-  finishIdempotentOperation,
+  applyDescontarCajaEmpresaEnTx,
+  cajaEmpresaRef,
+} from "@/lib/jefe-capital";
+import { computeSumaCapitalAdminsDetalle } from "@/lib/capital-aggregates";
+import {
+  applyGastoOperativoEmpleadoEnTx,
+  rutaEmpresaRef,
+  usuarioEmpresaRef,
+} from "@/lib/empleado-gasto-operativo-admin";
+import { applyDescontarCajaRutaEnTx } from "@/lib/ruta-financiera-admin";
+import { upsertCapitalRutaSnapshot } from "@/lib/capital-ruta-snapshot";
+import {
+  drainLedgerOutbox,
+  enqueueLedgerOutboxInTx,
+  type LedgerMovementSpec,
+  type WalletType,
+} from "@/lib/financial-ledger";
+import {
+  runIdempotent,
+  type IdempotentOutcome,
 } from "@/lib/financial-idempotency";
 import type { TipoGasto } from "@/types/firestore";
 import { fechaGastoDesdeStringCliente } from "@/lib/colombia-day-bounds";
@@ -207,278 +220,370 @@ export async function POST(request: NextRequest) {
   const creadoEn = Timestamp.now();
 
   const db = getAdminFirestore();
-  const empresaRef = db.collection(EMPRESAS_COLLECTION).doc(apiUser.empresaId);
-  const idem = await startIdempotentOperation({
+  const creadoPorNombre = creadoPorNombreBody?.trim() || apiUser.uid;
+
+  const ctx: CrearGastoCtx = {
+    db,
+    apiUser,
+    descripcion: descripcion.trim(),
+    monto,
+    fechaDate,
+    creadoEn,
+    tipo: tipoValido,
+    evidencia: (evidencia ?? "").trim() || null,
+    creadoPorNombre: creadoPorNombre.trim() || apiUser.uid,
+  };
+
+  const outcome = await runIdempotent({
     db,
     empresaId: apiUser.empresaId,
     key: idempotencyKey,
     endpoint: "gastos:create",
     uid: apiUser.uid,
+    handler: () => {
+      if (apiUser.role === "jefe") return crearGastoJefe(ctx);
+      if (isAdminPanelApiUser(apiUser)) {
+        return crearGastoAdmin(ctx, alcanceBody, rutaIdBody);
+      }
+      return crearGastoEmpleado(ctx);
+    },
   });
-  if (idem.replay) {
-    return NextResponse.json(idem.payload, { status: idem.status });
+
+  return NextResponse.json(outcome.payload, { status: outcome.status });
+}
+
+type ApiUser = NonNullable<Awaited<ReturnType<typeof getApiUser>>>;
+
+type CrearGastoCtx = {
+  db: ReturnType<typeof getAdminFirestore>;
+  apiUser: ApiUser;
+  descripcion: string;
+  monto: number;
+  fechaDate: Date;
+  creadoEn: Timestamp;
+  tipo: TipoGasto;
+  evidencia: string | null;
+  creadoPorNombre: string;
+};
+
+function mensajeError(e: unknown, fallback: string): string {
+  return e instanceof Error && e.message ? e.message : fallback;
+}
+
+/** Drena el outbox tras el commit; un fallo deja el asiento pending, no pierde dinero. */
+async function drenarLedger(
+  db: CrearGastoCtx["db"],
+  empresaId: string,
+  ids: string[]
+): Promise<void> {
+  if (ids.length === 0) return;
+  try {
+    await drainLedgerOutbox(db, empresaId, ids);
+  } catch (e) {
+    console.warn("[ledger] No se pudo drenar el gasto; queda pending en el outbox", e);
   }
-  const finalize = async (status: number, payload: Record<string, unknown>) => {
-    await finishIdempotentOperation({
-      db,
-      empresaId: apiUser.empresaId,
-      key: idempotencyKey,
-      result: { ok: status < 400, status, payload },
-    });
-    return NextResponse.json(payload, { status });
+}
+
+/** ── Jefe: caja empresa + gastosEmpresa ── */
+async function crearGastoJefe(ctx: CrearGastoCtx): Promise<IdempotentOutcome> {
+  const { db, apiUser, monto } = ctx;
+  const empresaRef = db.collection(EMPRESAS_COLLECTION).doc(apiUser.empresaId);
+  const ref = empresaRef.collection(GASTOS_EMPRESA_SUBCOLLECTION).doc();
+
+  const gastoDoc = {
+    descripcion: ctx.descripcion,
+    monto,
+    fecha: ctx.fechaDate,
+    creadoEn: ctx.creadoEn,
+    tipo: ctx.tipo,
+    creadoPor: apiUser.uid,
+    creadoPorNombre: ctx.creadoPorNombre,
+    rol: "jefe",
+    jefeUid: apiUser.uid,
+    evidencia: ctx.evidencia,
   };
 
-  const creadoPorNombre = creadoPorNombreBody?.trim() || apiUser.uid;
+  // Solo alimenta los campos de display del historial de capital.
+  const { sumaCapitalAdmins } =
+    monto > 0
+      ? await computeSumaCapitalAdminsDetalle(db, apiUser.uid)
+      : { sumaCapitalAdmins: 0 };
 
-  /** ── Jefe: caja empresa + gastosEmpresa ── */
-  if (apiUser.role === "jefe") {
-    let cajaEmpresaDespues: number | null = null;
-    if (monto > 0) {
-      try {
-        cajaEmpresaDespues = await descontarCajaEmpresa(
+  const cajaRef = cajaEmpresaRef(db, apiUser.uid);
+  let ledgerIds: string[] = [];
+
+  try {
+    await db.runTransaction(async (tx) => {
+      ledgerIds = [];
+      const cajaEmpresaSnap = await tx.get(cajaRef);
+
+      if (monto > 0) {
+        const cajaDespues = applyDescontarCajaEmpresaEnTx(tx, {
           db,
-          apiUser.uid,
+          jefeUid: apiUser.uid,
+          cajaEmpresaSnap,
           monto,
-          descripcion.trim()
-        );
-      } catch (e) {
-        return finalize(400, {
-          error:
-            e instanceof Error
-              ? e.message
-              : "Saldo insuficiente en la caja de la empresa",
+          sumaCapitalAdmins,
+          now: new Date(),
         });
-      }
-    }
 
-    const ref = empresaRef.collection(GASTOS_EMPRESA_SUBCOLLECTION).doc();
-    await ref.set({
-      descripcion: descripcion.trim(),
-      monto,
-      fecha: fechaDate,
-      creadoEn,
-      tipo: tipoValido,
-      creadoPor: apiUser.uid,
-      creadoPorNombre: creadoPorNombre.trim() || apiUser.uid,
-      rol: "jefe",
-      jefeUid: apiUser.uid,
-      evidencia: (evidencia ?? "").trim() || null,
-    });
-
-    if (monto > 0 && typeof cajaEmpresaDespues === "number") {
-      try {
-        await recordDebitMovement({
-          db,
-          empresaId: apiUser.empresaId,
-          walletType: "empresa_caja",
-          walletId: apiUser.empresaId,
-          amount: monto,
-          balanceAfter: cajaEmpresaDespues,
-          eventType: "gasto_empresa",
-          scope: "empresa",
-          createdBy: apiUser.uid,
-          relatedEntityType: "gasto",
-          relatedEntityId: ref.id,
-          metadata: {
+        ledgerIds = enqueueLedgerOutboxInTx(tx, db, apiUser.empresaId, [
+          movimientoGasto({
+            walletType: "empresa_caja",
+            walletId: apiUser.empresaId,
+            scope: "empresa",
+            eventType: "gasto_empresa",
+            balanceAfter: cajaDespues,
             gastoId: ref.id,
-            rol: "jefe",
-            tipo: tipoValido,
-            descripcion: descripcion.trim(),
-          },
-          operationId: `gasto_empresa:${ref.id}`,
-        });
-      } catch (e) {
-        console.warn("[ledger] No se pudo registrar movimiento de gasto empresa", e);
+            ctx,
+            metadata: { rol: "jefe" },
+          }),
+        ]);
       }
-    }
 
-    const payload = { id: ref.id };
-    return finalize(200, payload);
+      tx.set(ref, gastoDoc);
+    });
+  } catch (e) {
+    return {
+      status: 400,
+      payload: {
+        error: mensajeError(e, "Saldo insuficiente en la caja de la empresa"),
+      },
+    };
   }
 
-  /** ── Admin: caja admin + gastosAdministrador ── */
-  if (isAdminPanelApiUser(apiUser)) {
-    const alcance: AlcanceGastoAdmin =
-      alcanceBody === "ruta" ? "ruta" : "admin";
-    let rutaIdValue = "";
-    let ledgerWalletType: WalletType | null = null;
-    let ledgerWalletId = "";
-    let ledgerBalanceAfter: number | null = null;
-    let ledgerEventType = "";
-    let ledgerScope: "admin" | "ruta" = "admin";
+  await drenarLedger(db, apiUser.empresaId, ledgerIds);
 
-    if (alcance === "ruta") {
-      const rid =
-        typeof rutaIdBody === "string" ? rutaIdBody.trim() : "";
-      if (!rid) {
-        return finalize(400, { error: "Debes elegir una ruta para un gasto de ruta" });
-      }
-      const rutaSnap = await empresaRef
-        .collection(RUTAS_SUBCOLLECTION)
-        .doc(rid)
-        .get();
-      if (!rutaSnap.exists) {
-        return finalize(400, { error: "Ruta no encontrada" });
-      }
-      const adminRuta = rutaSnap.data()?.adminId;
-      if (adminRuta !== apiUser.uid) {
-        return finalize(403, { error: "Esta ruta no pertenece a tu administración" });
-      }
-      rutaIdValue = rid;
+  return { status: 200, payload: { id: ref.id } };
+}
+
+/** ── Admin: caja admin o caja ruta + gastosAdministrador ── */
+async function crearGastoAdmin(
+  ctx: CrearGastoCtx,
+  alcanceBody: AlcanceGastoAdmin | string | undefined,
+  rutaIdBody: string | undefined
+): Promise<IdempotentOutcome> {
+  const { db, apiUser, monto } = ctx;
+  const empresaRef = db.collection(EMPRESAS_COLLECTION).doc(apiUser.empresaId);
+  const alcance: AlcanceGastoAdmin = alcanceBody === "ruta" ? "ruta" : "admin";
+
+  let rutaIdValue = "";
+  if (alcance === "ruta") {
+    rutaIdValue = typeof rutaIdBody === "string" ? rutaIdBody.trim() : "";
+    if (!rutaIdValue) {
+      return {
+        status: 400,
+        payload: { error: "Debes elegir una ruta para un gasto de ruta" },
+      };
     }
+  }
 
-    if (monto > 0) {
-      try {
-        if (alcance === "ruta") {
-          const result = await descontarCajaRutaAdmin(
-            db,
-            apiUser.empresaId,
-            apiUser.uid,
-            rutaIdValue,
-            monto
-          );
-          ledgerWalletType = "ruta_caja";
-          ledgerWalletId = rutaIdValue;
-          ledgerBalanceAfter = result.cajaRuta;
-          ledgerEventType = "gasto_ruta";
-          ledgerScope = "ruta";
-        } else {
-          const nuevaCajaAdmin = await descontarCajaAdmin(
-            db,
-            apiUser.empresaId,
-            apiUser.uid,
-            monto,
-            descripcion.trim(),
-            { acumularGastoPeriodo: true }
-          );
-          ledgerWalletType = "admin_caja";
-          ledgerWalletId = apiUser.uid;
-          ledgerBalanceAfter = nuevaCajaAdmin;
-          ledgerEventType = "gasto_admin";
-          ledgerScope = "admin";
+  const ref = empresaRef.collection(GASTOS_ADMIN_SUBCOLLECTION).doc();
+  const gastoDoc = {
+    descripcion: ctx.descripcion,
+    monto,
+    fecha: ctx.fechaDate,
+    creadoEn: ctx.creadoEn,
+    tipo: ctx.tipo,
+    creadoPor: apiUser.uid,
+    creadoPorNombre: ctx.creadoPorNombre,
+    rol: "admin",
+    adminId: apiUser.uid,
+    alcance,
+    rutaId: rutaIdValue || null,
+    evidencia: ctx.evidencia,
+  };
+
+  const rutaRef = rutaIdValue
+    ? rutaEmpresaRef(db, apiUser.empresaId, rutaIdValue)
+    : null;
+  const adminRef = cajaAdminRef(db, apiUser.empresaId, apiUser.uid);
+  let ledgerIds: string[] = [];
+
+  try {
+    await db.runTransaction(async (tx) => {
+      ledgerIds = [];
+      const now = new Date();
+
+      if (monto > 0 && alcance === "ruta" && rutaRef) {
+        const rutaSnap = await tx.get(rutaRef);
+        const resultado = applyDescontarCajaRutaEnTx(tx, {
+          rutaSnap,
+          rutaRef,
+          adminUid: apiUser.uid,
+          monto,
+          now,
+        });
+        ledgerIds = enqueueLedgerOutboxInTx(tx, db, apiUser.empresaId, [
+          movimientoGasto({
+            walletType: "ruta_caja",
+            walletId: rutaIdValue,
+            scope: "ruta",
+            eventType: "gasto_ruta",
+            balanceAfter: resultado.cajaRuta,
+            gastoId: ref.id,
+            ctx,
+            metadata: { rol: "admin", alcance, rutaId: rutaIdValue },
+          }),
+        ]);
+      } else if (monto > 0) {
+        const adminSnap = await tx.get(adminRef);
+        const cajaDespues = applyDescontarCajaAdminEnTx(tx, {
+          adminRef,
+          adminSnap,
+          monto,
+          now,
+          acumularGastoPeriodo: true,
+        });
+        ledgerIds = enqueueLedgerOutboxInTx(tx, db, apiUser.empresaId, [
+          movimientoGasto({
+            walletType: "admin_caja",
+            walletId: apiUser.uid,
+            scope: "admin",
+            eventType: "gasto_admin",
+            balanceAfter: cajaDespues,
+            gastoId: ref.id,
+            ctx,
+            metadata: { rol: "admin", alcance, rutaId: null },
+          }),
+        ]);
+      } else if (alcance === "ruta" && rutaRef) {
+        // Gasto sin monto: igual se valida la propiedad de la ruta.
+        const rutaSnap = await tx.get(rutaRef);
+        if (!rutaSnap.exists) throw new Error("Ruta no encontrada");
+        if ((rutaSnap.data()?.adminId as string) !== apiUser.uid) {
+          throw new Error("Esta ruta no pertenece a tu administración");
         }
-      } catch (e) {
-        return finalize(400, {
-          error:
-            e instanceof Error
-              ? e.message
-              : alcance === "ruta"
-                ? "Saldo insuficiente en caja de la ruta"
-                : "Saldo insuficiente en base del administrador",
-        });
       }
-    }
 
-    const ref = empresaRef.collection(GASTOS_ADMIN_SUBCOLLECTION).doc();
-    await ref.set({
-      descripcion: descripcion.trim(),
-      monto,
-      fecha: fechaDate,
-      creadoEn,
-      tipo: tipoValido,
-      creadoPor: apiUser.uid,
-      creadoPorNombre: creadoPorNombre.trim() || apiUser.uid,
-      rol: "admin",
-      adminId: apiUser.uid,
-      alcance,
-      rutaId: rutaIdValue || null,
-      evidencia: (evidencia ?? "").trim() || null,
+      tx.set(ref, gastoDoc);
     });
-
-    if (
-      monto > 0 &&
-      ledgerWalletType &&
-      ledgerWalletId &&
-      typeof ledgerBalanceAfter === "number"
-    ) {
-      try {
-        await recordDebitMovement({
-          db,
-          empresaId: apiUser.empresaId,
-          walletType: ledgerWalletType,
-          walletId: ledgerWalletId,
-          amount: monto,
-          balanceAfter: ledgerBalanceAfter,
-          eventType: ledgerEventType,
-          scope: ledgerScope,
-          createdBy: apiUser.uid,
-          relatedEntityType: "gasto",
-          relatedEntityId: ref.id,
-          metadata: {
-            gastoId: ref.id,
-            rol: "admin",
-            alcance,
-            rutaId: rutaIdValue || null,
-            tipo: tipoValido,
-            descripcion: descripcion.trim(),
-          },
-          operationId: `gasto_admin:${ref.id}`,
-        });
-      } catch (e) {
-        console.warn("[ledger] No se pudo registrar movimiento de gasto admin", e);
-      }
-    }
-
-    const payload = { id: ref.id };
-    return finalize(200, payload);
+  } catch (e) {
+    const msg = mensajeError(
+      e,
+      alcance === "ruta"
+        ? "Saldo insuficiente en caja de la ruta"
+        : "Saldo insuficiente en base del administrador"
+    );
+    const status = msg.includes("no pertenece a tu administración") ? 403 : 400;
+    return { status, payload: { error: msg } };
   }
 
-  /** ── Empleado: descuenta cajaEmpleado y cuadra la ruta (cajasEmpleados / capitalTotal) ── */
-  const rutaIdEmp = apiUser.rutaId?.trim();
-  if (!rutaIdEmp) {
-    return finalize(400, { error: "No tienes ruta asignada" });
-  }
-  if (monto > 0) {
-    try {
-      await registrarGastoOperativoEmpleadoDesdeApi(
+  if (rutaRef) {
+    const after = await rutaRef.get();
+    if (after.exists) {
+      await upsertCapitalRutaSnapshot(
         db,
         apiUser.empresaId,
-        apiUser.uid,
-        rutaIdEmp,
-        monto,
-        descripcion.trim(),
-        tipoValido
+        rutaIdValue,
+        after.data()!
       );
-    } catch (e) {
-      return finalize(400, {
-        error:
-          e instanceof Error
-            ? e.message
-            : "No se pudo registrar el gasto contra la base del empleado",
-      });
     }
+  }
+
+  await drenarLedger(db, apiUser.empresaId, ledgerIds);
+
+  return { status: 200, payload: { id: ref.id } };
+}
+
+/** ── Empleado: caja empleado + cuadre de ruta + gastosEmpleado ── */
+async function crearGastoEmpleado(ctx: CrearGastoCtx): Promise<IdempotentOutcome> {
+  const { db, apiUser, monto } = ctx;
+  const empresaRef = db.collection(EMPRESAS_COLLECTION).doc(apiUser.empresaId);
+
+  const rutaIdEmp = apiUser.rutaId?.trim();
+  if (!rutaIdEmp) {
+    return { status: 400, payload: { error: "No tienes ruta asignada" } };
   }
 
   const ref = empresaRef.collection(GASTOS_EMPLEADO_SUBCOLLECTION).doc();
-  await ref.set({
-    descripcion: descripcion.trim(),
+  const gastoDoc = {
+    descripcion: ctx.descripcion,
     monto,
-    fecha: fechaDate,
-    creadoEn,
-    tipo: tipoValido,
+    fecha: ctx.fechaDate,
+    creadoEn: ctx.creadoEn,
+    tipo: ctx.tipo,
     creadoPor: apiUser.uid,
-    creadoPorNombre: creadoPorNombre.trim() || apiUser.uid,
+    creadoPorNombre: ctx.creadoPorNombre,
     rol: "empleado",
     adminId: apiUser.adminId ?? "",
     empleadoId: apiUser.uid,
     rutaId: rutaIdEmp,
-    evidencia: (evidencia ?? "").trim() || null,
-  });
+    evidencia: ctx.evidencia,
+  };
+
+  const usuarioRef = usuarioEmpresaRef(db, apiUser.empresaId, apiUser.uid);
+  const rutaRef = rutaEmpresaRef(db, apiUser.empresaId, rutaIdEmp);
+  let ledgerIds: string[] = [];
+
+  try {
+    await db.runTransaction(async (tx) => {
+      ledgerIds = [];
+
+      if (monto > 0) {
+        const usuarioSnap = await tx.get(usuarioRef);
+        const rutaSnap = await tx.get(rutaRef);
+        const resultado = applyGastoOperativoEmpleadoEnTx(tx, {
+          usuarioRef,
+          usuarioSnap,
+          rutaRef,
+          rutaSnap,
+          monto,
+          now: Timestamp.now(),
+        });
+        ledgerIds = enqueueLedgerOutboxInTx(tx, db, apiUser.empresaId, [
+          movimientoGasto({
+            walletType: "empleado_caja",
+            walletId: apiUser.uid,
+            scope: "empleado",
+            eventType: "gasto_empleado",
+            balanceAfter: resultado.cajaEmpleado,
+            gastoId: ref.id,
+            ctx,
+            metadata: { rol: "empleado", rutaId: rutaIdEmp },
+          }),
+        ]);
+      }
+
+      tx.set(ref, gastoDoc);
+    });
+  } catch (e) {
+    return {
+      status: 400,
+      payload: {
+        error: mensajeError(
+          e,
+          "No se pudo registrar el gasto contra la base del empleado"
+        ),
+      },
+    };
+  }
+
+  const rutaAfter = await rutaRef.get();
+  if (rutaAfter.exists) {
+    await upsertCapitalRutaSnapshot(
+      db,
+      apiUser.empresaId,
+      rutaIdEmp,
+      rutaAfter.data()!
+    );
+  }
+
+  await drenarLedger(db, apiUser.empresaId, ledgerIds);
 
   const adminUid = (apiUser.adminId ?? "").trim();
   if (!adminUid) {
     console.warn(
       "[gastos] Empleado sin adminId en perfil; no se envía push FCM. Asigna administrador al trabajador en Firestore/users."
     );
-  }
-  if (adminUid) {
+  } else {
     void (async () => {
       try {
         await notifyAdminGastoEmpleado(getAdminMessaging(), {
           adminUid,
-          empleadoNombre: creadoPorNombre.trim() || apiUser.uid,
+          empleadoNombre: ctx.creadoPorNombre,
           monto,
-          descripcion: descripcion.trim(),
+          descripcion: ctx.descripcion,
           gastoId: ref.id,
           empresaId: apiUser.empresaId,
         });
@@ -488,6 +593,37 @@ export async function POST(request: NextRequest) {
     })();
   }
 
-  const payload = { id: ref.id };
-  return finalize(200, payload);
+  return { status: 200, payload: { id: ref.id } };
+}
+
+function movimientoGasto(params: {
+  walletType: WalletType;
+  walletId: string;
+  scope: "empresa" | "admin" | "ruta" | "empleado";
+  eventType: string;
+  balanceAfter: number;
+  gastoId: string;
+  ctx: CrearGastoCtx;
+  metadata: Record<string, unknown>;
+}): LedgerMovementSpec {
+  const { ctx } = params;
+  return {
+    direction: "debit",
+    walletType: params.walletType,
+    walletId: params.walletId,
+    amount: ctx.monto,
+    balanceAfter: params.balanceAfter,
+    eventType: params.eventType,
+    scope: params.scope,
+    createdBy: ctx.apiUser.uid,
+    relatedEntityType: "gasto",
+    relatedEntityId: params.gastoId,
+    metadata: {
+      gastoId: params.gastoId,
+      tipo: ctx.tipo,
+      descripcion: ctx.descripcion,
+      ...params.metadata,
+    },
+    operationId: `${params.eventType}:${params.gastoId}`,
+  };
 }

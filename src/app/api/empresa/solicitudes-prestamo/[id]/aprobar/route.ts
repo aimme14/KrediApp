@@ -10,7 +10,8 @@ import {
   USUARIOS_SUBCOLLECTION,
   RUTAS_SUBCOLLECTION,
 } from "@/lib/empresas-db";
-import { recordDebitMovement } from "@/lib/financial-ledger";
+import { drainLedgerOutbox, enqueueLedgerOutboxInTx } from "@/lib/financial-ledger";
+import { runIdempotent, type IdempotentOutcome } from "@/lib/financial-idempotency";
 import type { ModalidadPago } from "@/types/firestore";
 import { isAdminPanelApiUser } from "@/lib/admin-panel-role";
 import { validateFechaFinalRequired, sugerirFechaFinalYmd, resolveDiasCobroModoForCreate, parseDiasCobroModo } from "@/lib/prestamo-fecha-final";
@@ -28,29 +29,54 @@ export async function POST(
     return NextResponse.json({ error: "Solo administrador" }, { status: 403 });
   }
 
-  const { id: solicitudId } = await params;
-  if (!solicitudId?.trim()) {
+  const { id: solicitudIdRaw } = await params;
+  if (!solicitudIdRaw?.trim()) {
     return NextResponse.json({ error: "Solicitud no válida" }, { status: 400 });
   }
+  const solicitudId = solicitudIdRaw.trim();
 
   const db = getAdminFirestore();
 
+  // Clave derivada del servidor: aprobar una solicitud es idempotente por
+  // definición, sin depender de que el cliente mande una clave.
+  const outcome = await runIdempotent({
+    db,
+    empresaId: apiUser.empresaId,
+    key: `solicitud-prestamo-aprobar:${solicitudId}`,
+    endpoint: "solicitudes-prestamo:aprobar",
+    uid: apiUser.uid,
+    handler: () => aprobar(db, apiUser, solicitudId),
+  });
+
+  return NextResponse.json(outcome.payload, { status: outcome.status });
+}
+
+type ApiUser = NonNullable<Awaited<ReturnType<typeof getApiUser>>>;
+
+async function aprobar(
+  db: ReturnType<typeof getAdminFirestore>,
+  apiUser: ApiUser,
+  solicitudId: string
+): Promise<IdempotentOutcome> {
   const solRef = db
     .collection(EMPRESAS_COLLECTION)
     .doc(apiUser.empresaId)
     .collection(SOLICITUDES_PRESTAMO_SUBCOLLECTION)
-    .doc(solicitudId.trim());
+    .doc(solicitudId);
 
   const solSnap = await solRef.get();
   if (!solSnap.exists) {
-    return NextResponse.json({ error: "Solicitud no encontrada" }, { status: 404 });
+    return { status: 404, payload: { error: "Solicitud no encontrada" } };
   }
   const sol = solSnap.data() as Record<string, unknown>;
   if (sol.estado !== "pendiente") {
-    return NextResponse.json({ error: "La solicitud ya fue resuelta" }, { status: 400 });
+    return { status: 400, payload: { error: "La solicitud ya fue resuelta" } };
   }
   if (sol.adminId !== apiUser.uid) {
-    return NextResponse.json({ error: "No puedes aprobar solicitudes de otra administración" }, { status: 403 });
+    return {
+      status: 403,
+      payload: { error: "No puedes aprobar solicitudes de otra administración" },
+    };
   }
 
   const empleadoUid = typeof sol.empleadoUid === "string" ? sol.empleadoUid : "";
@@ -80,21 +106,19 @@ export async function POST(
     fechaFinalVal = validateFechaFinalRequired(sugerida, fechaInicio);
   }
   if (!fechaFinalVal.ok) {
-    return NextResponse.json(
-      {
+    return {
+      status: 400,
+      payload: {
         error:
           "La solicitud no tiene fecha final válida. Pide al trabajador que vuelva a solicitar el préstamo.",
       },
-      { status: 400 }
-    );
+    };
   }
   const fechaFinalYmd = fechaFinalVal.ymd;
   const totalAPagar = Math.round(monto * (1 + interes / 100) * 100) / 100;
 
   const inicio = new Date(fechaInicio);
   inicio.setHours(0, 0, 0, 0);
-
-  let ledgerBalanceAfter: number | undefined;
 
   const prestamoRef = db
     .collection(EMPRESAS_COLLECTION)
@@ -126,8 +150,18 @@ export async function POST(
     .collection(RUTAS_SUBCOLLECTION)
     .doc(rutaId);
 
+  let ledgerOperationIds: string[] = [];
+
   try {
     await db.runTransaction(async (tx) => {
+      // Primera lectura: la solicitud queda bloqueada por la transacción, de
+      // modo que dos aprobaciones simultáneas no puedan desembolsar dos veces.
+      const solSnapTx = await tx.get(solRef);
+      if (!solSnapTx.exists) throw new Error("SOLICITUD_NOT_FOUND");
+      const solTx = solSnapTx.data() as Record<string, unknown>;
+      if (solTx.estado !== "pendiente") throw new Error("SOLICITUD_YA_RESUELTA");
+      if (solTx.adminId !== apiUser.uid) throw new Error("SOLICITUD_DE_OTRO_ADMIN");
+
       const clienteSnapTx = await tx.get(clienteRef);
       if (!clienteSnapTx.exists) {
         throw new Error("CLIENTE_NOT_FOUND");
@@ -163,8 +197,6 @@ export async function POST(
       const nuevaInversiones = Math.round((inversiones + monto) * 100) / 100;
       const nuevoCajasEmpleados = Math.round((cajasEmpleados - monto) * 100) / 100;
 
-      ledgerBalanceAfter = nuevaCajaEmp;
-
       tx.update(empleadoRef, {
         cajaEmpleado: nuevaCajaEmp,
         ultimaActualizacionCapital: new Date(),
@@ -183,6 +215,7 @@ export async function POST(
         rutaId,
         adminId: apiUser.uid,
         empleadoId: empleadoUid,
+        solicitudId,
         monto,
         interes,
         modalidad,
@@ -214,70 +247,47 @@ export async function POST(
         resueltaEn: FieldValue.serverTimestamp(),
         resueltaPorUid: apiUser.uid,
       });
+
+      // El movimiento del ledger se encola en la misma transacción: si el
+      // desembolso se revierte, el asiento contable no queda huérfano.
+      ledgerOperationIds = enqueueLedgerOutboxInTx(tx, db, apiUser.empresaId, [
+        {
+          direction: "debit",
+          walletType: "empleado_caja",
+          walletId: empleadoUid,
+          amount: monto,
+          balanceAfter: nuevaCajaEmp,
+          eventType: "prestamo_desembolso_empleado",
+          scope: "empleado",
+          createdBy: apiUser.uid,
+          relatedEntityType: "prestamo",
+          relatedEntityId: prestamoRef.id,
+          metadata: {
+            prestamoId: prestamoRef.id,
+            clienteId,
+            rutaId,
+            empleadoId: empleadoUid,
+            totalAPagar,
+            interesPct: interes,
+            aprobadoPorAdmin: apiUser.uid,
+          },
+          operationId: `prestamo:${prestamoRef.id}`,
+        },
+      ]);
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "";
-    if (msg === "CLIENTE_NOT_FOUND") {
-      return NextResponse.json({ error: "Cliente no encontrado" }, { status: 404 });
-    }
-    if (msg === "CLIENTE_MOROSO") {
-      return NextResponse.json(
-        { error: "No se puede otorgar préstamo a un cliente moroso" },
-        { status: 400 }
-      );
-    }
-    if (msg === "CLIENTE_CON_PRESTAMO_ACTIVO") {
-      return NextResponse.json(
-        {
-          error:
-            "El cliente ya tiene un préstamo activo — la solicitud fue rechazada automáticamente",
-        },
-        { status: 400 }
-      );
-    }
-    if (msg === "EMPLEADO_NOT_FOUND") {
-      return NextResponse.json({ error: "Empleado no encontrado" }, { status: 400 });
-    }
-    if (msg === "RUTA_NOT_FOUND") {
-      return NextResponse.json({ error: "Ruta no encontrada" }, { status: 400 });
-    }
-    if (msg === "SALDO_INSUFICIENTE_EMPLEADO") {
-      return NextResponse.json(
-        {
-          error: "El empleado no tiene saldo suficiente en su caja para este préstamo",
-        },
-        { status: 400 }
-      );
-    }
+    const conocido = mapAprobarError(msg);
+    if (conocido) return conocido;
     throw e;
   }
 
-  try {
-    await recordDebitMovement({
-      db,
-      empresaId: apiUser.empresaId,
-      walletType: "empleado_caja",
-      walletId: empleadoUid,
-      amount: monto,
-      balanceAfter: ledgerBalanceAfter,
-      eventType: "prestamo_desembolso_empleado",
-      scope: "empleado",
-      createdBy: apiUser.uid,
-      relatedEntityType: "prestamo",
-      relatedEntityId: prestamoRef.id,
-      metadata: {
-        prestamoId: prestamoRef.id,
-        clienteId,
-        rutaId,
-        empleadoId: empleadoUid,
-        totalAPagar,
-        interesPct: interes,
-        aprobadoPorAdmin: apiUser.uid,
-      },
-      operationId: `prestamo:${prestamoRef.id}`,
-    });
-  } catch (e) {
-    console.warn("[ledger] No se pudo registrar movimiento de desembolso", e);
+  if (ledgerOperationIds.length > 0) {
+    try {
+      await drainLedgerOutbox(db, apiUser.empresaId, ledgerOperationIds);
+    } catch (e) {
+      console.warn("[ledger] No se pudo drenar el desembolso; queda pending en el outbox", e);
+    }
   }
 
   void (async () => {
@@ -297,5 +307,48 @@ export async function POST(
     }
   })();
 
-  return NextResponse.json({ ok: true, prestamoId: prestamoRef.id });
+  return { status: 200, payload: { ok: true, prestamoId: prestamoRef.id } };
+}
+
+/** Códigos de la transacción → respuesta HTTP. `null` = error inesperado. */
+function mapAprobarError(msg: string): IdempotentOutcome | null {
+  switch (msg) {
+    case "SOLICITUD_NOT_FOUND":
+      return { status: 404, payload: { error: "Solicitud no encontrada" } };
+    case "SOLICITUD_YA_RESUELTA":
+      return { status: 400, payload: { error: "La solicitud ya fue resuelta" } };
+    case "SOLICITUD_DE_OTRO_ADMIN":
+      return {
+        status: 403,
+        payload: { error: "No puedes aprobar solicitudes de otra administración" },
+      };
+    case "CLIENTE_NOT_FOUND":
+      return { status: 404, payload: { error: "Cliente no encontrado" } };
+    case "CLIENTE_MOROSO":
+      return {
+        status: 400,
+        payload: { error: "No se puede otorgar préstamo a un cliente moroso" },
+      };
+    case "CLIENTE_CON_PRESTAMO_ACTIVO":
+      return {
+        status: 400,
+        payload: {
+          error:
+            "El cliente ya tiene un préstamo activo — la solicitud fue rechazada automáticamente",
+        },
+      };
+    case "EMPLEADO_NOT_FOUND":
+      return { status: 400, payload: { error: "Empleado no encontrado" } };
+    case "RUTA_NOT_FOUND":
+      return { status: 400, payload: { error: "Ruta no encontrada" } };
+    case "SALDO_INSUFICIENTE_EMPLEADO":
+      return {
+        status: 400,
+        payload: {
+          error: "El empleado no tiene saldo suficiente en su caja para este préstamo",
+        },
+      };
+    default:
+      return null;
+  }
 }

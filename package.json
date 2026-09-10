@@ -12,6 +12,11 @@
     "test:watch": "jest --watchAll",
     "test:coverage": "jest --coverage",
     "test:rules": "node scripts/run-firestore-rules-tests.js",
+    "test:integration": "node scripts/run-integration-tests.js",
+    "audit:financiero": "node scripts/audit-integridad-financiera.js",
+    "ledger:bootstrap": "node scripts/bootstrap-wallet-balances.js",
+    "ledger:reconcile": "node scripts/reconcile-ledger.js",
+    "ledger:flush": "node scripts/flush-ledger-outbox.js",
     "create-super-admin": "node scripts/create-super-admin.js",
     "migrate-super-admin": "node scripts/migrate-super-admin-to-collection.js",
     "migrate-empresas": "node scripts/migrate-to-empresas-structure.js"

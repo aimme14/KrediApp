@@ -175,9 +175,9 @@ export async function aprobarSolicitudPrestamo(
     .collection(SOLICITUDES_PRESTAMO_SUBCOLLECTION)
     .doc(solicitudId);
 
-  const solSnap = await solRef.get();
-  if (!solSnap.exists) throw new Error("Solicitud no encontrada");
-  const sol = solSnap.data() as Record<string, unknown>;
+  const solSnapPrevio = await solRef.get();
+  if (!solSnapPrevio.exists) throw new Error("Solicitud no encontrada");
+  const sol = solSnapPrevio.data() as Record<string, unknown>;
   if (sol.estado !== "pendiente") throw new Error("La solicitud ya fue resuelta");
   if (sol.adminId !== adminUid) throw new Error("No puedes aprobar solicitudes de otra administración");
 
@@ -200,6 +200,18 @@ export async function aprobarSolicitudPrestamo(
     .doc(sol.clienteId as string);
 
   await db.runTransaction(async (tx) => {
+    // Releer la solicitud bajo el lock de la transacción: dos aprobaciones
+    // simultáneas verían ambas "pendiente" en la lectura previa.
+    const solSnap = await tx.get(solRef);
+    if (!solSnap.exists) throw new Error("Solicitud no encontrada");
+    const solActual = solSnap.data() as Record<string, unknown>;
+    if (solActual.estado !== "pendiente") {
+      throw new Error("La solicitud ya fue resuelta");
+    }
+    if (solActual.adminId !== adminUid) {
+      throw new Error("No puedes aprobar solicitudes de otra administración");
+    }
+
     const clienteSnap = await tx.get(clienteRef);
     const clienteMoroso = clienteSnap.data()?.moroso === true;
 
@@ -250,17 +262,21 @@ export async function rechazarSolicitudPrestamo(
     .collection(SOLICITUDES_PRESTAMO_SUBCOLLECTION)
     .doc(solicitudId);
 
-  const solSnap = await solRef.get();
-  if (!solSnap.exists) throw new Error("Solicitud no encontrada");
-  const sol = solSnap.data() as Record<string, unknown>;
-  if (sol.estado !== "pendiente") throw new Error("La solicitud ya fue resuelta");
-  if (sol.adminId !== adminUid) throw new Error("No puedes rechazar solicitudes de otra administración");
+  await db.runTransaction(async (tx) => {
+    const solSnap = await tx.get(solRef);
+    if (!solSnap.exists) throw new Error("Solicitud no encontrada");
+    const sol = solSnap.data() as Record<string, unknown>;
+    if (sol.estado !== "pendiente") throw new Error("La solicitud ya fue resuelta");
+    if (sol.adminId !== adminUid) {
+      throw new Error("No puedes rechazar solicitudes de otra administración");
+    }
 
-  await solRef.update({
-    estado: "rechazada" as EstadoSolicitudPrestamo,
-    motivoRechazo: motivoRechazo?.trim() || null,
-    resueltaEn: Timestamp.now(),
-    resueltaPorUid: adminUid,
+    tx.update(solRef, {
+      estado: "rechazada" as EstadoSolicitudPrestamo,
+      motivoRechazo: motivoRechazo?.trim() || null,
+      resueltaEn: Timestamp.now(),
+      resueltaPorUid: adminUid,
+    });
   });
 }
 
