@@ -21,8 +21,9 @@ npm test
 Si todos pasan ✅ → puedes hacer deploy con confianza.
 Si alguno falla ❌ → revisa tu cambio antes de continuar.
 
-> Los tests de **reglas Firestore** no se ejecutan con `npm test` / `test:coverage`
-> (necesitan el emulador). Para ellos: `npm run test:rules`.
+> Los tests de **reglas Firestore** y los de **integración financiera** no se
+> ejecutan con `npm test` / `test:coverage` (necesitan el emulador).
+> Para ellos: `npm run test:rules` y `npm run test:integration`.
 
 ### 2. Si modificaste una función financiera
 
@@ -50,8 +51,38 @@ Los tests se re-ejecutan automáticamente cada vez que guardas un archivo.
 src/lib/__tests__/
 ├── capital-formulas.test.ts          ← Fórmulas de capital (ruta, admin)
 ├── ruta-financiera-compute.test.ts   ← Cobros, pérdidas, distribución capital/ganancia
-└── tu-caja-del-dia.test.ts           ← Caja efectivo del empleado
+├── tu-caja-del-dia.test.ts           ← Caja efectivo del empleado
+└── integration/                      ← Contra emulador (npm run test:integration)
 ```
+
+---
+
+## Tests de integración financiera
+
+```bash
+npm run test:integration
+```
+
+Los tests unitarios verifican fórmulas; estos verifican **comportamiento bajo
+concurrencia**, que es donde se pierde dinero de verdad. Corren con
+`firebase-admin` apuntado al emulador de Firestore, así que ejercitan
+transacciones, reintentos y contención reales.
+
+| Archivo | Qué demuestra |
+|---|---|
+| `cajas.concurrency.test.ts` | Débitos simultáneos sobre la misma caja no se pisan ni dejan saldo negativo |
+| `aprobar-solicitud.concurrency.test.ts` | Cinco aprobaciones a la vez generan un solo préstamo y un solo descuento |
+| `gastos.atomico.test.ts` | El débito de caja y el documento del gasto se confirman o se descartan juntos |
+| `crear-ruta.atomic.test.ts` | Contador, ruta y débito de `cajaAdmin` son una sola operación |
+| `entrega-reporte.concurrency.test.ts` | Doble aprobación hace un solo traspaso; los descuadres se registran |
+| `idempotencia.test.ts` | Replay de éxitos, expiración del lock huérfano, liberación tras fallo |
+| `invariantes.test.ts` | Con secuencias aleatorias, `capitalTotal == cajaRuta + cajasEmpleados + inversiones − perdidas` |
+
+Requiere JDK 21+ (igual que `test:rules`). Tarda ~2,5 minutos: la contención
+real no se puede acelerar.
+
+**Al tocar un flujo de dinero, el test tiene que fallar sin tu fix.** Si pasa
+con y sin el cambio, no está probando lo que crees.
 
 ---
 
