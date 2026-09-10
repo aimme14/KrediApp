@@ -8,6 +8,7 @@ import {
 } from "@/lib/jefe-capital";
 import { withRateLimit } from "@/lib/with-rate-limit";
 import { financialWriteLimiterUser } from "@/lib/rate-limit";
+import { runIdempotent } from "@/lib/financial-idempotency";
 
 
 function jsonDoc(doc: Awaited<ReturnType<typeof getCapitalEmpresa>>) {
@@ -46,6 +47,7 @@ async function postHandler(request: NextRequest) {
   }
 
   const body = await request.json().catch(() => ({}));
+  const { idempotencyKey } = body as { idempotencyKey?: string };
   const monto =
     typeof body.monto === "number"
       ? body.monto
@@ -60,15 +62,26 @@ async function postHandler(request: NextRequest) {
 
   const db = getAdminFirestore();
 
-  try {
-    const doc = await ajustarCapital(db, apiUser.uid, monto);
-    return NextResponse.json(jsonDoc(doc));
-  } catch (e) {
-    return NextResponse.json(
-      { error: e instanceof Error ? e.message : "Error al invertir" },
-      { status: 400 }
-    );
-  }
+  const outcome = await runIdempotent({
+    db,
+    empresaId: apiUser.empresaId,
+    key: idempotencyKey,
+    endpoint: "jefe:invertir",
+    uid: apiUser.uid,
+    handler: async () => {
+      try {
+        const doc = await ajustarCapital(db, apiUser.uid, monto);
+        return { status: 200, payload: jsonDoc(doc) };
+      } catch (e) {
+        return {
+          status: 400,
+          payload: { error: e instanceof Error ? e.message : "Error al invertir" },
+        };
+      }
+    },
+  });
+
+  return NextResponse.json(outcome.payload, { status: outcome.status });
 }
 
 export const POST = withRateLimit(financialWriteLimiterUser, postHandler);

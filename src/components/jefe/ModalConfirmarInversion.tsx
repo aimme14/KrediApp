@@ -5,6 +5,7 @@ import { useAuth } from "@/context/AuthContext";
 import { invertirCajaJefe, transferirBaseEmpresaAAdmin } from "@/lib/capital";
 import type { CapitalResponse } from "@/lib/capital";
 import { formatMontoEnteroInput } from "@/lib/monto-input-es";
+import { useIdempotencyKey } from "@/hooks/useIdempotencyKey";
 
 function formatMonto(value: number): string {
   return new Intl.NumberFormat("es-CO", {
@@ -39,6 +40,7 @@ export function ModalConfirmarInversion({
   const [montoConfirm, setMontoConfirm] = useState("");
   const [modalError, setModalError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const idem = useIdempotencyKey();
 
   useEffect(() => {
     const onEscape = (e: KeyboardEvent) => {
@@ -67,13 +69,23 @@ export function ModalConfirmarInversion({
     try {
       const token = await user.getIdToken();
       if (inversion.tipo === "empresa") {
-        const data = await invertirCajaJefe(token, { monto: inversion.monto });
+        const idempotencyKey = idem.obtener(`empresa:${inversion.monto}`);
+        const data = await invertirCajaJefe(token, {
+          monto: inversion.monto,
+          idempotencyKey,
+        });
+        idem.confirmar();
         onSuccess(data);
       } else {
+        const idempotencyKey = idem.obtener(
+          `admin:${inversion.adminUid}:${inversion.monto}`
+        );
         const data = await transferirBaseEmpresaAAdmin(token, {
           adminUid: inversion.adminUid,
           monto: inversion.monto,
+          idempotencyKey,
         });
+        idem.confirmar();
         onSuccess(data);
       }
       onClose();

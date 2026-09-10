@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { isAdminEmpresaRole, isAdminPanelRole } from "@/lib/admin-panel-role";
+import { useIdempotencyKey } from "@/hooks/useIdempotencyKey";
 import {
   getCajaAdmin,
   getResumenEconomico,
@@ -76,6 +77,8 @@ export default function GestionFinancieraPageContent() {
   const [error, setError] = useState<string | null>(null);
 
   const [cajaAdmin, setCajaAdmin] = useState(0);
+  const idemInversion = useIdempotencyKey();
+  const idemIngreso = useIdempotencyKey();
   const [rutas, setRutas] = useState<ResumenRutaItem[]>([]);
 
   const [invertirRutaId, setInvertirRutaId] = useState("");
@@ -200,17 +203,30 @@ export default function GestionFinancieraPageContent() {
     setInvertirSaving(true);
     try {
       const token = await user.getIdToken();
+      const idempotencyKey = idemInversion.obtener(
+        `${pending.tipo}:${pending.rutaId}:${pending.monto}`
+      );
       if (pending.tipo === "a-ruta") {
         setInvertirError(null);
         setInvertirOk(false);
-        await invertirEnCajaRuta(token, { rutaId: pending.rutaId, monto: pending.monto });
+        await invertirEnCajaRuta(token, {
+          rutaId: pending.rutaId,
+          monto: pending.monto,
+          idempotencyKey,
+        });
+        idemInversion.confirmar();
         setInvertirMonto("");
         setInvertirOk(true);
         setTimeout(() => setInvertirOk(false), 3200);
       } else {
         setInvertirAdminError(null);
         setInvertirAdminOk(false);
-        await invertirEnCajaAdmin(token, { rutaId: pending.rutaId, monto: pending.monto });
+        await invertirEnCajaAdmin(token, {
+          rutaId: pending.rutaId,
+          monto: pending.monto,
+          idempotencyKey,
+        });
+        idemInversion.confirmar();
         setInvertirAdminMonto("");
         setInvertirAdminOk(true);
         setTimeout(() => setInvertirAdminOk(false), 3200);
@@ -224,10 +240,13 @@ export default function GestionFinancieraPageContent() {
       else setInvertirAdminError(msg);
       setInversionModal(null);
       setConfirmarInversionMarcado(false);
+      // Los saldos en pantalla quedaron obsoletos: si la operación sí llegó a
+      // ejecutarse, refrescarlos evita que el usuario la repita creyendo que falló.
+      void load();
     } finally {
       setInvertirSaving(false);
     }
-  }, [user, profile, inversionModal, load, online]);
+  }, [user, profile, inversionModal, load, online, idemInversion]);
 
   const handleInvertirEnRuta = (e: FormEvent) => {
     e.preventDefault();
@@ -303,7 +322,11 @@ export default function GestionFinancieraPageContent() {
     setIngresoOk(false);
     try {
       const token = await user.getIdToken();
-      await ingresarBaseAdminEmpresa(token, { monto: pending.monto });
+      await ingresarBaseAdminEmpresa(token, {
+        monto: pending.monto,
+        idempotencyKey: idemIngreso.obtener(`ingreso:${pending.monto}`),
+      });
+      idemIngreso.confirmar();
       setIngresoMonto("");
       setIngresoOk(true);
       setTimeout(() => setIngresoOk(false), 3200);
@@ -314,10 +337,13 @@ export default function GestionFinancieraPageContent() {
       setIngresoError(err instanceof Error ? err.message : "Error al ingresar a la base");
       setIngresoModal(null);
       setConfirmarIngresoMarcado(false);
+      // El saldo en pantalla quedó obsoleto: si el ingreso sí entró, refrescarlo
+      // evita que el usuario lo repita creyendo que falló.
+      void load();
     } finally {
       setIngresoSaving(false);
     }
-  }, [user, profile, ingresoModal, load, online]);
+  }, [user, profile, ingresoModal, load, online, idemIngreso]);
 
   const handleIngresarBase = (e: FormEvent) => {
     e.preventDefault();

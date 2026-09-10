@@ -8,6 +8,7 @@ import {
 } from "@/lib/jefe-capital";
 import { withRateLimit } from "@/lib/with-rate-limit";
 import { financialWriteLimiterUser } from "@/lib/rate-limit";
+import { runIdempotent } from "@/lib/financial-idempotency";
 
 function jsonDoc(doc: Awaited<ReturnType<typeof getCapitalEmpresa>>) {
   const historial = (doc.historial ?? []).map((h) =>
@@ -44,6 +45,7 @@ async function postHandler(request: NextRequest) {
   }
 
   const body = await request.json().catch(() => ({}));
+  const { idempotencyKey } = body as { idempotencyKey?: string };
   const adminUid =
     typeof body.adminUid === "string" ? body.adminUid.trim() : "";
   const monto =
@@ -63,22 +65,33 @@ async function postHandler(request: NextRequest) {
 
   const db = getAdminFirestore();
 
-  try {
-    const doc = await transferirBaseEmpresaAAdmin(db, apiUser.uid, adminUid, monto);
-    return NextResponse.json(jsonDoc(doc));
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : "Error al registrar la inversión";
-    const status =
-      msg.includes("insuficiente") ||
-      msg.includes("no pertenece") ||
-      msg.includes("no es un administrador") ||
-      msg.includes("Debes indicar") ||
-      msg.includes("propio jefe") ||
-      msg.includes("mayor a 0")
-        ? 400
-        : 500;
-    return NextResponse.json({ error: msg }, { status });
-  }
+  const outcome = await runIdempotent({
+    db,
+    empresaId: apiUser.empresaId,
+    key: idempotencyKey,
+    endpoint: "jefe:transferir-base-admin",
+    uid: apiUser.uid,
+    handler: async () => {
+      try {
+        const doc = await transferirBaseEmpresaAAdmin(db, apiUser.uid, adminUid, monto);
+        return { status: 200, payload: jsonDoc(doc) };
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "Error al registrar la inversión";
+        const status =
+          msg.includes("insuficiente") ||
+          msg.includes("no pertenece") ||
+          msg.includes("no es un administrador") ||
+          msg.includes("Debes indicar") ||
+          msg.includes("propio jefe") ||
+          msg.includes("mayor a 0")
+            ? 400
+            : 500;
+        return { status, payload: { error: msg } };
+      }
+    },
+  });
+
+  return NextResponse.json(outcome.payload, { status: outcome.status });
 }
 
 export const POST = withRateLimit(financialWriteLimiterUser, postHandler);

@@ -1379,7 +1379,7 @@ export interface IngresoBaseAdminEmpresaItem {
 /** Ingreso externo a la base (solo adminEmpresa). */
 export async function ingresarBaseAdminEmpresa(
   token: string,
-  params: { monto: number }
+  params: { monto: number; idempotencyKey?: string }
 ): Promise<{ cajaAdmin: number }> {
   const res = await fetchWithAuth("/api/admin-empresa/ingresar-base", token, {
     method: "POST",
@@ -1406,7 +1406,7 @@ export async function listIngresosBaseAdminEmpresa(
 /** Transfiere monto de la base del admin a la base de una ruta (solo rutas propias). */
 export async function invertirEnCajaRuta(
   token: string,
-  params: { rutaId: string; monto: number }
+  params: { rutaId: string; monto: number; idempotencyKey?: string }
 ): Promise<{ cajaAdmin: number; cajaRuta: number; capitalTotal: number }> {
   const res = await fetchWithAuth("/api/empresa/invertir-caja-ruta", token, {
     method: "POST",
@@ -1447,7 +1447,7 @@ export async function listInversionesCajaRuta(
 /** Transfiere monto de la base de una ruta a la base del administrador (solo rutas propias). */
 export async function invertirEnCajaAdmin(
   token: string,
-  params: { rutaId: string; monto: number }
+  params: { rutaId: string; monto: number; idempotencyKey?: string }
 ): Promise<{ cajaAdmin: number; cajaRuta: number; capitalTotal: number }> {
   const res = await fetchWithAuth("/api/empresa/invertir-caja-admin", token, {
     method: "POST",

@@ -76,6 +76,8 @@ transacciones, reintentos y contención reales.
 | `crear-ruta.atomic.test.ts` | Contador, ruta y débito de `cajaAdmin` son una sola operación |
 | `entrega-reporte.concurrency.test.ts` | Doble aprobación hace un solo traspaso; los descuadres se registran |
 | `idempotencia.test.ts` | Replay de éxitos, expiración del lock huérfano, liberación tras fallo |
+| `idempotencia-capital.test.ts` | Reintentar un movimiento de capital con la misma clave no lo duplica; con claves distintas sí se ejecutan los dos |
+| `admin-empresa.test.ts` | Ingreso de liquidez del `adminEmpresa`: atomicidad con su historial y rollback ante fallo |
 | `invariantes.test.ts` | Con secuencias aleatorias, `capitalTotal == cajaRuta + cajasEmpleados + inversiones − perdidas` |
 
 Requiere JDK 21+ (igual que `test:rules`). Tarda ~2,5 minutos: la contención
