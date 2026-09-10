@@ -9,7 +9,7 @@ import {
 } from "@/lib/empresas-db";
 import { applyDesembolsoPrestamoDesdeCajaEmpleadoEnTx } from "@/lib/ruta-financiera-admin";
 import { upsertCapitalRutaSnapshot } from "@/lib/capital-ruta-snapshot";
-import { recordDebitMovement } from "@/lib/financial-ledger";
+import { drainLedgerOutbox, enqueueLedgerOutboxInTx } from "@/lib/financial-ledger";
 import { validarClienteElegibleParaPrestamo } from "@/lib/prestamo-aprobacion-empleado";
 import { resolveDiasCobroModoForCreate, validateFechaFinalRequired } from "@/lib/prestamo-fecha-final";
 import { fechaDiaColombiaHoy } from "@/lib/colombia-day-bounds";
@@ -113,6 +113,7 @@ export async function crearPrestamoEmpleado(
     .collection(USUARIOS_SUBCOLLECTION)
     .doc(adminId);
 
+  let ledgerOperationIds: string[] = [];
   let ledgerBalanceAfter: number | undefined;
   const now = new Date();
 
@@ -174,34 +175,41 @@ export async function crearPrestamoEmpleado(
 
     tx.set(adminRef, { totalPrestamosActivos: FieldValue.increment(1) }, { merge: true });
     tx.update(clienteRef, { prestamo_activo: true });
+
+    // El asiento se encola en la misma transacción: si el desembolso se
+    // revierte, no queda un movimiento contable sin respaldo.
+    ledgerOperationIds = enqueueLedgerOutboxInTx(tx, db, empresaId, [
+      {
+        direction: "debit",
+        walletType: "empleado_caja",
+        walletId: empleadoUid,
+        amount: monto,
+        balanceAfter: nuevaCajaEmp,
+        eventType: "prestamo_desembolso_empleado",
+        scope: "empleado",
+        createdBy: empleadoUid,
+        relatedEntityType: "prestamo",
+        relatedEntityId: prestamoRef.id,
+        metadata: {
+          prestamoId: prestamoRef.id,
+          clienteId: clienteId.trim(),
+          rutaId,
+          empleadoId: empleadoUid,
+          totalAPagar,
+          interesPct,
+          aprobacionTipo,
+        },
+        operationId: `prestamo:${prestamoRef.id}`,
+      },
+    ]);
   });
 
-  try {
-    await recordDebitMovement({
-      db,
-      empresaId,
-      walletType: "empleado_caja",
-      walletId: empleadoUid,
-      amount: monto,
-      balanceAfter: ledgerBalanceAfter,
-      eventType: "prestamo_desembolso_empleado",
-      scope: "empleado",
-      createdBy: empleadoUid,
-      relatedEntityType: "prestamo",
-      relatedEntityId: prestamoRef.id,
-      metadata: {
-        prestamoId: prestamoRef.id,
-        clienteId: clienteId.trim(),
-        rutaId,
-        empleadoId: empleadoUid,
-        totalAPagar,
-        interesPct,
-        aprobacionTipo,
-      },
-      operationId: `prestamo:${prestamoRef.id}`,
-    });
-  } catch (e) {
-    console.warn("[ledger] No se pudo registrar movimiento de desembolso", e);
+  if (ledgerOperationIds.length > 0) {
+    try {
+      await drainLedgerOutbox(db, empresaId, ledgerOperationIds);
+    } catch (e) {
+      console.warn("[ledger] Desembolso queda pending en el outbox", e);
+    }
   }
 
   try {

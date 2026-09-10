@@ -6,8 +6,11 @@ const config = {
     "^@/(.*)$": "<rootDir>/src/$1",
   },
   testMatch: ["**/__tests__/**/*.test.ts"],
-  // Requiere emulador Firestore — usar `npm run test:rules`
-  testPathIgnorePatterns: ["<rootDir>/src/lib/__tests__/firestore-rules\\.test\\.ts$"],
+  // Requieren emulador Firestore — usar `npm run test:rules` / `npm run test:integration`
+  testPathIgnorePatterns: [
+    "<rootDir>/src/lib/__tests__/firestore-rules\\.test\\.ts$",
+    "<rootDir>/src/lib/__tests__/integration/",
+  ],
   transform: {
     "^\.+\.(ts|tsx)$": "ts-jest",
   },

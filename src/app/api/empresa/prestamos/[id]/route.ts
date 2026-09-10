@@ -15,7 +15,7 @@ import {
   startIdempotentOperation,
   finishIdempotentOperation,
 } from "@/lib/financial-idempotency";
-import { recordCreditMovement } from "@/lib/financial-ledger";
+import { drainLedgerOutbox, enqueueLedgerOutboxInTx } from "@/lib/financial-ledger";
 import { upsertCapitalRutaSnapshot } from "@/lib/capital-ruta-snapshot";
 import { computeCapitalTotalRutaDesdeSaldos } from "@/lib/capital-formulas";
 import { round2 } from "@/lib/ruta-financiera-compute";
@@ -110,8 +110,11 @@ async function deleteHandler(
     return finalize(409, { error: MENSAJE_CON_MOVIMIENTOS });
   }
 
+  let ledgerOperationIds: string[] = [];
+
   try {
     const result = await db.runTransaction(async (tx) => {
+      ledgerOperationIds = [];
       // ── Lecturas primero (requisito de Firestore) ──
       const prestamoSnap = await tx.get(prestamoRef);
       if (!prestamoSnap.exists) throw new Error("PRESTAMO_NOT_FOUND");
@@ -179,6 +182,24 @@ async function deleteHandler(
           capitalTotal: nuevoCapitalTotal,
           ultimaActualizacion: now,
         });
+
+        // La reversión contable se encola con el mismo commit que la revierte.
+        ledgerOperationIds = enqueueLedgerOutboxInTx(tx, db, empresaId, [
+          {
+            direction: "credit",
+            walletType: "ruta_caja",
+            walletId: rutaId,
+            amount: monto,
+            balanceAfter: nuevaCajaRuta,
+            eventType: "prestamo_eliminado_reversion",
+            scope: "ruta",
+            createdBy: apiUser.uid,
+            relatedEntityType: "prestamo",
+            relatedEntityId: prestamoId,
+            metadata: { prestamoId, clienteId, rutaId },
+            operationId: `prestamo-delete:${prestamoId}`,
+          },
+        ]);
       }
 
       // ── Liberar al cliente ──
@@ -223,30 +244,11 @@ async function deleteHandler(
       }
     }
 
-    // Movimiento de reversión en el ledger (crédito a la base de la ruta).
-    if (result.rutaId && result.monto > 0) {
+    if (ledgerOperationIds.length > 0) {
       try {
-        await recordCreditMovement({
-          db,
-          empresaId,
-          walletType: "ruta_caja",
-          walletId: result.rutaId,
-          amount: result.monto,
-          balanceAfter: result.nuevaCajaRuta,
-          eventType: "prestamo_eliminado_reversion",
-          scope: "ruta",
-          createdBy: apiUser.uid,
-          relatedEntityType: "prestamo",
-          relatedEntityId: prestamoId,
-          metadata: {
-            prestamoId,
-            clienteId: result.clienteId,
-            rutaId: result.rutaId,
-          },
-          operationId: `prestamo-delete:${prestamoId}`,
-        });
+        await drainLedgerOutbox(db, empresaId, ledgerOperationIds);
       } catch (e) {
-        console.warn("[ledger] No se pudo registrar reversión de eliminación", e);
+        console.warn("[ledger] Reversión queda pending en el outbox", e);
       }
     }
 
