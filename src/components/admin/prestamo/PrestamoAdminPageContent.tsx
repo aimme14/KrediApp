@@ -846,6 +846,29 @@ export default function PrestamoAdminPageContent() {
     };
   })();
 
+  const renderSelectFiltroRuta = (selectId: string) => (
+    <>
+      <label htmlFor={selectId} className="admin-clientes-filtro-ruta-label">
+        Ruta
+      </label>
+      <select
+        id={selectId}
+        className="admin-clientes-filtro-ruta-select"
+        value={filtroRutaId}
+        onChange={(e) => setFiltroRutaId(e.target.value)}
+        aria-label="Filtrar préstamos y saldo por ruta"
+      >
+        <option value="">Todas las rutas</option>
+        {rutas.map((r) => (
+          <option key={r.id} value={r.id}>
+            {r.nombre}
+            {r.ubicacion ? ` · ${r.ubicacion}` : ""}
+          </option>
+        ))}
+      </select>
+    </>
+  );
+
   return (
     <div className="card prestamo-admin-page">
       {showCreateForm && (
@@ -896,29 +919,12 @@ export default function PrestamoAdminPageContent() {
       )}
 
       {!showCreateForm && (
-      <>
+      <div className="prestamo-admin-layout">
         {!loading && (
           <div className="prestamo-admin-resumen-block">
-            <div className="prestamo-admin-resumen-head">
+            <div className="prestamo-admin-resumen-head prestamo-admin-ruta-desktop">
               <div className="admin-clientes-filtro-ruta prestamo-admin-filtro-ruta">
-                <label htmlFor="prestamos-filtro-ruta" className="admin-clientes-filtro-ruta-label">
-                  Ruta
-                </label>
-                <select
-                  id="prestamos-filtro-ruta"
-                  className="admin-clientes-filtro-ruta-select"
-                  value={filtroRutaId}
-                  onChange={(e) => setFiltroRutaId(e.target.value)}
-                  aria-label="Filtrar préstamos y saldo por ruta"
-                >
-                  <option value="">Todas las rutas</option>
-                  {rutas.map((r) => (
-                    <option key={r.id} value={r.id}>
-                      {r.nombre}
-                      {r.ubicacion ? ` · ${r.ubicacion}` : ""}
-                    </option>
-                  ))}
-                </select>
+                {renderSelectFiltroRuta("prestamos-filtro-ruta")}
               </div>
             </div>
             <div className="prestamo-admin-resumen">
@@ -1005,12 +1011,47 @@ export default function PrestamoAdminPageContent() {
         ) : (
           <>
             <div className="prestamo-admin-filtros-wrap">
+              <div className="prestamo-admin-ruta-estado-row">
+                <div className="admin-clientes-filtro-ruta prestamo-admin-filtro-ruta-mobile">
+                  {renderSelectFiltroRuta("prestamos-filtro-ruta-mobile")}
+                </div>
+                <div className="admin-clientes-filtro-ruta admin-filtro-estado-mobile">
+                  <label htmlFor="prestamos-filtro-estado" className="admin-clientes-filtro-ruta-label">
+                    Estado
+                  </label>
+                  <select
+                    id="prestamos-filtro-estado"
+                    className="admin-clientes-filtro-ruta-select"
+                    value={filtroContable.modo === "hoy" ? "hoy" : filtroEstado}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      if (v === "hoy") {
+                        setFiltroContable({ modo: "hoy" });
+                        setFiltroEstado("todos");
+                      } else {
+                        setFiltroContable({ modo: "todo" });
+                        setFiltroEstado(v as PrestamoFiltroEstado);
+                      }
+                    }}
+                    aria-label="Filtrar préstamos por estado"
+                  >
+                    {FILTROS_PRESTAMO.map(({ est, label }) => (
+                      <Fragment key={est}>
+                        <option value={est}>
+                          {label} ({formatContadorFiltro(est)})
+                        </option>
+                        {est === "activo" ? <option value="hoy">Hoy</option> : null}
+                      </Fragment>
+                    ))}
+                  </select>
+                </div>
+              </div>
               <div className="prestamo-admin-filtro-estado-section">
                 <p id="prestamo-filtro-estado-label" className="prestamo-admin-filtro-legend">
                   Estado
                 </p>
                 <div
-                  className="prestamo-admin-tabs prestamo-historial-filtros prestamo-admin-historial-filtros-row"
+                  className="prestamo-admin-tabs prestamo-historial-filtros prestamo-admin-historial-filtros-row admin-filtro-tabs-desktop"
                   role="tablist"
                   aria-labelledby="prestamo-filtro-estado-label"
                 >
@@ -1045,32 +1086,34 @@ export default function PrestamoAdminPageContent() {
               </div>
 
               <div className="prestamo-admin-search-toolbar">
-                <div className="prestamo-admin-search-field">
-                  <span className="prestamo-admin-search-icon" aria-hidden>
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <circle cx="11" cy="11" r="8" />
-                      <path d="m21 21-4.3-4.3" />
-                    </svg>
-                  </span>
-                  <input
-                    id="prestamos-buscador"
-                    className="prestamo-admin-search-input"
-                    type="search"
-                    value={filtroNombre}
-                    onChange={(e) => setFiltroNombre(e.target.value)}
-                    placeholder="Buscar por nombre, código o cédula..."
-                    aria-label="Buscar préstamos por nombre de cliente"
-                  />
+                <div className="prestamo-admin-search-orden-row">
+                  <div className="prestamo-admin-search-field">
+                    <span className="prestamo-admin-search-icon" aria-hidden>
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="11" cy="11" r="8" />
+                        <path d="m21 21-4.3-4.3" />
+                      </svg>
+                    </span>
+                    <input
+                      id="prestamos-buscador"
+                      className="prestamo-admin-search-input"
+                      type="search"
+                      value={filtroNombre}
+                      onChange={(e) => setFiltroNombre(e.target.value)}
+                      placeholder="Buscar por nombre, código o cédula..."
+                      aria-label="Buscar préstamos por nombre de cliente"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    className="btn btn-secondary prestamo-admin-orden-btn"
+                    style={{ fontSize: "0.8125rem", whiteSpace: "nowrap" }}
+                    onClick={() => setOrdenDesc((v) => !v)}
+                    title={ordenDesc ? "Ordenar: más antiguos primero" : "Ordenar: más recientes primero"}
+                  >
+                    {ordenDesc ? "↓ Más recientes" : "↑ Más antiguos"}
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  style={{ fontSize: "0.8125rem", whiteSpace: "nowrap" }}
-                  onClick={() => setOrdenDesc((v) => !v)}
-                  title={ordenDesc ? "Ordenar: más antiguos primero" : "Ordenar: más recientes primero"}
-                >
-                  {ordenDesc ? "↓ Más recientes" : "↑ Más antiguos"}
-                </button>
                 {filtroNombreLower ? (
                   <p className="prestamo-admin-search-hint">
                     {gruposPorCliente.length} cliente{gruposPorCliente.length !== 1 ? "s" : ""} encontrado{gruposPorCliente.length !== 1 ? "s" : ""}
@@ -1344,6 +1387,7 @@ export default function PrestamoAdminPageContent() {
           </div>
           {(hayMas || hayMasPagados || hayMasCastigados) && (
             <div
+              className="prestamo-admin-hist-pager"
               style={{
                 textAlign: "center",
                 marginTop: "1rem",
@@ -1384,11 +1428,6 @@ export default function PrestamoAdminPageContent() {
                   {loadingCastigados ? "Cargando..." : "Cargar más pérdidas del historial"}
                 </button>
               )}
-              {(hayMasPagados || hayMasCastigados) && (
-                <p style={{ fontSize: "0.75rem", color: "var(--text-muted)", margin: 0 }}>
-                  El historial completo no está cargado aún.
-                </p>
-              )}
             </div>
           )}
           {periodosLoading && prestamosFiltrados.length === 0 ? (
@@ -1421,7 +1460,7 @@ export default function PrestamoAdminPageContent() {
           </>
         )}
         </div>
-      </>
+      </div>
       )}
 
       {showModalPrestamo && (

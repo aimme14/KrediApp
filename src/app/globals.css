@@ -5117,6 +5117,145 @@ td {
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--link) 18%, transparent);
 }
 
+.admin-filtro-estado-mobile,
+.prestamo-admin-filtro-ruta-mobile,
+.prestamo-admin-ruta-estado-row {
+  display: none;
+}
+
+.prestamo-admin-search-orden-row {
+  display: contents;
+}
+
+@media (max-width: 640px) {
+  .prestamo-admin-layout {
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+  }
+
+  .prestamo-admin-layout > * {
+    order: 6;
+  }
+
+  .prestamo-admin-layout .prestamo-admin-resumen-block,
+  .prestamo-admin-layout .prestamo-admin-hist-card {
+    display: contents;
+  }
+
+  .prestamo-admin-layout .prestamo-admin-resumen-block + .prestamo-admin-hist-card {
+    margin-top: 0;
+  }
+
+  .prestamo-admin-layout .prestamo-admin-resumen-head {
+    display: none !important;
+  }
+
+  .prestamo-admin-layout .prestamo-admin-hist-head {
+    order: 1;
+  }
+
+  .prestamo-admin-layout .prestamo-admin-resumen {
+    order: 2;
+    margin-bottom: 0;
+  }
+
+  .prestamo-admin-layout .prestamo-admin-filtros-wrap {
+    order: 3;
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    margin-bottom: 0;
+  }
+
+  .prestamo-admin-layout .prestamo-admin-hist-table-wrap {
+    order: 4;
+  }
+
+  .prestamo-admin-layout .prestamo-admin-filtro-vacio,
+  .prestamo-admin-layout .prestamo-admin-loading,
+  .prestamo-admin-layout .prestamo-admin-empty {
+    order: 5;
+  }
+
+  .prestamo-admin-layout .prestamo-admin-hist-pager {
+    order: 6;
+  }
+
+  .prestamo-admin-ruta-desktop {
+    display: none !important;
+  }
+
+  .prestamo-admin-ruta-estado-row {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: flex-end;
+    gap: 0.5rem;
+  }
+
+  .prestamo-admin-ruta-estado-row .admin-clientes-filtro-ruta,
+  .prestamo-admin-ruta-estado-row .admin-filtro-estado-mobile {
+    display: flex;
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  .prestamo-admin-ruta-estado-row .admin-clientes-filtro-ruta-select {
+    min-width: 0;
+  }
+
+  .prestamo-admin-filtro-estado-section {
+    display: none !important;
+  }
+
+  .admin-filtro-tabs-desktop {
+    display: none !important;
+  }
+
+  .prestamo-admin-search-orden-row {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 0.45rem;
+    width: 100%;
+  }
+
+  .prestamo-admin-search-orden-row .prestamo-admin-search-field {
+    flex: 1 1 0;
+    min-width: 0;
+    max-width: none;
+  }
+
+  .prestamo-admin-search-orden-row .prestamo-admin-orden-btn {
+    flex: 0 0 auto;
+    flex-shrink: 0;
+    margin: 0;
+    padding: 0.42rem 0.5rem;
+    font-size: 0.72rem !important;
+    line-height: 1.2;
+  }
+
+  .admin-clientes-filtros-row {
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: flex-end;
+    gap: 0.5rem;
+  }
+
+  .admin-clientes-filtros-row .admin-clientes-filtro-ruta,
+  .admin-clientes-filtros-row .admin-filtro-estado-mobile {
+    display: flex;
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  .admin-clientes-filtros-row .admin-clientes-filtro-ruta-select {
+    min-width: 0;
+  }
+}
+
 @media (max-width: 768px) {
   .admin-clientes-table-wrap {
     overflow-x: auto;

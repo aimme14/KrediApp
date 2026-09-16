@@ -599,8 +599,27 @@ export default function ClienteAdminPageContent() {
                 ) : null}
               </div>
               <div className="admin-clientes-filtros-row">
+                <div className="admin-clientes-filtro-ruta admin-filtro-estado-mobile">
+                  <label htmlFor="clientes-filtro-estado" className="admin-clientes-filtro-ruta-label">
+                    Estado
+                  </label>
+                  <select
+                    id="clientes-filtro-estado"
+                    className="admin-clientes-filtro-ruta-select"
+                    value={vistaLista}
+                    onChange={(e) => setVistaLista(e.target.value as typeof vistaLista)}
+                    aria-label="Filtrar y ordenar clientes"
+                  >
+                    {FILTROS_CLIENTE.map(({ value, label }) => (
+                      <option key={value} value={value}>
+                        {label}
+                        {value !== "az" ? ` (${contadoresPorFiltro[value]})` : ""}
+                      </option>
+                    ))}
+                  </select>
+                </div>
                 <div
-                  className="prestamo-admin-tabs admin-clientes-filtro-tabs"
+                  className="prestamo-admin-tabs admin-clientes-filtro-tabs admin-filtro-tabs-desktop"
                   role="tablist"
                   aria-label="Filtrar y ordenar clientes"
                 >
