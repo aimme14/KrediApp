@@ -1111,9 +1111,6 @@ export default function PrestamoAdminPageContent() {
                   <th className="prestamo-admin-col-oculta-movil">Frecuencia</th>
                   <th className="prestamo-admin-cobro-th">
                     <span className="prestamo-admin-cobro-th-desktop">Acción</span>
-                    <span className="prestamo-admin-cobro-th-mobile prestamo-admin-cobro-th-mobile--cobrar" aria-hidden>
-                      Cobrar
-                    </span>
                     <span className="prestamo-admin-cobro-th-mobile prestamo-admin-cobro-th-mobile--historial" aria-hidden>
                       Historial
                     </span>
@@ -1220,15 +1217,6 @@ export default function PrestamoAdminPageContent() {
                         </td>
                         <td className="prestamo-admin-col-oculta-movil">{principal.modalidad}</td>
                         <td className="prestamo-admin-cobro-cell">
-                          {isPrestamoEnCobro(principal) && (
-                            <Link
-                              href={`/dashboard/admin/cobrar?clienteId=${grupo.clienteId}&prestamoId=${principal.id}`}
-                              className="btn btn-primary prestamo-admin-cobro-btn"
-                            >
-                              <span className="prestamo-admin-cobro-label-desktop">Registrar cobro</span>
-                              <span className="prestamo-admin-cobro-label-mobile">Cobrar</span>
-                            </Link>
-                          )}
                           <button
                             type="button"
                             className={`btn btn-secondary prestamo-admin-historial-btn${
@@ -1311,14 +1299,6 @@ export default function PrestamoAdminPageContent() {
                                 </td>
                                 <td className="prestamo-admin-expand-empty">{p.modalidad}</td>
                                 <td className="prestamo-admin-cobro-cell">
-                                  {isPrestamoEnCobro(p) && (
-                                    <Link
-                                      href={`/dashboard/admin/cobrar?clienteId=${grupo.clienteId}&prestamoId=${p.id}`}
-                                      className="btn btn-primary prestamo-admin-cobro-btn prestamo-admin-cobro-btn--sm"
-                                    >
-                                      Cobrar
-                                    </Link>
-                                  )}
                                   {prestamoEsEliminable(p) && (
                                     <button
                                       type="button"

@@ -1329,6 +1329,48 @@ button {
   }
 }
 
+.registrar-pagos-admin-card {
+  max-width: 42rem;
+  margin: 0 auto;
+}
+
+.registrar-pagos-admin-filtros {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  margin-bottom: 1rem;
+}
+
+.registrar-pagos-admin-filtros-fila {
+  margin-bottom: 0;
+}
+
+.registrar-pagos-admin-buscador {
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: none;
+}
+
+.registrar-pagos-admin-search-field {
+  min-height: 2.35rem;
+}
+
+@media (max-width: 640px) {
+  .registrar-pagos-admin-filtros-fila.admin-clientes-filtros-row {
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: flex-end;
+    gap: 0.5rem;
+  }
+
+  .registrar-pagos-admin-filtros-fila .pagos-diarios-filtro-ruta,
+  .registrar-pagos-admin-filtros-fila .registrar-pagos-admin-buscador {
+    flex: 1 1 0;
+    min-width: 0;
+    max-width: none;
+  }
+}
+
 /* Modal cámara para tomar foto */
 .gastos-camera-overlay {
   position: fixed;
