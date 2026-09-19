@@ -1,11 +1,10 @@
 "use client";
 
 import { useEffect } from "react";
-import Link from "next/link";
 import type { PrestamoItem } from "@/lib/empresa-api";
 import { formatClienteCodigoRutaYNumero } from "@/lib/empresa-api";
 import { fechaRelevantePrestamo, calcularDuracionDias } from "@/lib/prestamo-display";
-import { isPrestamoEnCobro, labelEstadoPrestamo } from "@/lib/prestamo-estado";
+import { labelEstadoPrestamo } from "@/lib/prestamo-estado";
 import { formatMonedaPrestamoAdmin } from "@/lib/prestamo-admin-format";
 import type { PrestamoFiltroEstado } from "@/lib/prestamo-periodo-filter";
 
@@ -165,14 +164,6 @@ export default function PrestamoDetalleMobileModal({
         )}
 
         <div className="prestamo-detalle-actions">
-          {isPrestamoEnCobro(prestamo) && (
-            <Link
-              href={`/dashboard/admin/cobrar?clienteId=${clienteId}&prestamoId=${prestamo.id}`}
-              className="btn btn-primary prestamo-detalle-cobrar-btn"
-            >
-              Cobrar
-            </Link>
-          )}
           {onHistorial && (
             <button type="button" className="btn btn-secondary" onClick={onHistorial}>
               Historial
