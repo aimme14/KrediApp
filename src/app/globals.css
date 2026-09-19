@@ -12404,6 +12404,70 @@ a.admin-inicio-link-btn {
   border-color: #6d28d9;
   color: #fff;
 }
+
+:root .ruta-dia-section-pasa-mas-tarde-title,
+[data-theme="dark"] .ruta-dia-section-pasa-mas-tarde-title {
+  color: #c4b5fd;
+}
+:root .ruta-dia-avatar.prioridad-pasa-mas-tarde,
+[data-theme="dark"] .ruta-dia-avatar.prioridad-pasa-mas-tarde {
+  background: rgba(124, 58, 237, 0.28);
+  color: #f3e8ff;
+  border-color: rgba(167, 139, 250, 0.45);
+}
+:root .ruta-dia-badge.estado-pasa-mas-tarde,
+[data-theme="dark"] .ruta-dia-badge.estado-pasa-mas-tarde {
+  background: rgba(124, 58, 237, 0.32);
+  color: #ede9fe;
+  border: 1px solid rgba(167, 139, 250, 0.45);
+}
+:root .ruta-dia-chip-pasa-mas-tarde:not(.ruta-dia-chip-active),
+[data-theme="dark"] .ruta-dia-chip-pasa-mas-tarde:not(.ruta-dia-chip-active) {
+  color: #ddd6fe;
+  border-color: rgba(167, 139, 250, 0.55);
+}
+:root .ruta-dia-item-pasa-mas-tarde,
+[data-theme="dark"] .ruta-dia-item-pasa-mas-tarde {
+  background: rgba(124, 58, 237, 0.1);
+}
+:root .cobrar-btn-pasa-mas-tarde,
+[data-theme="dark"] .cobrar-btn-pasa-mas-tarde {
+  color: #ddd6fe;
+  border-color: rgba(167, 139, 250, 0.55);
+}
+:root .cobrar-btn-pasa-mas-tarde:hover:not(:disabled),
+[data-theme="dark"] .cobrar-btn-pasa-mas-tarde:hover:not(:disabled) {
+  background: rgba(124, 58, 237, 0.2);
+}
+
+[data-theme="light"] .ruta-dia-section-pasa-mas-tarde-title {
+  color: #6d28d9;
+}
+[data-theme="light"] .ruta-dia-avatar.prioridad-pasa-mas-tarde {
+  background: color-mix(in srgb, #7c3aed 18%, var(--card-bg));
+  color: #5b21b6;
+  border: 1px solid color-mix(in srgb, #7c3aed 35%, var(--card-border));
+}
+[data-theme="light"] .ruta-dia-badge.estado-pasa-mas-tarde {
+  background: color-mix(in srgb, #7c3aed 16%, var(--card-bg));
+  color: #5b21b6;
+  border: 1px solid color-mix(in srgb, #7c3aed 28%, var(--card-border));
+}
+[data-theme="light"] .ruta-dia-chip-pasa-mas-tarde:not(.ruta-dia-chip-active) {
+  color: #5b21b6;
+  border-color: color-mix(in srgb, #7c3aed 45%, var(--card-border));
+}
+[data-theme="light"] .ruta-dia-item-pasa-mas-tarde {
+  background: color-mix(in srgb, #7c3aed 6%, var(--card-bg));
+}
+[data-theme="light"] .cobrar-btn-pasa-mas-tarde {
+  color: #5b21b6;
+  border-color: color-mix(in srgb, #7c3aed 40%, var(--card-border));
+}
+[data-theme="light"] .cobrar-btn-pasa-mas-tarde:hover:not(:disabled) {
+  background: color-mix(in srgb, #7c3aed 10%, var(--input-bg));
+}
+
 /* Cliente marcado moroso por admin (señal visual; datos ya en lista de clientes) */
 .ruta-dia-item-moroso {
   background: #fef2f2;
