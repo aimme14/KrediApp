@@ -45,7 +45,7 @@ export default function RegistrarPagosAdminPageContent() {
       const principal = grupo.items[0];
       if (!principal) return;
       router.push(
-        `/dashboard/admin/cobrar?clienteId=${encodeURIComponent(principal.clienteId)}&prestamoId=${encodeURIComponent(principal.prestamoId)}`
+        `/dashboard/admin/cobrar?clienteId=${encodeURIComponent(principal.clienteId)}&prestamoId=${encodeURIComponent(principal.prestamoId)}&from=registrar-pagos`
       );
     },
     [markVisitado, router]

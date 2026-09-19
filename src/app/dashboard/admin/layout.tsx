@@ -169,14 +169,14 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
           <span className="admin-mobile-tabbar-label">Cobro diario</span>
         </Link>
         <Link
-          href="/dashboard/admin/ruta-del-dia"
-          className={`admin-mobile-tabbar-item${adminNavItemActive(pathname, "/dashboard/admin/ruta-del-dia") ? " admin-mobile-tabbar-item-active" : ""}`}
+          href="/dashboard/admin/prestamo"
+          className={`admin-mobile-tabbar-item${adminNavItemActive(pathname, "/dashboard/admin/prestamo") ? " admin-mobile-tabbar-item-active" : ""}`}
           onClick={closeMenu}
         >
           <span className="admin-mobile-tabbar-icon-wrap">
-            <AdminNavIcon name="ruta-dia" />
+            <AdminNavIcon name="loan" />
           </span>
-          <span className="admin-mobile-tabbar-label">Ruta del día</span>
+          <span className="admin-mobile-tabbar-label">Préstamos</span>
         </Link>
         <button
           type="button"

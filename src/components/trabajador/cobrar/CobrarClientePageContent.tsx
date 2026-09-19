@@ -114,7 +114,10 @@ function CobrarClientePageContent() {
   const router = useRouter();
   const clienteId = searchParams.get("clienteId");
   const prestamoId = searchParams.get("prestamoId");
-  const fromAdmin = searchParams.get("from") === "admin" || (pathname ?? "").includes("/admin/");
+  const fromParam = searchParams.get("from");
+  const fromAdmin = fromParam === "admin" || (pathname ?? "").includes("/admin/");
+  const fromPrestamosAdmin =
+    fromParam === "prestamo" || fromParam === "prestamos";
 
   const [cliente, setCliente] = useState<ClienteItem | null>(null);
   const [prestamo, setPrestamo] = useState<PrestamoItem | null>(null);
@@ -687,8 +690,16 @@ function CobrarClientePageContent() {
   };
 
   if (!profile || (profile.role !== "trabajador" && !isAdminPanelRole(profile.role))) return null;
-  const backHref = fromAdmin ? "/dashboard/admin/prestamo" : "/dashboard/trabajador/ruta";
-  const backLabel = fromAdmin ? "Volver a Préstamos" : "Ruta del día";
+  const backHref = !fromAdmin
+    ? "/dashboard/trabajador/ruta"
+    : fromPrestamosAdmin
+      ? "/dashboard/admin/prestamo"
+      : "/dashboard/admin/registrar-pagos";
+  const backLabel = !fromAdmin
+    ? "Ruta del día"
+    : fromPrestamosAdmin
+      ? "Volver a Préstamos"
+      : "Volver a Cobro diario";
   const renovarPrestamoHref = `/dashboard/${fromAdmin ? "admin" : "trabajador"}/prestamo?clienteId=${encodeURIComponent(clienteId ?? "")}`;
   if (!clienteId || !prestamoId) {
     return (
