@@ -9,7 +9,7 @@ const RegistrarPagosAdminPageContent = dynamic(
     ssr: false,
     loading: () => (
       <div className="container" style={{ paddingTop: "2rem", textAlign: "center" }}>
-        <p>Cargando registrar pagos...</p>
+        <p>Cargando cobro diario...</p>
       </div>
     ),
   }
@@ -20,7 +20,7 @@ export default function RegistrarPagosAdminPage() {
     <Suspense
       fallback={
         <div className="container" style={{ paddingTop: "2rem", textAlign: "center" }}>
-          <p>Cargando registrar pagos...</p>
+          <p>Cargando cobro diario...</p>
         </div>
       }
     >

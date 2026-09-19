@@ -7,6 +7,7 @@ import { useAdminDashboard } from "@/context/AdminDashboardContext";
 import { FILTROS_RUTA_DIA } from "@/hooks/useRutaDia";
 import { useAdminRegistrarPagos } from "@/hooks/useAdminRegistrarPagos";
 import { RutaDiaClientesLista } from "@/components/ruta-dia/RutaDiaClientesLista";
+import { RutaDiaConteosResumen } from "@/components/ruta-dia/RutaDiaConteosResumen";
 import { isAdminPanelRole } from "@/lib/admin-panel-role";
 import type { ClienteRutaGrupo } from "@/types/finanzas";
 
@@ -75,12 +76,14 @@ export default function RegistrarPagosAdminPageContent() {
     <div className="card ruta-dia-card registrar-pagos-admin-card">
       <header className="ruta-dia-header">
         <div>
-          <h2 className="ruta-dia-title">Registrar pagos</h2>
+          <h2 className="ruta-dia-title">Cobro diario</h2>
           <p className="ruta-dia-subtitle">
             {fechaLabel} · {subtituloRuta}
           </p>
         </div>
       </header>
+
+      <RutaDiaConteosResumen conteos={conteos} />
 
       {error && (
         <div className="ruta-dia-error-wrap" role="alert">
@@ -200,7 +203,6 @@ export default function RegistrarPagosAdminPageContent() {
         busquedaTrim={busquedaTrim}
         filtroLabel={filtroLabel}
         emptySinClientesMsg="No hay préstamos activos para cobrar."
-        conteos={conteos}
         onSelectGrupo={handleClickCliente}
       />
     </div>

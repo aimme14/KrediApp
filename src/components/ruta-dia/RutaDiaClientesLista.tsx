@@ -69,12 +69,6 @@ const SECCIONES: { prioridad: PrioridadClienteRuta; titulo: string }[] = [
   { prioridad: 5, titulo: "PRESTAMOS" },
 ];
 
-export type RutaDiaConteos = {
-  cobrados: number;
-  noPagoHoy: number;
-  pendientes: number;
-};
-
 type Props = {
   clientesFiltradosGrouped: ClienteRutaGrupo[];
   loading: boolean;
@@ -83,7 +77,6 @@ type Props = {
   busquedaTrim: string;
   filtroLabel: string;
   emptySinClientesMsg: string;
-  conteos: RutaDiaConteos;
   onSelectGrupo: (grupo: ClienteRutaGrupo) => void;
 };
 
@@ -95,7 +88,6 @@ export function RutaDiaClientesLista({
   busquedaTrim,
   filtroLabel,
   emptySinClientesMsg,
-  conteos,
   onSelectGrupo,
 }: Props) {
   const gruposPorPrioridad = useMemo(() => {
@@ -245,23 +237,6 @@ export function RutaDiaClientesLista({
           );
         })}
       </div>
-
-      <footer className="ruta-dia-footer">
-        <div className="ruta-dia-footer-item">
-          <span className="ruta-dia-footer-label">Cobrados</span>
-          <span className="ruta-dia-footer-value ruta-dia-footer-value-green">
-            {conteos.cobrados}
-          </span>
-        </div>
-        <div className="ruta-dia-footer-item">
-          <span className="ruta-dia-footer-label">No pagaron hoy</span>
-          <span className="ruta-dia-footer-value">{conteos.noPagoHoy}</span>
-        </div>
-        <div className="ruta-dia-footer-item">
-          <span className="ruta-dia-footer-label">Pendientes</span>
-          <span className="ruta-dia-footer-value">{conteos.pendientes}</span>
-        </div>
-      </footer>
     </>
   );
 }

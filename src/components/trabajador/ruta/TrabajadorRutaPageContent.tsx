@@ -8,6 +8,7 @@ import { useTrabajadorCajaDia } from "@/context/TrabajadorCajaDiaContext";
 import { useRuta } from "@/hooks/useRuta";
 import { FILTROS_RUTA_DIA, useRutaDia } from "@/hooks/useRutaDia";
 import { RutaDiaClientesLista } from "@/components/ruta-dia/RutaDiaClientesLista";
+import { RutaDiaConteosResumen } from "@/components/ruta-dia/RutaDiaConteosResumen";
 import type { ClienteRutaGrupo } from "@/types/finanzas";
 
 function formatCurrency(value: number): string {
@@ -94,6 +95,8 @@ export default function TrabajadorRutaPageContent() {
           </p>
         </div>
       </header>
+
+      <RutaDiaConteosResumen conteos={conteosRuta} />
 
       {errorRuta && (
         <p className="ruta-dia-error" role="alert">
@@ -216,7 +219,6 @@ export default function TrabajadorRutaPageContent() {
         busquedaTrim={busquedaTrim}
         filtroLabel={filtroLabel}
         emptySinClientesMsg="No tienes clientes en tu ruta."
-        conteos={conteosRuta}
         onSelectGrupo={handleClickCliente}
       />
     </div>

@@ -28,7 +28,7 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
   { href: "/dashboard/admin", label: "Inicio", icon: "home" },
   { href: "/dashboard/admin/ruta-del-dia", label: "Ruta del día", icon: "ruta-dia" },
   { href: "/dashboard/admin/prestamo", label: "Préstamos", icon: "loan" },
-  { href: "/dashboard/admin/registrar-pagos", label: "Registrar pagos", icon: "payments" },
+  { href: "/dashboard/admin/registrar-pagos", label: "Cobro diario", icon: "payments" },
   {
     href: "/dashboard/admin/solicitudes-prestamo",
     label: "Solicitudes préstamo",
