@@ -44,11 +44,20 @@ export type FiltroRutaDia =
   | "todos"
   | "no_pago_hoy"
   | "pendientes"
+  | "pasa_mas_tarde"
   | "cobrados"
   | "morosos";
 
+export type MarcadoresCobroDiaHoy = {
+  noPagosHoy: { prestamoId: string }[];
+  pasaMasTardeHoy: { prestamoId: string }[];
+};
+
 /** Misma prioridad que `clientesFiltrados` para que el 1.er ítem del grupo = préstamo que abre Cobrar */
 export function compareClienteRutaPrioridad(a: ClienteRuta, b: ClienteRuta): number {
+  if (a.pasaMasTardeHoy !== b.pasaMasTardeHoy) {
+    return a.pasaMasTardeHoy ? -1 : 1;
+  }
   if (a.prioridad !== b.prioridad) return a.prioridad - b.prioridad;
   const zonaA = (a.zona ?? "").toLowerCase();
   const zonaB = (b.zona ?? "").toLowerCase();
@@ -91,12 +100,15 @@ function toDate(value: string | null | undefined): Date | null {
 export function buildClientesRuta(
   clientes: ClienteItem[],
   prestamos: PrestamoItem[],
-  noPagosHoy: { prestamoId: string }[]
+  marcadores: MarcadoresCobroDiaHoy | { prestamoId: string }[]
 ): ClienteRuta[] {
   const prestamosPendientes = prestamos.filter((p) => isPrestamoEnCobro(p));
   const mapClientesById = new Map(clientes.map((c) => [c.id, c]));
   const visitados = getVisitadosHoy();
+  const noPagosHoy = Array.isArray(marcadores) ? marcadores : marcadores.noPagosHoy;
+  const pasaMasTardeRaw = Array.isArray(marcadores) ? [] : marcadores.pasaMasTardeHoy;
   const noPagoHoySet = new Set(noPagosHoy.map((n) => n.prestamoId));
+  const pasaMasTardeSet = new Set(pasaMasTardeRaw.map((n) => n.prestamoId));
 
   const map: ClienteRuta[] = [];
   for (const p of prestamosPendientes) {
@@ -127,6 +139,8 @@ export function buildClientesRuta(
       visitado: visitados.has(p.clienteId),
       cuotaPagadaHoy,
       noPagoHoy: noPagoHoySet.has(p.id),
+      pasaMasTardeHoy:
+        pasaMasTardeSet.has(p.id) && !cuotaPagadaHoy && !noPagoHoySet.has(p.id),
       moroso: p.moroso === true || c?.moroso === true,
     });
   }
@@ -163,6 +177,9 @@ export function filtrarClientesRuta(
       break;
     case "pendientes":
       lista = lista.filter((c) => !c.cuotaPagadaHoy && !c.noPagoHoy);
+      break;
+    case "pasa_mas_tarde":
+      lista = lista.filter((c) => c.pasaMasTardeHoy);
       break;
     case "cobrados":
       lista = lista.filter((c) => c.cuotaPagadaHoy);
@@ -219,6 +236,9 @@ export function agruparClientesRuta(clientesFiltrados: ClienteRuta[]): ClienteRu
   });
 
   groups.sort((a, b) => {
+    const aPasa = a.items.some((i) => i.pasaMasTardeHoy);
+    const bPasa = b.items.some((i) => i.pasaMasTardeHoy);
+    if (aPasa !== bPasa) return aPasa ? -1 : 1;
     if (a.prioridadMax !== b.prioridadMax) return a.prioridadMax - b.prioridadMax;
     if (b.diasVencidosMax !== a.diasVencidosMax) return b.diasVencidosMax - a.diasVencidosMax;
     return b.totalMonto - a.totalMonto;

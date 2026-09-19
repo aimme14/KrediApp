@@ -196,7 +196,7 @@ export default function TrabajadorRutaPageContent() {
                 <button
                   key={f.id}
                   type="button"
-                  className={`ruta-dia-chip ${filtro === f.id ? "ruta-dia-chip-active" : ""}`}
+                  className={`ruta-dia-chip${f.id === "pasa_mas_tarde" ? " ruta-dia-chip-pasa-mas-tarde" : ""}${filtro === f.id ? " ruta-dia-chip-active" : ""}${filtro === f.id && f.id === "pasa_mas_tarde" ? " ruta-dia-chip-pasa-mas-tarde-active" : ""}`}
                   onClick={() => {
                     setFiltro(f.id);
                     setFiltroExpandido(false);

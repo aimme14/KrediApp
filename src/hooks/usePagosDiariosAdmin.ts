@@ -23,7 +23,7 @@ export type PagoDiarioAdminItem = {
   prestamoId: string;
   monto: number;
   fecha: string | null;
-  tipo: "pago" | "no_pago" | "perdida";
+  tipo: "pago" | "no_pago" | "perdida" | "pasa_mas_tarde";
   metodoPago: string | null;
   clienteNombre: string;
   rutaNombre: string;
@@ -57,7 +57,9 @@ function mapDoc(id: string, d: Record<string, unknown>): PagoDiarioAdminItem {
     monto: typeof d.monto === "number" ? d.monto : 0,
     fecha,
     tipo:
-      d.tipo === "no_pago" || d.tipo === "perdida" ? d.tipo : "pago",
+      d.tipo === "no_pago" || d.tipo === "perdida" || d.tipo === "pasa_mas_tarde"
+        ? d.tipo
+        : "pago",
     metodoPago: typeof d.metodoPago === "string" ? d.metodoPago : null,
     clienteNombre:
       typeof d.clienteNombre === "string" && d.clienteNombre.trim()

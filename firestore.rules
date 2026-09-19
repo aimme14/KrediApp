@@ -65,6 +65,10 @@ service cloud.firestore {
       allow read: if request.auth != null && isEnabled() && (
         resource.data.empleadoId == request.auth.uid
         || resource.data.adminId  == request.auth.uid
+        || (isEmpleado()
+            && belongsToEmpresa(resource.data.empresaId)
+            && request.auth.token.get('rutaId', '') != ''
+            && resource.data.rutaId == request.auth.token.rutaId)
         || (request.auth.token.role == 'jefe'
             && resource.data.empresaId == request.auth.uid)
       );

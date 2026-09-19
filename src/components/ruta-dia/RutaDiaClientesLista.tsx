@@ -7,7 +7,11 @@ import {
 } from "@/lib/ruta-dia-prioridad";
 import type { ClienteRutaGrupo, PrioridadClienteRuta } from "@/types/finanzas";
 
-export type SemaforoRuta = "rojo" | "naranja" | "amarillo" | "verde";
+export type SemaforoRuta = "rojo" | "naranja" | "amarillo" | "verde" | "morado";
+
+function grupoPasaMasTarde(grupo: ClienteRutaGrupo): boolean {
+  return grupo.items.some((i) => i.pasaMasTardeHoy);
+}
 
 function grupoTieneAlertaAlta(grupo: ClienteRutaGrupo): boolean {
   return grupo.items.some((i) => tieneAlertaAlta(i.intentosFallidos));
@@ -21,6 +25,7 @@ function getSemaforo(grupo: ClienteRutaGrupo): SemaforoRuta {
   const allCuotaPagadaHoy =
     grupo.items.length > 0 && grupo.items.every((i) => i.cuotaPagadaHoy);
   const tieneNoPagoHoy = grupo.items.some((i) => i.noPagoHoy);
+  if (grupoPasaMasTarde(grupo)) return "morado";
   if (grupoTieneAlertaAlta(grupo)) return "rojo";
   if (tieneNoPagoHoy) return "naranja";
   if (tieneAlertaNoPago(grupo)) return "naranja";
@@ -38,6 +43,8 @@ function getSemaforoLabel(semaforo: SemaforoRuta): string {
       return "Pendiente por cobrar";
     case "verde":
       return "Cuota del día pagada";
+    case "morado":
+      return "Pasa más tarde (visitar después)";
     default:
       return "";
   }
@@ -55,6 +62,7 @@ function getBadgeLabel(grupo: ClienteRutaGrupo): string {
   const allCuotaPagadaHoy =
     grupo.items.length > 0 && grupo.items.every((i) => i.cuotaPagadaHoy);
   const tieneNoPagoHoy = grupo.items.some((i) => i.noPagoHoy);
+  if (grupoPasaMasTarde(grupo)) return "Pasa más tarde";
   if (grupoTieneAlertaAlta(grupo)) return "Alerta alta";
   if (allCuotaPagadaHoy) return "Pagó hoy";
   if (tieneNoPagoHoy) return "No pagó hoy";
@@ -90,7 +98,7 @@ export function RutaDiaClientesLista({
   emptySinClientesMsg,
   onSelectGrupo,
 }: Props) {
-  const gruposPorPrioridad = useMemo(() => {
+  const { gruposPasaMasTarde, gruposPorPrioridad } = useMemo(() => {
     const grupos: Record<number, ClienteRutaGrupo[]> = {
       1: [],
       2: [],
@@ -98,10 +106,15 @@ export function RutaDiaClientesLista({
       4: [],
       5: [],
     };
+    const pasaMasTarde: ClienteRutaGrupo[] = [];
     for (const g of clientesFiltradosGrouped) {
+      if (grupoPasaMasTarde(g)) {
+        pasaMasTarde.push(g);
+        continue;
+      }
       grupos[g.prioridadMax].push(g);
     }
-    return grupos;
+    return { gruposPasaMasTarde: pasaMasTarde, gruposPorPrioridad: grupos };
   }, [clientesFiltradosGrouped]);
 
   const handleKeyDown = useCallback(
@@ -132,9 +145,107 @@ export function RutaDiaClientesLista({
     );
   }
 
+  const renderGrupo = (grupo: ClienteRutaGrupo, prioridadVisual: PrioridadClienteRuta | "pmt") => {
+    const initials = grupo.clienteNombre
+      .split(" ")
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((p) => p[0]?.toUpperCase())
+      .join("");
+    const badgeLabel = getBadgeLabel(grupo);
+    const semaforo = getSemaforo(grupo);
+    const subtituloParts: string[] = [];
+    if (grupo.cantidadPrestamos > 1) {
+      subtituloParts.push(`${grupo.cantidadPrestamos} préstamos`);
+    }
+    if (grupo.diasVencidosMax > 0) {
+      subtituloParts.push(`${grupo.diasVencidosMax} días vencidos`);
+    }
+    const allCuotaPagada =
+      grupo.items.length > 0 && grupo.items.every((i) => i.cuotaPagadaHoy);
+    const estadoFirst = grupoPasaMasTarde(grupo)
+      ? "pasa-mas-tarde"
+      : allCuotaPagada
+        ? "pagada"
+        : grupoTieneAlertaAlta(grupo)
+          ? "alerta"
+          : tieneAlertaNoPago(grupo)
+            ? "alerta"
+            : (grupo.items[0]?.estado?.toLowerCase() ?? "activo");
+
+    const ariaMoroso = grupo.moroso
+      ? " Cliente marcado como moroso por el administrador."
+      : "";
+    const avatarClass =
+      prioridadVisual === "pmt"
+        ? "ruta-dia-avatar prioridad-pasa-mas-tarde"
+        : `ruta-dia-avatar prioridad-${prioridadVisual}`;
+
+    return (
+      <li
+        key={grupo.clienteId}
+        className={`ruta-dia-item ruta-dia-item-semaforo-${semaforo} ${grupo.visitado ? "ruta-dia-item-visitado" : ""} ${grupo.moroso ? "ruta-dia-item-moroso" : ""}${grupoPasaMasTarde(grupo) ? " ruta-dia-item-pasa-mas-tarde" : ""}`}
+        role="button"
+        tabIndex={0}
+        onClick={() => onSelectGrupo(grupo)}
+        onKeyDown={(e) => handleKeyDown(e, grupo)}
+        aria-label={`${grupo.clienteNombre}, ${getSemaforoLabel(semaforo)}. Saldo a cobrar ahora ${formatCurrency(grupo.items[0]?.monto ?? 0)}${grupo.cantidadPrestamos > 1 ? `; total ${grupo.cantidadPrestamos} préstamos ${formatCurrency(grupo.totalMonto)}` : ""}.${ariaMoroso} ${grupo.visitado ? "Visitado" : ""}`}
+      >
+        <span className="ruta-dia-semaforo-wrap" title={getSemaforoLabel(semaforo)} aria-hidden>
+          <span className={`ruta-dia-semaforo ruta-dia-semaforo-${semaforo}`} />
+          {semaforo === "naranja" && (
+            <span className="ruta-dia-semaforo-warn-icon">⚠</span>
+          )}
+        </span>
+        <div className={avatarClass}>
+          <span>{initials || "?"}</span>
+          {grupo.visitado && <span className="ruta-dia-avatar-check" aria-hidden />}
+        </div>
+        <div className="ruta-dia-item-main">
+          {grupo.moroso ? (
+            <div className="ruta-dia-moroso-banner" role="status">
+              <span className="ruta-dia-moroso-banner-icon" aria-hidden>
+                ⚠
+              </span>
+              <span>Cliente moroso</span>
+            </div>
+          ) : null}
+          <div className="ruta-dia-item-row">
+            <span className="ruta-dia-item-nombre">{grupo.clienteNombre}</span>
+            <span className="ruta-dia-item-monto">
+              {formatCurrency(grupo.items[0]?.monto ?? 0)}
+              {grupo.cantidadPrestamos > 1 && (
+                <span className="ruta-dia-item-cuotas">
+                  {" "}
+                  · total {formatCurrency(grupo.totalMonto)}
+                </span>
+              )}
+            </span>
+          </div>
+          <div className="ruta-dia-item-row ruta-dia-item-secondary">
+            <span className="ruta-dia-item-sub">
+              {subtituloParts.join(" · ") || grupo.zona || "—"}
+            </span>
+            <span className={`ruta-dia-badge estado-${estadoFirst}`}>{badgeLabel}</span>
+          </div>
+        </div>
+      </li>
+    );
+  };
+
   return (
     <>
       <div className="ruta-dia-list">
+        {gruposPasaMasTarde.length > 0 && (
+          <section className="ruta-dia-section ruta-dia-section-pasa-mas-tarde" aria-label="Pasa más tarde">
+            <h3 className="ruta-dia-section-title ruta-dia-section-pasa-mas-tarde-title">
+              PASA MÁS TARDE
+            </h3>
+            <ul className="ruta-dia-section-list">
+              {gruposPasaMasTarde.map((grupo) => renderGrupo(grupo, "pmt"))}
+            </ul>
+          </section>
+        )}
         {SECCIONES.map(({ prioridad, titulo }) => {
           const list = gruposPorPrioridad[prioridad] ?? [];
           if (list.length === 0) return null;
@@ -144,94 +255,7 @@ export function RutaDiaClientesLista({
                 {titulo}
               </h3>
               <ul className="ruta-dia-section-list">
-                {list.map((grupo) => {
-                  const initials = grupo.clienteNombre
-                    .split(" ")
-                    .filter(Boolean)
-                    .slice(0, 2)
-                    .map((p) => p[0]?.toUpperCase())
-                    .join("");
-                  const badgeLabel = getBadgeLabel(grupo);
-                  const semaforo = getSemaforo(grupo);
-                  const subtituloParts: string[] = [];
-                  if (grupo.cantidadPrestamos > 1) {
-                    subtituloParts.push(`${grupo.cantidadPrestamos} préstamos`);
-                  }
-                  if (grupo.diasVencidosMax > 0) {
-                    subtituloParts.push(`${grupo.diasVencidosMax} días vencidos`);
-                  }
-                  const allCuotaPagada =
-                    grupo.items.length > 0 && grupo.items.every((i) => i.cuotaPagadaHoy);
-                  const estadoFirst = allCuotaPagada
-                    ? "pagada"
-                    : grupoTieneAlertaAlta(grupo)
-                      ? "alerta"
-                      : tieneAlertaNoPago(grupo)
-                        ? "alerta"
-                        : (grupo.items[0]?.estado?.toLowerCase() ?? "activo");
-
-                  const ariaMoroso = grupo.moroso
-                    ? " Cliente marcado como moroso por el administrador."
-                    : "";
-                  return (
-                    <li
-                      key={grupo.clienteId}
-                      className={`ruta-dia-item ruta-dia-item-semaforo-${semaforo} ${grupo.visitado ? "ruta-dia-item-visitado" : ""} ${grupo.moroso ? "ruta-dia-item-moroso" : ""}`}
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => onSelectGrupo(grupo)}
-                      onKeyDown={(e) => handleKeyDown(e, grupo)}
-                      aria-label={`${grupo.clienteNombre}, ${getSemaforoLabel(semaforo)}. Saldo a cobrar ahora ${formatCurrency(grupo.items[0]?.monto ?? 0)}${grupo.cantidadPrestamos > 1 ? `; total ${grupo.cantidadPrestamos} préstamos ${formatCurrency(grupo.totalMonto)}` : ""}.${ariaMoroso} ${grupo.visitado ? "Visitado" : ""}`}
-                    >
-                      <span
-                        className="ruta-dia-semaforo-wrap"
-                        title={getSemaforoLabel(semaforo)}
-                        aria-hidden
-                      >
-                        <span className={`ruta-dia-semaforo ruta-dia-semaforo-${semaforo}`} />
-                        {semaforo === "naranja" && (
-                          <span className="ruta-dia-semaforo-warn-icon">⚠</span>
-                        )}
-                      </span>
-                      <div className={`ruta-dia-avatar prioridad-${prioridad}`}>
-                        <span>{initials || "?"}</span>
-                        {grupo.visitado && (
-                          <span className="ruta-dia-avatar-check" aria-hidden />
-                        )}
-                      </div>
-                      <div className="ruta-dia-item-main">
-                        {grupo.moroso ? (
-                          <div className="ruta-dia-moroso-banner" role="status">
-                            <span className="ruta-dia-moroso-banner-icon" aria-hidden>
-                              ⚠
-                            </span>
-                            <span>Cliente moroso</span>
-                          </div>
-                        ) : null}
-                        <div className="ruta-dia-item-row">
-                          <span className="ruta-dia-item-nombre">{grupo.clienteNombre}</span>
-                          <span className="ruta-dia-item-monto">
-                            {formatCurrency(grupo.items[0]?.monto ?? 0)}
-                            {grupo.cantidadPrestamos > 1 && (
-                              <span className="ruta-dia-item-cuotas">
-                                {" "}
-                                · total {formatCurrency(grupo.totalMonto)}
-                              </span>
-                            )}
-                          </span>
-                        </div>
-                        <div className="ruta-dia-item-row ruta-dia-item-secondary">
-                          <span className="ruta-dia-item-sub">
-                            {subtituloParts.join(" · ") || grupo.zona || "—"}
-                          </span>
-                          <span className={`ruta-dia-badge estado-${estadoFirst}`}>
-                            {badgeLabel}
-                          </span>
-                        </div>
-                      </div>
-                    </li>
-                  );
-                })}
+                {list.map((grupo) => renderGrupo(grupo, prioridad))}
               </ul>
             </section>
           );

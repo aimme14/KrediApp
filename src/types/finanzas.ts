@@ -185,6 +185,8 @@ export interface ClienteRuta {
   cuotaPagadaHoy: boolean;
   /** True si hoy se registró «no pagó» para este préstamo (cobros del día). */
   noPagoHoy: boolean;
+  /** True si hoy marcó «pasa más tarde» y aún no pagó. */
+  pasaMasTardeHoy: boolean;
   /** Marcado moroso por el admin (señal en UI; distinto de alertas por no pago). */
   moroso: boolean;
 }

@@ -11,6 +11,7 @@ import {
   listPagos,
   registrarPago,
   registrarNoPago,
+  registrarPasaMasTarde,
   registrarPerdida,
   checkCobroIdempotency,
   type ClienteItem,
@@ -161,6 +162,8 @@ function CobrarClientePageContent() {
   const [submittingNoPago, setSubmittingNoPago] = useState(false);
   const [showModalNoPago, setShowModalNoPago] = useState(false);
   const [noPagoRegistrado, setNoPagoRegistrado] = useState(false);
+  const [submittingPasaMasTarde, setSubmittingPasaMasTarde] = useState(false);
+  const [pasaMasTardeRegistrado, setPasaMasTardeRegistrado] = useState(false);
 
   const [showPerdida, setShowPerdida] = useState(false);
   const [showModalPerdida, setShowModalPerdida] = useState(false);
@@ -642,6 +645,33 @@ function CobrarClientePageContent() {
     }
   };
 
+  const handlePasaMasTarde = async () => {
+    if (!online) {
+      setError(OFFLINE_MSG);
+      return;
+    }
+    if (!user || !prestamoId || !profile) return;
+    setSubmittingPasaMasTarde(true);
+    setError(null);
+    const idempotencyKey = crypto.randomUUID();
+    try {
+      const token = await user.getIdToken();
+      const nombreRegistro = profile.displayName ?? profile.email ?? "";
+      await registrarPasaMasTarde(token, prestamoId, {
+        registradoPorUid: user.uid,
+        registradoPorNombre: nombreRegistro || undefined,
+        idempotencyKey,
+      });
+      setPasaMasTardeRegistrado(true);
+      await refreshLista();
+      void refreshCajaDia();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Error al registrar pasa más tarde");
+    } finally {
+      setSubmittingPasaMasTarde(false);
+    }
+  };
+
   const handleEjecutarPerdida = async () => {
     if (!online) {
       setError(OFFLINE_MSG);
@@ -778,6 +808,19 @@ function CobrarClientePageContent() {
     );
   }
 
+  if (pasaMasTardeRegistrado) {
+    return (
+      <div className="card cobrar-card cobrar-confirmacion">
+        <h2 className="cobrar-title">Pasa más tarde</h2>
+        <p>
+          {cliente.nombre} quedó marcado para visitar después. Lo verás en morado en{" "}
+          {fromAdmin ? "Cobro diario" : "Ruta del día"}.
+        </p>
+        <Link href={backHref} className="btn btn-primary">{backLabel}</Link>
+      </div>
+    );
+  }
+
   if (showNoPago) {
     return (
       <CobrarNoPagoPanel
@@ -895,7 +938,9 @@ function CobrarClientePageContent() {
                           ? "var(--danger, #f87171)"
                           : p.tipo === "no_pago"
                             ? "var(--warning, #eab308)"
-                            : "inherit",
+                            : p.tipo === "pasa_mas_tarde"
+                              ? "#7c3aed"
+                              : "inherit",
                     }}
                   >
                     {p.tipo === "perdida"
@@ -906,9 +951,11 @@ function CobrarClientePageContent() {
                               ? ` — ${MOTIVOS_NO_PAGO.find((m) => m.value === p.motivoNoPago)?.label ?? p.motivoNoPago}`
                               : ""
                           }`
-                        : p.metodoPago === "transferencia"
-                          ? "Transferencia"
-                          : "Efectivo"}
+                        : p.tipo === "pasa_mas_tarde"
+                          ? "Pasa más tarde"
+                          : p.metodoPago === "transferencia"
+                            ? "Transferencia"
+                            : "Efectivo"}
                   </span>
                   <span className="cobrar-historial-registrado" title="Registrado por">
                     {p.registradoPorNombre || p.registradoPorUid || "—"}
@@ -1123,19 +1170,27 @@ function CobrarClientePageContent() {
           <p className="error-msg" role="alert">{OFFLINE_MSG}</p>
         )}
 
-        <div className="cobrar-actions">
+        <div className="cobrar-actions cobrar-actions-triple">
           <button
             type="button"
             className="btn btn-secondary"
             onClick={() => setShowNoPago(true)}
-            disabled={!online}
+            disabled={!online || submittingPasaMasTarde}
           >
             No pagó
           </button>
           <button
+            type="button"
+            className="btn btn-secondary cobrar-btn-pasa-mas-tarde"
+            onClick={() => { void handlePasaMasTarde(); }}
+            disabled={!online || submitting || submittingPasaMasTarde || showModalCobro}
+          >
+            {submittingPasaMasTarde ? "Guardando…" : "Pasar más tarde"}
+          </button>
+          <button
             type="submit"
             className="btn btn-primary"
-            disabled={!puedeConfirmar || submitting || showModalCobro || showModalYaPagoHoy || !online}
+            disabled={!puedeConfirmar || submitting || showModalCobro || showModalYaPagoHoy || !online || submittingPasaMasTarde}
           >
             Confirmar cobro
           </button>

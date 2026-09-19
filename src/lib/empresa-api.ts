@@ -171,7 +171,7 @@ export type PagoItem = {
   id: string;
   monto: number;
   fecha: string | null;
-  tipo: "pago" | "no_pago" | "perdida";
+  tipo: "pago" | "no_pago" | "perdida" | "pasa_mas_tarde";
   metodoPago: string | null;
   motivoNoPago?: string | null;
   motivoPerdida?: string | null;
@@ -1266,6 +1266,32 @@ export async function registrarNoPago(
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error ?? "Error al registrar no pago");
+}
+
+/** Marca que el cliente pidió posponer el cobro (hoy); no afecta intentos fallidos ni caja. */
+export async function registrarPasaMasTarde(
+  token: string,
+  prestamoId: string,
+  params: {
+    nota?: string;
+    registradoPorUid?: string;
+    registradoPorNombre?: string;
+    idempotencyKey?: string;
+  }
+): Promise<{ pagoId: string }> {
+  const res = await fetchWithAuth(`/api/empresa/prestamos/${encodeURIComponent(prestamoId)}/pagos`, token, {
+    method: "POST",
+    body: JSON.stringify({
+      tipo: "pasa_mas_tarde",
+      nota: params.nota?.trim() || undefined,
+      registradoPorUid: params.registradoPorUid,
+      registradoPorNombre: params.registradoPorNombre,
+      idempotencyKey: params.idempotencyKey,
+    }),
+  });
+  const data = await parseJsonResponse(res);
+  if (!res.ok) throw new Error(String(data.error ?? "Error al registrar pasa más tarde"));
+  return { pagoId: typeof data.pagoId === "string" ? data.pagoId : "" };
 }
 
 /**

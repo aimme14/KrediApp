@@ -152,6 +152,15 @@
       "collectionGroup": "pagos",
       "queryScope": "COLLECTION_GROUP",
       "fields": [
+        { "fieldPath": "empresaId", "order": "ASCENDING" },
+        { "fieldPath": "rutaId", "order": "ASCENDING" },
+        { "fieldPath": "fecha", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "pagos",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
         { "fieldPath": "empleadoId", "order": "ASCENDING" },
         { "fieldPath": "rutaId", "order": "ASCENDING" },
         { "fieldPath": "fecha", "order": "ASCENDING" }

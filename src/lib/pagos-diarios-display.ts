@@ -20,6 +20,7 @@ export function formatHoraPagosDiarios(iso: string | null): string {
 export function labelTipoPagosDiarios(item: PagoDiarioAdminItem): string {
   if (item.tipo === "no_pago") return "No pagó";
   if (item.tipo === "perdida") return "Pérdida";
+  if (item.tipo === "pasa_mas_tarde") return "Pasa más tarde";
   return "Cobro";
 }
 

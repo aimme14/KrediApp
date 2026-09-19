@@ -43,6 +43,11 @@ import type { EstadoPrestamo } from "@/types/firestore";
 import { isAdminPanelApiUser } from "@/lib/admin-panel-role";
 import { withRateLimit } from "@/lib/with-rate-limit";
 import { pagosLimiterUser } from "@/lib/rate-limit";
+import {
+  anularPasaMasTardeHoyEnTx,
+  boundsHoyColombiaTimestamps,
+} from "@/lib/pasa-mas-tarde-server";
+import { TIPO_PAGO_PASA_MAS_TARDE } from "@/lib/pasa-mas-tarde-constants";
 
 
 const MOTIVOS_NO_PAGO = ["sin_fondos", "no_estaba", "promesa_pago", "otro"] as const;
@@ -244,7 +249,7 @@ async function postHandler(
     registradoPorNombre,
     idempotencyKey,
   } = body as {
-    tipo?: "pago" | "no_pago" | "perdida";
+    tipo?: "pago" | "no_pago" | "perdida" | "pasa_mas_tarde";
     monto?: number;
     metodoPago?: "efectivo" | "transferencia";
     evidencia?: string;
@@ -319,6 +324,80 @@ async function postHandler(
       apiUser.empresaId,
       clienteIdPrestamo
     );
+  }
+
+  if (tipo === TIPO_PAGO_PASA_MAS_TARDE) {
+    let pagoIdMarcador: string;
+    try {
+      pagoIdMarcador = await db.runTransaction(async (tx) => {
+        const prSnap = await tx.get(prestamoRef);
+        if (!prSnap.exists) {
+          throw new Error("PRESTAMO_NOT_FOUND");
+        }
+
+        const { start, end } = boundsHoyColombiaTimestamps();
+        const hoySnap = await tx.get(
+          prestamoRef
+            .collection(PAGOS_SUBCOLLECTION)
+            .where("fecha", ">=", start)
+            .where("fecha", "<=", end)
+        );
+        for (const doc of hoySnap.docs) {
+          const pd = doc.data();
+          if (pd.tipo === TIPO_PAGO_PASA_MAS_TARDE && pd.estado !== "anulado") {
+            return doc.id;
+          }
+        }
+
+        let rutaNombre = "";
+        if (rutaIdPrestamoData) {
+          const rutaRef = db
+            .collection(EMPRESAS_COLLECTION)
+            .doc(apiUser.empresaId)
+            .collection(RUTAS_SUBCOLLECTION)
+            .doc(rutaIdPrestamoData);
+          const rSnap = await tx.get(rutaRef);
+          rutaNombre = rutaNombreDesdeSnap(rSnap);
+        }
+
+        const pagoRef = prestamoRef.collection(PAGOS_SUBCOLLECTION).doc();
+        tx.set(pagoRef, {
+          monto: 0,
+          fecha: now,
+          empleadoId: apiUser.uid,
+          tipo: TIPO_PAGO_PASA_MAS_TARDE,
+          nota: (nota ?? "").trim() || null,
+          registradoPorUid: uidRegistro,
+          registradoPorNombre: nombreRegistro,
+          ...buildCamposAuditoria({
+            adminId: adminIdPrestamo,
+            empresaId: apiUser.empresaId,
+            prestamoId,
+            rutaId: rutaIdPrestamoData,
+            clienteId: clienteIdPrestamo,
+            clienteNombre: clienteNombrePrestamo,
+            rutaNombre,
+            cobradoPorRol: apiUser.role,
+          }),
+        });
+        return pagoRef.id;
+      });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "";
+      if (msg === "PRESTAMO_NOT_FOUND") {
+        return finalize(404, { error: "Préstamo no encontrado" });
+      }
+      if (msg === "FECHA_DIA_INVALIDA") {
+        return finalize(400, { error: "Fecha del día inválida" });
+      }
+      return finalize(400, { error: msg || "No se pudo registrar pasa más tarde" });
+    }
+
+    return finalize(200, {
+      ok: true,
+      tipo: TIPO_PAGO_PASA_MAS_TARDE,
+      pagoId: pagoIdMarcador,
+    });
   }
 
   if (tipo === "no_pago") {
@@ -802,6 +881,8 @@ async function postHandler(
         }),
       };
       if (keyTrimmed) pagoData.idempotencyKey = keyTrimmed;
+
+      await anularPasaMasTardeHoyEnTx(tx, prestamoRef, nowTx);
 
       tx.set(pagoRef, pagoData);
 

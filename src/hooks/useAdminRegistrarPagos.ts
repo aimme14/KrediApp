@@ -1,22 +1,10 @@
 "use client";
 
 import { useMemo, useState, useEffect, useCallback } from "react";
-import {
-  collectionGroup,
-  onSnapshot,
-  query,
-  where,
-  Timestamp,
-} from "firebase/firestore";
-import { db } from "@/lib/firebase";
 import { useAuth } from "@/context/AuthContext";
 import { useTrabajadorLista } from "@/context/TrabajadorListaContext";
 import { isAdminPanelRole } from "@/lib/admin-panel-role";
-import {
-  fechaDiaColombiaHoy,
-  finDiaColombiaUtc,
-  inicioDiaColombiaUtc,
-} from "@/lib/colombia-day-bounds";
+import { useMarcadoresPagosDiaHoy } from "@/hooks/useMarcadoresPagosDiaHoy";
 import {
   addVisitadoHoy,
   agruparClientesRuta,
@@ -43,64 +31,19 @@ export function useAdminRegistrarPagos() {
   const [busquedaNombre, setBusquedaNombre] = useState("");
   const [filtroRutaId, setFiltroRutaId] = useState("");
   const [visitadosBump, setVisitadosBump] = useState(0);
-  const [noPagosHoy, setNoPagosHoy] = useState<{ prestamoId: string }[]>([]);
-  const [loadingNoPagos, setLoadingNoPagos] = useState(true);
-  const [errorNoPagos, setErrorNoPagos] = useState<string | null>(null);
 
-  const fechaDia = fechaDiaColombiaHoy();
   const isAdmin = Boolean(user && profile && isAdminPanelRole(profile.role));
-
-  useEffect(() => {
-    if (!db || !user || !isAdmin || !profile?.empresaId) {
-      setNoPagosHoy([]);
-      setLoadingNoPagos(false);
-      return;
-    }
-
-    const start = inicioDiaColombiaUtc(fechaDia);
-    const end = finDiaColombiaUtc(fechaDia);
-    if (!start || !end) {
-      setErrorNoPagos("Fecha inválida");
-      setLoadingNoPagos(false);
-      return;
-    }
-
-    setLoadingNoPagos(true);
-    setErrorNoPagos(null);
-
-    const q = query(
-      collectionGroup(db, "pagos"),
-      where("empresaId", "==", profile.empresaId),
-      where("adminId", "==", user.uid),
-      where("fecha", ">=", Timestamp.fromDate(start)),
-      where("fecha", "<=", Timestamp.fromDate(end))
-    );
-
-    const unsub = onSnapshot(
-      q,
-      (snap) => {
-        const ids: { prestamoId: string }[] = [];
-        for (const doc of snap.docs) {
-          const d = doc.data() as Record<string, unknown>;
-          if (d.tipo !== "no_pago" || d.estado === "anulado") continue;
-          const prestamoId =
-            typeof d.prestamoId === "string"
-              ? d.prestamoId
-              : doc.ref.parent.parent?.id ?? "";
-          if (prestamoId) ids.push({ prestamoId });
-        }
-        setNoPagosHoy(ids);
-        setLoadingNoPagos(false);
-      },
-      (err) => {
-        console.warn("[useAdminRegistrarPagos] noPagos:", err);
-        setErrorNoPagos(err.message || "Error al cargar no pagos del día");
-        setLoadingNoPagos(false);
-      }
-    );
-
-    return unsub;
-  }, [user?.uid, profile?.empresaId, isAdmin, fechaDia]);
+  const marcadoresScope = useMemo(
+    () =>
+      user?.uid && isAdmin ? ({ kind: "admin" as const, adminUid: user.uid }) : undefined,
+    [user?.uid, isAdmin]
+  );
+  const {
+    marcadores,
+    loading: loadingMarcadores,
+    error: errorMarcadores,
+    fechaDia,
+  } = useMarcadoresPagosDiaHoy(isAdmin, profile?.empresaId, marcadoresScope);
 
   const rutaIdPorClienteId = useMemo(
     () => new Map(clientes.map((c) => [c.id, c.rutaId ?? ""])),
@@ -114,8 +57,8 @@ export function useAdminRegistrarPagos() {
 
   const clientesRuta = useMemo(() => {
     if (!isAdmin) return [];
-    return buildClientesRuta(clientes, prestamos, noPagosHoy);
-  }, [isAdmin, clientes, prestamos, noPagosHoy, visitadosBump]);
+    return buildClientesRuta(clientes, prestamos, marcadores);
+  }, [isAdmin, clientes, prestamos, marcadores, visitadosBump]);
 
   const clientesFiltrados = useMemo(
     () =>
@@ -139,8 +82,8 @@ export function useAdminRegistrarPagos() {
     [clientesFiltrados]
   );
 
-  const loading = isAdmin && (loadingLista || loadingNoPagos);
-  const error = errorLista ?? errorNoPagos;
+  const loading = isAdmin && (loadingLista || loadingMarcadores);
+  const error = errorLista ?? errorMarcadores;
 
   useEffect(() => {
     const onVisibility = () => {
