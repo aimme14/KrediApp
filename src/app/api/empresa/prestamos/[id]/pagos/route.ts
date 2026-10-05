@@ -48,6 +48,12 @@ import {
   boundsHoyColombiaTimestamps,
 } from "@/lib/pasa-mas-tarde-server";
 import { TIPO_PAGO_PASA_MAS_TARDE } from "@/lib/pasa-mas-tarde-constants";
+import { fechaDiaColombiaHoy } from "@/lib/colombia-day-bounds";
+import {
+  aplicarDeltaJornadaEnTx,
+  asegurarJornadaDiaRuta,
+  jornadaDiaDocRef,
+} from "@/lib/jornada-dia-cache";
 
 
 const MOTIVOS_NO_PAGO = ["sin_fondos", "no_estaba", "promesa_pago", "otro"] as const;
@@ -725,6 +731,17 @@ async function postHandler(
   if (!prestamoPreRead.exists) {
     return NextResponse.json({ error: "Préstamo no encontrado" }, { status: 404 });
   }
+  const rutaIdPre =
+    typeof prestamoPreRead.data()?.rutaId === "string"
+      ? String(prestamoPreRead.data()?.rutaId).trim()
+      : "";
+  if (rutaIdPre) {
+    try {
+      await asegurarJornadaDiaRuta(db, apiUser.empresaId, rutaIdPre);
+    } catch (err) {
+      console.warn("[jornada-dia] caché no preparada:", err);
+    }
+  }
   const keyTrimmed = typeof idempotencyKey === "string" ? idempotencyKey.trim() : "";
 
   try {
@@ -806,6 +823,11 @@ async function postHandler(
           if (!uSnap.exists) throw new Error("EMPLEADO_USUARIO_NOT_FOUND");
         }
       }
+
+      const jornadaRef = rutaIdPrestamo
+        ? jornadaDiaDocRef(db, apiUser.empresaId, fechaDiaColombiaHoy(), rutaIdPrestamo)
+        : null;
+      const jornadaSnap = jornadaRef ? await tx.get(jornadaRef) : null;
 
       const resolucionPago = resolverEstadoTrasMovimiento({
         tipo: "pago",
@@ -932,6 +954,10 @@ async function postHandler(
             });
           }
         }
+      }
+
+      if (jornadaSnap) {
+        aplicarDeltaJornadaEnTx(tx, jornadaSnap, montoAplicar);
       }
 
       if (nuevoSaldo <= 0) {

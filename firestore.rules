@@ -204,6 +204,16 @@ service cloud.firestore {
               || resource.data.adminId  == request.auth.uid);
         allow write: if false;
       }
+      // Caché de jornada (cuotas del día). Escritura solo por Admin SDK.
+      match /jornadaDia/{docId} {
+        allow read: if request.auth != null && isEnabled() && belongsToEmpresa(empresaId) && (
+          isJefe(empresaId)
+          || (isAdmin() && resource.data.adminId == request.auth.uid)
+          || (isEmpleado() && resource.data.rutaId == request.auth.token.rutaId)
+        );
+        allow write: if false;
+      }
+
       match /reportesDia/{reporteId} {
         allow read: if request.auth != null && isEnabled()
           && belongsToEmpresa(empresaId)

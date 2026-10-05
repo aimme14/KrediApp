@@ -5,6 +5,10 @@
     {
       "path": "/api/cron/expirar-accesos",
       "schedule": "10 5 * * *"
+    },
+    {
+      "path": "/api/cron/jornada-dia",
+      "schedule": "0 5 * * *"
     }
   ]
 }

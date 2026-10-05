@@ -8,6 +8,7 @@ import { useTrabajadorLista } from "@/context/TrabajadorListaContext";
 import { AdminRutaStatsGrid } from "@/components/AdminRutaStatsGrid";
 import { computeSaldoPorRecogerPorRuta } from "@/lib/prestamo-display";
 import { isAdminPanelRole } from "@/lib/admin-panel-role";
+import { useJornadaDiaCache } from "@/hooks/useJornadaDiaCache";
 
 function formatMoneda(value: number): string {
   return `$ ${Math.trunc(value).toLocaleString("es-CO", {
@@ -41,6 +42,11 @@ export default function AdminDashboardPage() {
     error,
   } = useAdminDashboard();
   const { prestamos, clientes } = useTrabajadorLista();
+  const {
+    porRuta: jornadaPorRuta,
+    loading: jornadaLoading,
+    error: jornadaError,
+  } = useJornadaDiaCache();
 
   const fechaTitulo = useMemo(() => formatFechaCabecera(new Date()), []);
 
@@ -277,6 +283,19 @@ export default function AdminDashboardPage() {
                       ruta={r}
                       showGananciasNetas
                       saldoPorRecoger={saldoPorRecogerPorRuta.get(r.id) ?? 0}
+                      jornadaHoy={
+                        jornadaPorRuta[r.id]
+                          ? {
+                              montoARecoger: jornadaPorRuta[r.id].montoARecoger,
+                              montoRecogido: jornadaPorRuta[r.id].montoRecogido,
+                            }
+                          : jornadaLoading
+                            ? null
+                            : {
+                                montoARecoger: jornadaError ? Number.NaN : 0,
+                                montoRecogido: jornadaError ? Number.NaN : 0,
+                              }
+                      }
                     />
                   </article>
               ))}

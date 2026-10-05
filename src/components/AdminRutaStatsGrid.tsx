@@ -40,6 +40,8 @@ type AdminRutaStatsGridProps = {
   showGananciasNetas?: boolean;
   /** Saldo pendiente en préstamos activos de la ruta (Inicio admin). */
   saldoPorRecoger?: number;
+  /** Caché de la jornada: cuota del día y lo que falta por cobrar hoy. */
+  jornadaHoy?: { montoARecoger: number; montoRecogido: number } | null;
 };
 
 /** Tarjetas financieras por ruta (Inicio admin, listado Rutas, etc.). */
@@ -48,6 +50,7 @@ export function AdminRutaStatsGrid({
   className,
   showGananciasNetas,
   saldoPorRecoger,
+  jornadaHoy,
 }: AdminRutaStatsGridProps) {
   const g = snapPesoDisplay(ruta.ganancias ?? 0);
   const gananciasNetas = showGananciasNetas ? computeGananciasNetasRuta(ruta) : null;
@@ -57,6 +60,32 @@ export function AdminRutaStatsGrid({
 
   return (
     <div className={gridClass} aria-label="Resumen financiero de la ruta">
+      {jornadaHoy !== undefined ? (
+        <div className="admin-inicio-ruta-stat admin-inicio-ruta-stat--jornada" aria-label="Jornada de cobro">
+          <div className="admin-inicio-jornada-par">
+            <span className="admin-inicio-ruta-stat-label">Saldo por recoger hoy</span>
+            <span className="admin-inicio-ruta-stat-value">
+              {jornadaHoy == null
+                ? "…"
+                : Number.isFinite(jornadaHoy.montoARecoger)
+                  ? formatMoneda(jornadaHoy.montoARecoger)
+                  : "—"}
+            </span>
+            <span className="admin-inicio-ruta-stat-hint">cuotas del día</span>
+          </div>
+          <div className="admin-inicio-jornada-par">
+            <span className="admin-inicio-ruta-stat-label">Recogido</span>
+            <span className="admin-inicio-ruta-stat-value admin-inicio-ruta-stat-value--pos">
+              {jornadaHoy == null
+                ? "…"
+                : Number.isFinite(jornadaHoy.montoRecogido)
+                  ? formatMoneda(jornadaHoy.montoRecogido)
+                  : "—"}
+            </span>
+            <span className="admin-inicio-ruta-stat-hint">cobrado en la jornada</span>
+          </div>
+        </div>
+      ) : null}
       <div className="admin-inicio-ruta-stat">
         <span className="admin-inicio-ruta-stat-icon admin-inicio-metric-icon--violet" aria-hidden>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

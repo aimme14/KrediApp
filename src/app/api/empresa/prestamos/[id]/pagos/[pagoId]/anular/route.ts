@@ -46,6 +46,7 @@ import {
 import { deltaTotalPrestamosActivosPorCambioEstado } from "@/lib/total-prestamos-activos";
 import { withRateLimit } from "@/lib/with-rate-limit";
 import { anularLimiterUser } from "@/lib/rate-limit";
+import { aplicarDeltaJornadaEnTx, jornadaDiaDocRef } from "@/lib/jornada-dia-cache";
 
 const ELEGIBILIDAD_CODES = [
   "PAGO_NO_ACTIVO",
@@ -410,6 +411,14 @@ async function postHandler(
       const rev = calcularReversion({ pago, prestamo, ruta, empleado, modo });
       const nowTx = new Date();
 
+      const fechaPagoTx = fechaDiaCalendarioDesdeISO(pago.fecha.toISOString());
+      const ajustaJornada =
+        pago.tipo === "pago" && rutaId.length > 0 && fechaPagoTx === fechaDiaColombiaHoy();
+      const jornadaSnap =
+        ajustaJornada && fechaPagoTx
+          ? await tx.get(jornadaDiaDocRef(db, empresaId, fechaPagoTx, rutaId))
+          : null;
+
       // ultimoPagoFecha: usa el snapshot guardado en el pago (nuevo), con fallback al query pre-tx (legacy)
       const ultimoPagoFechaAnteriorTx = pd.ultimoPagoFechaAnterior ?? ultimoPagoFechaRestaurar;
 
@@ -453,6 +462,10 @@ async function postHandler(
           cajaEmpleado: rev.nuevaCajaEmpleado,
           ultimaActualizacionCapital: nowTx,
         });
+      }
+
+      if (jornadaSnap) {
+        aplicarDeltaJornadaEnTx(tx, jornadaSnap, -pago.monto);
       }
 
       if (rev.reabrePrestamo) {

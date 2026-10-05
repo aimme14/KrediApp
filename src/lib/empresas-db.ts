@@ -88,3 +88,9 @@ export const WALLET_BALANCES_SUBCOLLECTION = "walletBalances";
 
 /** Registro de operaciones idempotentes por empresa. */
 export const FINANCIAL_OPERATIONS_SUBCOLLECTION = "financialOperations";
+
+/**
+ * Caché de la jornada de cobro por ruta y día (Colombia).
+ * empresas/{empresaId}/jornadaDia/{fechaDia}_{rutaId}
+ */
+export const JORNADA_DIA_SUBCOLLECTION = "jornadaDia";
