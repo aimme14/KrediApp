@@ -147,7 +147,14 @@ async function calcularPayload(
     prestamos.push(prestamoInput(doc.id, doc.data() as Record<string, unknown>));
   }
 
-  const cerradosHoy = [...new Set(pagos.map((p) => p.prestamoId))].filter((id) => !vistos.has(id));
+  const cerradosHoy: string[] = [];
+  const idsPago = new Set<string>();
+  for (let i = 0; i < pagos.length; i += 1) {
+    const prestamoId = pagos[i].prestamoId;
+    if (vistos.has(prestamoId) || idsPago.has(prestamoId)) continue;
+    idsPago.add(prestamoId);
+    cerradosHoy.push(prestamoId);
+  }
   for (let i = 0; i < cerradosHoy.length; i += 100) {
     const refs = cerradosHoy.slice(i, i + 100).map((id) => prestamosCol.doc(id));
     const snaps = await db.getAll(...refs);

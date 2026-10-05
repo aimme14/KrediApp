@@ -64,6 +64,16 @@ export function TrabajadorInicioJornada() {
             {valor(jornada?.montoRecogido)}
           </span>
         </div>
+        <div className="trabajador-inicio-jornada-par">
+          <span className="trabajador-inicio-caja-label">Falta por recoger</span>
+          <span
+            className={`trabajador-inicio-caja-valor ${
+              error || (loading && jornada == null) ? "trabajador-inicio-caja-valor-muted" : ""
+            }`}
+          >
+            {valor(jornada?.montoRestante)}
+          </span>
+        </div>
       </div>
     </section>
   );

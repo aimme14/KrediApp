@@ -8422,8 +8422,8 @@ a.admin-inicio-link-btn {
 .admin-inicio-ruta-stat--jornada {
   grid-column: 1 / -1;
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.75rem;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 0.65rem;
   align-items: start;
 }
 
@@ -10881,8 +10881,8 @@ a.admin-inicio-link-btn {
 
 .trabajador-inicio-jornada-card {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.75rem;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 0.55rem;
   padding: 0.75rem 0.8rem;
   background: var(--card-bg);
   border: 1px solid var(--card-border);

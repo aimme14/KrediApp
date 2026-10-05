@@ -41,7 +41,7 @@ type AdminRutaStatsGridProps = {
   /** Saldo pendiente en préstamos activos de la ruta (Inicio admin). */
   saldoPorRecoger?: number;
   /** Caché de la jornada: cuota del día y lo que falta por cobrar hoy. */
-  jornadaHoy?: { montoARecoger: number; montoRecogido: number } | null;
+  jornadaHoy?: { montoARecoger: number; montoRecogido: number; montoRestante: number } | null;
 };
 
 /** Tarjetas financieras por ruta (Inicio admin, listado Rutas, etc.). */
@@ -83,6 +83,17 @@ export function AdminRutaStatsGrid({
                   : "—"}
             </span>
             <span className="admin-inicio-ruta-stat-hint">cobrado en la jornada</span>
+          </div>
+          <div className="admin-inicio-jornada-par">
+            <span className="admin-inicio-ruta-stat-label">Falta por recoger</span>
+            <span className="admin-inicio-ruta-stat-value">
+              {jornadaHoy == null
+                ? "…"
+                : Number.isFinite(jornadaHoy.montoRestante)
+                  ? formatMoneda(jornadaHoy.montoRestante)
+                  : "—"}
+            </span>
+            <span className="admin-inicio-ruta-stat-hint">de la jornada</span>
           </div>
         </div>
       ) : null}

@@ -288,12 +288,14 @@ export default function AdminDashboardPage() {
                           ? {
                               montoARecoger: jornadaPorRuta[r.id].montoARecoger,
                               montoRecogido: jornadaPorRuta[r.id].montoRecogido,
+                              montoRestante: jornadaPorRuta[r.id].montoRestante,
                             }
                           : jornadaLoading
                             ? null
                             : {
                                 montoARecoger: jornadaError ? Number.NaN : 0,
                                 montoRecogido: jornadaError ? Number.NaN : 0,
+                                montoRestante: jornadaError ? Number.NaN : 0,
                               }
                       }
                     />
