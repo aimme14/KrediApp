@@ -4,7 +4,6 @@ import Link from "next/link";
 
 import { TrabajadorActionIcon } from "@/components/trabajador/TrabajadorActionIcon";
 import { TrabajadorInicioCajaDelDia } from "@/components/trabajador/TrabajadorInicioCajaDelDia";
-import { TrabajadorInicioJornada } from "@/components/trabajador/TrabajadorInicioJornada";
 import { useAuth } from "@/context/AuthContext";
 
 const QUICK_ACTIONS = [
@@ -28,8 +27,6 @@ export default function TrabajadorInicioPage() {
       <header className="trabajador-inicio-header">
         <h1 className="trabajador-inicio-title">Hola, {displayName}</h1>
       </header>
-
-      <TrabajadorInicioJornada />
 
       <TrabajadorInicioCajaDelDia />
 
