@@ -255,8 +255,8 @@ export const ADMIN_HELP_PAGES: Record<AdminHelpPageKey, HelpPageContent> = {
     cautions: [
       "Solo se pueden anular cobros del periodo contable abierto. Al cerrar el periodo ya no podrás anularlos.",
       "Solo se puede anular el cobro más reciente del préstamo. Si hay dos errores, anula primero el más reciente.",
-      "Si el reporte del empleado ya fue aprobado, el cobro en efectivo no se puede anular. Revisa antes de aprobar reportes.",
-      "Los cobros por transferencia se pueden anular aunque el reporte esté aprobado, ya que no pasan por la caja del empleado.",
+      "Si el cobro lo hizo el trabajador y ya quedó dentro de un reporte aceptado, no se puede anular, ni en efectivo ni por transferencia.",
+      "Mientras la entrega siga pendiente, ese cobro del trabajador sí se puede anular. Los cobros del administrador no dependen de esa entrega.",
     ],
     relatedLinks: [
       { label: "Reportes", href: "/dashboard/admin/reportes-dia" },

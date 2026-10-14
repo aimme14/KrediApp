@@ -4,9 +4,13 @@ import {
   determinarModoReversion,
   calcularReversion,
   resolverImpactoReversionPago,
+  cobroBloqueadoPorReporteAceptado,
+  esCobroDeTrabajador,
+  mapRangoReporteAceptado,
   type DatosPago,
   type DatosPrestamo,
   type DatosRuta,
+  type RangoReporteAceptado,
 } from "../anular-pago-prestamo";
 import {
   computeRutaCamposTrasCobroPrestamo,
@@ -413,5 +417,146 @@ describe("calcularReversion — préstamo que se había cerrado", () => {
       modo: "snapshots",
     });
     expect(rev.reabrePrestamo).toBe(false);
+  });
+});
+
+const reporteAceptado: RangoReporteAceptado = {
+  empleadoId: "emp-1",
+  rutaId: "ruta-1",
+  fechaDesde: new Date("2026-10-01T05:00:00.000Z"),
+  fechaHasta: new Date("2026-10-03T20:00:00.000Z"),
+  fechaDia: "2026-10-03",
+};
+
+describe("cobro bloqueado por reporte aceptado", () => {
+  const dentro = new Date("2026-10-02T18:00:00.000Z");
+
+  it("bloquea efectivo y transferencia del trabajador si el cobro cae en el periodo aceptado", () => {
+    expect(
+      cobroBloqueadoPorReporteAceptado({
+        cobradoPorRol: "empleado",
+        empleadoId: "emp-1",
+        rutaId: "ruta-1",
+        adminUid: "admin-1",
+        fechaPago: dentro,
+        reportes: [reporteAceptado],
+      })
+    ).toBe(true);
+    expect(
+      cobroBloqueadoPorReporteAceptado({
+        cobradoPorRol: "trabajador",
+        empleadoId: "emp-1",
+        rutaId: "ruta-1",
+        adminUid: "admin-1",
+        fechaPago: dentro,
+        reportes: [reporteAceptado],
+      })
+    ).toBe(true);
+  });
+
+  it("deja anular si el reporte sigue sin aceptarse", () => {
+    expect(
+      cobroBloqueadoPorReporteAceptado({
+        cobradoPorRol: "empleado",
+        empleadoId: "emp-1",
+        rutaId: "ruta-1",
+        adminUid: "admin-1",
+        fechaPago: dentro,
+        reportes: [],
+      })
+    ).toBe(false);
+  });
+
+  it("deja anular un cobro del trabajador fuera del periodo aceptado", () => {
+    expect(
+      cobroBloqueadoPorReporteAceptado({
+        cobradoPorRol: "empleado",
+        empleadoId: "emp-1",
+        rutaId: "ruta-1",
+        adminUid: "admin-1",
+        fechaPago: new Date("2026-10-04T15:00:00.000Z"),
+        reportes: [reporteAceptado],
+      })
+    ).toBe(false);
+  });
+
+  it("no bloquea cobros del administrador aunque exista un reporte del trabajador", () => {
+    expect(esCobroDeTrabajador({ cobradoPorRol: "admin", empleadoId: "admin-1", adminUid: "admin-1" })).toBe(
+      false
+    );
+    expect(
+      cobroBloqueadoPorReporteAceptado({
+        cobradoPorRol: "admin",
+        empleadoId: "admin-1",
+        rutaId: "ruta-1",
+        adminUid: "admin-1",
+        fechaPago: dentro,
+        reportes: [reporteAceptado],
+      })
+    ).toBe(false);
+  });
+
+  it("ignora el reporte de otro trabajador o de otra ruta", () => {
+    expect(
+      cobroBloqueadoPorReporteAceptado({
+        cobradoPorRol: "empleado",
+        empleadoId: "emp-2",
+        rutaId: "ruta-1",
+        adminUid: "admin-1",
+        fechaPago: dentro,
+        reportes: [reporteAceptado],
+      })
+    ).toBe(false);
+    expect(
+      cobroBloqueadoPorReporteAceptado({
+        cobradoPorRol: "empleado",
+        empleadoId: "emp-1",
+        rutaId: "ruta-2",
+        adminUid: "admin-1",
+        fechaPago: dentro,
+        reportes: [reporteAceptado],
+      })
+    ).toBe(false);
+  });
+
+  it("trata como trabajador un cobro legacy cuyo empleado no es el admin", () => {
+    expect(
+      esCobroDeTrabajador({ cobradoPorRol: null, empleadoId: "emp-1", adminUid: "admin-1" })
+    ).toBe(true);
+    expect(
+      esCobroDeTrabajador({ cobradoPorRol: null, empleadoId: "admin-1", adminUid: "admin-1" })
+    ).toBe(false);
+  });
+
+  it("en reportes viejos sin rango usa la fecha del día", () => {
+    const legacy = mapRangoReporteAceptado({
+      empleadoId: "emp-1",
+      rutaId: "ruta-1",
+      fechaDia: "2026-10-02",
+    });
+    expect(legacy.fechaDesde).toBeNull();
+    expect(
+      cobroBloqueadoPorReporteAceptado({
+        cobradoPorRol: "empleado",
+        empleadoId: "emp-1",
+        rutaId: "ruta-1",
+        adminUid: "admin-1",
+        fechaPago: dentro,
+        reportes: [legacy],
+      })
+    ).toBe(true);
+  });
+
+  it("no usa la fecha del día si el rango existe y el cobro quedó fuera", () => {
+    expect(
+      cobroBloqueadoPorReporteAceptado({
+        cobradoPorRol: "empleado",
+        empleadoId: "emp-1",
+        rutaId: "ruta-1",
+        adminUid: "admin-1",
+        fechaPago: new Date("2026-10-03T21:00:00.000Z"),
+        reportes: [{ ...reporteAceptado, fechaDia: "2026-10-03" }],
+      })
+    ).toBe(false);
   });
 });

@@ -1,6 +1,15 @@
 import { round2, snapPesoCOP } from "@/lib/ruta-financiera-admin";
 import { computeCapitalTotalRutaDesdeSaldos } from "@/lib/capital-formulas";
 
+export {
+  VENTANA_MS_REPORTES_ANULACION,
+  cobroBloqueadoPorReporteAceptado,
+  esCobroDeTrabajador,
+  mapRangoReporteAceptado,
+  pagoCaeEnReporteAceptado,
+  type RangoReporteAceptado,
+} from "@/lib/cobro-reporte-aceptado";
+
 export type AnulacionElegibilidadError =
   | "PAGO_NO_ACTIVO"
   | "PAGO_TIPO_INVALIDO"
@@ -251,7 +260,7 @@ export function mensajeElegibilidad(error: AnulacionElegibilidadError): string {
     case "SIN_SNAPSHOTS_NI_FALLBACK":
       return "Este pago no tiene suficiente información para ser anulado. Contacta soporte.";
     case "REPORTE_APROBADO":
-      return "El reporte del día ya fue aprobado. La anulación de pagos en reportes cerrados estará disponible próximamente.";
+      return "Este cobro lo hizo el trabajador y ya quedó dentro de un reporte aceptado. No se puede anular.";
     case "PRESTAMO_DESCUADRADO":
       return "El préstamo cambió después de este cobro. No se puede anular de forma segura.";
   }

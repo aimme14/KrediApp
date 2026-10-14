@@ -27,6 +27,7 @@ import { upsertCapitalRutaSnapshot } from "@/lib/capital-ruta-snapshot";
 import {
   fechaDiaColombiaHoy,
   fechaDiaCalendarioDesdeISO,
+  inicioDiaColombiaUtc,
 } from "@/lib/colombia-day-bounds";
 import { gastoOcurreEnRangoContable } from "@/lib/gastos-periodo-filter";
 import { isAdminPanelApiUser } from "@/lib/admin-panel-role";
@@ -37,6 +38,10 @@ import {
   calcularReversion,
   mensajeElegibilidad,
   inferirAcreditaCajaRuta,
+  cobroBloqueadoPorReporteAceptado,
+  esCobroDeTrabajador,
+  mapRangoReporteAceptado,
+  VENTANA_MS_REPORTES_ANULACION,
   type DatosPago,
   type DatosPrestamo,
   type DatosRuta,
@@ -132,23 +137,81 @@ async function obtenerRangoPeriodoAbiertoAdmin(
   return buildRangoDesdeQuerySnap(snap);
 }
 
-async function existeReporteAprobadoParaEmpleado(
-  empresaId: string,
-  empleadoUid: string,
-  fechaDia: string,
-  adminUid: string
-): Promise<boolean> {
-  const db = getAdminFirestore();
-  const snap = await db
+function rutaIdDePagoYPrestamo(
+  pago: Record<string, unknown>,
+  prestamo: Record<string, unknown>
+): string {
+  const desdePago = typeof pago.rutaId === "string" ? pago.rutaId.trim() : "";
+  if (desdePago) return desdePago;
+  return typeof prestamo.rutaId === "string" ? prestamo.rutaId.trim() : "";
+}
+
+/**
+ * Cobro del trabajador cuyo instante cae en un reporte ya aceptado.
+ * La ventana usa el índice empleadoId + rutaId + adminId + fecha.
+ */
+async function cobroCubiertoPorReporteAceptado(params: {
+  db: FirebaseFirestore.Firestore;
+  tx?: FirebaseFirestore.Transaction;
+  empresaId: string;
+  adminUid: string;
+  pagoRaw: Record<string, unknown>;
+  prestamoRaw: Record<string, unknown>;
+  fechaPago: Date;
+  fechaDia: string;
+}): Promise<boolean> {
+  const empleadoId =
+    typeof params.pagoRaw.empleadoId === "string" ? params.pagoRaw.empleadoId.trim() : "";
+  const cobradoPorRol =
+    typeof params.pagoRaw.cobradoPorRol === "string" ? params.pagoRaw.cobradoPorRol : null;
+  const rutaId = rutaIdDePagoYPrestamo(params.pagoRaw, params.prestamoRaw);
+
+  if (
+    !esCobroDeTrabajador({
+      cobradoPorRol,
+      empleadoId,
+      adminUid: params.adminUid,
+    }) ||
+    !empleadoId
+  ) {
+    return false;
+  }
+
+  const inicio = inicioDiaColombiaUtc(params.fechaDia) ?? params.fechaPago;
+  const fin = new Date(inicio.getTime() + VENTANA_MS_REPORTES_ANULACION);
+  const col = params.db
     .collection(EMPRESAS_COLLECTION)
-    .doc(empresaId)
-    .collection(REPORTES_DIA_SUBCOLLECTION)
-    .where("empleadoId", "==", empleadoUid)
-    .where("fechaDia", "==", fechaDia)
-    .where("adminId", "==", adminUid)
-    .limit(1)
-    .get();
-  return !snap.empty;
+    .doc(params.empresaId)
+    .collection(REPORTES_DIA_SUBCOLLECTION);
+
+  const q = rutaId
+    ? col
+        .where("empleadoId", "==", empleadoId)
+        .where("rutaId", "==", rutaId)
+        .where("adminId", "==", params.adminUid)
+        .where("fecha", ">=", Timestamp.fromDate(inicio))
+        .where("fecha", "<=", Timestamp.fromDate(fin))
+        .orderBy("fecha", "desc")
+    : col
+        .where("adminId", "==", params.adminUid)
+        .where("fecha", ">=", Timestamp.fromDate(inicio))
+        .where("fecha", "<=", Timestamp.fromDate(fin))
+        .orderBy("fecha", "asc")
+        .limit(200);
+
+  const snap = params.tx ? await params.tx.get(q) : await q.get();
+  const reportes = snap.docs.map((d) =>
+    mapRangoReporteAceptado(d.data() as Record<string, unknown>)
+  );
+
+  return cobroBloqueadoPorReporteAceptado({
+    cobradoPorRol,
+    empleadoId,
+    rutaId,
+    adminUid: params.adminUid,
+    fechaPago: params.fechaPago,
+    reportes,
+  });
 }
 
 async function postHandler(
@@ -258,16 +321,17 @@ async function postHandler(
   const ultimoPagoFechaRestaurar =
     pagosActivos.length > 1 ? (pagosActivos[1].data().fecha ?? null) : null;
 
-  if (!pagoPre.acreditaCajaRuta && pagoPre.empleadoId) {
-    const reporteAprobado = await existeReporteAprobadoParaEmpleado(
-      empresaId,
-      pagoPre.empleadoId,
-      fechaDiaPago ?? hoy,
-      apiUser.uid
-    );
-    if (reporteAprobado) {
-      return finalize(409, { error: mensajeElegibilidad("REPORTE_APROBADO") });
-    }
+  const cubiertoPorReporte = await cobroCubiertoPorReporteAceptado({
+    db,
+    empresaId,
+    adminUid: apiUser.uid,
+    pagoRaw: pagoPreSnap.data() as Record<string, unknown>,
+    prestamoRaw: prestamoPre as Record<string, unknown>,
+    fechaPago: pagoPre.fecha,
+    fechaDia: fechaDiaPago ?? hoy,
+  });
+  if (cubiertoPorReporte) {
+    return finalize(409, { error: mensajeElegibilidad("REPORTE_APROBADO") });
   }
 
   try {
@@ -307,21 +371,16 @@ async function postHandler(
           rangoPeriodoAbiertoTx.hasta
         );
 
-      // ── Re-check reporte dentro de tx (solo para cobros de empleado en efectivo) ──
-      let reporteAprobadoTx = false;
-      if (!pago.acreditaCajaRuta && pago.empleadoId) {
-        // Nota: requiere índice compuesto (empleadoId, fechaDia, adminId) en reportes_dia
-        const reporteQueryTx = db
-          .collection(EMPRESAS_COLLECTION)
-          .doc(empresaId)
-          .collection(REPORTES_DIA_SUBCOLLECTION)
-          .where("empleadoId", "==", pago.empleadoId)
-          .where("fechaDia", "==", fechaDiaPago ?? hoy)
-          .where("adminId", "==", apiUser.uid)
-          .limit(1);
-        const reporteSnapTx = await tx.get(reporteQueryTx);
-        reporteAprobadoTx = !reporteSnapTx.empty;
-      }
+      const reporteAprobadoTx = await cobroCubiertoPorReporteAceptado({
+        db,
+        tx,
+        empresaId,
+        adminUid: apiUser.uid,
+        pagoRaw: pd as Record<string, unknown>,
+        prestamoRaw: pr as Record<string, unknown>,
+        fechaPago: pago.fecha,
+        fechaDia: fechaDiaPago ?? hoy,
+      });
 
       // ── Verificar último pago dentro de tx usando ultimoPagoId (O(1) para préstamos nuevos) ──
       const ultimoPagoIdEnPrestamo =

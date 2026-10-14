@@ -16,6 +16,12 @@ import {
   parseFechaDiaColombia,
 } from "@/lib/colombia-day-bounds";
 import { pagoOcurreEnPeriodoAbierto } from "@/lib/gastos-periodo-filter";
+import {
+  cobroBloqueadoPorReporteAceptado,
+  esCobroDeTrabajador,
+  type RangoReporteAceptado,
+} from "@/lib/cobro-reporte-aceptado";
+import { useReportesAceptadosAdmin } from "@/hooks/useReportesAceptadosAdmin";
 import { isAdminPanelRole } from "@/lib/admin-panel-role";
 import {
   formatFechaImpresionPagosDiarios,
@@ -56,6 +62,7 @@ export default function PagosDiariosPageContent() {
   const [filtroRutaId, setFiltroRutaId] = useState("");
   const [filtroNombre, setFiltroNombre] = useState("");
   const { pagos, loading, error } = usePagosDiariosAdmin(fechaBusqueda);
+  const { reportes, listos: reportesListos } = useReportesAceptadosAdmin(fechaBusqueda);
   const [modal, setModal] = useState<EstadoModal>({ abierto: false });
   const [nombreEmpresa, setNombreEmpresa] = useState("");
   const [periodos, setPeriodos] = useState<PeriodoAdminListaItem[]>([]);
@@ -427,6 +434,9 @@ export default function PagosDiariosPageContent() {
                       key={`${item.prestamoId}-${item.id}`}
                       item={item}
                       periodos={periodos}
+                      reportes={reportes}
+                      reportesListos={reportesListos}
+                      adminUid={user?.uid ?? ""}
                       onAnular={abrirModal}
                     />
                   ))}
@@ -451,6 +461,9 @@ export default function PagosDiariosPageContent() {
                       key={`${item.prestamoId}-${item.id}`}
                       item={item}
                       periodos={periodos}
+                      reportes={reportes}
+                      reportesListos={reportesListos}
+                      adminUid={user?.uid ?? ""}
                       onAnular={abrirModal}
                     />
                   ))}
@@ -501,19 +514,41 @@ function TarjetaResumen({
 function PagoDiarioRow({
   item,
   periodos,
+  reportes,
+  reportesListos,
+  adminUid,
   onAnular,
 }: {
   item: PagoDiarioAdminItem;
   periodos: PeriodoAdminListaItem[];
+  reportes: RangoReporteAceptado[];
+  reportesListos: boolean;
+  adminUid: string;
   onAnular: (item: PagoDiarioAdminItem) => void;
 }) {
   const anulado = item.estado === "anulado";
+  const esTrabajador = esCobroDeTrabajador({
+    cobradoPorRol: item.cobradoPorRol,
+    empleadoId: item.empleadoId,
+    adminUid,
+  });
+  const bloqueadoPorReporte =
+    reportesListos &&
+    cobroBloqueadoPorReporteAceptado({
+      cobradoPorRol: item.cobradoPorRol,
+      empleadoId: item.empleadoId,
+      rutaId: item.rutaId,
+      adminUid,
+      fechaPago: item.fecha ? new Date(item.fecha) : null,
+      reportes,
+    });
 
   const esAnulableEnPeriodo =
     item.tipo === "pago" &&
     !anulado &&
     item.fecha !== null &&
-    pagoOcurreEnPeriodoAbierto(item.fecha, periodos);
+    pagoOcurreEnPeriodoAbierto(item.fecha, periodos) &&
+    (!esTrabajador || (reportesListos && !bloqueadoPorReporte));
 
   const monto =
     item.tipo === "pago"
