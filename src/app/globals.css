@@ -10868,40 +10868,6 @@ a.admin-inicio-link-btn {
   margin-bottom: 0.35rem;
 }
 
-.trabajador-inicio-date {
-  margin: 0 0 0.45rem;
-  font-size: 0.78rem;
-  color: var(--text-muted);
-  text-transform: capitalize;
-}
-
-.trabajador-inicio-jornada {
-  margin-bottom: 0.65rem;
-}
-
-.trabajador-inicio-jornada-card {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: 0.55rem;
-  padding: 0.75rem 0.8rem;
-  background: var(--card-bg);
-  border: 1px solid var(--card-border);
-  border-radius: 11px;
-  min-width: 0;
-}
-
-.trabajador-inicio-jornada-par {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.3rem;
-}
-
-.trabajador-inicio-jornada-card .trabajador-inicio-caja-valor {
-  font-size: 1.05rem;
-}
-
 .trabajador-inicio-caja-card {
   display: flex;
   flex-direction: column;
