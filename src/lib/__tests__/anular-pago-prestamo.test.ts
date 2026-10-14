@@ -3,6 +3,7 @@ import {
   validarCoherenciaPrestamoConPago,
   determinarModoReversion,
   calcularReversion,
+  saldoPendienteTrasAnulacion,
   resolverImpactoReversionPago,
   cobroBloqueadoPorReporteAceptado,
   esCobroDeTrabajador,
@@ -55,8 +56,7 @@ describe("validarElegibilidadAnulacion", () => {
     expect(
       validarElegibilidadAnulacion({
         pago: pagoBase,
-        enPeriodoAbierto: true,
-        esUltimoPago: true,
+        enPeriodoCerrado: false,
         reporteAprobado: false,
       })
     ).toBeNull();
@@ -66,8 +66,7 @@ describe("validarElegibilidadAnulacion", () => {
     expect(
       validarElegibilidadAnulacion({
         pago: { ...pagoBase, estado: "anulado" },
-        enPeriodoAbierto: true,
-        esUltimoPago: true,
+        enPeriodoCerrado: false,
         reporteAprobado: false,
       })
     ).toBe("PAGO_NO_ACTIVO");
@@ -77,44 +76,64 @@ describe("validarElegibilidadAnulacion", () => {
     expect(
       validarElegibilidadAnulacion({
         pago: { ...pagoBase, tipo: "no_pago" },
-        enPeriodoAbierto: true,
-        esUltimoPago: true,
+        enPeriodoCerrado: false,
         reporteAprobado: false,
       })
     ).toBe("PAGO_TIPO_INVALIDO");
   });
 
-  it("rechaza pago fuera del periodo abierto", () => {
+  it("permite anular sin periodo abierto y aunque no sea el último cobro", () => {
     expect(
       validarElegibilidadAnulacion({
         pago: pagoBase,
-        enPeriodoAbierto: false,
-        esUltimoPago: true,
+        enPeriodoCerrado: false,
         reporteAprobado: false,
       })
-    ).toBe("PAGO_FUERA_DE_PERIODO_ABIERTO");
+    ).toBeNull();
   });
 
-  it("rechaza si no es el último pago", () => {
+  it("rechaza un cobro que cae en un periodo cerrado", () => {
     expect(
       validarElegibilidadAnulacion({
         pago: pagoBase,
-        enPeriodoAbierto: true,
-        esUltimoPago: false,
+        enPeriodoCerrado: true,
         reporteAprobado: false,
       })
-    ).toBe("PAGO_NO_ES_ULTIMO");
+    ).toBe("PAGO_EN_PERIODO_CERRADO");
   });
 
   it("rechaza si el reporte ya fue aprobado", () => {
     expect(
       validarElegibilidadAnulacion({
         pago: pagoBase,
-        enPeriodoAbierto: true,
-        esUltimoPago: true,
+        enPeriodoCerrado: false,
         reporteAprobado: true,
       })
     ).toBe("REPORTE_APROBADO");
+  });
+});
+
+describe("saldoPendienteTrasAnulacion", () => {
+  it("restaura el saldo anterior cuando el cobro es el último", () => {
+    expect(
+      saldoPendienteTrasAnulacion({
+        saldoActual: 150_000,
+        pago: pagoBase,
+        esUltimoPago: true,
+        modo: "snapshots",
+      })
+    ).toBe(200_000);
+  });
+
+  it("suma solo lo descontado por ese cobro si hay cobros posteriores", () => {
+    expect(
+      saldoPendienteTrasAnulacion({
+        saldoActual: 80_000,
+        pago: pagoBase,
+        esUltimoPago: false,
+        modo: "snapshots",
+      })
+    ).toBe(130_000);
   });
 });
 

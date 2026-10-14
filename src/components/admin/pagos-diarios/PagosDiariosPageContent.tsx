@@ -15,7 +15,7 @@ import {
   fechaDiaColombiaHoy,
   parseFechaDiaColombia,
 } from "@/lib/colombia-day-bounds";
-import { pagoOcurreEnPeriodoAbierto } from "@/lib/gastos-periodo-filter";
+import { pagoCaeEnPeriodoCerrado } from "@/lib/gastos-periodo-filter";
 import {
   cobroBloqueadoPorReporteAceptado,
   esCobroDeTrabajador,
@@ -66,6 +66,7 @@ export default function PagosDiariosPageContent() {
   const [modal, setModal] = useState<EstadoModal>({ abierto: false });
   const [nombreEmpresa, setNombreEmpresa] = useState("");
   const [periodos, setPeriodos] = useState<PeriodoAdminListaItem[]>([]);
+  const [periodosListos, setPeriodosListos] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -74,10 +75,16 @@ export default function PagosDiariosPageContent() {
       .getIdToken()
       .then((token) => listPeriodosAdmin(token))
       .then((list) => {
-        if (!cancelled) setPeriodos(list);
+        if (!cancelled) {
+          setPeriodos(list);
+          setPeriodosListos(true);
+        }
       })
       .catch(() => {
-        if (!cancelled) setPeriodos([]);
+        if (!cancelled) {
+          setPeriodos([]);
+          setPeriodosListos(true);
+        }
       });
     return () => {
       cancelled = true;
@@ -434,6 +441,7 @@ export default function PagosDiariosPageContent() {
                       key={`${item.prestamoId}-${item.id}`}
                       item={item}
                       periodos={periodos}
+                      periodosListos={periodosListos}
                       reportes={reportes}
                       reportesListos={reportesListos}
                       adminUid={user?.uid ?? ""}
@@ -461,6 +469,7 @@ export default function PagosDiariosPageContent() {
                       key={`${item.prestamoId}-${item.id}`}
                       item={item}
                       periodos={periodos}
+                      periodosListos={periodosListos}
                       reportes={reportes}
                       reportesListos={reportesListos}
                       adminUid={user?.uid ?? ""}
@@ -514,6 +523,7 @@ function TarjetaResumen({
 function PagoDiarioRow({
   item,
   periodos,
+  periodosListos,
   reportes,
   reportesListos,
   adminUid,
@@ -521,6 +531,7 @@ function PagoDiarioRow({
 }: {
   item: PagoDiarioAdminItem;
   periodos: PeriodoAdminListaItem[];
+  periodosListos: boolean;
   reportes: RangoReporteAceptado[];
   reportesListos: boolean;
   adminUid: string;
@@ -542,12 +553,14 @@ function PagoDiarioRow({
       fechaPago: item.fecha ? new Date(item.fecha) : null,
       reportes,
     });
+  const enPeriodoCerrado = item.fecha ? pagoCaeEnPeriodoCerrado(item.fecha, periodos) : false;
 
   const esAnulableEnPeriodo =
     item.tipo === "pago" &&
     !anulado &&
     item.fecha !== null &&
-    pagoOcurreEnPeriodoAbierto(item.fecha, periodos) &&
+    periodosListos &&
+    !enPeriodoCerrado &&
     (!esTrabajador || (reportesListos && !bloqueadoPorReporte));
 
   const monto =

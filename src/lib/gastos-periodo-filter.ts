@@ -123,6 +123,25 @@ export function periodoAbiertoAdmin(
   return periodos.find((p) => p.estado === "abierto") ?? null;
 }
 
+/**
+ * True si la fecha del cobro cae en algún periodo ya cerrado.
+ * Sin periodos, o con solo un periodo abierto, no bloquea.
+ */
+export function pagoCaeEnPeriodoCerrado(
+  fechaIso: string | null | undefined,
+  periodos: PeriodoAdminListaItem[]
+): boolean {
+  if (!fechaIso) return false;
+  for (const periodo of periodos) {
+    if (periodo.estado !== "cerrado" || !periodo.fechaApertura || !periodo.fechaCierre) continue;
+    const desde = fechaDesdeIso(periodo.fechaApertura);
+    const hasta = fechaDesdeIso(periodo.fechaCierre);
+    if (!desde || !hasta) continue;
+    if (gastoOcurreEnRangoContable(fechaIso, desde, hasta)) return true;
+  }
+  return false;
+}
+
 /** True si la fecha del cobro cae dentro del periodo contable abierto del admin. */
 export function pagoOcurreEnPeriodoAbierto(
   fechaIso: string | null | undefined,

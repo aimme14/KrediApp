@@ -244,7 +244,7 @@ export const ADMIN_HELP_PAGES: Record<AdminHelpPageKey, HelpPageContent> = {
   "pagos-diarios": {
     title: "Pagos diarios",
     summary:
-      "Vista en tiempo real de todos los cobros registrados en el día, por empleados y por ti. Desde aquí puedes anular un cobro erróneo o duplicado mientras el periodo contable siga abierto.",
+      "Vista en tiempo real de todos los cobros registrados en el día, por empleados y por ti. Desde aquí puedes anular un cobro erróneo o duplicado, salvo que pertenezca a un periodo contable cerrado o a un reporte de trabajador ya aceptado.",
     steps: [
       "Selecciona la fecha para ver los movimientos de ese día.",
       "Todos los cobros del día aparecen en la lista con cliente, ruta, método de pago y quién lo registró (trabajador o administrador).",
@@ -253,8 +253,8 @@ export const ADMIN_HELP_PAGES: Record<AdminHelpPageKey, HelpPageContent> = {
       "El saldo del préstamo, la caja del empleado y las tarjetas de ruta se corrigen automáticamente.",
     ],
     cautions: [
-      "Solo se pueden anular cobros del periodo contable abierto. Al cerrar el periodo ya no podrás anularlos.",
-      "Solo se puede anular el cobro más reciente del préstamo. Si hay dos errores, anula primero el más reciente.",
+      "No hace falta tener un periodo abierto para anular. Si el cobro cae en un periodo ya cerrado, no se puede anular, ni del administrador ni del trabajador.",
+      "Se puede anular un cobro anterior aunque el préstamo tenga cobros más nuevos.",
       "Si el cobro lo hizo el trabajador y ya quedó dentro de un reporte aceptado, no se puede anular, ni en efectivo ni por transferencia.",
       "Mientras la entrega siga pendiente, ese cobro del trabajador sí se puede anular. Los cobros del administrador no dependen de esa entrega.",
     ],

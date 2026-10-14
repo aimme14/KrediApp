@@ -29,13 +29,15 @@ import {
   fechaDiaCalendarioDesdeISO,
   inicioDiaColombiaUtc,
 } from "@/lib/colombia-day-bounds";
-import { gastoOcurreEnRangoContable } from "@/lib/gastos-periodo-filter";
+import { pagoCaeEnPeriodoCerrado } from "@/lib/gastos-periodo-filter";
+import type { PeriodoAdminListaItem } from "@/lib/empresa-api";
 import { isAdminPanelApiUser } from "@/lib/admin-panel-role";
 import {
   validarElegibilidadAnulacion,
   validarCoherenciaPrestamoConPago,
   determinarModoReversion,
   calcularReversion,
+  saldoPendienteTrasAnulacion,
   mensajeElegibilidad,
   inferirAcreditaCajaRuta,
   cobroBloqueadoPorReporteAceptado,
@@ -57,6 +59,7 @@ const ELEGIBILIDAD_CODES = [
   "PAGO_NO_ACTIVO",
   "PAGO_TIPO_INVALIDO",
   "PAGO_FUERA_DE_PERIODO_ABIERTO",
+  "PAGO_EN_PERIODO_CERRADO",
   "PAGO_NO_ES_ULTIMO",
   "SIN_SNAPSHOTS_NI_FALLBACK",
   "REPORTE_APROBADO",
@@ -105,36 +108,37 @@ function mapDatosPago(pd: Record<string, unknown>): DatosPago {
   };
 }
 
-/** Extrae el rango [fechaApertura, ahora] de un QuerySnapshot de periodos. */
-function buildRangoDesdeQuerySnap(
-  snap: FirebaseFirestore.QuerySnapshot
-): { desde: Date; hasta: Date } | null {
-  if (snap.empty) return null;
-  const fechaAperturaRaw = snap.docs[0].data().fechaApertura;
-  const desde =
-    fechaAperturaRaw instanceof Timestamp
-      ? fechaAperturaRaw.toDate()
-      : fechaAperturaRaw instanceof Date
-        ? fechaAperturaRaw
-        : null;
-  if (!desde) return null;
-  return { desde, hasta: new Date() };
+function isoDesdeFirestore(value: unknown): string | null {
+  if (value instanceof Timestamp) return value.toDate().toISOString();
+  if (value instanceof Date) return Number.isFinite(value.getTime()) ? value.toISOString() : null;
+  if (typeof value === "string" && value.trim()) return value;
+  return null;
 }
 
-async function obtenerRangoPeriodoAbiertoAdmin(
+function periodosDesdeSnap(snap: FirebaseFirestore.QuerySnapshot): PeriodoAdminListaItem[] {
+  return snap.docs.map((d) => {
+    const data = d.data();
+    return {
+      id: d.id,
+      estado: data.estado === "cerrado" ? "cerrado" : "abierto",
+      fechaApertura: isoDesdeFirestore(data.fechaApertura),
+      fechaCierre: isoDesdeFirestore(data.fechaCierre),
+      abiertoPorUid: typeof data.abiertoPorUid === "string" ? data.abiertoPorUid : "",
+      cerradoPorUid: typeof data.cerradoPorUid === "string" ? data.cerradoPorUid : null,
+    };
+  });
+}
+
+function queryPeriodosAdmin(
+  db: FirebaseFirestore.Firestore,
   empresaId: string,
   adminUid: string
-): Promise<{ desde: Date; hasta: Date } | null> {
-  const db = getAdminFirestore();
-  const snap = await db
+): FirebaseFirestore.Query {
+  return db
     .collection(EMPRESAS_COLLECTION)
     .doc(empresaId)
     .collection(PERIODOS_ADMIN_SUBCOLLECTION)
-    .where("adminId", "==", adminUid)
-    .where("estado", "==", "abierto")
-    .limit(1)
-    .get();
-  return buildRangoDesdeQuerySnap(snap);
+    .where("adminId", "==", adminUid);
 }
 
 function rutaIdDePagoYPrestamo(
@@ -291,17 +295,9 @@ async function postHandler(
   const pagoPre = mapDatosPago(pagoPreSnap.data() as Record<string, unknown>);
   const fechaDiaPago = fechaDiaCalendarioDesdeISO(pagoPre.fecha.toISOString());
 
-  const rangoPeriodoAbierto = await obtenerRangoPeriodoAbiertoAdmin(empresaId, apiUser.uid);
-  const enPeriodoAbierto =
-    rangoPeriodoAbierto !== null &&
-    gastoOcurreEnRangoContable(
-      pagoPre.fecha.toISOString(),
-      rangoPeriodoAbierto.desde,
-      rangoPeriodoAbierto.hasta
-    );
-
-  if (!enPeriodoAbierto) {
-    return finalize(409, { error: mensajeElegibilidad("PAGO_FUERA_DE_PERIODO_ABIERTO") });
+  const periodosPreSnap = await queryPeriodosAdmin(db, empresaId, apiUser.uid).get();
+  if (pagoCaeEnPeriodoCerrado(pagoPre.fecha.toISOString(), periodosDesdeSnap(periodosPreSnap))) {
+    return finalize(409, { error: mensajeElegibilidad("PAGO_EN_PERIODO_CERRADO") });
   }
 
   const pagosActivosSnap = await prestamoRef
@@ -314,12 +310,11 @@ async function postHandler(
   const pagosActivos = pagosActivosSnap.docs.filter(
     (d) => (d.data().estado ?? "activo") !== "anulado"
   );
-  if (pagosActivos.length === 0 || pagosActivos[0].id !== pagoId) {
-    return finalize(409, { error: mensajeElegibilidad("PAGO_NO_ES_ULTIMO") });
-  }
-
+  const indiceEstePago = pagosActivos.findIndex((d) => d.id === pagoId);
   const ultimoPagoFechaRestaurar =
-    pagosActivos.length > 1 ? (pagosActivos[1].data().fecha ?? null) : null;
+    indiceEstePago === 0 && pagosActivos.length > 1
+      ? (pagosActivos[1].data().fecha ?? null)
+      : null;
 
   const cubiertoPorReporte = await cobroCubiertoPorReporteAceptado({
     db,
@@ -353,23 +348,11 @@ async function postHandler(
         fechaCierre: pr.fechaCierre ?? null,
       };
 
-      // ── Re-read open period inside tx (elimina TOCTOU sobre el periodo) ──
-      const periodoQueryTx = db
-        .collection(EMPRESAS_COLLECTION)
-        .doc(empresaId)
-        .collection(PERIODOS_ADMIN_SUBCOLLECTION)
-        .where("adminId", "==", apiUser.uid)
-        .where("estado", "==", "abierto")
-        .limit(1);
-      const periodoSnapTx = await tx.get(periodoQueryTx);
-      const rangoPeriodoAbiertoTx = buildRangoDesdeQuerySnap(periodoSnapTx);
-      const enPeriodoAbiertoTx =
-        rangoPeriodoAbiertoTx !== null &&
-        gastoOcurreEnRangoContable(
-          pago.fecha.toISOString(),
-          rangoPeriodoAbiertoTx.desde,
-          rangoPeriodoAbiertoTx.hasta
-        );
+      const periodosSnapTx = await tx.get(queryPeriodosAdmin(db, empresaId, apiUser.uid));
+      const enPeriodoCerradoTx = pagoCaeEnPeriodoCerrado(
+        pago.fecha.toISOString(),
+        periodosDesdeSnap(periodosSnapTx)
+      );
 
       const reporteAprobadoTx = await cobroCubiertoPorReporteAceptado({
         db,
@@ -382,18 +365,9 @@ async function postHandler(
         fechaDia: fechaDiaPago ?? hoy,
       });
 
-      // ── Verificar último pago dentro de tx usando ultimoPagoId (O(1) para préstamos nuevos) ──
-      const ultimoPagoIdEnPrestamo =
-        typeof pr.ultimoPagoId === "string" ? pr.ultimoPagoId : null;
-      const esUltimoPagoTx =
-        ultimoPagoIdEnPrestamo !== null
-          ? ultimoPagoIdEnPrestamo === pagoId
-          : true; // Legacy: préstamos sin ultimoPagoId → confiar en el chequeo pre-tx
-
       const elegibilidadError = validarElegibilidadAnulacion({
         pago,
-        enPeriodoAbierto: enPeriodoAbiertoTx,
-        esUltimoPago: esUltimoPagoTx,
+        enPeriodoCerrado: enPeriodoCerradoTx,
         reporteAprobado: reporteAprobadoTx,
       });
       if (elegibilidadError) {
@@ -407,8 +381,15 @@ async function postHandler(
         throw new Error("SIN_SNAPSHOTS_NI_FALLBACK");
       }
 
+      const ultimoPagoIdEnPrestamo =
+        typeof pr.ultimoPagoId === "string" ? pr.ultimoPagoId : null;
       const coherenciaError = validarCoherenciaPrestamoConPago(prestamo, pago, modo);
-      if (coherenciaError) {
+      const esUltimoPagoTx =
+        ultimoPagoIdEnPrestamo !== null
+          ? ultimoPagoIdEnPrestamo === pagoId
+          : coherenciaError === null;
+
+      if (esUltimoPagoTx && coherenciaError) {
         throw new Error(coherenciaError);
       }
 
@@ -489,18 +470,27 @@ async function postHandler(
         reversionModo: modo,
       });
 
+      const saldoPendienteAnulado = saldoPendienteTrasAnulacion({
+        saldoActual: prestamo.saldoPendiente,
+        pago,
+        esUltimoPago: esUltimoPagoTx,
+        modo,
+      });
+      const reabrePrestamo = esUltimoPagoTx && rev.reabrePrestamo;
       const prestamoUpdate: Record<string, unknown> = {
-        saldoPendiente: rev.nuevoSaldoPendiente,
-        adelantoCuota: rev.nuevoAdelantoCuota,
-        estado: rev.nuevoEstadoPrestamo,
+        saldoPendiente: saldoPendienteAnulado,
         updatedAt: nowTx,
-        intentosFallidos: rev.intentosFallidosRestaurados,
-        ultimoPagoFecha: ultimoPagoFechaAnteriorTx ?? FieldValue.delete(),
-        ultimoPagoId: pago.ultimoPagoIdAnterior ?? FieldValue.delete(),
       };
-      if (rev.reabrePrestamo) {
-        prestamoUpdate.fechaCierre = FieldValue.delete();
-        prestamoUpdate.cerradoPor = FieldValue.delete();
+      if (esUltimoPagoTx) {
+        prestamoUpdate.adelantoCuota = rev.nuevoAdelantoCuota;
+        prestamoUpdate.estado = rev.nuevoEstadoPrestamo;
+        prestamoUpdate.intentosFallidos = rev.intentosFallidosRestaurados;
+        prestamoUpdate.ultimoPagoFecha = ultimoPagoFechaAnteriorTx ?? FieldValue.delete();
+        prestamoUpdate.ultimoPagoId = pago.ultimoPagoIdAnterior ?? FieldValue.delete();
+        if (reabrePrestamo) {
+          prestamoUpdate.fechaCierre = FieldValue.delete();
+          prestamoUpdate.cerradoPor = FieldValue.delete();
+        }
       }
       tx.update(prestamoRef, prestamoUpdate);
 
@@ -527,7 +517,7 @@ async function postHandler(
         aplicarDeltaJornadaEnTx(tx, jornadaSnap, -pago.monto);
       }
 
-      if (rev.reabrePrestamo) {
+      if (reabrePrestamo) {
         const clienteId = typeof pr.clienteId === "string" ? pr.clienteId.trim() : "";
         if (clienteId) {
           const clienteRef = db
@@ -545,7 +535,7 @@ async function postHandler(
           : apiUser.uid;
       const deltaContador = deltaTotalPrestamosActivosPorCambioEstado({
         estadoAntes: prestamo.estado,
-        estadoDespues: rev.nuevoEstadoPrestamo,
+        estadoDespues: esUltimoPagoTx ? rev.nuevoEstadoPrestamo : prestamo.estado,
       });
       if (deltaContador !== 0) {
         tx.set(
@@ -592,10 +582,10 @@ async function postHandler(
 
       return {
         rutaId,
-        reabrePrestamo: rev.reabrePrestamo,
+        reabrePrestamo,
         adminId: adminIdPrestamo,
         modo,
-        nuevoSaldoPendiente: rev.nuevoSaldoPendiente,
+        nuevoSaldoPendiente: saldoPendienteAnulado,
         cuotaCapital: pago.cuotaCapital,
         cuotaGanancia: pago.cuotaGanancia,
         acreditaCajaRuta: pago.acreditaCajaRuta,

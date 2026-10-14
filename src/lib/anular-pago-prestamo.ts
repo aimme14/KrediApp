@@ -14,6 +14,7 @@ export type AnulacionElegibilidadError =
   | "PAGO_NO_ACTIVO"
   | "PAGO_TIPO_INVALIDO"
   | "PAGO_FUERA_DE_PERIODO_ABIERTO"
+  | "PAGO_EN_PERIODO_CERRADO"
   | "PAGO_NO_ES_ULTIMO"
   | "SIN_SNAPSHOTS_NI_FALLBACK"
   | "REPORTE_APROBADO"
@@ -108,11 +109,10 @@ export type DatosEmpleado = {
 
 export function validarElegibilidadAnulacion(params: {
   pago: DatosPago;
-  enPeriodoAbierto: boolean;
-  esUltimoPago: boolean;
+  enPeriodoCerrado: boolean;
   reporteAprobado: boolean;
 }): AnulacionElegibilidadError | null {
-  const { pago, enPeriodoAbierto, esUltimoPago, reporteAprobado } = params;
+  const { pago, enPeriodoCerrado, reporteAprobado } = params;
 
   if (pago.estado !== "activo" && pago.estado !== undefined) {
     return "PAGO_NO_ACTIVO";
@@ -120,16 +120,39 @@ export function validarElegibilidadAnulacion(params: {
   if (pago.tipo !== "pago") {
     return "PAGO_TIPO_INVALIDO";
   }
-  if (!enPeriodoAbierto) {
-    return "PAGO_FUERA_DE_PERIODO_ABIERTO";
-  }
-  if (!esUltimoPago) {
-    return "PAGO_NO_ES_ULTIMO";
+  if (enPeriodoCerrado) {
+    return "PAGO_EN_PERIODO_CERRADO";
   }
   if (reporteAprobado) {
     return "REPORTE_APROBADO";
   }
   return null;
+}
+
+/**
+ * Saldo del préstamo después de anular.
+ * Si el cobro es el último, restaura el saldo anterior.
+ * Si hay cobros posteriores, solo devuelve lo que ese cobro había descontado.
+ */
+export function saldoPendienteTrasAnulacion(params: {
+  saldoActual: number;
+  pago: Pick<DatosPago, "monto" | "saldoPendienteAntes" | "saldoPendienteDespues">;
+  esUltimoPago: boolean;
+  modo: ModoReversion;
+}): number {
+  if (
+    params.esUltimoPago &&
+    params.modo === "snapshots" &&
+    typeof params.pago.saldoPendienteAntes === "number"
+  ) {
+    return round2(Math.max(0, params.pago.saldoPendienteAntes));
+  }
+  const delta =
+    typeof params.pago.saldoPendienteAntes === "number" &&
+    typeof params.pago.saldoPendienteDespues === "number"
+      ? round2(params.pago.saldoPendienteAntes - params.pago.saldoPendienteDespues)
+      : params.pago.monto;
+  return round2(Math.max(0, params.saldoActual + Math.max(0, delta)));
 }
 
 /**
@@ -255,6 +278,8 @@ export function mensajeElegibilidad(error: AnulacionElegibilidadError): string {
       return "Solo se pueden anular cobros registrados como pago.";
     case "PAGO_FUERA_DE_PERIODO_ABIERTO":
       return "Solo se pueden anular cobros del periodo contable abierto. Cierra el periodo solo cuando ya no necesites corregir cobros.";
+    case "PAGO_EN_PERIODO_CERRADO":
+      return "Este cobro pertenece a un periodo contable cerrado. No se puede anular.";
     case "PAGO_NO_ES_ULTIMO":
       return "No se puede anular este pago porque hay cobros posteriores en el mismo préstamo. Anula primero el cobro más reciente.";
     case "SIN_SNAPSHOTS_NI_FALLBACK":

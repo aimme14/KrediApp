@@ -3,7 +3,9 @@ import {
   esGastoDelDiaColombia,
   filtrarGastosPorFiltroContable,
   filtrarGastosPorPeriodo,
+  pagoCaeEnPeriodoCerrado,
 } from "@/lib/gastos-periodo-filter";
+import type { PeriodoAdminListaItem } from "@/lib/empresa-api";
 import { inicioDiaColombiaUtc } from "@/lib/colombia-day-bounds";
 
 const HOY = "2026-06-08";
@@ -115,5 +117,31 @@ describe("filtro contable admin", () => {
   it("calcula totales por alcance", () => {
     const tot = calcularTotalesGastosPorAlcance(gastos);
     expect(tot).toEqual({ admin: 100, ruta: 50, empleado: 20, total: 170 });
+  });
+});
+
+describe("pagoCaeEnPeriodoCerrado", () => {
+  const cerrado: PeriodoAdminListaItem = {
+    id: "p1",
+    estado: "cerrado",
+    fechaApertura: "2026-06-20T21:16:00.000Z",
+    fechaCierre: "2026-06-30T01:01:00.000Z",
+    abiertoPorUid: "admin",
+    cerradoPorUid: "admin",
+  };
+  const abierto: PeriodoAdminListaItem = {
+    id: "p2",
+    estado: "abierto",
+    fechaApertura: "2026-07-01T19:47:00.000Z",
+    fechaCierre: null,
+    abiertoPorUid: "admin",
+    cerradoPorUid: null,
+  };
+
+  it("bloquea un cobro dentro del periodo cerrado y deja pasar el resto", () => {
+    expect(pagoCaeEnPeriodoCerrado("2026-06-25T15:00:00.000Z", [cerrado, abierto])).toBe(true);
+    expect(pagoCaeEnPeriodoCerrado("2026-07-10T15:00:00.000Z", [cerrado, abierto])).toBe(false);
+    expect(pagoCaeEnPeriodoCerrado("2026-06-25T15:00:00.000Z", [])).toBe(false);
+    expect(pagoCaeEnPeriodoCerrado("2026-07-10T15:00:00.000Z", [abierto])).toBe(false);
   });
 });
